@@ -3,6 +3,11 @@
 const state = {model:null,capabilities:null,scenarioData:null,selected:null,tab:'1d',step:0,scenario:null,disabled:new Set(),prototype:0};
 const $ = s => document.querySelector(s);
 const svgNS = 'http://www.w3.org/2000/svg';
+/* Canonical field accessors. 0.2.0 uses sourceId/targetId/type; 0.1.x models
+   used source/target/kind. Both are accepted so old generated sites keep working. */
+const esrc = e => e.sourceId ?? e.source;
+const etgt = e => e.targetId ?? e.target;
+const etype = e => e.type ?? e.kind;
 function node(tag, cls, parent, value){const el=document.createElement(tag);if(cls)el.className=cls;if(value!==undefined)el.textContent=String(value);if(parent)parent.appendChild(el);return el;}
 function svg(tag,parent,props={},value){const el=document.createElementNS(svgNS,tag);Object.entries(props).forEach(([k,v])=>el.setAttribute(k,String(v)));if(value!==undefined)el.textContent=String(value);parent.appendChild(el);return el;}
 function clear(el){el.replaceChildren();return el;}
@@ -22,16 +27,16 @@ function renderInspector(){const area=clear($('#detail'));let n=current().nodes.
  if(!n){node('p','muted small',area,'在 2D 图中单击实体以查看其属性和关系。');return;}
  node('h2','',area,n.name);const dl=node('dl','kv',area);
  for(const [k,v] of [['ID',n.id],['类型',n.kind||'未知'],['层级',n.layer||'未定义'],['核验',n.verification||'unknown'],['证据',n.evidence||'未提供']]){node('dt','',dl,k);node('dd','',dl,v)}
- const neighbors=current().edges.filter(e=>e.source===n.id||e.target===n.id);
- node('p','section-title',area,'RELATIONS');for(const e of neighbors)text(area,e.id,(e.source+' → '+e.target));
+ const neighbors=current().edges.filter(e=>esrc(e)===n.id||etgt(e)===n.id);
+ node('p','section-title',area,'RELATIONS');for(const e of neighbors)text(area,e.id,(esrc(e)+' → '+etgt(e)));
 }
 function render1D(el){head(current().meta.system,'1D / LINEAR FACTS');const about=panel(el,'系统资料');text(about,'系统名称',current().meta.system);text(about,'说明',current().meta.description);text(about,'事实状态',current().meta.evidenceState);
  const cards=node('div','facts',el);current().nodes.forEach(n=>{const div=node('div','fact',cards);node('h3','',div,n.name);node('small','',div,n.id+' · '+(n.kind||'未知类型'));text(div,'证据',n.evidence||'未提供');button(div,'定位关系',()=>{state.selected=n.id;showTab('2d')})});
  const views=panel(el,'架构 View / 关注点');current().views.forEach(v=>{text(views,v.title||v.id,(v.concerns||[]).join('、')||'尚未定义')});
 }
-function graphLayout(nodes,edges){const ranks=new Map(nodes.map(n=>[n.id,0]));const edgeset=edges.filter(e=>ranks.has(e.source)&&ranks.has(e.target));
+function graphLayout(nodes,edges){const ranks=new Map(nodes.map(n=>[n.id,0]));const edgeset=edges.filter(e=>ranks.has(esrc(e))&&ranks.has(etgt(e)));
  // Fixed number of relaxation passes; cyclic graphs remain safe and bounded.
- for(let i=0;i<nodes.length;i++){let changed=false;for(const e of edgeset){let d=Math.min(nodes.length-1,(ranks.get(e.source)||0)+1);if(d>(ranks.get(e.target)||0)){ranks.set(e.target,d);changed=true;}}if(!changed)break;}
+ for(let i=0;i<nodes.length;i++){let changed=false;for(const e of edgeset){let d=Math.min(nodes.length-1,(ranks.get(esrc(e))||0)+1);if(d>(ranks.get(etgt(e))||0)){ranks.set(etgt(e),d);changed=true;}}if(!changed)break;}
  const buckets=new Map();nodes.forEach(n=>{let rank=ranks.get(n.id)||0;if(!buckets.has(rank))buckets.set(rank,[]);buckets.get(rank).push(n)});
  const pos={};[...buckets].sort((a,b)=>a[0]-b[0]).forEach(([rank,ns])=>ns.forEach((n,i)=>pos[n.id]={x:125+(rank*195),y:90+i*112}));
  return {pos,width:Math.max(740,230+Math.max(0,...ranks.values())*195),height:Math.max(320,...[...buckets.values()].map(v=>v.length*112+50))};
@@ -40,12 +45,12 @@ function render2D(el){head('节点与依赖关系','2D / GRAPH VIEW');const wrap
  const action=node('div','control',wrapper);node('span','muted small',action,'选择 View：');const select=node('select','',action);
  const views=current().views.length?current().views:[{id:'all',title:'全部节点',nodeIds:current().nodes.map(n=>n.id)}];
  views.forEach(v=>{let o=node('option','',select,v.title||v.id);o.value=v.id});const holder=node('div','',wrapper);
- function draw(){clear(holder);const view=views.find(v=>v.id===select.value)||views[0];const nodes=current().nodes.filter(n=>!view.nodeIds||view.nodeIds.includes(n.id));const edges=current().edges.filter(e=>nodes.some(n=>n.id===e.source)&&nodes.some(n=>n.id===e.target)&&(!view.edgeKinds||view.edgeKinds.includes(e.kind)));
+ function draw(){clear(holder);const view=views.find(v=>v.id===select.value)||views[0];const nodes=current().nodes.filter(n=>!view.nodeIds||view.nodeIds.includes(n.id));const edges=current().edges.filter(e=>nodes.some(n=>n.id===esrc(e))&&nodes.some(n=>n.id===etgt(e))&&(!view.edgeKinds||view.edgeKinds.includes(etype(e))));
  const {pos,width,height}=graphLayout(nodes,edges);const root=svg('svg',holder,{viewBox:`0 0 ${width} ${height}`,class:'chart',role:'img','aria-label':'架构节点依赖图'});
  const defs=svg('defs',root);const marker=svg('marker',defs,{id:'arr',markerWidth:10,markerHeight:8,refX:10,refY:4,orient:'auto'});svg('path',marker,{d:'M0,0 L10,4 L0,8 Z',fill:'#5b9bb8'});
- edges.forEach(e=>{const a=pos[e.source],b=pos[e.target];if(!a||!b)return;const focus=state.selected&&(e.source===state.selected||e.target===state.selected);const route=a.x===b.x?`M${a.x+46} ${a.y+15} L${b.x+46} ${b.y-18}`:`M${a.x+74} ${a.y} C${a.x+115} ${a.y} ${b.x-115} ${b.y} ${b.x-74} ${b.y}`;
+ edges.forEach(e=>{const a=pos[esrc(e)],b=pos[etgt(e)];if(!a||!b)return;const focus=state.selected&&(esrc(e)===state.selected||etgt(e)===state.selected);const route=a.x===b.x?`M${a.x+46} ${a.y+15} L${b.x+46} ${b.y-18}`:`M${a.x+74} ${a.y} C${a.x+115} ${a.y} ${b.x-115} ${b.y} ${b.x-74} ${b.y}`;
  svg('path',root,{d:route,class:'edge'+(focus?' focus':''),'marker-end':'url(#arr)'});
- let x=(a.x+b.x)/2,y=(a.y+b.y)/2-10;svg('text',root,{x,y,class:'edge-label','text-anchor':'middle'},e.description||e.kind||e.id);
+ let x=(a.x+b.x)/2,y=(a.y+b.y)/2-10;svg('text',root,{x,y,class:'edge-label','text-anchor':'middle'},e.description||etype(e)||e.id);
  });
  nodes.forEach(n=>{const p=pos[n.id],g=svg('g',root,{class:'node'+(state.selected===n.id?' selected':''),tabindex:0,role:'button','aria-label':n.name});svg('rect',g,{x:p.x-74,y:p.y-28,width:148,height:57,rx:10});svg('text',g,{x:p.x,y:p.y-1,'text-anchor':'middle'},n.name.length>12?n.name.slice(0,11)+'…':n.name);svg('text',g,{x:p.x,y:p.y+17,'text-anchor':'middle',fill:'#9baec9','font-size':10},n.id.length>20?n.id.slice(0,19)+'…':n.id);
  const selectNode=()=>{state.selected=n.id;draw();renderInspector()};g.addEventListener('click',selectNode);g.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();selectNode()}})});

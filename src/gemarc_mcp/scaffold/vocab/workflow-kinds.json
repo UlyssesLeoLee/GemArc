@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "0.2.0",
+  "id": "workflow-kinds",
+  "title": "工作流语义模型词表",
+  "description": "v5.0 提示词 §2.7：工作流不能只是一组可以拖动的框和箭头。每个节点、端口、关系、条件、异常、输入、输出和执行约束必须可被程序及大模型明确理解。",
+  "nodeKinds": [
+    {"id": "task", "label": "任务", "executes": true},
+    {"id": "decision", "label": "判定", "executes": false, "note": "必须声明分支条件"},
+    {"id": "gateway", "label": "网关", "executes": false, "note": "并行/汇聚/排他"},
+    {"id": "start", "label": "开始", "executes": false},
+    {"id": "end", "label": "结束", "executes": false},
+    {"id": "subprocess", "label": "子流程", "executes": true, "note": "必须声明被调用的流程 ID"},
+    {"id": "event", "label": "事件", "executes": false, "note": "必须声明触发条件"},
+    {"id": "data", "label": "数据对象", "executes": false}
+  ],
+  "portKinds": [
+    {"id": "input", "label": "输入"},
+    {"id": "output", "label": "输出"},
+    {"id": "control", "label": "控制"},
+    {"id": "error", "label": "异常"}
+  ],
+  "edgeKinds": [
+    {"id": "sequence", "label": "顺序流", "directed": true},
+    {"id": "conditional", "label": "条件流", "directed": true, "requiresCondition": true},
+    {"id": "message", "label": "消息流", "directed": true},
+    {"id": "association", "label": "关联", "directed": false}
+  ],
+  "executionConstraints": [
+    {"id": "order", "label": "顺序", "note": "源节点完成后目标节点才可执行"},
+    {"id": "exclusive", "label": "互斥", "note": "同一资源上的排他执行"},
+    {"id": "parallel", "label": "并行", "note": "允许多个实例同时运行"},
+    {"id": "timeout", "label": "超时", "note": "必须声明时长与超时后的处理"},
+    {"id": "retry", "label": "重试", "note": "必须声明次数与退避策略"},
+    {"id": "compensation", "label": "补偿", "note": "必须声明失败后的补偿动作"}
+  ],
+  "rules": [
+    "画布坐标、颜色和动画不应决定业务执行语义；所有计算以明确的数据契约为准。",
+    "每个工作流节点必须绑定至少一个 canonical nodeId 或声明为纯流程内部元素。",
+    "条件流必须带可被程序判断的 condition 表达式，不得只写自然语言。"
+  ]
+}

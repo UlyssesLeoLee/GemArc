@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>GemArc · 5D Architecture</title>
+  <link rel="stylesheet" href="./style.css">
+  <!--
+    Optional third-party libraries. The runtime has NO hard dependency on any of
+    them: every adapter takes the library as an argument and falls back to a
+    built-in implementation when it is absent. Remove this import map to run
+    fully offline; the site then shows "未加载" instead of pretending.
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "@gemarc/runtime/": "./runtime/",
+      "three": "https://esm.sh/three@0.180.0",
+      "three/addons/": "https://esm.sh/three@0.180.0/examples/jsm/",
+      "graphology": "https://esm.sh/graphology@2.6.1",
+      "@dagrejs/dagre": "https://esm.sh/@dagrejs/dagre@1.1.4",
+      "dexie": "https://esm.sh/dexie@4.0.11",
+      "sigma": "https://esm.sh/sigma@3.0.0"
+    }
+  }
+  </script>
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="gem">◆</span><span>GemArc</span><small>5D Architecture</small></div>
+    <div id="evidence" class="tag">正在载入</div>
+  </header>
+  <main>
+    <aside class="sidebar">
+      <p class="section-title">维度 / DIMENSIONS</p>
+      <nav id="nav">
+        <button data-tab="1d" class="active"><span>01</span> 1D 文字 / Facts</button>
+        <button data-tab="2d"><span>02</span> 2D 图论 / Graph</button>
+        <button data-tab="3d"><span>03</span> 3D 空间 / Space</button>
+        <button data-tab="4d"><span>04</span> 4D 动态 / Time</button>
+        <button data-tab="5d"><span>05</span> 5D 因果 / Causality</button>
+        <button data-tab="views"><span>06</span> 图示 / Views</button>
+        <button data-tab="workflow"><span>UI</span> 工作流 / Workflow</button>
+      </nav>
+      <div class="side-foot" id="view-picker"></div>
+    </aside>
+    <section class="mainpane">
+      <div class="heading">
+        <div><div id="kicker" class="kicker">ARCHITECTURE MODEL</div><h1 id="headline">5D Architecture</h1></div>
+        <div id="view-actions"></div>
+      </div>
+      <div id="content"></div>
+    </section>
+    <aside class="inspector">
+      <p class="section-title">INSPECTOR / 证据详情</p>
+      <div id="detail">选择节点或关系查看关联信息</div>
+      <div class="side-foot">界面仅展示模型数据；未经核实的项目事实不得视为真实证据。</div>
+    </aside>
+  </main>
+  <footer id="footer">GemArc · Static Profile · 零构建原生 ESM</footer>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

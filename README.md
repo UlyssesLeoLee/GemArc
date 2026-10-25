@@ -72,6 +72,57 @@ Claude Code、Codex、Cursor 和其他 MCP Host 的配置容器键名可能不�
 
 **安全提示**：写权限仅应由本地用户在可信配置中授权。设置 `GEMARC_ALLOW_WRITE=1` 后，允许当前 MCP 客户端调用写入工具；生产环境应增加按调用授权、审计和隔离策略。不要将服务无认证直接暴露到公网。
 
+## 5D 脚手架（固定格式 + 共用代码）
+
+本 MCP 的主要用途是**提供制作 5D 设计的脚手架**：把「可被写死的东西」从大模型手里拿走，
+模型只填事实。脚手架包含三层固定件：
+
+| 层 | 内容 | 位置 |
+|---|---|---|
+| 契约层 | 8 份 JSON Schema（Canonical Model / Node / Edge / Evidence / Space / View / Scenario / Workflow） | `src/gemarc_mcp/scaffold/contracts/` |
+| 词表层 | 6 级证据等级、21 种实体类型、21 种关系类型、19 种图示类型、相关性分级、空间层级、Case 分类 | `src/gemarc_mcp/scaffold/vocab/` |
+| 运行层 | 图引擎、Focus 退避、3D 空间、4D/5D 仿真、跨视图状态、工作流语义、互操作适配器 | `src/gemarc_mcp/scaffold/runtime/` |
+
+词表是**提示词、Python 校验器、浏览器运行时三方共用的唯一事实源**；
+浏览器侧读取由同一份 JSON 生成的模块，漂移会被 `tests/test_scaffold_vocab.py` 直接拦下。
+
+### 使用流程
+
+```powershell
+# 1. 生成脚手架：固定件 + 待填槽位
+E:\GemArc\.venv\Scripts\python.exe -m gemarc_mcp.cli scaffold demo --profile static
+
+# 2. 填写 <workspace>/demo/model/architecture.json
+#    槽位清单在 demo/scaffold/scaffold-manifest.json 与 FILL-IN.md 里
+#    每个槽位都写明了 JSON Pointer、填什么、以及约束它的规则
+
+# 3. 校验
+E:\GemArc\.venv\Scripts\python.exe -m gemarc_mcp.cli validate demo --strict
+
+# 4. 产出站点
+E:\GemArc\.venv\Scripts\python.exe -m gemarc_mcp.cli build demo --profile static
+```
+
+对应的 MCP 工具是 `gemarc.scaffold` 与 `gemarc.contracts`（后者可读取契约与词表内容）。
+
+### 两种交付 profile，共用一份源码
+
+| profile | 模块解析 | 依赖 | 启动 |
+|---|---|---|---|
+| `static` | import map | 无（可选库走 CDN 或本地 vendor） | `python -m http.server 8000` |
+| `vite` | Vite alias | npm 安装 three / graphology / dagre / dexie / sigma | `npm install && npm run dev` |
+
+应用源码用与 profile 无关的 `@gemarc/runtime/...` 导入，因此不会出现两份实现漂移。
+
+### 4D/5D 仿真内核：两端同构
+
+仿真存在两份实现：Python（`simulation.py`，MCP 工具的权威）与 JavaScript（浏览器侧，
+让动画真的由计算驱动）。两份实现会漂移，所以有**黄金用例**：
+`src/gemarc_mcp/scaffold/cases/simulation-golden.json` 保存 8 个场景的逐字预期输出，
+`tests/test_sim_consistency.py` 用 Node 跑同一批用例并要求逐字相等。
+
+设计细节见 `docs/02_基本设计/09_脚手架与共用运行时设计.md`。
+
 ## 远程端点（Vercel）
 
 仓库自带一个 Vercel 部署形态：单个 Python Function 同时提供 MCP Streamable HTTP 端点与 5D 静态站。

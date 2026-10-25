@@ -23,18 +23,18 @@ def sample_model(name: str) -> dict:
     return {"meta": {"system": name, "schemaVersion": "0.1.0", "version": "0.1.0", "language": "zh-CN",
                      "evidenceState": "illustrative", "description": "示例模型，非真实工程事实"},
             "nodes": [
-                {"id": "sensor", "name": "事件源", "kind": "adapter", "layer": "设备层", "verification": "illustrative", "evidence": "示例"},
-                {"id": "queue", "name": "消息队列", "kind": "service", "layer": "中间件层", "verification": "illustrative", "evidence": "示例"},
-                {"id": "rule", "name": "规则引擎", "kind": "service", "layer": "应用层", "verification": "illustrative", "evidence": "示例"},
-                {"id": "notify", "name": "通知服务", "kind": "service", "layer": "应用层", "verification": "illustrative", "evidence": "示例"}
+                {"id": "sensor", "name": "事件源", "kind": "Component", "layer": "设备层", "verification": "illustrative", "evidence": "示例"},
+                {"id": "queue", "name": "消息队列", "kind": "Service", "layer": "中间件层", "verification": "illustrative", "evidence": "示例"},
+                {"id": "rule", "name": "规则引擎", "kind": "Service", "layer": "应用层", "verification": "illustrative", "evidence": "示例"},
+                {"id": "notify", "name": "通知服务", "kind": "Service", "layer": "应用层", "verification": "illustrative", "evidence": "示例"}
             ],
             "edges": [
-                {"id": "e1", "source": "sensor", "target": "queue", "kind": "event", "description": "上传事件", "verification": "illustrative", "evidence": "示例"},
-                {"id": "e2", "source": "queue", "target": "rule", "kind": "event", "description": "传递事件", "verification": "illustrative", "evidence": "示例"},
-                {"id": "e3", "source": "rule", "target": "notify", "kind": "event", "description": "规则触发通知", "verification": "illustrative", "evidence": "示例"}
+                {"id": "e1", "sourceId": "sensor", "targetId": "queue", "type": "sends", "description": "上传事件", "verification": "illustrative", "evidence": "示例"},
+                {"id": "e2", "sourceId": "queue", "targetId": "rule", "type": "sends", "description": "传递事件", "verification": "illustrative", "evidence": "示例"},
+                {"id": "e3", "sourceId": "rule", "targetId": "notify", "type": "sends", "description": "规则触发通知", "verification": "illustrative", "evidence": "示例"}
             ],
-            "views": [{"id": "logical", "title": "逻辑架构", "stakeholders": ["架构师"], "concerns": ["事件依赖"],
-                       "nodeIds": ["sensor", "queue", "rule", "notify"], "edgeKinds": ["event"], "reviewIntent": "识别单点故障"}],
+            "views": [{"id": "logical", "title": "逻辑架构", "diagramType": "logical-view", "stakeholders": ["架构师"], "concerns": ["事件依赖"],
+                       "nodeIds": ["sensor", "queue", "rule", "notify"], "edgeKinds": ["sends"], "reviewIntent": "识别单点故障"}],
             "scenarios": [{"id": "normal", "name": "示例：正常事件传播", "evidenceClass": "hypothetical",
                            "events": [{"module": "sensor", "event": "emit", "timeMs": 0}],
                            "rules": [
@@ -125,6 +125,71 @@ def assets(query: str = "") -> dict:
     return data
 
 
+def contracts(query: str = "") -> dict:
+    """Read-only view of the fixed contracts and vocabularies."""
+    from .scaffold import builder, sync
+
+    payload = {
+        "status": "ok",
+        "schemaVersion": "0.2.0",
+        "vocabDigest": sync.vocab_digest(),
+        "contracts": sorted(p.name for p in builder.CONTRACTS_DIR.glob("*.json")),
+        "vocabularies": sorted(p.name for p in builder.VOCAB_DIR.glob("*.json")),
+        "profiles": list(builder.PROFILES),
+        "slots": [{"id": s["id"], "pointer": s["pointer"], "what": s["what"],
+                   "required": s["required"], "rule": s["rule"]} for s in builder.SLOTS],
+    }
+    if query:
+        target = builder.CONTRACTS_DIR / query
+        if not target.is_file():
+            target = builder.VOCAB_DIR / query
+        if not target.is_file():
+            raise GemArcError("GEMARC_CONTRACT_001", f"未找到契约文件: {query}")
+        payload["document"] = json.loads(target.read_text(encoding="utf-8"))
+    return payload
+
+
+def scaffold_project(ws: Workspace, name: str, profile: str = "static") -> dict:
+    """Materialise the fixed parts plus the fill-in slots for a project.
+
+    The scaffold owns the project directory: it creates the project, writes the
+    empty model the caller has to fill, and drops the contracts, the vocabulary
+    and the shared runtime next to it.
+    """
+    from .scaffold import builder
+
+    ws.writable()
+    if profile not in builder.PROFILES:
+        raise GemArcError("GEMARC_SCAFFOLD_001", f"未知的 profile: {profile}")
+    project = ws.project(name)
+    scaffold_dir = ws.path(project / "scaffold")
+    manifest_path = scaffold_dir / "scaffold-manifest.json"
+    if manifest_path.exists():
+        raise GemArcError("GEMARC_SCAFFOLD_002", "脚手架已存在；拒绝覆盖")
+    project.mkdir(parents=True, exist_ok=True)
+
+    model_path = ws.path(project / "model" / "architecture.json")
+    if not model_path.exists():
+        atomic_json(model_path, builder.model_template(name))
+    if not ws.path(project / "gemarc.lock.json").exists():
+        atomic_json(ws.path(project / "gemarc.lock.json"),
+                    {"schemaVersion": "0.2.0", "registry": "0.2.0", "generator": "0.2.0"})
+
+    manifest = builder.build_scaffold(scaffold_dir, name, profile)
+    return {
+        "status": "ok",
+        "project": name,
+        "profile": profile,
+        "scaffold": str(scaffold_dir),
+        "manifest": str(manifest_path),
+        "model": str(model_path),
+        "slots": [slot["id"] for slot in manifest["slots"]],
+        "fixedFileCount": sum(len(files) for files in manifest["fixed"].values()),
+        "commands": manifest["commands"],
+        "notice": "固定件已就位；填写 model/architecture.json 的槽位后运行 gemarc.build",
+    }
+
+
 def replace_model(ws: Workspace, name: str, value: dict, expected_sha256: str) -> dict:
     ws.writable()
     filename, previous = load_model(ws, name)
@@ -143,6 +208,7 @@ def replace_model(ws: Workspace, name: str, value: dict, expected_sha256: str) -
 def diff(ws: Workspace, before: str, after: str) -> dict:
     bfile, b = load_model(ws, before)
     afile, a = load_model(ws, after)
+    b, a = normalized_model(b), normalized_model(a)
     def changed(kind):
         old = {e["id"]: e for e in b.get(kind, []) if isinstance(e, dict) and "id" in e}
         new = {e["id"]: e for e in a.get(kind, []) if isinstance(e, dict) and "id" in e}
@@ -152,14 +218,19 @@ def diff(ws: Workspace, before: str, after: str) -> dict:
     e = changed("edges")
     impacted = set(n["added"] + n["removed"] + n["modified"])
     for edge in a.get("edges", []) + b.get("edges", []):
-        if edge.get("source") in impacted or edge.get("target") in impacted or edge.get("id") in e["modified"]:
-            impacted.update([edge.get("source"), edge.get("target")])
+        if edge.get("sourceId") in impacted or edge.get("targetId") in impacted or edge.get("id") in e["modified"]:
+            impacted.update([edge.get("sourceId"), edge.get("targetId")])
     return {"status": "ok", "baseSha256": digest(bfile), "targetSha256": digest(afile),
             "nodes": n, "edges": e, "affectedNodes": sorted(impacted - {None})}
 
 
-def build(ws: Workspace, name: str, legacy_dist: str | None = None) -> dict:
+BUILD_PROFILES = ("mvp", "static", "vite")
+
+
+def build(ws: Workspace, name: str, legacy_dist: str | None = None, profile: str = "mvp") -> dict:
     ws.writable()
+    if profile not in BUILD_PROFILES:
+        raise GemArcError("GEMARC_BUILD_005", f"未知的 build profile: {profile}")
     folder, model = load_model(ws, name)
     result = validate(model)
     if result["status"] != "ok":
@@ -168,16 +239,21 @@ def build(ws: Workspace, name: str, legacy_dist: str | None = None) -> dict:
     dist = ws.path(project / "site")
     stage = Path(tempfile.mkdtemp(prefix=".gemarc-build-", dir=project))
     try:
-        source = resources.files("gemarc_mcp").joinpath("web")
-        for filename in ("index.html", "app.js", "style.css"):
-            stage.joinpath(filename).write_bytes(source.joinpath(filename).read_bytes())
-        (stage / "data").mkdir()
-        atomic_json(stage / "data" / "architecture.json", model)
+        canonical = normalized_model(model)
         precomputed = {}
         for sc in model.get("scenarios", []):
             precomputed[sc["id"]] = {"normal": simulate(model, sc["id"]),
                                      "disabledSample": compare(model, sc["id"], [model["nodes"][0]["id"]]) if model["nodes"] else None}
-        atomic_json(stage / "data" / "scenarios.json", precomputed)
+        if profile == "mvp":
+            source = resources.files("gemarc_mcp").joinpath("web")
+            for filename in ("index.html", "app.js", "style.css"):
+                stage.joinpath(filename).write_bytes(source.joinpath(filename).read_bytes())
+            (stage / "data").mkdir()
+            atomic_json(stage / "data" / "architecture.json", canonical)
+            atomic_json(stage / "data" / "scenarios.json", precomputed)
+        else:
+            from .scaffold import builder
+            builder.build_site(stage, canonical, profile, precomputed, None)
         has_3d = False
         if legacy_dist:
             src = ws.path(legacy_dist)
@@ -196,7 +272,8 @@ def build(ws: Workspace, name: str, legacy_dist: str | None = None) -> dict:
             "viewer2D": "implemented", "viewer3D": "supplied_compiled_legacy_viewer" if has_3d else "not_available",
             "dynamic4D": "model_driven_mvp" if model.get("scenarios") else "no_data",
             "causal5D": "explicit_rule_mvp" if model.get("scenarios") else "no_data",
-            "prototype": "basic_tabs", "evidenceState": model.get("meta", {}).get("evidenceState", "unknown")})
+            "prototype": "basic_tabs", "evidenceState": model.get("meta", {}).get("evidenceState", "unknown"),
+            "profile": profile})
         if dist.exists():
             # No destructive overwrite of a user-owned non-generated folder.
             if not (dist / "data" / "capabilities.json").is_file():
@@ -213,8 +290,12 @@ def build(ws: Workspace, name: str, legacy_dist: str | None = None) -> dict:
             shutil.rmtree(backup)
         else:
             stage.rename(dist)
+        commands = {"mvp": "python -m http.server 8000 --bind 127.0.0.1",
+                    "static": "python -m http.server 8000 --bind 127.0.0.1",
+                    "vite": "npm install && npm run dev"}[profile]
         return {"status": "ok", "site": str(dist), "index": str(dist / "index.html"),
-                "viewer3D": has_3d, "validation": result,
+                "profile": profile, "viewer3D": has_3d, "validation": result,
+                "run": commands,
                 "notice": "4D/5D 是显式规则模拟 MVP；未进行真实浏览器/WebGL 测试"}
     finally:
         if stage.exists():
@@ -227,13 +308,32 @@ def verify(ws: Workspace, name: str) -> dict:
     missing = [p for p in required if not (site/p).is_file()]
     if missing:
         return {"status": "invalid", "missing": missing, "check": "filesystem_only"}
+    capabilities = read_json(site/"data/capabilities.json")
+    profile = capabilities.get("profile", "mvp")
+    if profile in ("static", "vite"):
+        # The full profiles ship the shared runtime; without it the site cannot
+        # resolve a single module, so a missing runtime is a hard failure.
+        for extra in ("runtime/core/model.js", "runtime/core/vocab-data.js",
+                      "runtime/graph/graph-store.js", "runtime/sim/index.js"):
+            if not (site/extra).is_file():
+                missing.append(extra)
+        if profile == "vite":
+            for extra in ("package.json", "vite.config.js", "src/main.js"):
+                if not (site/extra).is_file():
+                    missing.append(extra)
     model = read_json(site/"data/architecture.json")
     data = validate(model)
     content = (site/"index.html").read_text(encoding="utf-8")
-    if not all(word in content for word in ("app.js", "style.css", "GemArc")):
+    if profile == "vite":
+        # The vite entry point pulls the shared app and styles in from src/main.js.
+        expected_refs = ("src/main.js", "GemArc")
+    else:
+        expected_refs = ("app.js", "style.css", "GemArc")
+    if not all(word in content for word in expected_refs):
         missing.append("HTML 静态资源引用")
     return {"status": "ok" if not missing and data["status"] == "ok" else "invalid",
-            "missing": missing, "model": data, "check": "filesystem_and_schema_only",
+            "missing": missing, "model": data, "profile": profile,
+            "check": "filesystem_and_schema_only",
             "notExecuted": ["WebGL 渲染", "浏览器交互", "帧率性能", "许可证复核"]}
 
 

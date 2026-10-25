@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gemarc.dev/schemas/0.2.0/edge.schema.json",
+  "title": "Canonical Edge",
+  "description": "v5.0 提示词 §4.2 Edge Schema。sourceId/targetId 为权威字段；旧模型的 source/target 被接受并归一化。必须支持有向、无向、多重边、自环、有类型、条件边。",
+  "type": "object",
+  "required": ["id", "sourceId", "targetId", "type"],
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$"
+    },
+    "sourceId": {
+      "type": "string",
+      "description": "源节点 ID，必须存在于 nodes 中"
+    },
+    "targetId": {
+      "type": "string",
+      "description": "目标节点 ID，必须存在于 nodes 中"
+    },
+    "type": {
+      "type": "string",
+      "description": "关系类型，取值见 vocab/edge-types.json；未登记的类型必须被拒绝",
+      "enum": [
+        "contains", "belongsTo", "composes", "aggregates", "dependsOn", "imports",
+        "calls", "implements", "inherits", "transitions", "triggers",
+        "reads", "writes", "owns",
+        "publishes", "subscribes", "sends", "receives",
+        "constrains", "evidences", "derivesFrom"
+      ]
+    },
+    "directed": {
+      "type": "boolean",
+      "default": true,
+      "description": "false 表示无向边，渲染与查询都必须按无向处理"
+    },
+    "condition": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "成立条件。必须可被程序判断，不得只写自然语言。空字符串视同 null。"
+    },
+    "weight": {
+      "type": ["number", "null"],
+      "default": null,
+      "description": "关系权重。用于影响面排序或路径代价。"
+    },
+    "properties": {"type": "object", "default": {}},
+    "evidenceIds": {
+      "type": "array",
+      "items": {"type": "string"},
+      "default": []
+    },
+    "verification": {
+      "type": "string",
+      "enum": [
+        "Implemented", "Observed", "Designed", "Inferred", "Hypothetical", "Unknown",
+        "confirmed", "observed", "designed", "assumed", "inferred", "illustrative", "hypothetical", "unknown"
+      ]
+    },
+    "trustBoundary": {
+      "type": ["boolean", "null"],
+      "default": null,
+      "description": "跨信任域标记。null 表示未判定；true 时渲染必须使用区别样式并在详情中标注。"
+    },
+    "spaceSpan": {
+      "type": ["object", "null"],
+      "default": null,
+      "description": "跨空间关系类型，取值见 vocab/space-levels.json crossSpaceRelations",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["same-room", "cross-room", "cross-floor", "cross-building"]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"type": {"enum": ["calls", "triggers", "sends", "transitions"]}}},
+      "then": {"properties": {"condition": {"type": ["string", "null"]}}}
+    }
+  ]
+}

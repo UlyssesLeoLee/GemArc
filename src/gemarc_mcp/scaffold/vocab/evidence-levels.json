@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "0.2.0",
+  "id": "evidence-levels",
+  "title": "事实等级词表",
+  "description": "v5.0 提示词 §3.2 定义的 6 级事实等级。canonical 为权威值；legacyAliases 用于兼容 0.1.x 模型的 confirmed/assumed/illustrative/unknown。",
+  "canonical": [
+    {
+      "id": "Implemented",
+      "label": "已实现",
+      "rank": 6,
+      "meaning": "代码确认存在",
+      "assertion": "可作为已实现功能陈述",
+      "requiresEvidence": true
+    },
+    {
+      "id": "Observed",
+      "label": "已观测",
+      "rank": 5,
+      "meaning": "执行或测试已观测",
+      "assertion": "可作为已发生行为陈述",
+      "requiresEvidence": true
+    },
+    {
+      "id": "Designed",
+      "label": "已设计",
+      "rank": 4,
+      "meaning": "设计明确描述",
+      "assertion": "只能陈述为设计意图，不得表述为已实现",
+      "requiresEvidence": true
+    },
+    {
+      "id": "Inferred",
+      "label": "已推断",
+      "rank": 3,
+      "meaning": "有依据的推断",
+      "assertion": "必须同时给出推断依据",
+      "requiresEvidence": true
+    },
+    {
+      "id": "Hypothetical",
+      "label": "假设",
+      "rank": 2,
+      "meaning": "明确的模拟假设",
+      "assertion": "不得表述为真实生产行为",
+      "requiresEvidence": false
+    },
+    {
+      "id": "Unknown",
+      "label": "未知",
+      "rank": 1,
+      "meaning": "证据不足",
+      "assertion": "必须在界面上显式标注为未知",
+      "requiresEvidence": false
+    }
+  ],
+  "legacyAliases": {
+    "confirmed": "Implemented",
+    "observed": "Observed",
+    "designed": "Designed",
+    "assumed": "Inferred",
+    "inferred": "Inferred",
+    "illustrative": "Hypothetical",
+    "hypothetical": "Hypothetical",
+    "unknown": "Unknown"
+  },
+  "rules": [
+    "Implemented 不自动等于 Observed：代码存在只证明已实现，不证明运行时行为。",
+    "不能将 Designed 当作已经实现。",
+    "不能将 Hypothetical 当作真实生产行为。",
+    "strict 校验要求节点与边的等级 rank >= 5（Implemented 或 Observed）且存在证据引用。"
+  ]
+}

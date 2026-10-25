@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "0.2.0",
+  "id": "relation-classes",
+  "title": "Focus–Context 相关性分级",
+  "description": "v5.0 提示词 §7.2 定义的 4 个相关性等级。相关性依赖图连通性、边类型、路径归属、空间归属、事件传播、因果子图、工作流依赖与当前 Case。禁止仅根据三维空间距离推断业务相关性。",
+  "classes": [
+    {
+      "id": "Selected",
+      "label": "已选中",
+      "rank": 4,
+      "visual": {"opacity": 1.0, "outline": "strong", "labels": "full", "lineWeight": "normal", "zOffset": "front"},
+      "rule": "当前焦点对象本身"
+    },
+    {
+      "id": "Directly Related",
+      "label": "直接相关",
+      "rank": 3,
+      "visual": {"opacity": 1.0, "outline": "normal", "labels": "full", "lineWeight": "normal", "zOffset": "none"},
+      "rule": "与焦点存在直接边、路径成员、同房间归属，或被事件/因果规则直接触达"
+    },
+    {
+      "id": "Contextually Related",
+      "label": "上下文相关",
+      "rank": 2,
+      "visual": {"opacity": 0.45, "outline": "weak", "labels": "collapsed", "lineWeight": "thin", "zOffset": "none"},
+      "rule": "在限定跳数内可达但不直接相连；或属于当前 Case / 场景作用域"
+    },
+    {
+      "id": "Unrelated",
+      "label": "无关",
+      "rank": 1,
+      "visual": {"opacity": 0.12, "outline": "none", "labels": "hidden", "lineWeight": "hairline", "zOffset": "back"},
+      "rule": "不满足以上任何判定"
+    }
+  ],
+  "invariants": [
+    "退避属于可逆的展示变换，不得修改真实架构坐标、事实关系或工作流执行语义。",
+    "Selected 与 Directly Related 不得被折叠或隐藏标签。",
+    "恢复后不得残留错误透明度或位置。",
+    "快速连续点击必须可以取消尚未完成的过渡动画。"
+  ]
+}

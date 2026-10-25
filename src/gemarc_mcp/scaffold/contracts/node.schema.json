@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gemarc.dev/schemas/0.2.0/node.schema.json",
+  "title": "Canonical Node",
+  "description": "v5.0 提示词 §4.1 Node Schema。字段与提示词一致；spaceRef / attributes / methods / visibility 为扩展字段，缺失时界面必须标注为缺失而不得伪造。",
+  "type": "object",
+  "required": ["id", "kind", "name", "verification"],
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$",
+      "description": "稳定 ID。跨视图、跨 Case、跨工作流引用都必须用它。"
+    },
+    "kind": {
+      "type": "string",
+      "description": "实体类型，取值见 vocab/entity-kinds.json",
+      "$ref": "#/$defs/kind"
+    },
+    "name": {"type": "string", "minLength": 1},
+    "properties": {
+      "type": "object",
+      "description": "自由属性。已登记的键必须来自 model-contract 的保留词表，不得用于存放业务语义。",
+      "default": {}
+    },
+    "parentId": {
+      "type": ["string", "null"],
+      "description": "所属容器节点 ID。null 表示顶层。",
+      "default": null
+    },
+    "role": {
+      "type": ["string", "null"],
+      "description": "节点在容器内的角色，例如 Processor / Store / Gateway",
+      "default": null
+    },
+    "domainId": {
+      "type": ["string", "null"],
+      "description": "所属业务域/子域 ID，用于分组过滤",
+      "default": null
+    },
+    "evidenceIds": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "证据 ID 列表，引用顶层 evidence 数组",
+      "default": []
+    },
+    "verification": {
+      "type": "string",
+      "description": "事实等级，取值见 vocab/evidence-levels.json。旧值 confirmed/assumed/illustrative 仍被接受但必须归一化。",
+      "$ref": "#/$defs/verification"
+    },
+    "spaceRef": {
+      "type": ["object", "null"],
+      "description": "三维空间归属。缺失表示该节点未参与 Building–Floor–Room 布局。",
+      "default": null,
+      "properties": {
+        "buildingId": {"type": ["string", "null"]},
+        "floorId": {"type": ["string", "null"]},
+        "roomId": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "attributes": {
+      "type": "array",
+      "description": "UML/ER 保真字段。仅当节点被该图示类型选中时才可非空。",
+      "default": [],
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {"type": "string"},
+          "type": {"type": ["string", "null"]},
+          "visibility": {"type": "string", "enum": ["public", "protected", "private", "package"]},
+          "primaryKey": {"type": "boolean", "default": false},
+          "foreignKey": {"type": ["string", "null"], "default": null},
+          "nullable": {"type": "boolean", "default": true}
+        },
+        "additionalProperties": true
+      }
+    },
+    "methods": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {"type": "string"},
+          "returnType": {"type": ["string", "null"]},
+          "visibility": {"type": "string", "enum": ["public", "protected", "private", "package"]},
+          "parameters": {"type": "array", "items": {"type": "object"}, "default": []}
+        },
+        "additionalProperties": true
+      }
+    },
+    "state": {
+      "type": ["string", "null"],
+      "description": "状态机视图使用的当前状态",
+      "default": null
+    }
+  },
+  "$defs": {
+    "kind": {
+      "type": "string",
+      "enum": [
+        "System", "Subsystem", "Module", "Component", "Service", "Class", "Interface", "Method",
+        "Entity", "Table", "Attribute", "Actor", "Event", "State", "Transition", "Constraint",
+        "Relationship", "Evidence", "Scenario", "CausalRule"
+      ]
+    },
+    "verification": {
+      "type": "string",
+      "enum": [
+        "Implemented", "Observed", "Designed", "Inferred", "Hypothetical", "Unknown",
+        "confirmed", "observed", "designed", "assumed", "inferred", "illustrative", "hypothetical", "unknown"
+      ]
+    }
+  }
+}

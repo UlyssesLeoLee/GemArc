@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "0.2.0",
+  "id": "space-levels",
+  "title": "Building–Floor–Room 空间层级",
+  "description": "v5.0 提示词 §6 的三维工程空间语义。Building/Floor/Room 可以是阅读用的虚拟空间组织，但必须保存其语义来源；虚拟房间不得冒充真实代码模块或物理部署设施。",
+  "levels": [
+    {
+      "id": "Building",
+      "label": "楼宇",
+      "depth": 0,
+      "represents": ["系统", "子系统", "部署域", "应用集群", "信任边界", "Bounded Context 群组"],
+      "semanticSourceField": "building.semanticSource",
+      "note": "顶层空间容器"
+    },
+    {
+      "id": "Floor",
+      "label": "楼层",
+      "depth": 1,
+      "represents": ["架构层", "运行层", "接入层", "应用层", "领域层", "数据层", "基础设施层"],
+      "semanticSourceField": "floor.semanticSource",
+      "note": "中间层容器"
+    },
+    {
+      "id": "Room",
+      "label": "房间",
+      "depth": 2,
+      "represents": ["模块组", "包", "服务簇", "子域", "组件组", "数据域", "UML/ER 子图"],
+      "semanticSourceField": "room.semanticSource",
+      "note": "叶子空间容器，直接容纳节点与边"
+    }
+  ],
+  "navigations": [
+    {"id": "overview", "label": "全局鸟瞰"},
+    {"id": "building-select", "label": "Building 选择"},
+    {"id": "floor-switch", "label": "Floor 切换"},
+    {"id": "floor-exploded", "label": "Floor Exploded View"},
+    {"id": "room-focus", "label": "Room Focus"},
+    {"id": "room-cutaway", "label": "Room Cutaway"},
+    {"id": "node-focus", "label": "Node/Edge Focus"},
+    {"id": "back-to-overview", "label": "逐级返回总览"}
+  ],
+  "crossSpaceRelations": ["same-room", "cross-room", "cross-floor", "cross-building"],
+  "rules": [
+    "禁止添加无意义的门窗、家具等建筑装饰。",
+    "关系线路必须能够直接点击。",
+    "图示路由路径不得冒充实际存在的网络设备或通信中间件。",
+    "虚拟房间必须带 semanticSource 标注其为阅读用组织。"
+  ]
+}

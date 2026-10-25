@@ -1,16 +1,48 @@
 {
-  "schemaVersion": "0.1.0",
+  "schemaVersion": "0.2.0",
   "name": "GemArc standard registry",
   "licensePolicy": "Verify every third-party dependency before distribution",
   "components": [
-    {"id":"gemarc.1d.facts","version":"0.1.0","dimension":"1D","status":"implemented","license":"MIT","purpose":"Fact and evidence browser"},
-    {"id":"gemarc.2d.graph","version":"0.1.0","dimension":"2D","status":"implemented","license":"MIT","purpose":"SVG node-edge diagram with selection"},
-    {"id":"gemarc.3d.legacy-viewer","version":"0.1.0","dimension":"3D","status":"adapter","license":"Check original repository","purpose":"Optional existing Three.js viewer built separately"},
-    {"id":"gemarc.4d.timeline","version":"0.1.0","dimension":"4D","status":"implemented_mvp","license":"MIT","purpose":"Bounded rule-generated event timeline"},
-    {"id":"gemarc.5d.intervention","version":"0.1.0","dimension":"5D","status":"implemented_mvp","license":"MIT","purpose":"Explicit-rule module disabling and bounded rerun"},
-    {"id":"gemarc.prototype.tabs","version":"0.1.0","dimension":"prototype","status":"implemented_mvp","license":"MIT","purpose":"Data-driven multi-tab interactive page prototype"},
+    {"id":"gemarc.1d.facts","version":"0.2.0","dimension":"1D","status":"implemented","license":"MIT","purpose":"Fact and evidence browser"},
+    {"id":"gemarc.2d.graph","version":"0.2.0","dimension":"2D","status":"implemented","license":"MIT","purpose":"SVG node-edge diagram with selection"},
+    {"id":"gemarc.3d.legacy-viewer","version":"0.2.0","dimension":"3D","status":"adapter","license":"Check original repository","purpose":"Optional existing Three.js viewer built separately"},
+    {"id":"gemarc.4d.timeline","version":"0.2.0","dimension":"4D","status":"implemented_mvp","license":"MIT","purpose":"Bounded rule-generated event timeline"},
+    {"id":"gemarc.5d.intervention","version":"0.2.0","dimension":"5D","status":"implemented_mvp","license":"MIT","purpose":"Explicit-rule module disabling and bounded rerun"},
+    {"id":"gemarc.prototype.tabs","version":"0.2.0","dimension":"prototype","status":"implemented_mvp","license":"MIT","purpose":"Data-driven multi-tab interactive page prototype"},
+
+    {"id":"gemarc.contract.canonical-model","version":"0.2.0","dimension":"contract","status":"implemented","license":"MIT","purpose":"JSON Schema for the CanonicalArchitectureModel"},
+    {"id":"gemarc.contract.node","version":"0.2.0","dimension":"contract","status":"implemented","license":"MIT","purpose":"JSON Schema for a canonical node"},
+    {"id":"gemarc.contract.edge","version":"0.2.0","dimension":"contract","status":"implemented","license":"MIT","purpose":"JSON Schema for a canonical relation"},
+    {"id":"gemarc.contract.evidence","version":"0.2.0","dimension":"contract","status":"implemented","license":"MIT","purpose":"JSON Schema for an evidence record"},
+    {"id":"gemarc.contract.space","version":"0.2.0","dimension":"contract","status":"implemented","license":"MIT","purpose":"JSON Schema for the Building-Floor-Room structure"},
+    {"id":"gemarc.contract.view","version":"0.2.0","dimension":"contract","status":"implemented","license":"MIT","purpose":"JSON Schema for a diagram view definition"},
+    {"id":"gemarc.contract.scenario","version":"0.2.0","dimension":"contract","status":"implemented","license":"MIT","purpose":"JSON Schema for scenarios and cases"},
+    {"id":"gemarc.contract.workflow","version":"0.2.0","dimension":"contract","status":"implemented","license":"MIT","purpose":"JSON Schema for machine-readable workflows"},
+
+    {"id":"gemarc.vocab.evidence-levels","version":"0.2.0","dimension":"vocabulary","status":"implemented","license":"MIT","purpose":"Six canonical fact levels plus the legacy alias table"},
+    {"id":"gemarc.vocab.entity-kinds","version":"0.2.0","dimension":"vocabulary","status":"implemented","license":"MIT","purpose":"The 21 canonical entity kinds"},
+    {"id":"gemarc.vocab.edge-types","version":"0.2.0","dimension":"vocabulary","status":"implemented","license":"MIT","purpose":"Relation types with direction, condition and trust boundary"},
+    {"id":"gemarc.vocab.diagram-types","version":"0.2.0","dimension":"vocabulary","status":"implemented","license":"MIT","purpose":"19 diagram types with node/edge whitelists and fidelity requirements"},
+    {"id":"gemarc.vocab.relation-classes","version":"0.2.0","dimension":"vocabulary","status":"implemented","license":"MIT","purpose":"Four focus relevance classes and their visual treatment"},
+    {"id":"gemarc.vocab.space-levels","version":"0.2.0","dimension":"vocabulary","status":"implemented","license":"MIT","purpose":"Building, Floor and Room semantics with the eight navigations"},
+    {"id":"gemarc.vocab.case-categories","version":"0.2.0","dimension":"vocabulary","status":"implemented","license":"MIT","purpose":"Normal, abnormal, boundary, combination and recovery cases"},
+
+    {"id":"gemarc.runtime.core","version":"0.2.0","dimension":"shared","status":"implemented","license":"MIT","purpose":"Stable ids, diagnostics, model normalisation and vocabulary access"},
+    {"id":"gemarc.runtime.graph","version":"0.2.0","dimension":"2D","status":"implemented","license":"MIT","purpose":"GraphStore, GraphQueryEngine, index, persistence, interaction"},
+    {"id":"gemarc.runtime.focus","version":"0.2.0","dimension":"shared","status":"implemented","license":"MIT","purpose":"FocusContextEngine and the dynamic retreat animation"},
+    {"id":"gemarc.runtime.space","version":"0.2.0","dimension":"3D","status":"implemented","license":"MIT","purpose":"Building-Floor-Room model and navigation state machine"},
+    {"id":"gemarc.runtime.sim","version":"0.2.0","dimension":"4D","status":"implemented","license":"MIT","purpose":"Event and causal engine, a structural twin of simulation.py"},
+    {"id":"gemarc.runtime.view","version":"0.2.0","dimension":"shared","status":"implemented","license":"MIT","purpose":"Cross-view synchronisation state and view resolution"},
+    {"id":"gemarc.runtime.workflow","version":"0.2.0","dimension":"prototype","status":"implemented","license":"MIT","purpose":"Workflow model, semantic validator and canvas controller"},
+    {"id":"gemarc.runtime.interop","version":"0.2.0","dimension":"shared","status":"implemented","license":"MIT","purpose":"BPMN, UML XMI, ER and Draw.io adapters"},
+
+    {"id":"gemarc.profile.static","version":"0.2.0","dimension":"delivery","status":"implemented","license":"MIT","purpose":"Zero build site: native ESM with an import map"},
+    {"id":"gemarc.profile.vite","version":"0.2.0","dimension":"delivery","status":"implemented","license":"MIT","purpose":"npm project sharing the same runtime sources"},
+    {"id":"gemarc.scaffold","version":"0.2.0","dimension":"scaffolding","status":"implemented","license":"MIT","purpose":"Materialises the fixed parts and the fill-in slots for a project"},
+    {"id":"gemarc.golden-cases","version":"0.2.0","dimension":"scaffolding","status":"implemented","license":"MIT","purpose":"Golden cases pinning the Python and JavaScript simulation kernels together"},
+
     {"id":"gemarc.prototype.konva-editor","version":"future","dimension":"prototype","status":"not_implemented","license":"Unverified","purpose":"Konva.js visual editor"},
-    {"id":"gemarc.2d.graphology-dagre","version":"future","dimension":"2D","status":"not_implemented","license":"Unverified","purpose":"Graphology/Dagre adapters"},
-    {"id":"gemarc.storage.dexie","version":"future","dimension":"shared","status":"not_implemented","license":"Unverified","purpose":"IndexedDB cache"}
+    {"id":"gemarc.2d.graphology-dagre","version":"future","dimension":"2D","status":"optional_adapter","license":"MIT","purpose":"Optional Graphology and Dagre adapters; a built-in layout is the default"},
+    {"id":"gemarc.storage.dexie","version":"future","dimension":"shared","status":"optional_adapter","license":"Apache-2.0","purpose":"Optional IndexedDB adapter; an in-memory adapter is the default"}
   ]
 }

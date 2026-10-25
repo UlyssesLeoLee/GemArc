@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gemarc.dev/schemas/0.2.0/evidence.schema.json",
+  "title": "Canonical Evidence",
+  "description": "证据实体。节点与边通过 evidenceIds 引用。证据必须能指回真实来源；无法指回来源时必须标为 Unknown 而不是编造引用。",
+  "type": "object",
+  "required": ["id", "kind", "verification"],
+  "additionalProperties": true,
+  "properties": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$"},
+    "kind": {
+      "type": "string",
+      "enum": ["code", "test", "design-doc", "log", "config", "schema", "observation", "inference", "assumption"]
+    },
+    "level": {
+      "type": "string",
+      "description": "本条证据支持的事实等级",
+      "enum": ["Implemented", "Observed", "Designed", "Inferred", "Hypothetical", "Unknown"]
+    },
+    "verification": {
+      "type": "string",
+      "description": "与 level 同义保留字段。取值见 vocab/evidence-levels.json",
+      "enum": [
+        "Implemented", "Observed", "Designed", "Inferred", "Hypothetical", "Unknown",
+        "confirmed", "observed", "designed", "assumed", "inferred", "illustrative", "hypothetical", "unknown"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "description": "证据来源。locator 必须能定位到真实文件/位置。",
+      "required": ["locator"],
+      "properties": {
+        "repository": {"type": ["string", "null"]},
+        "branch": {"type": ["string", "null"]},
+        "commit": {"type": ["string", "null"]},
+        "file": {"type": ["string", "null"]},
+        "line": {"type": ["integer", "null"], "minimum": 1},
+        "symbol": {"type": ["string", "null"]},
+        "locator": {"type": "string", "minLength": 1, "description": "人类可读的定位串，例如 src/app/main.py:42"},
+        "excerpt": {"type": ["string", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "observedAt": {"type": ["string", "null"], "description": "观测时间（ISO 8601）"},
+    "notes": {"type": ["string", "null"]}
+  }
+}

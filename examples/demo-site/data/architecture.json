@@ -1,36 +1,59 @@
 {
+  "cases": [],
   "edges": [
     {
+      "condition": null,
       "description": "上传事件",
+      "directed": true,
       "evidence": "示例",
+      "evidenceIds": [],
       "id": "e1",
-      "kind": "event",
-      "source": "sensor",
-      "target": "queue",
-      "verification": "illustrative"
+      "properties": {},
+      "sourceId": "sensor",
+      "spaceSpan": null,
+      "targetId": "queue",
+      "trustBoundary": null,
+      "type": "sends",
+      "verification": "Hypothetical",
+      "weight": null
     },
     {
+      "condition": null,
       "description": "传递事件",
+      "directed": true,
       "evidence": "示例",
+      "evidenceIds": [],
       "id": "e2",
-      "kind": "event",
-      "source": "queue",
-      "target": "rule",
-      "verification": "illustrative"
+      "properties": {},
+      "sourceId": "queue",
+      "spaceSpan": null,
+      "targetId": "rule",
+      "trustBoundary": null,
+      "type": "sends",
+      "verification": "Hypothetical",
+      "weight": null
     },
     {
+      "condition": null,
       "description": "规则触发通知",
+      "directed": true,
       "evidence": "示例",
+      "evidenceIds": [],
       "id": "e3",
-      "kind": "event",
-      "source": "rule",
-      "target": "notify",
-      "verification": "illustrative"
+      "properties": {},
+      "sourceId": "rule",
+      "spaceSpan": null,
+      "targetId": "notify",
+      "trustBoundary": null,
+      "type": "sends",
+      "verification": "Hypothetical",
+      "weight": null
     }
   ],
+  "evidence": [],
   "meta": {
     "description": "示例模型，非真实工程事实",
-    "evidenceState": "illustrative",
+    "evidenceState": "Hypothetical",
     "language": "zh-CN",
     "schemaVersion": "0.1.0",
     "system": "demo",
@@ -38,36 +61,68 @@
   },
   "nodes": [
     {
+      "attributes": [],
+      "domainId": null,
       "evidence": "示例",
+      "evidenceIds": [],
       "id": "sensor",
-      "kind": "adapter",
+      "kind": "Component",
       "layer": "设备层",
+      "methods": [],
       "name": "事件源",
-      "verification": "illustrative"
+      "parentId": null,
+      "properties": {},
+      "role": null,
+      "spaceRef": null,
+      "verification": "Hypothetical"
     },
     {
+      "attributes": [],
+      "domainId": null,
       "evidence": "示例",
+      "evidenceIds": [],
       "id": "queue",
-      "kind": "service",
+      "kind": "Service",
       "layer": "中间件层",
+      "methods": [],
       "name": "消息队列",
-      "verification": "illustrative"
+      "parentId": null,
+      "properties": {},
+      "role": null,
+      "spaceRef": null,
+      "verification": "Hypothetical"
     },
     {
+      "attributes": [],
+      "domainId": null,
       "evidence": "示例",
+      "evidenceIds": [],
       "id": "rule",
-      "kind": "service",
+      "kind": "Service",
       "layer": "应用层",
+      "methods": [],
       "name": "规则引擎",
-      "verification": "illustrative"
+      "parentId": null,
+      "properties": {},
+      "role": null,
+      "spaceRef": null,
+      "verification": "Hypothetical"
     },
     {
+      "attributes": [],
+      "domainId": null,
       "evidence": "示例",
+      "evidenceIds": [],
       "id": "notify",
-      "kind": "service",
+      "kind": "Service",
       "layer": "应用层",
+      "methods": [],
       "name": "通知服务",
-      "verification": "illustrative"
+      "parentId": null,
+      "properties": {},
+      "role": null,
+      "spaceRef": null,
+      "verification": "Hypothetical"
     }
   ],
   "prototypes": [
@@ -126,13 +181,15 @@
       ]
     }
   ],
+  "space": null,
   "views": [
     {
       "concerns": [
         "事件依赖"
       ],
+      "diagramType": "logical-view",
       "edgeKinds": [
-        "event"
+        "sends"
       ],
       "id": "logical",
       "nodeIds": [
@@ -147,5 +204,6 @@
       ],
       "title": "逻辑架构"
     }
-  ]
+  ],
+  "workflows": []
 }

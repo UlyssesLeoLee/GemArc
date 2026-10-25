@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gemarc.dev/schemas/0.2.0/canonical-model.schema.json",
+  "title": "CanonicalArchitectureModel",
+  "description": "v5.0 提示词 §3.3 的统一事实模型。全部图示、模拟、查询和动画都依赖这份数据。模型只表达事实，不表达表现。",
+  "type": "object",
+  "required": ["meta", "nodes", "edges"],
+  "additionalProperties": true,
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["system"],
+      "additionalProperties": true,
+      "properties": {
+        "system": {"type": "string", "minLength": 1},
+        "schemaVersion": {"type": "string", "default": "0.2.0"},
+        "version": {"type": ["string", "null"], "default": null},
+        "language": {"type": "string", "enum": ["zh-CN", "ja-JP", "en-US"], "default": "zh-CN"},
+        "evidenceState": {
+          "type": "string",
+          "description": "整体事实等级。旧值 confirmed/assumed/illustrative 仍被接受并归一化。",
+          "enum": [
+            "Implemented", "Observed", "Designed", "Inferred", "Hypothetical", "Unknown",
+            "confirmed", "observed", "designed", "assumed", "inferred", "illustrative", "hypothetical", "unknown"
+          ]
+        },
+        "description": {"type": ["string", "null"], "default": null},
+        "source": {
+          "type": ["object", "null"],
+          "default": null,
+          "description": "分析来源。记录实际分析的 branch / commit / 文件来源及版本。",
+          "additionalProperties": true,
+          "properties": {
+            "repository": {"type": ["string", "null"]},
+            "branch": {"type": ["string", "null"]},
+            "commit": {"type": ["string", "null"]},
+            "localPath": {"type": ["string", "null"]},
+            "analyzedAt": {"type": ["string", "null"]}
+          }
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "default": [],
+      "items": {"$ref": "node.schema.json"}
+    },
+    "edges": {
+      "type": "array",
+      "default": [],
+      "items": {"$ref": "edge.schema.json"}
+    },
+    "evidence": {
+      "type": "array",
+      "default": [],
+      "items": {"$ref": "evidence.schema.json"}
+    },
+    "space": {
+      "type": ["object", "null"],
+      "default": null,
+      "description": "Building–Floor–Room 空间结构",
+      "properties": {
+        "buildings": {"type": "array", "items": {"type": "object"}, "default": []},
+        "floors": {"type": "array", "items": {"type": "object"}, "default": []},
+        "rooms": {"type": "array", "items": {"type": "object"}, "default": []}
+      },
+      "additionalProperties": true
+    },
+    "views": {
+      "type": "array",
+      "default": [],
+      "items": {"$ref": "view.schema.json"}
+    },
+    "scenarios": {
+      "type": "array",
+      "default": [],
+      "items": {"type": "object"}
+    },
+    "cases": {
+      "type": "array",
+      "default": [],
+      "items": {"type": "object"}
+    },
+    "workflows": {
+      "type": "array",
+      "default": [],
+      "items": {"$ref": "workflow.schema.json"}
+    },
+    "prototypes": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "required": ["id", "title"],
+        "additionalProperties": true,
+        "properties": {
+          "id": {"type": "string"},
+          "title": {"type": "string", "minLength": 1},
+          "description": {"type": ["string", "null"], "default": null},
+          "actions": {"type": "array", "items": {"type": "string"}, "default": []},
+          "canonicalNodeIds": {"type": "array", "items": {"type": "string"}, "default": []}
+        }
+      }
+    }
+  }
+}

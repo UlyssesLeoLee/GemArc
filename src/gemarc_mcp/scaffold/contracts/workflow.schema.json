@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gemarc.dev/schemas/0.2.0/workflow.schema.json",
+  "title": "Canonical Workflow",
+  "description": "v5.0 提示词 §2.7 与 AI-Native Infinite Workflow Canvas。工作流必须具有机器可读语义：节点、端口、关系、条件、异常、输入、输出、执行约束都要可被程序及大模型理解。画布坐标不承载执行语义。",
+  "type": "object",
+  "required": ["id", "name", "nodes", "edges"],
+  "additionalProperties": true,
+  "properties": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$"},
+    "name": {"type": "string", "minLength": 1},
+    "description": {"type": ["string", "null"], "default": null},
+    "kind": {
+      "type": "string",
+      "enum": ["task", "decision", "gateway", "start", "end", "subprocess", "event", "data"],
+      "description": "流程类型，取值见 vocab/workflow-kinds.json nodeKinds"
+    },
+    "nodes": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "name"],
+        "additionalProperties": true,
+        "properties": {
+          "id": {"type": "string", "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$"},
+          "kind": {
+            "type": "string",
+            "enum": ["task", "decision", "gateway", "start", "end", "subprocess", "event", "data"]
+          },
+          "name": {"type": "string", "minLength": 1},
+          "canonicalNodeId": {
+            "type": ["string", "null"],
+            "default": null,
+            "description": "绑定的 canonical 节点 ID；纯流程内部元素可为空"
+          },
+          "ports": {
+            "type": "array",
+            "default": [],
+            "items": {
+              "type": "object",
+              "required": ["id", "kind"],
+              "additionalProperties": true,
+              "properties": {
+                "id": {"type": "string"},
+                "kind": {"type": "string", "enum": ["input", "output", "control", "error"]},
+                "name": {"type": ["string", "null"], "default": null},
+                "schemaRef": {"type": ["string", "null"], "default": null}
+              }
+            }
+          },
+          "constraints": {
+            "type": "array",
+            "default": [],
+            "items": {
+              "type": "object",
+              "required": ["kind"],
+              "additionalProperties": true,
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": ["order", "exclusive", "parallel", "timeout", "retry", "compensation"]
+                },
+                "value": {"type": ["number", "string", "boolean", "null"], "default": null},
+                "backoffMs": {"type": ["integer", "null"], "minimum": 0, "default": null},
+                "onTimeout": {"type": ["string", "null"], "default": null},
+                "compensationNodeId": {"type": ["string", "null"], "default": null}
+              }
+            }
+          },
+          "dataContract": {
+            "type": ["object", "null"],
+            "default": null,
+            "description": "输入输出的数据契约。必须可被程序读取。",
+            "additionalProperties": true
+          },
+          "exceptionHandling": {
+            "type": ["object", "null"],
+            "default": null,
+            "properties": {
+              "onError": {"type": ["string", "null"], "default": null},
+              "errorPortId": {"type": ["string", "null"], "default": null}
+            },
+            "additionalProperties": true
+          },
+          "canvas": {
+            "type": ["object", "null"],
+            "default": null,
+            "description": "纯表现数据：画布坐标。不得影响执行语义。",
+            "properties": {
+              "x": {"type": "number"},
+              "y": {"type": "number"},
+              "width": {"type": ["number", "null"], "default": null},
+              "height": {"type": ["number", "null"], "default": null}
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "required": ["id", "sourceId", "targetId", "kind"],
+        "additionalProperties": true,
+        "properties": {
+          "id": {"type": "string", "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$"},
+          "sourceId": {"type": "string"},
+          "targetId": {"type": "string"},
+          "sourcePortId": {"type": ["string", "null"], "default": null},
+          "targetPortId": {"type": ["string", "null"], "default": null},
+          "kind": {
+            "type": "string",
+            "enum": ["sequence", "conditional", "message", "association"]
+          },
+          "directed": {"type": "boolean", "default": true},
+          "condition": {
+            "type": ["string", "null"],
+            "default": null,
+            "description": "kind=conditional 时必填。必须是可被程序判断的表达式。"
+          },
+          "dataContract": {"type": ["object", "null"], "default": null},
+          "canvas": {
+            "type": ["object", "null"],
+            "default": null,
+            "properties": {"points": {"type": "array", "items": {"type": "object"}}}
+          }
+        }
+      }
+    },
+    "variables": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "additionalProperties": true,
+        "properties": {
+          "name": {"type": "string"},
+          "type": {"type": ["string", "null"], "default": null},
+          "defaultValue": {"type": ["string", "number", "boolean", "null"], "default": null}
+        }
+      }
+    }
+  }
+}

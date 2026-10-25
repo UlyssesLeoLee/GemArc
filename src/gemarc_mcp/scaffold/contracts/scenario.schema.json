@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gemarc.dev/schemas/0.2.0/scenario.schema.json",
+  "title": "Canonical Scenario 与 Case",
+  "description": "v5.0 提示词 §7 与 Scenario & Causal Lab。Scenario 是事件与因果规则的定义；Case 是可执行实例（scenarioId + 干预 + 期望）。",
+  "type": "object",
+  "required": ["scenarios"],
+  "additionalProperties": false,
+  "properties": {
+    "scenarios": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "events", "rules"],
+        "additionalProperties": true,
+        "properties": {
+          "id": {"type": "string", "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$"},
+          "name": {"type": "string", "minLength": 1},
+          "description": {"type": ["string", "null"], "default": null},
+          "evidenceClass": {
+            "type": "string",
+            "enum": ["Observed", "Designed", "Inferred", "Hypothetical", "Unknown"],
+            "description": "场景本身的证据等级。Hypothetical 的场景不得被描述为实际运行结果。"
+          },
+          "events": {
+            "type": "array",
+            "default": [],
+            "items": {
+              "type": "object",
+              "required": ["module", "event", "timeMs"],
+              "additionalProperties": true,
+              "properties": {
+                "module": {"type": "string", "description": "必须存在于 nodes 中"},
+                "event": {"type": "string", "minLength": 1},
+                "timeMs": {"type": "number", "minimum": 0, "maximum": 3600000},
+                "payload": {"type": ["object", "null"], "default": null}
+              }
+            }
+          },
+          "rules": {
+            "type": "array",
+            "default": [],
+            "items": {
+              "type": "object",
+              "required": ["source", "whenEvent", "target", "emit"],
+              "additionalProperties": true,
+              "properties": {
+                "source": {"type": "string"},
+                "whenEvent": {"type": "string", "minLength": 1},
+                "target": {"type": "string"},
+                "emit": {"type": "string", "minLength": 1},
+                "delayMs": {"type": "number", "minimum": 0, "maximum": 3600000, "default": 0},
+                "guard": {"type": ["string", "null"], "default": null},
+                "probability": {"type": ["number", "null"], "minimum": 0, "maximum": 1, "default": null}
+              }
+            }
+          },
+          "initialState": {"type": ["object", "null"], "default": null}
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "required": ["id", "scenarioId", "category", "title"],
+        "additionalProperties": true,
+        "properties": {
+          "id": {"type": "string", "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$"},
+          "scenarioId": {"type": "string", "description": "必须存在于 scenarios 中"},
+          "category": {
+            "type": "string",
+            "enum": ["normal", "abnormal", "boundary", "combination", "recovery"],
+            "description": "取值见 vocab/case-categories.json"
+          },
+          "title": {"type": "string", "minLength": 1},
+          "description": {"type": ["string", "null"], "default": null},
+          "disabledNodeIds": {
+            "type": "array",
+            "items": {"type": "string"},
+            "default": [],
+            "description": "干预集合（模块屏蔽）。元素必须存在于 nodes 中。"
+          },
+          "expected": {
+            "type": ["object", "null"],
+            "default": null,
+            "properties": {
+              "delivered": {"type": ["integer", "null"], "minimum": 0},
+              "blocked": {"type": ["integer", "null"], "minimum": 0},
+              "notes": {"type": ["string", "null"]}
+            },
+            "additionalProperties": false
+          },
+          "evidenceClass": {
+            "type": "string",
+            "enum": ["Observed", "Designed", "Inferred", "Hypothetical", "Unknown"]
+          }
+        }
+      }
+    }
+  }
+}

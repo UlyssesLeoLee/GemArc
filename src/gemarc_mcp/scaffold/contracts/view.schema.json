@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gemarc.dev/schemas/0.2.0/view.schema.json",
+  "title": "Canonical View",
+  "description": "v5.0 提示词 §8。View 是图示实例：必须声明 diagramType，且只允许引用该类型允许的实体与关系。不得为了凑数量而生成虚假图示。",
+  "type": "object",
+  "required": ["id", "title", "diagramType"],
+  "additionalProperties": true,
+  "properties": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$"},
+    "title": {"type": "string", "minLength": 1},
+    "diagramType": {
+      "type": "string",
+      "description": "取值见 vocab/diagram-types.json types[].id",
+      "enum": [
+        "uml-class", "uml-component", "uml-package", "uml-sequence", "uml-state-machine",
+        "uml-activity", "uml-deployment", "uml-use-case", "er-diagram", "dfd",
+        "dependency-diagram", "logical-view", "development-view", "process-view",
+        "deployment-view", "data-view", "security-view", "operations-view", "causal-view"
+      ]
+    },
+    "dimension": {
+      "type": "string",
+      "enum": ["1D", "2D", "3D", "4D", "5D"],
+      "description": "该图示的表达层级。3D 视图必须声明空间轴来源；4D/5D 视图必须绑定 scenarioId。"
+    },
+    "stakeholders": {"type": "array", "items": {"type": "string"}, "default": []},
+    "concerns": {"type": "array", "items": {"type": "string"}, "default": []},
+    "reviewQuestions": {
+      "type": "array",
+      "items": {"type": "string"},
+      "default": [],
+      "description": "该图示要回答的审查问题。空数组时界面必须提示未定义审查问题。"
+    },
+    "nodeIds": {"type": "array", "items": {"type": "string"}, "default": []},
+    "edgeKinds": {
+      "type": "array",
+      "items": {"type": "string"},
+      "default": [],
+      "description": "允许显示的关系类型；空数组表示不限制"
+    },
+    "edgeIds": {
+      "type": "array",
+      "items": {"type": "string"},
+      "default": [],
+      "description": "显式指定要显示的边；与 edgeKinds 同时存在时取交集"
+    },
+    "axes": {
+      "type": "object",
+      "description": "空间轴语义。仅 3D 视图需要；每根轴必须映射到真实属性并可追溯。",
+      "default": {},
+      "properties": {
+        "x": {"$ref": "#/$defs/axis"},
+        "y": {"$ref": "#/$defs/axis"},
+        "z": {"$ref": "#/$defs/axis"}
+      },
+      "additionalProperties": false
+    },
+    "scenarioId": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "4D/5D 视图绑定的场景 ID"
+    },
+    "caseIds": {"type": "array", "items": {"type": "string"}, "default": []},
+    "legend": {
+      "type": "object",
+      "default": {},
+      "description": "该图示的图例定义。颜色必须来自设计令牌，且轴色在三套渲染器中含义一致。"
+    },
+    "missing": {
+      "type": "array",
+      "items": {"type": "string"},
+      "default": [],
+      "description": "该图示保真要求中模型未提供的信息。必须显式列出，不得伪造。"
+    }
+  },
+  "$defs": {
+    "axis": {
+      "type": "object",
+      "required": ["field"],
+      "additionalProperties": true,
+      "properties": {
+        "field": {"type": "string", "minLength": 1, "description": "轴所依据的模型字段路径"},
+        "label": {"type": ["string", "null"], "default": null},
+        "values": {"type": "array", "items": {"type": "string"}, "default": []},
+        "evidenceIds": {"type": "array", "items": {"type": "string"}, "default": []}
+      }
+    }
+  }
+}

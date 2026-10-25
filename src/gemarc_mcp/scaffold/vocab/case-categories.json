@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "0.2.0",
+  "id": "case-categories",
+  "title": "Scenario & Causal Lab 用例分类",
+  "description": "统一管理正常、异常、边界、组合及恢复 Case。Case 与 Scenario 的关系是：Case 是一个可执行的实例（scenarioId + 干预配置 + 期望），Scenario 是规则与事件的定义。",
+  "categories": [
+    {"id": "normal", "label": "正常", "assertion": "预期路径成立", "requiresIntervention": false},
+    {"id": "abnormal", "label": "异常", "assertion": "预期失败或降级被显式观测到", "requiresIntervention": true},
+    {"id": "boundary", "label": "边界", "assertion": "极限输入或极限规模下的行为被确定", "requiresIntervention": true},
+    {"id": "combination", "label": "组合", "assertion": "多个条件同时成立时的交互被确定", "requiresIntervention": true},
+    {"id": "recovery", "label": "恢复", "assertion": "故障后恢复到已知良好状态的过程被确定", "requiresIntervention": true}
+  ],
+  "fields": {
+    "id": "稳定 ID，命名规则 <scenarioId>__<caseId>",
+    "scenarioId": "指向 definitions.scenarios 中的场景 ID",
+    "category": "本词表中的分类 ID",
+    "title": "人类可读标题",
+    "disabledNodeIds": "本次 Case 的干预集合（模块屏蔽）",
+    "expected": {"delivered": "预期送达事件数", "blocked": "预期被阻断事件数", "notes": "文字判定说明"},
+    "evidenceClass": "沿用 evidence-levels 词表；Hypothetical 的 Case 不得被描述为实际运行结果"
+  },
+  "rules": [
+    "每个 Case 必须绑定一个 scenarioId，且该 scenario 必须存在于模型中。",
+    "requiresIntervention 为 true 的分类必须给出非空 disabledNodeIds 或显式说明无干预原因。",
+    "Case 库与 4D/5D 视图共享同一 scenarioId 引用，切换视图不得改变 Case 语义。"
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "0.2.0",
+  "id": "diagram-types",
+  "title": "图示类型与保真要求",
+  "description": "v5.0 提示词 §8.1 要求按真实项目证据生成的图示。不得为了凑数量而生成虚假图示——只有具备证据的图示才允许出现在 view 列表中。",
+  "types": [
+    {"id": "uml-class", "label": "UML 类图", "dimension": "2D", "nodeKinds": ["Class", "Interface", "Entity", "Table", "Relationship"], "edgeKinds": ["inherits", "implements", "composes", "aggregates", "dependsOn"], "fidelity": ["attributes", "methods", "visibility", "multiplicity"], "notation": "UML"},
+    {"id": "uml-component", "label": "UML 组件图", "dimension": "2D", "nodeKinds": ["Component", "Service", "Module", "Subsystem"], "edgeKinds": ["dependsOn", "implements", "contains", "publishes", "subscribes"], "fidelity": ["ports", "interfaces"], "notation": "UML"},
+    {"id": "uml-package", "label": "UML 包图", "dimension": "2D", "nodeKinds": ["Module", "Subsystem", "System"], "edgeKinds": ["contains", "dependsOn"], "fidelity": ["nesting"], "notation": "UML"},
+    {"id": "uml-sequence", "label": "UML 时序图", "dimension": "2D", "nodeKinds": ["Actor", "Service", "Class", "Component", "Module"], "edgeKinds": ["calls", "sends", "receives"], "fidelity": ["lifeline", "message", "activation", "guard"], "notation": "UML"},
+    {"id": "uml-state-machine", "label": "UML 状态机图", "dimension": "2D", "nodeKinds": ["State", "Transition", "Event", "Class"], "edgeKinds": ["transitions", "triggers"], "fidelity": ["initial", "final", "guard", "state"], "notation": "UML"},
+    {"id": "uml-activity", "label": "UML 活动图", "dimension": "2D", "nodeKinds": ["Event", "Scenario", "Constraint", "Actor"], "edgeKinds": ["triggers", "dependsOn", "contains"], "fidelity": ["decision", "merge", "fork", "join", "guard"], "notation": "UML"},
+    {"id": "uml-deployment", "label": "UML 部署图", "dimension": "3D", "nodeKinds": ["System", "Subsystem", "Service", "Component"], "edgeKinds": ["contains", "publishes", "subscribes", "dependsOn"], "fidelity": ["node", "executionEnvironment", "artifact"], "notation": "UML"},
+    {"id": "uml-use-case", "label": "UML 用例图", "dimension": "2D", "nodeKinds": ["Actor", "Service", "Module"], "edgeKinds": ["calls", "dependsOn"], "fidelity": ["systemBoundary", "include", "extend"], "notation": "UML"},
+    {"id": "er-diagram", "label": "ER 图", "dimension": "2D", "nodeKinds": ["Entity", "Table", "Attribute", "Relationship"], "edgeKinds": ["composes", "owns", "dependsOn"], "fidelity": ["cardinality", "primaryKey", "foreignKey", "attribute"], "notation": "ER"},
+    {"id": "dfd", "label": "数据流图", "dimension": "2D", "nodeKinds": ["Process", "Service", "Module", "Entity"], "edgeKinds": ["reads", "writes", "sends", "receives"], "fidelity": ["externalEntity", "dataStore", "process"], "notation": "DFD"},
+    {"id": "dependency-diagram", "label": "依赖图", "dimension": "2D", "nodeKinds": ["Module", "Component", "Service", "Class"], "edgeKinds": ["dependsOn", "imports"], "fidelity": [], "notation": "generic"},
+    {"id": "logical-view", "label": "逻辑视图", "dimension": "2D", "nodeKinds": ["System", "Subsystem", "Module", "Service", "Entity"], "edgeKinds": ["contains", "dependsOn", "calls"], "fidelity": [], "notation": "generic"},
+    {"id": "development-view", "label": "开发视图", "dimension": "2D", "nodeKinds": ["Module", "Package", "Class", "Component"], "edgeKinds": ["dependsOn", "contains", "inherits"], "fidelity": [], "notation": "generic"},
+    {"id": "process-view", "label": "进程视图", "dimension": "2D", "nodeKinds": ["Service", "Component", "Module", "Actor"], "edgeKinds": ["calls", "sends", "receives", "publishes", "subscribes"], "fidelity": [], "notation": "generic"},
+    {"id": "deployment-view", "label": "部署视图", "dimension": "3D", "nodeKinds": ["System", "Subsystem", "Service", "Component", "Module"], "edgeKinds": ["contains", "publishes", "subscribes", "sends", "receives"], "fidelity": ["building", "floor", "room"], "notation": "generic"},
+    {"id": "data-view", "label": "数据视图", "dimension": "2D", "nodeKinds": ["Entity", "Table", "Attribute", "Service"], "edgeKinds": ["reads", "writes", "owns", "composes"], "fidelity": [], "notation": "generic"},
+    {"id": "security-view", "label": "安全视图", "dimension": "2D", "nodeKinds": ["System", "Subsystem", "Service", "Component", "Actor"], "edgeKinds": ["dependsOn", "calls", "sends", "receives", "contains"], "fidelity": ["trustBoundary", "principal"], "notation": "generic"},
+    {"id": "operations-view", "label": "运维视图", "dimension": "2D", "nodeKinds": ["Service", "Component", "Service", "Module"], "edgeKinds": ["dependsOn", "publishes", "subscribes"], "fidelity": ["slo", "healthCheck"], "notation": "generic"},
+    {"id": "causal-view", "label": "因果视图", "dimension": "4D", "nodeKinds": ["Scenario", "CausalRule", "Event", "Service", "Module", "State"], "edgeKinds": ["triggers", "contains", "dependsOn"], "fidelity": ["counterfactual"], "notation": "generic"}
+  ],
+  "rules": [
+    "每个 view 必须声明 diagramType，且该类型必须在本词表中登记。",
+    "view 的 nodeIds 只能包含该类型 nodeKinds 允许的实体；edgeKinds 同理。",
+    "fidelity 列出的元素若在模型中不存在对应信息，必须在界面上标注为缺失，不得伪造。",
+    "不得为了凑数量而生成虚假图示：没有证据支撑的图示类型不允许出现在 view 列表中。"
+  ]
+}

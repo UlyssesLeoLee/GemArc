@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gemarc.dev/schemas/0.2.0/space.schema.json",
+  "title": "Building–Floor–Room 空间结构",
+  "description": "v5.0 提示词 §6。三层结构可作为阅读用虚拟空间组织，但每个容器必须保存 semanticSource，虚拟房间不得冒充真实代码模块或物理部署设施。",
+  "type": "object",
+  "required": ["buildings"],
+  "additionalProperties": false,
+  "properties": {
+    "buildings": {
+      "type": "array",
+      "default": [],
+      "items": {"$ref": "#/$defs/building"}
+    },
+    "floors": {
+      "type": "array",
+      "default": [],
+      "items": {"$ref": "#/$defs/floor"}
+    },
+    "rooms": {
+      "type": "array",
+      "default": [],
+      "items": {"$ref": "#/$defs/room"}
+    }
+  },
+  "$defs": {
+    "building": {
+      "type": "object",
+      "required": ["id", "name"],
+      "additionalProperties": true,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$"},
+        "name": {"type": "string", "minLength": 1},
+        "kind": {
+          "type": ["string", "null"],
+          "description": "该楼宇代表的语义类别，见 vocab/space-levels.json Building.represents",
+          "default": null
+        },
+        "semanticSource": {
+          "type": "string",
+          "minLength": 1,
+          "description": "必须说明该空间组织由什么推导而来（例如架构层定义、部署清单）。无法说明时不得创建该楼宇。"
+        },
+        "trustBoundary": {"type": ["boolean", "null"], "default": null},
+        "nodeIds": {"type": "array", "items": {"type": "string"}, "default": []}
+      }
+    },
+    "floor": {
+      "type": "object",
+      "required": ["id", "buildingId", "name"],
+      "additionalProperties": true,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$"},
+        "buildingId": {"type": "string", "description": "所属楼宇 ID，必须存在于 buildings 中"},
+        "name": {"type": "string", "minLength": 1},
+        "kind": {"type": ["string", "null"], "default": null},
+        "semanticSource": {"type": "string", "minLength": 1},
+        "nodeIds": {"type": "array", "items": {"type": "string"}, "default": []}
+      }
+    },
+    "room": {
+      "type": "object",
+      "required": ["id", "floorId", "name"],
+      "additionalProperties": true,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$"},
+        "floorId": {"type": "string", "description": "所属楼层 ID，必须存在于 floors 中"},
+        "name": {"type": "string", "minLength": 1},
+        "kind": {"type": ["string", "null"], "default": null},
+        "semanticSource": {"type": "string", "minLength": 1},
+        "nodeIds": {"type": "array", "items": {"type": "string"}, "default": []}
+      }
+    }
+  }
+}

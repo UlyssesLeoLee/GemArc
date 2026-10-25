@@ -48,7 +48,7 @@ class ServiceTests(unittest.TestCase):
         service.init_project(self.ws,'demo')
         file,m=service.load_model(self.ws,'demo')
         before=digest(file)
-        m['edges'][0]['target']='missing'
+        m['edges'][0]['targetId']='missing'
         self.assertEqual(service.replace_model(self.ws,'demo',m,before)['status'],'invalid')
         self.assertEqual(digest(file),before)
     def test_diff(self):

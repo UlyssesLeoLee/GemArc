@@ -24,7 +24,23 @@
 | FR-018 | `service.diff` | 部分 | `test_diff` | 动画及场景差异分析 |
 | FR-019 | 无 | 未实现 | 无 | MCP Apps 嵌入式预览 |
 
-**状态说明**：已运行 23 项核心 Python UT/服务集成测试和浏览器 Mock 数据 DOM/交互冒烟测试才算对应能力得到初步验证。**SDK 端到端 MCP 协议已完成核验**——用官方 MCP 客户端对 stdio 与 Streamable HTTP 两种传输各跑一遍 `initialize` → `list_tools` → `call_tool`，11 个 tool / 2 个 resource / 1 个 prompt 全部调通（`tests/test_mcp_contract.py` 只用 FakeServer 替换了 SDK，不构成握手证据）。Node/npm、Three.js/WebGL 浏览器、视觉回归和真实项目事实提取**仍未在本次环境中完成**。符合标准导向的文档化 ≠ 完成相应正式验证。
+**状态说明**：已运行核心 Python UT/服务集成测试和浏览器 Mock 数据 DOM/交互冒烟测试才算对应能力得到初步验证。**SDK 端到端 MCP 协议已完成核验**——用官方 MCP 客户端对 stdio 与 Streamable HTTP 两种传输各跑一遍 `initialize` → `list_tools` → `call_tool`，13 个 tool / 2 个 resource / 1 个 prompt 全部调通（`tests/test_mcp_contract.py` 只用 FakeServer 替换了 SDK，不构成握手证据）。Node/npm、Three.js/WebGL 浏览器、视觉回归和真实项目事实提取**仍未在本次环境中完成**。符合标准导向的文档化 ≠ 完成相应正式验证。
+
+## 5D 脚手架（固定格式 + 共用代码）
+
+> 目标：把「可被写死的东西」从大模型手里拿走，模型只填事实。设计见 `docs/02_基本设计/09_脚手架与共用运行时设计.md`。
+
+| 能力 | 状态 | 证据 | 后续工作 |
+|---|---|---|---|
+| 契约层（8 份 JSON Schema） | 实现 | `test_scaffold` | 增加更多 UML 变体 |
+| 词表层（7 份，三方唯一事实源） | 实现 | `test_scaffold_vocab` 断言生成物与源文件一致 | 无 |
+| 运行层（core/graph/focus/space/sim/view/workflow/interop） | 实现 | Node `--test` 覆盖 | 3D 拾取仍需 legacy Viewer 注入 |
+| 0.2.0 归一化（sourceId/targetId/type、6 级证据） | 实现，旧模型不破 | `test_model_compat` | 无 |
+| 4D/5D 双端同构 | 实现 | `test_sim_consistency` 逐字比对 8 个黄金用例 | 结构因果模型 |
+| 脚手架生成器 + 槽位清单 | 实现 | `test_scaffold`、`test_scaffold_flow` | 槽位收敛策略 |
+| `static` / `vite` 双 profile 共用一份源码 | 实现 | `test_scaffold_flow`（含 Node 实际 import 站点 runtime） | 离线 vendor 流程 |
+| `gemarc.scaffold` / `gemarc.contracts` 工具 | 实现 | MCP 工具注册数 13 | 无 |
+| 浏览器端视觉回归 | **未实现** | 无 | `verify` 仍只做文件系统与 Schema 检查 |
 
 ## 远程端点（Vercel）
 

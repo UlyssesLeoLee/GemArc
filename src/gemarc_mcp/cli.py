@@ -15,9 +15,17 @@ def main(argv=None):
         sub = commands.add_parser(cmd)
         sub.add_argument("project")
         if cmd == "validate": sub.add_argument("--strict", action="store_true")
-        if cmd == "build": sub.add_argument("--legacy-dist", default="")
+        if cmd == "build":
+            sub.add_argument("--legacy-dist", default="")
+            sub.add_argument("--profile", default="mvp", choices=list(service.BUILD_PROFILES),
+                             help="mvp=小型查看器, static=零构建 ESM 站, vite=npm 工程")
     insp = commands.add_parser("inspect")
     insp.add_argument("path")
+    sc = commands.add_parser("scaffold")
+    sc.add_argument("project")
+    sc.add_argument("--profile", default="static", choices=["static", "vite"])
+    ct = commands.add_parser("contracts")
+    ct.add_argument("--query", default="")
     sim = commands.add_parser("simulate")
     sim.add_argument("project")
     sim.add_argument("scenario")
@@ -32,6 +40,9 @@ def main(argv=None):
     try:
         if ns.command == "assets":
             result = service.assets(ns.query)
+        elif ns.command == "contracts":
+            # Read-only static content; it needs no workspace.
+            result = service.contracts(ns.query)
         else:
             if not ns.workspace: raise GemArcError("GEMARC_AUTH_000", "--workspace 或 GEMARC_WORKSPACE_ROOT 为必填")
             ws = Workspace(ns.workspace)
@@ -42,7 +53,10 @@ def main(argv=None):
                 path, m = service.load_model(ws, ns.project)
                 result = model.validate(m, ns.strict)
                 result["modelSha256"] = digest(path)
-            elif ns.command == "build": result = service.build(ws, ns.project, ns.legacy_dist or None)
+            elif ns.command == "build":
+                result = service.build(ws, ns.project, ns.legacy_dist or None, ns.profile)
+            elif ns.command == "scaffold": result = service.scaffold_project(ws, ns.project, ns.profile)
+            elif ns.command == "contracts": result = service.contracts(ns.query)
             elif ns.command == "verify": result = service.verify(ws, ns.project)
             elif ns.command == "export": result = service.export_zip(ws, ns.project)
             elif ns.command == "diff": result = service.diff(ws, ns.base_project, ns.target_project)

@@ -107,8 +107,10 @@ class HttpTransportTests(unittest.TestCase):
     def test_handshake_exposes_full_tool_surface(self):
         out = self._drive({})
         self.assertEqual(out["server"], "GemArc MCP")
-        self.assertEqual(len(out["tools"]), 11)
-        self.assertEqual(len(set(out["tools"])), 11)
+        self.assertEqual(len(out["tools"]), 13)
+        self.assertEqual(len(set(out["tools"])), 13)
+        for name in ("gemarc.scaffold", "gemarc.contracts"):
+            self.assertIn(name, out["tools"])
         self.assertEqual(out["resources"], ["gemarc://registry", "gemarc://schema/model"])
         self.assertEqual(out["prompts"], ["gemarc-design"])
 

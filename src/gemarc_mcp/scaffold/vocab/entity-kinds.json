@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "0.2.0",
+  "id": "entity-kinds",
+  "title": "CanonicalArchitectureModel 实体类型词表",
+  "description": "v5.0 提示词 §3.3 要求的 21 种实体类型。实际项目不存在的实体类型不必生成。",
+  "kinds": [
+    {"id": "System", "label": "系统", "graphRole": "node", "spaceLevel": "Building", "uml": ["Package"], "note": "顶层系统边界"},
+    {"id": "Subsystem", "label": "子系统", "graphRole": "node", "spaceLevel": "Building", "uml": ["Package", "Component"]},
+    {"id": "Module", "label": "模块", "graphRole": "node", "spaceLevel": "Room", "uml": ["Package"]},
+    {"id": "Component", "label": "组件", "graphRole": "node", "spaceLevel": "Room", "uml": ["Component"]},
+    {"id": "Service", "label": "服务", "graphRole": "node", "spaceLevel": "Room", "uml": ["Component"]},
+    {"id": "Class", "label": "类", "graphRole": "node", "spaceLevel": "Room", "uml": ["Class"]},
+    {"id": "Interface", "label": "接口", "graphRole": "node", "spaceLevel": "Room", "uml": ["Class"]},
+    {"id": "Method", "label": "方法", "graphRole": "node", "spaceLevel": "Room", "uml": ["Class"], "note": "方法作为节点时需绑定宿主 Class"},
+    {"id": "Entity", "label": "实体", "graphRole": "node", "spaceLevel": "Room", "uml": ["Class"], "note": "领域实体"},
+    {"id": "Table", "label": "表", "graphRole": "node", "spaceLevel": "Room", "uml": ["Class"]},
+    {"id": "Attribute", "label": "属性", "graphRole": "node", "spaceLevel": null, "uml": ["Class"], "note": "字段/列，作为节点时需绑定宿主"},
+    {"id": "Actor", "label": "参与者", "graphRole": "node", "spaceLevel": "Room", "uml": ["UseCase"]},
+    {"id": "Event", "label": "事件", "graphRole": "node", "spaceLevel": "Room", "uml": ["Activity"]},
+    {"id": "State", "label": "状态", "graphRole": "node", "spaceLevel": "Room", "uml": ["StateMachine"]},
+    {"id": "Transition", "label": "迁移", "graphRole": "node", "spaceLevel": "Room", "uml": ["StateMachine"]},
+    {"id": "Constraint", "label": "约束", "graphRole": "node", "spaceLevel": "Room", "uml": ["Activity"], "note": "业务/非功能约束"},
+    {"id": "Relationship", "label": "关系实体", "graphRole": "node", "spaceLevel": "Room", "uml": ["Class"], "note": "需要独立身份的领域关系"},
+    {"id": "Evidence", "label": "证据", "graphRole": "node", "spaceLevel": null, "uml": [], "note": "证据实体，被节点与边通过 evidenceIds 引用"},
+    {"id": "Scenario", "label": "场景", "graphRole": "node", "spaceLevel": "Room", "uml": ["Activity"]},
+    {"id": "CausalRule", "label": "因果规则", "graphRole": "node", "spaceLevel": "Room", "uml": ["Activity"]}
+  ],
+  "rules": [
+    "每个对象必须使用稳定 ID。",
+    "每条关系必须保存明确来源。",
+    "实际项目不存在的实体类型不必生成。",
+    "spaceLevel 为 null 的类型不参与 Building–Floor–Room 空间布局。"
+  ]
+}

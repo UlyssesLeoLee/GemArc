@@ -33,6 +33,16 @@ def create_server():
         """Find reusable standardized components and clearly labeled future components."""
         return safe_response(lambda: service.assets(query))
 
+    @app.tool(name="gemarc.contracts")
+    def contracts(query: str = "") -> dict:
+        """List the fixed contracts, vocabularies and fill-in slots; optionally return one document."""
+        return safe_response(lambda: service.contracts(query))
+
+    @app.tool(name="gemarc.scaffold")
+    def scaffold(project: str, profile: str = "static") -> dict:
+        """Materialise the fixed parts (contracts, vocabulary, shared runtime, site shell) plus the fill-in slots; requires GEMARC_ALLOW_WRITE=1."""
+        return safe_response(lambda: service.scaffold_project(workspace(), project, profile))
+
     @app.tool(name="gemarc.init")
     def init(project: str) -> dict:
         """Create a new example-backed GemArc project; requires GEMARC_ALLOW_WRITE=1."""
@@ -54,9 +64,9 @@ def create_server():
         return safe_response(action)
 
     @app.tool(name="gemarc.build")
-    def build(project: str, legacy_dist: str = "") -> dict:
-        """Compile a local static 5D website, optionally embedding an existing compiled 3D Viewer."""
-        return safe_response(lambda: service.build(workspace(), project, legacy_dist or None))
+    def build(project: str, legacy_dist: str = "", profile: str = "mvp") -> dict:
+        """Compile a static site; profile selects mvp (small viewer), static (zero-build ESM) or vite (npm project)."""
+        return safe_response(lambda: service.build(workspace(), project, legacy_dist or None, profile))
 
     @app.tool(name="gemarc.simulate")
     def simulate(project: str, scenario_id: str, disabled_nodes: list[str] | None = None,

@@ -8,7 +8,7 @@ class ModelTests(unittest.TestCase):
     def test_valid_sample(self): self.assertEqual(validate(self.m)['status'], 'ok')
     def test_strict_requires_provenance(self): self.assertEqual(validate(self.m, strict=True)['status'], 'invalid')
     def test_reject_dangling_edge(self):
-        self.m['edges'][0]['target'] = 'missing'
+        self.m['edges'][0]['targetId'] = 'missing'
         self.assertEqual(validate(self.m)['status'], 'invalid')
     def test_reject_duplicate_id(self):
         self.m['nodes'].append(copy.deepcopy(self.m['nodes'][0]))
@@ -21,7 +21,7 @@ class ModelTests(unittest.TestCase):
         self.m['scenarios'][0]['rules'] = [None]
         self.assertEqual(validate(self.m)['status'], 'invalid')
     def test_malformed_edge_endpoint_no_crash(self):
-        self.m['edges'][0]['source'] = []
+        self.m['edges'][0]['sourceId'] = []
         self.assertEqual(validate(self.m)['status'], 'invalid')
     def test_missing_view_is_allowed(self):
         self.m['views'] = []

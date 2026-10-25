@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "0.2.0",
+  "id": "edge-types",
+  "title": "关系类型词表",
+  "description": "Canonical Model 中边的类型清单。category 决定可视化语义；directed 决定是否可逆；trustBoundary 标记跨信任域关系。",
+  "types": [
+    {"id": "contains", "label": "包含", "category": "structure", "directed": true, "defaultWeight": null, "conditionAllowed": false, "trustBoundary": false},
+    {"id": "belongsTo", "label": "归属", "category": "structure", "directed": true, "defaultWeight": null, "conditionAllowed": false, "trustBoundary": false},
+    {"id": "composes", "label": "组合", "category": "structure", "directed": true, "defaultWeight": null, "conditionAllowed": false, "trustBoundary": false},
+    {"id": "aggregates", "label": "聚合", "category": "structure", "directed": true, "defaultWeight": null, "conditionAllowed": false, "trustBoundary": false},
+    {"id": "dependsOn", "label": "依赖", "category": "structure", "directed": true, "defaultWeight": null, "conditionAllowed": false, "trustBoundary": false},
+    {"id": "calls", "label": "调用", "category": "behavior", "directed": true, "defaultWeight": null, "conditionAllowed": true, "trustBoundary": false},
+    {"id": "implements", "label": "实现", "category": "behavior", "directed": true, "defaultWeight": null, "conditionAllowed": false, "trustBoundary": false},
+    {"id": "inherits", "label": "继承", "category": "behavior", "directed": true, "defaultWeight": null, "conditionAllowed": false, "trustBoundary": false},
+    {"id": "transitions", "label": "状态迁移", "category": "behavior", "directed": true, "defaultWeight": null, "conditionAllowed": true, "trustBoundary": false},
+    {"id": "triggers", "label": "触发", "category": "behavior", "directed": true, "defaultWeight": null, "conditionAllowed": true, "trustBoundary": false},
+    {"id": "reads", "label": "读取", "category": "data", "directed": true, "defaultWeight": null, "conditionAllowed": false, "trustBoundary": false},
+    {"id": "writes", "label": "写入", "category": "data", "directed": true, "defaultWeight": null, "conditionAllowed": false, "trustBoundary": false},
+    {"id": "owns", "label": "拥有数据", "category": "data", "directed": true, "defaultWeight": null, "conditionAllowed": false, "trustBoundary": false},
+    {"id": "publishes", "label": "发布", "category": "flow", "directed": true, "defaultWeight": null, "conditionAllowed": false, "trustBoundary": true},
+    {"id": "subscribes", "label": "订阅", "category": "flow", "directed": true, "defaultWeight": null, "conditionAllowed": false, "trustBoundary": true},
+    {"id": "sends", "label": "发送", "category": "flow", "directed": true, "defaultWeight": null, "conditionAllowed": true, "trustBoundary": true},
+    {"id": "receives", "label": "接收", "category": "flow", "directed": true, "defaultWeight": null, "conditionAllowed": false, "trustBoundary": true},
+    {"id": "constrains", "label": "约束", "category": "constraint", "directed": true, "defaultWeight": null, "conditionAllowed": false, "trustBoundary": false},
+    {"id": "evidences", "label": "佐证", "category": "evidence", "directed": true, "defaultWeight": null, "conditionAllowed": false, "trustBoundary": false},
+    {"id": "derivesFrom", "label": "派生自", "category": "evidence", "directed": true, "defaultWeight": null, "conditionAllowed": false, "trustBoundary": false}
+  ],
+  "rules": [
+    "多条不同关系不得被错误合并：同一对节点之间不同 type 的边必须共存且各自可拾取。",
+    "trustBoundary 为 true 的边必须跨信任域显式标注，渲染时需要区别样式。",
+    "condition 与 weight 只有在 type 允许时才可非空。",
+    "未登记的 type 必须被拒绝，不得静默接受。"
+  ]
+}

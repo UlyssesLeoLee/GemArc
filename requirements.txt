@@ -1,0 +1,4 @@
+# Vercel Python builder installs from this file. Keep it aligned with pyproject.toml.
+# 2.3.0 is the lower bound that the Streamable HTTP deployment was verified against
+# (mcp.server.MCPServer + streamable_http_app + background-thread session manager).
+mcp>=2.3.0,<3.0

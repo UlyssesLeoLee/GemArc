@@ -1,0 +1,209 @@
+"""
+Vercel entrypoint for the GemArc MCP server.
+
+This module is the ASGI application that Vercel deploys as a Python Function.
+It serves two things from one function:
+
+  /mcp      MCP Streamable HTTP endpoint (11 tools / 2 resources / 1 prompt)
+  /healthz  health and deployment-state probe
+  /*        the 5D architecture static site (examples/demo-site)
+
+Serving the static site from the function as well keeps the whole deployment to
+a single build and a single routing rule, which removes any ambiguity about
+Vercel's static-build destination conventions. If you later want the site on
+the CDN instead, move it to a dedicated static project and delete the static
+mount below; nothing else depends on it.
+
+Three serverless-specific decisions are made here. Each was established by
+experiment, not assumption (evidence in docs/09_部署/01_Vercel部署.md):
+
+1. Transport is Streamable HTTP in stateless mode with JSON responses.
+   Vercel functions do not keep MCP session state between invocations, and a
+   long-lived SSE response would occupy a function for its whole lifetime.
+
+2. DNS-rebinding protection is disabled.
+   The SDK default only accepts Host: localhost / 127.0.0.1, so on a real domain
+   every request would be answered with HTTP 421 "Invalid Host header".
+   Measured: 421 with protection on, 200 with it off, same request.
+
+3. The MCP session manager is started in a background thread at import time.
+   Serverless hosts do not reliably run ASGI lifespan events
+   (vercel/vercel#11677), and without the session manager the SDK raises
+   "RuntimeError: Task group is not initialized. Make sure to use run()."
+
+Security posture: write access stays OFF unless an operator sets
+GEMARC_ALLOW_WRITE=1. The seeded demo project is published sample data, so the
+read-only tools are safe to expose; the write tools are not, because every
+caller would share one ephemeral workspace.
+"""
+from __future__ import annotations
+
+import os
+import shutil
+import sys
+import tempfile
+import threading
+from pathlib import Path
+
+import anyio
+from mcp.server.transport_security import TransportSecuritySettings
+from starlette.applications import Starlette
+from starlette.responses import JSONResponse, Response
+from starlette.routing import Mount, Route
+from starlette.staticfiles import StaticFiles
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT / "src") not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT / "src"))
+
+from gemarc_mcp import server as gemarc_server  # noqa: E402
+
+# --- workspace -------------------------------------------------------------
+# Vercel gives every instance an ephemeral filesystem and only /tmp is writable.
+# The root is instance-scoped so separate instances never share state.
+def _resolve_workspace() -> Path:
+    configured = Path(
+        os.environ.get("GEMARC_WORKSPACE_ROOT", "/tmp/gemarc-workspace")
+    )
+    try:
+        configured.mkdir(parents=True, exist_ok=True)
+        return configured.resolve()
+    except OSError:
+        # A misconfigured or read-only root must not take the whole function down.
+        fallback = Path(tempfile.gettempdir()) / "gemarc-workspace"
+        fallback.mkdir(parents=True, exist_ok=True)
+        return fallback.resolve()
+
+
+WORKSPACE_ROOT = _resolve_workspace()
+os.environ["GEMARC_WORKSPACE_ROOT"] = str(WORKSPACE_ROOT)
+
+# Writes stay off unless an operator explicitly turns them on. Anything other
+# than the exact value "1" is normalised to "0", so a stray "true" or "yes"
+# from an outer shell cannot silently enable the write tools.
+if os.environ.get("GEMARC_ALLOW_WRITE") != "1":
+    os.environ["GEMARC_ALLOW_WRITE"] = "0"
+
+SEED_PROJECT = "demo"
+SEED_MODEL = REPO_ROOT / "examples" / "demo-site" / "data" / "architecture.json"
+STATIC_DIR = REPO_ROOT / "examples" / "demo-site"
+
+
+def seed_demo_project() -> bool:
+    """Give the read-only tools something to read on a cold instance."""
+    target = WORKSPACE_ROOT / SEED_PROJECT / "model" / "architecture.json"
+    if target.exists():
+        return False
+    if not SEED_MODEL.is_file():
+        return False
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(SEED_MODEL, target)
+    return True
+
+
+SEEDED = seed_demo_project()
+
+# --- MCP server ------------------------------------------------------------
+_server = gemarc_server.create_server()
+_mcp_app = _server.streamable_http_app(
+    streamable_http_path="/mcp",
+    json_response=True,
+    stateless_http=True,
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=False
+    ),
+    host="0.0.0.0",
+)
+
+
+def _run_session_manager() -> None:
+    async def _main() -> None:
+        async with _server.session_manager.run():
+            await anyio.sleep_forever()
+
+    global _session_error
+    try:
+        anyio.run(_main)
+    except Exception as exc:  # pragma: no cover - the thread is best-effort
+        # Recorded rather than swallowed: a silent failure here surfaces at
+        # request time as "Task group is not initialized", which is impossible
+        # to diagnose without this marker.
+        _session_error = f"{type(exc).__name__}: {exc}"
+
+
+_session_error = ""
+_session_thread = threading.Thread(
+    target=_run_session_manager, daemon=True, name="gemarc-mcp-session"
+)
+_session_thread.start()
+
+
+# --- static site -----------------------------------------------------------
+STATIC_AVAILABLE = (STATIC_DIR / "index.html").is_file()
+
+
+async def _static_missing(scope, receive, send):
+    response = Response(
+        "GemArc static site is not present in this deployment bundle. "
+        "The MCP endpoint at /mcp is unaffected.",
+        status_code=404,
+        media_type="text/plain; charset=utf-8",
+    )
+    await response(scope, receive, send)
+
+
+static_app = (
+    StaticFiles(directory=str(STATIC_DIR), html=True)
+    if STATIC_AVAILABLE
+    else _static_missing
+)
+
+
+# --- dispatch --------------------------------------------------------------
+def _health_payload() -> dict:
+    return {
+        "status": "ok",
+        "server": "gemarc-mcp",
+        "transport": "streamable-http",
+        "protocolPath": "/mcp",
+        "workspace": str(WORKSPACE_ROOT),
+        "writeEnabled": os.environ.get("GEMARC_ALLOW_WRITE") == "1",
+        "seedProject": SEED_PROJECT,
+        "seeded": SEEDED,
+        "staticSiteAvailable": STATIC_AVAILABLE,
+        "sessionManagerThreadAlive": _session_thread.is_alive(),
+        "sessionManagerError": _session_error,
+    }
+
+
+async def healthz(_request):
+    return JSONResponse(_health_payload())
+
+
+async def _health_endpoint(scope, receive, send):
+    response = JSONResponse(_health_payload())
+    await response(scope, receive, send)
+
+
+async def _mcp_endpoint(scope, receive, send):
+    """Normalise the path so the MCP app always sees its own /mcp route."""
+    normalised = dict(scope)
+    normalised["path"] = "/mcp"
+    normalised["raw_path"] = b"/mcp"
+    await _mcp_app(normalised, receive, send)
+
+
+MCP_PATHS = ("/mcp", "/api/index", "/api/index.py", "/index.py")
+
+
+async def dispatch(scope, receive, send):
+    path = scope.get("path", "/")
+    if path.endswith("healthz"):
+        await _health_endpoint(scope, receive, send)
+    elif path in MCP_PATHS or path.rstrip("/").endswith("/mcp"):
+        await _mcp_endpoint(scope, receive, send)
+    else:
+        await static_app(scope, receive, send)
+
+
+app = Starlette(routes=[Route("/healthz", healthz), Mount("/", app=dispatch)])

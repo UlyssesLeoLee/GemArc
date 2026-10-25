@@ -1,0 +1,12 @@
+flowchart LR
+  Index[入口 index.html] --> D1[1D 证据与文字]
+  Index --> D2[2D 无限画布]
+  Index --> D3[3D 场景]
+  Index --> D4[4D 动态]
+  Index --> D5[5D 因果]
+  Index --> PX[Prototype 多标签原型]
+  D2 <-->|entityId| D3
+  D3 --> D4
+  D4 --> D5
+  PX -->|需求/接口/实体 ID| D2
+  D1 -->|证据链接| D2

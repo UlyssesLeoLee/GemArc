@@ -1,0 +1,10 @@
+flowchart LR
+  Source[Source Inputs] --> N[Normalize]
+  N --> E[Evidence & Model]
+  E --> V[Schema Validation]
+  V --> R[Registry Resolve]
+  R --> Lock[Lock Manifest]
+  Lock --> Gen[ViewModel Emit]
+  Gen --> Runtime[Shared Runtime & Pages]
+  Runtime --> Tests[QA Gates]
+  Tests --> Publish[Atomic Publish]

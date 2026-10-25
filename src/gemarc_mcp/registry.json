@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "0.1.0",
+  "name": "GemArc standard registry",
+  "licensePolicy": "Verify every third-party dependency before distribution",
+  "components": [
+    {"id":"gemarc.1d.facts","version":"0.1.0","dimension":"1D","status":"implemented","license":"MIT","purpose":"Fact and evidence browser"},
+    {"id":"gemarc.2d.graph","version":"0.1.0","dimension":"2D","status":"implemented","license":"MIT","purpose":"SVG node-edge diagram with selection"},
+    {"id":"gemarc.3d.legacy-viewer","version":"0.1.0","dimension":"3D","status":"adapter","license":"Check original repository","purpose":"Optional existing Three.js viewer built separately"},
+    {"id":"gemarc.4d.timeline","version":"0.1.0","dimension":"4D","status":"implemented_mvp","license":"MIT","purpose":"Bounded rule-generated event timeline"},
+    {"id":"gemarc.5d.intervention","version":"0.1.0","dimension":"5D","status":"implemented_mvp","license":"MIT","purpose":"Explicit-rule module disabling and bounded rerun"},
+    {"id":"gemarc.prototype.tabs","version":"0.1.0","dimension":"prototype","status":"implemented_mvp","license":"MIT","purpose":"Data-driven multi-tab interactive page prototype"},
+    {"id":"gemarc.prototype.konva-editor","version":"future","dimension":"prototype","status":"not_implemented","license":"Unverified","purpose":"Konva.js visual editor"},
+    {"id":"gemarc.2d.graphology-dagre","version":"future","dimension":"2D","status":"not_implemented","license":"Unverified","purpose":"Graphology/Dagre adapters"},
+    {"id":"gemarc.storage.dexie","version":"future","dimension":"shared","status":"not_implemented","license":"Unverified","purpose":"IndexedDB cache"}
+  ]
+}

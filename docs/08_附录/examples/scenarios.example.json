@@ -1,0 +1,98 @@
+{
+  "notice": "All scenarios are hypothetical standard test fixtures. Not observed in target repository.",
+  "moduleDefinitions": [
+    {
+      "id": "sample.queue",
+      "states": [
+        "ready",
+        "delayed",
+        "down"
+      ],
+      "inputPorts": [
+        "event"
+      ],
+      "outputPorts": [
+        "message"
+      ]
+    },
+    {
+      "id": "sample.rules",
+      "states": [
+        "ready",
+        "down"
+      ],
+      "inputPorts": [
+        "message"
+      ],
+      "outputPorts": [
+        "alert"
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "CASE-001",
+      "type": "normal",
+      "status": "HYPOTHETICAL",
+      "seed": 42,
+      "events": [
+        {
+          "at": 0,
+          "type": "ingress.receive",
+          "source": "sample.ingress"
+        },
+        {
+          "at": 1,
+          "type": "queue.forward",
+          "source": "sample.queue"
+        },
+        {
+          "at": 2,
+          "type": "rules.accept",
+          "source": "sample.rules"
+        }
+      ],
+      "outcomes": [
+        "notify.triggered"
+      ]
+    },
+    {
+      "id": "CASE-002",
+      "type": "timeout",
+      "status": "HYPOTHETICAL",
+      "seed": 42,
+      "interventions": [
+        {
+          "target": "sample.queue",
+          "property": "delayMs",
+          "value": 5000
+        }
+      ],
+      "rules": [
+        "if delayMs > timeoutMs then timeout"
+      ],
+      "outcomes": [
+        "notify.delayed_or_failed"
+      ]
+    },
+    {
+      "id": "CASE-003",
+      "type": "outage",
+      "status": "HYPOTHETICAL",
+      "seed": 42,
+      "interventions": [
+        {
+          "target": "sample.rules",
+          "property": "available",
+          "value": false
+        }
+      ],
+      "rules": [
+        "if rules unavailable then downstream alert suppressed"
+      ],
+      "outcomes": [
+        "notify.not_triggered"
+      ]
+    }
+  ]
+}

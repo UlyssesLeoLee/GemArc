@@ -1,0 +1,14 @@
+flowchart TB
+  User[架构师 / AI Agent] --> M[MCP Adapter / CLI]
+  M --> Inspect[Inspector & Evidence]
+  M --> Core[Application Services & Model Core]
+  Inspect --> Core
+  Core --> Registry[Component Registry + Lock]
+  Core --> Compiler[Architecture Compiler]
+  Registry --> Compiler
+  Core --> Dynamic[4D State/Event Engine]
+  Dynamic --> Causal[5D Causality Engine]
+  Causal --> Compiler
+  Compiler --> QA[Validator & QA Gate]
+  QA --> Export[HTML / JSON / MD / ZIP]
+  Export --> Viewer[Independent 1D–5D Viewer & Prototype]

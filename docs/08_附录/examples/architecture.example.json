@@ -1,0 +1,95 @@
+{
+  "meta": {
+    "schemaVersion": "1.0.0",
+    "projectId": "gemarc-sample",
+    "language": "zh-CN",
+    "description": "illustrative only"
+  },
+  "sources": [
+    {
+      "id": "src.sample",
+      "kind": "illustrative",
+      "ref": "example://designed-sample"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "ev.001",
+      "sourceRef": {
+        "kind": "example",
+        "ref": "example://designed-sample"
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "id": "node.ingress",
+      "name": "接入模块（示例）",
+      "kind": "service",
+      "verification": "illustrative",
+      "evidenceRefs": [
+        "ev.001"
+      ]
+    },
+    {
+      "id": "node.processor",
+      "name": "处理模块（示例）",
+      "kind": "service",
+      "verification": "illustrative",
+      "evidenceRefs": [
+        "ev.001"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge.route",
+      "source": "node.ingress",
+      "target": "node.processor",
+      "kind": "calls",
+      "verification": "illustrative",
+      "evidenceRefs": [
+        "ev.001"
+      ]
+    }
+  ],
+  "viewpoints": [
+    {
+      "id": "vp.logical",
+      "stakeholders": [
+        "架构师"
+      ],
+      "concerns": [
+        "模块依赖",
+        "职责边界"
+      ],
+      "questions": [
+        "模块是否过度耦合"
+      ]
+    }
+  ],
+  "views": [
+    {
+      "id": "view.logical",
+      "viewpointId": "vp.logical",
+      "entityIds": [
+        "node.ingress",
+        "node.processor"
+      ],
+      "edgeIds": [
+        "edge.route"
+      ],
+      "dimensions": {
+        "x": {
+          "field": "kind"
+        }
+      }
+    }
+  ],
+  "scenarios": [],
+  "causalModels": [],
+  "lock": {
+    "template": "gemarc-standard@1.0.0",
+    "components": {}
+  }
+}

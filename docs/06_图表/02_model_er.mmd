@@ -1,0 +1,15 @@
+erDiagram
+  PROJECT ||--o{ SOURCE : has
+  SOURCE ||--o{ EVIDENCE : provides
+  PROJECT ||--|| ARCHITECTURE : models
+  ARCHITECTURE ||--o{ NODE : has
+  ARCHITECTURE ||--o{ EDGE : has
+  NODE ||--o{ EDGE : source_or_target
+  EVIDENCE }o--o{ NODE : verifies
+  EVIDENCE }o--o{ EDGE : verifies
+  ARCHITECTURE ||--o{ VIEW : projects
+  VIEWPOINT ||--o{ VIEW : defines
+  ARCHITECTURE ||--o{ SCENARIO : simulates
+  SCENARIO ||--o{ EVENT : includes
+  ARCHITECTURE ||--o{ CAUSAL_RULE : governs
+  CAUSAL_RULE }o--o{ EVIDENCE : supports

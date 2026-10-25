@@ -1,0 +1,151 @@
+{
+  "edges": [
+    {
+      "description": "上传事件",
+      "evidence": "示例",
+      "id": "e1",
+      "kind": "event",
+      "source": "sensor",
+      "target": "queue",
+      "verification": "illustrative"
+    },
+    {
+      "description": "传递事件",
+      "evidence": "示例",
+      "id": "e2",
+      "kind": "event",
+      "source": "queue",
+      "target": "rule",
+      "verification": "illustrative"
+    },
+    {
+      "description": "规则触发通知",
+      "evidence": "示例",
+      "id": "e3",
+      "kind": "event",
+      "source": "rule",
+      "target": "notify",
+      "verification": "illustrative"
+    }
+  ],
+  "meta": {
+    "description": "示例模型，非真实工程事实",
+    "evidenceState": "illustrative",
+    "language": "zh-CN",
+    "schemaVersion": "0.1.0",
+    "system": "demo",
+    "version": "0.1.0"
+  },
+  "nodes": [
+    {
+      "evidence": "示例",
+      "id": "sensor",
+      "kind": "adapter",
+      "layer": "设备层",
+      "name": "事件源",
+      "verification": "illustrative"
+    },
+    {
+      "evidence": "示例",
+      "id": "queue",
+      "kind": "service",
+      "layer": "中间件层",
+      "name": "消息队列",
+      "verification": "illustrative"
+    },
+    {
+      "evidence": "示例",
+      "id": "rule",
+      "kind": "service",
+      "layer": "应用层",
+      "name": "规则引擎",
+      "verification": "illustrative"
+    },
+    {
+      "evidence": "示例",
+      "id": "notify",
+      "kind": "service",
+      "layer": "应用层",
+      "name": "通知服务",
+      "verification": "illustrative"
+    }
+  ],
+  "prototypes": [
+    {
+      "actions": [
+        "查看流程",
+        "查看节点"
+      ],
+      "description": "组件状态查看示例",
+      "id": "overview",
+      "title": "系统概览"
+    },
+    {
+      "actions": [
+        "保存设置"
+      ],
+      "description": "示例原型数据",
+      "id": "settings",
+      "title": "设置"
+    }
+  ],
+  "scenarios": [
+    {
+      "events": [
+        {
+          "event": "emit",
+          "module": "sensor",
+          "timeMs": 0
+        }
+      ],
+      "evidenceClass": "hypothetical",
+      "id": "normal",
+      "name": "示例：正常事件传播",
+      "rules": [
+        {
+          "delayMs": 10,
+          "emit": "ingest",
+          "source": "sensor",
+          "target": "queue",
+          "whenEvent": "emit"
+        },
+        {
+          "delayMs": 20,
+          "emit": "evaluate",
+          "source": "queue",
+          "target": "rule",
+          "whenEvent": "ingest"
+        },
+        {
+          "delayMs": 10,
+          "emit": "send",
+          "source": "rule",
+          "target": "notify",
+          "whenEvent": "evaluate"
+        }
+      ]
+    }
+  ],
+  "views": [
+    {
+      "concerns": [
+        "事件依赖"
+      ],
+      "edgeKinds": [
+        "event"
+      ],
+      "id": "logical",
+      "nodeIds": [
+        "sensor",
+        "queue",
+        "rule",
+        "notify"
+      ],
+      "reviewIntent": "识别单点故障",
+      "stakeholders": [
+        "架构师"
+      ],
+      "title": "逻辑架构"
+    }
+  ]
+}

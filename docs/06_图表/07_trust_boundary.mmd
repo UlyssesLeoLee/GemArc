@@ -1,0 +1,17 @@
+flowchart TB
+  subgraph Untrusted[不可信来源]
+    Git[Git README / Code]
+    Web[URL / Documents]
+  end
+  subgraph Authorized[授权的执行边界]
+    Inspect[Inspector: read-only]
+    Model[Model + Schema Check]
+    Build[Compiler: sandbox]
+    QA[QA + License Gate]
+  end
+  Git --> Inspect
+  Web --> Inspect
+  Inspect -->|data only| Model
+  Model --> Build --> QA
+  QA -->|passed| Artifacts[授权输出目录]
+  Secret[(凭据/敏感目录)] -.拒绝读取.-> Inspect

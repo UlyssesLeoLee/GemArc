@@ -1,0 +1,13 @@
+flowchart LR
+  B[立项/需求] --> R[SRS + NFR]
+  R --> A[基本设计]
+  A --> D[详细设计]
+  D --> U[UT]
+  U --> I[IT]
+  I --> S[ST]
+  S --> Accept[UAT]
+  Accept --> Release[Release & Operations]
+  QA[Review / Traceability] -.贯穿.-> R
+  QA -.贯穿.-> A
+  QA -.贯穿.-> D
+  QA -.贯穿.-> S

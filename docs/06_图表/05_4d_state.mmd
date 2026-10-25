@@ -1,0 +1,11 @@
+stateDiagram-v2
+  [*] --> Idle
+  Idle --> Received: receive
+  Received --> Processing: validated
+  Processing --> Completed: success
+  Processing --> RetryWait: recoverable error
+  RetryWait --> Processing: retry permitted
+  RetryWait --> Failed: retry budget exceeded
+  Processing --> Failed: terminal error
+  Completed --> [*]
+  Failed --> [*]

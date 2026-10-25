@@ -1,0 +1,53 @@
+# URL 和路径字段留空即可跳过；只有经过授权的根目录可用于读写。
+reference_repositories:
+  - url: ""
+    enabled: false
+    ref: auto
+    borrow: ["布局", "配色", "交互", "合法技术方案"]
+    use_as_target: false
+
+target_repositories:
+  - url: ""
+    ref: auto
+    role: primary
+
+local_folders: []
+project:
+  name: auto
+  summary: ""
+  language: zh-CN
+  output: ./gemarc-5d-output
+
+generation:
+  mode: IMPLEMENT_AND_VERIFY
+  dimensions: [1D, 2D, 3D, 4D, 5D]
+  prototype: true
+  enable_when_evidence_insufficient: false
+  offline: true
+  incremental: true
+
+scaffold:
+  template: gemarc-standard
+  lock_version: true
+  reuse_standard_components: true
+  allow_custom_components: true
+
+visual:
+  style: gemstone-precision
+  coordinate_system: left-handed-logical
+  auto_label_orientation: true
+  focus_nonrelated_retreat: true
+
+quality:
+  strict_schema: true
+  require_evidence_for_confirmed: true
+  require_causal_rule_for_derived: true
+  report_unknowns: true
+  verify_visuals: true
+  verify_before_export: true
+
+security:
+  approved_read_roots: []
+  approved_write_roots: []
+  remote_fetch_allowlist: []
+  allow_external_code_execution: false

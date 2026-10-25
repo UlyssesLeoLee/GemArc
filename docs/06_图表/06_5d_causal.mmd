@@ -1,0 +1,10 @@
+flowchart LR
+  Input[输入事件] --> Q[消息队列]
+  Q --> Rule[规则引擎]
+  Rule --> Notify[通知模块]
+  Notify --> Result[结果]
+  Off{规则模块被屏蔽?} -.干预.-> Rule
+  Off -->|是| Failure[传播中断结果]
+  Rule -.模型规则.-> Evidence[证据/假设层]
+  Failure --> Diff[与基线比较]
+  Result --> Diff

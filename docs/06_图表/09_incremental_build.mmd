@@ -1,0 +1,10 @@
+flowchart TD
+  F[Changed File] --> E[Evidence References]
+  E --> N[Nodes / Edges / Rules]
+  N --> View[Affected Views]
+  N --> Case[Affected 4D/5D Cases]
+  View --> Asset[Component Instances]
+  Case --> Asset
+  Asset --> Package[Rebuild Affected Package]
+  Lock[Changed Registry Major Version] --> Full[Forced Revalidation]
+  Full --> Package

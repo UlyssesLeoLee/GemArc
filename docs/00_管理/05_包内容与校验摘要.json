@@ -1,0 +1,20 @@
+{
+  "product": "GemArc MCP",
+  "version": "1.0",
+  "generatedDate": "2026-10-25",
+  "sourceSnapshot": {
+    "repository": "UlyssesLeoLee/GemArc",
+    "branch": "main",
+    "tree": "777af2a7e3aeadc5e05742074097c851c8b72301",
+    "method": "GitHub static inspection, no runtime tests"
+  },
+  "documentCount": 45,
+  "diagramCount": 10,
+  "functionalRequirementCount": 24,
+  "nonfunctionalRequirementCount": 20,
+  "testDesignCaseCount": 72,
+  "testExecutedCount": 0,
+  "xlsxWorkbooks": 1,
+  "officialCertification": false,
+  "statement": "IPA-aligned tailored design dossier; not official IPA certification or proven implementation"
+}

@@ -1,0 +1,141 @@
+{
+  "normal": {
+    "disabledSample": {
+      "baseline": {
+        "disabledNodes": [],
+        "evidenceClass": "hypothetical",
+        "scenarioId": "normal",
+        "status": "ok",
+        "summary": {
+          "blocked": 0,
+          "delivered": 4
+        },
+        "trace": [
+          {
+            "event": "emit",
+            "module": "sensor",
+            "status": "delivered",
+            "timeMs": 0,
+            "traceId": "trace-0000",
+            "triggeredBy": null
+          },
+          {
+            "event": "ingest",
+            "module": "queue",
+            "status": "delivered",
+            "timeMs": 10,
+            "traceId": "trace-0001",
+            "triggeredBy": "trace-0000"
+          },
+          {
+            "event": "evaluate",
+            "module": "rule",
+            "status": "delivered",
+            "timeMs": 30,
+            "traceId": "trace-0002",
+            "triggeredBy": "trace-0001"
+          },
+          {
+            "event": "send",
+            "module": "notify",
+            "status": "delivered",
+            "timeMs": 40,
+            "traceId": "trace-0003",
+            "triggeredBy": "trace-0002"
+          }
+        ],
+        "truncation": null
+      },
+      "gainedEvents": [],
+      "intervention": {
+        "disabledNodes": [
+          "sensor"
+        ],
+        "evidenceClass": "hypothetical",
+        "scenarioId": "normal",
+        "status": "ok",
+        "summary": {
+          "blocked": 1,
+          "delivered": 0
+        },
+        "trace": [
+          {
+            "event": "emit",
+            "module": "sensor",
+            "status": "blocked",
+            "timeMs": 0,
+            "traceId": "trace-0000",
+            "triggeredBy": null
+          }
+        ],
+        "truncation": null
+      },
+      "lostEvents": [
+        {
+          "event": "send",
+          "module": "notify"
+        },
+        {
+          "event": "ingest",
+          "module": "queue"
+        },
+        {
+          "event": "evaluate",
+          "module": "rule"
+        },
+        {
+          "event": "emit",
+          "module": "sensor"
+        }
+      ],
+      "notice": "仅代表指定模型规则的干预计算结果；不是现实因果识别证明",
+      "scenarioId": "normal",
+      "status": "ok"
+    },
+    "normal": {
+      "disabledNodes": [],
+      "evidenceClass": "hypothetical",
+      "scenarioId": "normal",
+      "status": "ok",
+      "summary": {
+        "blocked": 0,
+        "delivered": 4
+      },
+      "trace": [
+        {
+          "event": "emit",
+          "module": "sensor",
+          "status": "delivered",
+          "timeMs": 0,
+          "traceId": "trace-0000",
+          "triggeredBy": null
+        },
+        {
+          "event": "ingest",
+          "module": "queue",
+          "status": "delivered",
+          "timeMs": 10,
+          "traceId": "trace-0001",
+          "triggeredBy": "trace-0000"
+        },
+        {
+          "event": "evaluate",
+          "module": "rule",
+          "status": "delivered",
+          "timeMs": 30,
+          "traceId": "trace-0002",
+          "triggeredBy": "trace-0001"
+        },
+        {
+          "event": "send",
+          "module": "notify",
+          "status": "delivered",
+          "timeMs": 40,
+          "traceId": "trace-0003",
+          "triggeredBy": "trace-0002"
+        }
+      ],
+      "truncation": null
+    }
+  }
+}

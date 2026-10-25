@@ -1,0 +1,26 @@
+sequenceDiagram
+    actor User
+    participant Host as MCP Host
+    participant MCP as GemArc MCP
+    participant Core as Model Core
+    participant Assets as Registry
+    participant QA as Validator
+    User->>Host: 生成 5D 设计资料
+    Host->>MCP: inspect(sources)
+    MCP->>Core: extractEvidence()
+    Core-->>MCP: facts + unknowns
+    Host->>MCP: model(plan)
+    MCP->>Core: validateReferences()
+    Host->>MCP: assets(query)
+    MCP->>Assets: resolveAndLock()
+    Assets-->>MCP: componentLock
+    Host->>MCP: build(modelRef, output)
+    MCP->>QA: validateModel + verifyBuild
+    alt 验证失败
+      QA-->>MCP: errors
+      MCP-->>Host: failed + diagnostics
+    else 验证通过
+      QA-->>MCP: pass
+      Host->>MCP: export(buildId)
+      MCP-->>Host: artifactRefs + checksum
+    end

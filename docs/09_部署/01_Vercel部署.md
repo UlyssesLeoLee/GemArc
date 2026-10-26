@@ -12,7 +12,7 @@
 |---|---|---|
 | `/mcp` | MCP Streamable HTTP 端点 | `api/index.py` → `MCPServer.streamable_http_app()` |
 | `/healthz` | 健康检查与部署状态 | `api/index.py` |
-| `/` 及其他 | 5D 架构静态站 | `api/index.py` → Starlette `StaticFiles`（`examples/demo-site/`） |
+| `/` 及其他 | 5D 架构静态站（**冷启动时从包内源码物化**） | `api/index.py` → Starlette `StaticFiles` |
 
 配置文件：
 
@@ -23,9 +23,31 @@
 | `requirements.txt` | Vercel Python 构建器安装的依赖 |
 | `.python-version` | Python 3.12 |
 
+**静态站为什么是「物化」出来的**：仓库里的 `examples/demo-site` 是 **MVP 档**的随附预览，
+它与脚手架站（`static` 档）不是同一个应用。若把某一份提交进仓库的快照直接上线，
+它会与包内源码**静默漂移**——仓库声称有 3D 适配器，线上站点却没有。
+
+因此入口在**冷启动时**用包内源码（`src/gemarc_mcp/scaffold/` 的模板与运行时），
+配合 `examples/demo-site/data/architecture.json` 这份**已发布的示例模型**，
+在临时目录里现搭一个 `static` 档站点再对外提供：
+
+```
+冷启动 → builder.build_site(tmp, 已发布示例模型, "static") → StaticFiles(tmp)
+```
+
+- 线上站点**永远等于**当前源码，不可能漂移；
+- 不需要在仓库里提交第二份运行时副本；
+- 物化失败时**回退**到 `examples/demo-site`（并在 `/healthz` 的 `staticSiteSource` 里
+  如实写明回退原因），而不是让站点整个消失。
+
+**已实测**：`/healthz` 返回 `staticSiteSource: "scaffold-static"`；
+`/` 返回的 HTML 含 `importmap` 与 `"three"`；
+`/runtime/space/space-viewer-three.js` 返回 200 且含 `createThreeSpaceRenderer`。
+这三条已固化为回归测试 `tests/test_http_transport.py`。
+
 **为什么静态站也由函数提供**：这样整个部署只有一条路由规则和一个构建产物，
 不依赖 Vercel 静态构建的 `dest` 路径约定。若后续要让静态资源走 CDN，
-把 `examples/demo-site` 拆成独立的静态项目，并删除 `api/index.py` 中的
+把静态站拆成独立的静态项目，并删除 `api/index.py` 中的
 `static_app` 分支即可，其余部分不依赖它。
 
 ## 2. 三个必须的适配（及其实测依据）
@@ -36,7 +58,7 @@ Vercel 函数不在调用之间保存 MCP 会话状态，长连接的 SSE 响应
 因此使用 `streamable_http_app(json_response=True, stateless_http=True)`。
 
 **已实测**：`initialize` → `list_tools` → `list_resources` → `list_prompts` → `call_tool`
-全链路跑通，协商协议版本 `2025-11-25`，11 个 tool / 2 个 resource / 1 个 prompt 全部可见。
+全链路跑通，协商协议版本 `2025-11-25`，14 个 tool / 2 个 resource / 1 个 prompt 全部可见。
 
 ### 2.2 关闭 DNS rebinding 防护
 
@@ -68,7 +90,7 @@ Serverless 宿主不保证执行 ASGI lifespan 事件（官方 issue vercel/verc
 catch-all 路由下，函数收到的路径可能是 `/mcp`，也可能是重写产生的 `/api/index`。
 入口把这两者（以及 `/index.py`）都归一化为 MCP 端点。
 
-**已实测**：`/mcp` 与 `/api/index` 两条路径都返回 11 个 tool。
+**已实测**：`/mcp` 与 `/api/index` 两条路径都返回 14 个 tool。
 
 ## 3. 工具可用性矩阵
 
@@ -138,8 +160,9 @@ npx vercel@65.2.0 deploy --prod
 | `GEMARC_WORKSPACE_ROOT` | 否 | `/tmp/gemarc-workspace` | 工作区根，建议保持默认 |
 | `GEMARC_ALLOW_WRITE` | 否 | `0` | 置 `1` 才开放写工具，公开部署不建议 |
 
-`vercel.json` 用 `config.includeFiles` 显式带上 `src/**` 与 `examples/demo-site/**`，
-因为构建器不保证把非 import 追踪到的目录打进函数包。
+`vercel.json` 用 `config.includeFiles` 显式带上 `src/**` 与 `examples/demo-site/**`：
+前者是 MCP 运行时**也是**冷启动物化站点所用的模板与共享运行时，后者提供已发布的示例模型
+（以及物化失败时的回退预览）。因为构建器不保证把非 import 追踪到的目录打进函数包。
 
 ## 7. 部署后验证
 
@@ -155,7 +178,7 @@ async def m():
         async with ClientSession(r,w) as s:
             await s.initialize(); print(len((await s.list_tools()).tools), 'tools')
 asyncio.run(m())"
-# 期望输出：11 tools
+# 期望输出：14 tools
 
 # 3. 静态站
 curl -I https://<domain>/
@@ -165,12 +188,14 @@ curl -I https://<domain>/
 
 ### 已实测（本机真实运行）
 
-- Streamable HTTP 全链路握手，11 tool / 2 resource / 1 prompt 可见可调
+- Streamable HTTP 全链路握手，14 tool / 2 resource / 1 prompt 可见可调
 - DNS rebinding 防护开/关的 421 / 200 对照
 - 去掉 lifespan 触发 `Task group is not initialized`，改用后台线程后恢复
 - 写工具默认关闭（`GEMARC_AUTH_002`）且无副作用；越界路径被拒（`GEMARC_AUTH_001`）
 - 新容器 + 空工作区导致项目状态丢失（`GEMARC_IO_001`）
 - 静态站 `/`、`/app.js`、`/data/*.json` 均 200
+- 静态站是**冷启动物化**的脚手架构建（`staticSiteSource: "scaffold-static"`），
+  含 import map 与 `/runtime/space/space-viewer-three.js`
 - `/mcp` 与 `/api/index` 两条路径都可用
 - 真实域名 Host 头下 `/healthz` 返回 200
 - 以上行为已固化为回归测试 `tests/test_http_transport.py`（真实启动应用 + 官方客户端握手），
@@ -179,7 +204,10 @@ curl -I https://<domain>/
 ### 待验证（需要 Vercel 账号凭据，本次无法执行）
 
 - `vercel build` 是否按预期打出函数产物
-- `config.includeFiles` 的 glob 在真实构建中是否覆盖全部静态资源
+- `config.includeFiles` 的 glob 在真实构建中是否覆盖全部静态资源，
+  以及 `src/gemarc_mcp/scaffold/` 下的模板与运行时是否完整进入函数包
+  （冷启动物化站点依赖它们；缺任何一个都会让 `/` 回退到随附预览）
+- 冷启动物化站点的耗时（每个新实例都要现搭一次站点）
 - 真实域名下的完整 MCP 握手
 - 静态资源由函数提供时的冷启动耗时与 CDN 缓存行为
 
@@ -192,7 +220,9 @@ curl -I https://<domain>/
   以免在 Hobby 计划上构建失败；Pro 用户可自行加上。
 - 函数包体积上限 250MB（未压缩）/ 50MB（压缩），当前依赖远低于该限制。
 - 静态资源由函数提供，不走 CDN 边缘缓存；需要 CDN 时按第 1 节拆分项目。
-- 远程端点**没有**经过浏览器端 / WebGL 端到端验证，`gemarc.verify` 仍只做文件系统与 Schema 检查。
+- 远程端点**没有**经过浏览器端 / WebGL 端到端验证——同一份 `static` 档站点在本机浏览器里
+  已实测通过（见设计文档 §7），但**真实域名下的那次验证还没做**；
+  `gemarc.verify` 仍只做文件系统与 Schema 检查。
 
 ## 10. 什么时候不该用 Vercel
 

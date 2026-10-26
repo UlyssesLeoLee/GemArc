@@ -26,6 +26,9 @@ def main(argv=None):
     sc.add_argument("--profile", default="static", choices=["static", "vite"])
     ct = commands.add_parser("contracts")
     ct.add_argument("--query", default="")
+    br = commands.add_parser("brief")
+    br.add_argument("--project", default="")
+    br.add_argument("--section", default="")
     sim = commands.add_parser("simulate")
     sim.add_argument("project")
     sim.add_argument("scenario")
@@ -43,6 +46,8 @@ def main(argv=None):
         elif ns.command == "contracts":
             # Read-only static content; it needs no workspace.
             result = service.contracts(ns.query)
+        elif ns.command == "brief":
+            result = service.brief(ns.project, ns.section)
         else:
             if not ns.workspace: raise GemArcError("GEMARC_AUTH_000", "--workspace 或 GEMARC_WORKSPACE_ROOT 为必填")
             ws = Workspace(ns.workspace)

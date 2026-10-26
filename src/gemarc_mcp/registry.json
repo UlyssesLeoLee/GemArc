@@ -31,6 +31,8 @@
     {"id":"gemarc.runtime.graph","version":"0.2.0","dimension":"2D","status":"implemented","license":"MIT","purpose":"GraphStore, GraphQueryEngine, index, persistence, interaction"},
     {"id":"gemarc.runtime.focus","version":"0.2.0","dimension":"shared","status":"implemented","license":"MIT","purpose":"FocusContextEngine and the dynamic retreat animation"},
     {"id":"gemarc.runtime.space","version":"0.2.0","dimension":"3D","status":"implemented","license":"MIT","purpose":"Building-Floor-Room model and navigation state machine"},
+    {"id":"gemarc.runtime.space3d","version":"0.2.0","dimension":"3D","status":"implemented","license":"MIT","purpose":"Three.js renderer for Building-Floor-Room with screen-space picking and frustum-fitted camera; three.js itself is MIT"},
+    {"id":"gemarc.runtime.view-model","version":"0.2.0","dimension":"shared","status":"implemented","license":"MIT","purpose":"Pure view-model layer that turns the canonical model into DOM-free data trees"},
     {"id":"gemarc.runtime.sim","version":"0.2.0","dimension":"4D","status":"implemented","license":"MIT","purpose":"Event and causal engine, a structural twin of simulation.py"},
     {"id":"gemarc.runtime.view","version":"0.2.0","dimension":"shared","status":"implemented","license":"MIT","purpose":"Cross-view synchronisation state and view resolution"},
     {"id":"gemarc.runtime.workflow","version":"0.2.0","dimension":"prototype","status":"implemented","license":"MIT","purpose":"Workflow model, semantic validator and canvas controller"},
@@ -39,6 +41,8 @@
     {"id":"gemarc.profile.static","version":"0.2.0","dimension":"delivery","status":"implemented","license":"MIT","purpose":"Zero build site: native ESM with an import map"},
     {"id":"gemarc.profile.vite","version":"0.2.0","dimension":"delivery","status":"implemented","license":"MIT","purpose":"npm project sharing the same runtime sources"},
     {"id":"gemarc.scaffold","version":"0.2.0","dimension":"scaffolding","status":"implemented","license":"MIT","purpose":"Materialises the fixed parts and the fill-in slots for a project"},
+    {"id":"gemarc.scaffold.brief","version":"0.2.0","dimension":"scaffolding","status":"implemented","license":"MIT","purpose":"Tool-returned work instruction, slot list and vocabulary whitelist that replaces the prose prompt spec"},
+    {"id":"gemarc.scaffold.viewmodel-baseline","version":"0.2.0","dimension":"scaffolding","status":"implemented","license":"MIT","purpose":"Structural snapshot regression over the built site's view-model output"},
     {"id":"gemarc.golden-cases","version":"0.2.0","dimension":"scaffolding","status":"implemented","license":"MIT","purpose":"Golden cases pinning the Python and JavaScript simulation kernels together"},
 
     {"id":"gemarc.prototype.konva-editor","version":"future","dimension":"prototype","status":"not_implemented","license":"Unverified","purpose":"Konva.js visual editor"},

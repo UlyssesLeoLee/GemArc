@@ -1,21 +1,17 @@
 import { defineConfig } from 'vite';
 import { fileURLToPath, URL } from 'node:url';
-import { dirname, resolve } from 'node:path';
+import { dirname } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
 /**
- * The same runtime sources serve both profiles. Only the resolution differs:
- * the static profile uses an import map, this one uses an alias.
+ * The same runtime sources serve both profiles. The application always sits at
+ * the project root, so it reaches the runtime by a relative path; this profile
+ * only differs in how the optional third-party libraries are resolved.
  */
 export default defineConfig({
   root: here,
   publicDir: false,
-  resolve: {
-    alias: {
-      '@gemarc/runtime': resolve(here, 'runtime'),
-    },
-  },
   server: {
     port: 5173,
     open: false,

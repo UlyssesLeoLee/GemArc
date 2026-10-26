@@ -176,6 +176,30 @@ class ScaffoldFlowTests(unittest.TestCase):
         self.assertEqual(result["status"], "ok")
         self.assertEqual(len(result["document"]["canonical"]), 6)
 
+    def test_brief_is_the_compact_work_order(self):
+        brief = service.brief("demo")
+        self.assertEqual(brief["status"], "ok")
+        self.assertTrue(brief["purpose"])
+        self.assertTrue(brief["procedure"])
+        self.assertTrue(brief["rules"])
+        self.assertTrue(brief["slots"])
+        self.assertTrue(brief["commands"]["dev"])
+        vocabulary = brief["vocabulary"]
+        self.assertEqual(len(vocabulary["evidenceLevels"]), 6)
+        self.assertIn("Component", vocabulary["entityKinds"])
+        self.assertIn("sends", vocabulary["edgeTypes"])
+        self.assertEqual(len(vocabulary["diagramTypes"]), 19)
+        # The brief must stay far shorter than the specification it replaces.
+        self.assertLess(len(json.dumps(brief, ensure_ascii=False)), 40000)
+
+    def test_brief_sections_can_be_fetched_one_at_a_time(self):
+        result = service.brief("demo", "slots")
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["section"], "slots")
+        self.assertTrue(result["content"])
+        with self.assertRaises(Exception):
+            service.brief("demo", "nonsense")
+
 
 if __name__ == "__main__":
     unittest.main()

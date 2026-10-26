@@ -107,9 +107,9 @@ class HttpTransportTests(unittest.TestCase):
     def test_handshake_exposes_full_tool_surface(self):
         out = self._drive({})
         self.assertEqual(out["server"], "GemArc MCP")
-        self.assertEqual(len(out["tools"]), 13)
-        self.assertEqual(len(set(out["tools"])), 13)
-        for name in ("gemarc.scaffold", "gemarc.contracts"):
+        self.assertEqual(len(out["tools"]), 14)
+        self.assertEqual(len(set(out["tools"])), 14)
+        for name in ("gemarc.scaffold", "gemarc.contracts", "gemarc.brief"):
             self.assertIn(name, out["tools"])
         self.assertEqual(out["resources"], ["gemarc://registry", "gemarc://schema/model"])
         self.assertEqual(out["prompts"], ["gemarc-design"])
@@ -170,6 +170,38 @@ class HttpTransportTests(unittest.TestCase):
             body = response.read().decode("utf-8", "replace")
         self.assertIn("GemArc", body)
         self.assertIn("5D Architecture", body)
+
+    def test_served_site_is_the_scaffold_build_not_a_stale_snapshot(self):
+        """The remote site must be generated from the package sources.
+
+        A committed snapshot of the site would silently drift from the runtime
+        it is supposed to expose — the deployed 3D adapter would be missing
+        while the repository claims it exists. This test pins the served site
+        to the scaffold build.
+        """
+        import urllib.request
+
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{self.port}/healthz", timeout=10
+        ) as response:
+            payload = json.loads(response.read())
+        self.assertEqual(payload["staticSiteSource"], "scaffold-static")
+
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{self.port}/", timeout=10
+        ) as response:
+            index = response.read().decode("utf-8", "replace")
+        # The scaffold shell resolves three.js through an import map; the legacy
+        # MVP shell has no import map at all.
+        self.assertIn('"three"', index)
+        self.assertIn("importmap", index)
+
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{self.port}/runtime/space/space-viewer-three.js",
+            timeout=10,
+        ) as response:
+            adapter = response.read().decode("utf-8", "replace")
+        self.assertIn("createThreeSpaceRenderer", adapter)
 
 
 if __name__ == "__main__":

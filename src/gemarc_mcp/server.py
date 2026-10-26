@@ -38,6 +38,11 @@ def create_server():
         """List the fixed contracts, vocabularies and fill-in slots; optionally return one document."""
         return safe_response(lambda: service.contracts(query))
 
+    @app.tool(name="gemarc.brief")
+    def brief(project: str = "", section: str = "") -> dict:
+        """The compact work order for a language model: purpose, procedure, slots with their rules, vocabulary, commands. Use this instead of restating the specification."""
+        return safe_response(lambda: service.brief(project, section))
+
     @app.tool(name="gemarc.scaffold")
     def scaffold(project: str, profile: str = "static") -> dict:
         """Materialise the fixed parts (contracts, vocabulary, shared runtime, site shell) plus the fill-in slots; requires GEMARC_ALLOW_WRITE=1."""
@@ -112,7 +117,9 @@ def create_server():
     @app.prompt(name="gemarc-design")
     def design_prompt(project: str) -> str:
         """Generate verified 5D architecture data while reusing standardized components."""
-        return (f"针对授权项目 {project}：先调用 gemarc.inspect 与 gemarc.assets，然后读取原始设计证据，"
+        return (f"针对授权项目 {project}：先调用 gemarc.brief 取得精简工作指令、槽位清单与词表，"
+                "不要自行发明字段名、证据等级说法或引擎。"
+                "然后调用 gemarc.inspect 与 gemarc.assets，读取原始设计证据，"
                 "建立一个统一 Architecture Model，未确定事实标为 unknown/assumed；调用 gemarc.validate。"
                 "禁止重写现成 Viewer 共通代码；4D 仅使用真实事件或显式假设场景；5D 只能根据确认的规则做计算。"
                 "生成后运行 gemarc.build、gemarc.verify，审查未测试的浏览器能力并说明限制。")

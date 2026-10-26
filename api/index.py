@@ -4,9 +4,9 @@ Vercel entrypoint for the GemArc MCP server.
 This module is the ASGI application that Vercel deploys as a Python Function.
 It serves two things from one function:
 
-  /mcp      MCP Streamable HTTP endpoint (11 tools / 2 resources / 1 prompt)
+  /mcp      MCP Streamable HTTP endpoint (14 tools / 2 resources / 1 prompt)
   /healthz  health and deployment-state probe
-  /*        the 5D architecture static site (examples/demo-site)
+  /*        the 5D architecture static site (built from the package sources)
 
 Serving the static site from the function as well keeps the whole deployment to
 a single build and a single routing rule, which removes any ambiguity about
@@ -38,6 +38,7 @@ caller would share one ephemeral workspace.
 """
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import sys
@@ -86,7 +87,28 @@ if os.environ.get("GEMARC_ALLOW_WRITE") != "1":
 
 SEED_PROJECT = "demo"
 SEED_MODEL = REPO_ROOT / "examples" / "demo-site" / "data" / "architecture.json"
-STATIC_DIR = REPO_ROOT / "examples" / "demo-site"
+LEGACY_STATIC_DIR = REPO_ROOT / "examples" / "demo-site"
+
+
+def materialise_static_site() -> tuple[Path | None, str]:
+    """Build the current scaffold site from the package sources.
+
+    The committed ``examples/demo-site`` tree is the legacy MVP preview. The
+    scaffold site is generated from the very same sources the MCP ships, so the
+    deployed site can never drift from the code. Generation happens once per
+    cold instance into a temp directory; if it fails we fall back to the
+    committed preview rather than serving nothing.
+    """
+    try:
+        from gemarc_mcp.model import normalized_model
+        from gemarc_mcp.scaffold import builder
+
+        model = json.loads(SEED_MODEL.read_text(encoding="utf-8"))
+        target = Path(tempfile.mkdtemp(prefix="gemarc-site-"))
+        builder.build_site(target, normalized_model(model), "static")
+        return target, "scaffold-static"
+    except Exception as exc:  # pragma: no cover - the fallback keeps the site up
+        return None, f"{type(exc).__name__}: {exc}"
 
 
 def seed_demo_project() -> bool:
@@ -139,7 +161,13 @@ _session_thread.start()
 
 
 # --- static site -----------------------------------------------------------
+_generated_site, _site_source = materialise_static_site()
+STATIC_DIR = _generated_site or LEGACY_STATIC_DIR
 STATIC_AVAILABLE = (STATIC_DIR / "index.html").is_file()
+STATIC_SOURCE = _site_source if _generated_site else "committed-preview"
+if not _generated_site:
+    # Keep the reason visible instead of letting the fallback look like success.
+    STATIC_SOURCE = f"committed-preview (generation failed: {_site_source})"
 
 
 async def _static_missing(scope, receive, send):
@@ -171,6 +199,7 @@ def _health_payload() -> dict:
         "seedProject": SEED_PROJECT,
         "seeded": SEEDED,
         "staticSiteAvailable": STATIC_AVAILABLE,
+        "staticSiteSource": STATIC_SOURCE,
         "sessionManagerThreadAlive": _session_thread.is_alive(),
         "sessionManagerError": _session_error,
     }

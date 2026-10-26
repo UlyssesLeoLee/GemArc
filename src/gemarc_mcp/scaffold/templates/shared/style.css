@@ -138,6 +138,22 @@ h4 { margin: 8px 0 4px; font-size: 13px; color: var(--muted); }
 .canvas .edge { fill: none; stroke: var(--edge); stroke-width: 1.4; cursor: pointer; }
 .canvas .edge:hover { stroke: var(--accent); stroke-width: 2.2; }
 .canvas .edge-trust { stroke: var(--edge-trust); stroke-dasharray: 6 4; }
+/* An edge needs an independently pickable region; a 1.4px stroke is unhittable. */
+.canvas .edge-group { cursor: pointer; }
+.canvas .edge-hit { fill: none; stroke: transparent; stroke-width: 14; pointer-events: stroke; }
+
+/* The 3D scene needs a box of its own: a canvas without a height collapses. */
+.space-3d {
+  height: 460px;
+  margin: 0 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+  background: #0b0f14;
+}
+.space-3d .gemarc-space-canvas { display: block; width: 100%; height: 100%; }
+.space-3d .hint { padding: 14px; color: var(--muted); }
+.space-3d-status { margin: -8px 0 14px; }
 
 .timeline { margin: 0; padding-left: 18px; }
 .timeline .event { margin-bottom: 4px; }

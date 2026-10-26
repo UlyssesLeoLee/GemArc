@@ -125,6 +125,88 @@ def assets(query: str = "") -> dict:
     return data
 
 
+def brief(project: str = "", section: str = "") -> dict:
+    """The compact work order handed to a language model.
+
+    A long requirement document spends most of its length restating things
+    that are already written down somewhere: field names, allowed values,
+    engine behaviour. This returns the part a model actually needs - the slots
+    to fill, the rules constraining them, the vocabulary it may use, the
+    commands to run, and the inventory of parts that are already done.
+    """
+    from .scaffold import builder, sync
+
+    vocabulary = sync.load_vocab()
+    payload = {
+        "status": "ok",
+        "schemaVersion": "0.2.0",
+        "vocabDigest": sync.vocab_digest(),
+        "project": project or None,
+        "purpose": (
+            "用固定的架构模型与既成的引擎，产出可审查的 0D–5D 架构站点。"
+            "不要重新发明引擎、字段名或算法；只填事实，并把缺失如实标注为缺失。"
+        ),
+        "procedure": [
+            "1. 读 scaffold-manifest.json 与 FILL-IN.md，确认槽位清单。",
+            "2. 读 contracts/*.schema.json 确定每个对象该长什么样；读 vocab/*.json 确认允许哪些词。",
+            "3. 填写 model/architecture.json 的槽位。证据必须能指回真实来源；指不回去就标 Unknown。",
+            "4. 运行 gemarc.validate <project> --strict，修掉所有 error。",
+            "5. 运行 gemarc.build <project> --profile static（或 vite），产出站点。",
+        ],
+        "rules": [
+            "事实不可臆造：节点与关系必须能指回 evidence 实体。",
+            "证据等级按 evidence-levels 词表标注；Implemented 不等于 Observed。",
+            "表现模型与执行模型分离：画布坐标不决定业务语义。",
+            "缺失信息写进 missing 字段，不要伪造。",
+            "实际项目不存在的实体类型不必生成；不要为了凑数量造图示。",
+            "所有新增实现必须模块化，不要覆盖固定件。",
+        ],
+        "slots": [
+            {"id": slot["id"], "pointer": slot["pointer"], "what": slot["what"],
+             "required": slot["required"], "rule": slot["rule"]}
+            for slot in builder.SLOTS
+        ],
+        "vocabulary": {
+            "evidenceLevels": [
+                {"id": item["id"], "meaning": item["meaning"], "assertion": item["assertion"]}
+                for item in vocabulary["evidence-levels"]["canonical"]
+            ],
+            "entityKinds": [item["id"] for item in vocabulary["entity-kinds"]["kinds"]],
+            "edgeTypes": [item["id"] for item in vocabulary["edge-types"]["types"]],
+            "diagramTypes": [
+                {"id": item["id"], "dimension": item["dimension"],
+                 "nodeKinds": item["nodeKinds"], "edgeKinds": item["edgeKinds"],
+                 "fidelity": item["fidelity"]}
+                for item in vocabulary["diagram-types"]["types"]
+            ],
+            "caseCategories": [
+                {"id": item["id"], "assertion": item["assertion"]}
+                for item in vocabulary["case-categories"]["categories"]
+            ],
+            "workflowNodeKinds": [item["id"] for item in vocabulary["workflow-kinds"]["nodeKinds"]],
+            "workflowEdgeKinds": [item["id"] for item in vocabulary["workflow-kinds"]["edgeKinds"]],
+            "spaceLevels": [
+                {"id": item["id"], "represents": item["represents"]}
+                for item in vocabulary["space-levels"]["levels"]
+            ],
+        },
+        "commands": builder._commands("static"),
+        "alreadyDone": {
+            "contracts": sorted(p.name for p in builder.CONTRACTS_DIR.glob("*.json")),
+            "vocabularies": sorted(p.name for p in builder.VOCAB_DIR.glob("*.json")),
+            "runtime": "图引擎 / Focus 退避 / 3D 空间 / 4D-5D 仿真 / 跨视图状态 / 工作流语义 / 互操作适配器",
+            "site": "两套交付 profile 共用一份应用源码：static 零构建、vite 为 npm 工程",
+        },
+    }
+    if section:
+        key = section.strip()
+        if key not in payload:
+            raise GemArcError("GEMARC_BRIEF_001", f"未知的分段: {section}")
+        return {"status": "ok", "section": key, "content": payload[key],
+                "vocabDigest": payload["vocabDigest"]}
+    return payload
+
+
 def contracts(query: str = "") -> dict:
     """Read-only view of the fixed contracts and vocabularies."""
     from .scaffold import builder, sync

@@ -1,0 +1,1303 @@
+{
+  "causal": {
+    "body": [
+      {
+        "children": [
+          {
+            "class": "",
+            "tag": "h2",
+            "text": "因果干预对照"
+          },
+          {
+            "action": {
+              "id": "normal",
+              "type": "scenario"
+            },
+            "attrs": {
+              "value": "normal"
+            },
+            "children": [
+              {
+                "attrs": {
+                  "value": "normal"
+                },
+                "class": "",
+                "tag": "option",
+                "text": "正常事件传播"
+              }
+            ],
+            "tag": "select"
+          },
+          {
+            "children": [
+              {
+                "class": "hint",
+                "tag": "p",
+                "text": "选择要屏蔽的模块，然后重新计算反事实结果："
+              },
+              {
+                "action": {
+                  "id": "sensor",
+                  "type": "toggle-disable"
+                },
+                "attrs": {
+                  "type": "button"
+                },
+                "class": "chip",
+                "tag": "button",
+                "text": "事件源"
+              },
+              {
+                "action": {
+                  "id": "queue",
+                  "type": "toggle-disable"
+                },
+                "attrs": {
+                  "type": "button"
+                },
+                "class": "chip",
+                "tag": "button",
+                "text": "消息队列"
+              },
+              {
+                "action": {
+                  "id": "rule",
+                  "type": "toggle-disable"
+                },
+                "attrs": {
+                  "type": "button"
+                },
+                "class": "chip",
+                "tag": "button",
+                "text": "规则引擎"
+              },
+              {
+                "action": {
+                  "id": "notify",
+                  "type": "toggle-disable"
+                },
+                "attrs": {
+                  "type": "button"
+                },
+                "class": "chip",
+                "tag": "button",
+                "text": "通知服务"
+              }
+            ],
+            "class": "chips",
+            "tag": "div"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "h3",
+                "text": "丢失事件"
+              },
+              {
+                "class": "muted",
+                "tag": "li",
+                "text": "无"
+              }
+            ],
+            "class": "",
+            "tag": "ul"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "h3",
+                "text": "新增事件"
+              },
+              {
+                "class": "muted",
+                "tag": "li",
+                "text": "无"
+              }
+            ],
+            "class": "",
+            "tag": "ul"
+          },
+          {
+            "class": "hint",
+            "tag": "p",
+            "text": "仅代表指定模型规则的干预计算结果；不是现实因果识别证明"
+          }
+        ],
+        "class": "panel",
+        "tag": "section"
+      }
+    ],
+    "headline": "模块组合与因果干预",
+    "kicker": "5D / CAUSAL SYSTEM",
+    "lostEvents": 0
+  },
+  "facts": {
+    "body": [
+      {
+        "children": [
+          {
+            "class": "",
+            "tag": "h2",
+            "text": "系统资料"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "b",
+                "text": "系统名称："
+              },
+              {
+                "class": "muted",
+                "tag": "span",
+                "text": "结构基线示例"
+              }
+            ],
+            "class": "small",
+            "tag": "p"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "b",
+                "text": "说明："
+              },
+              {
+                "class": "muted",
+                "tag": "span",
+                "text": "用于结构回归的固定示例模型"
+              }
+            ],
+            "class": "small",
+            "tag": "p"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "b",
+                "text": "事实等级："
+              },
+              {
+                "class": "muted",
+                "tag": "span",
+                "text": "Hypothetical"
+              }
+            ],
+            "class": "small",
+            "tag": "p"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "b",
+                "text": "来源："
+              },
+              {
+                "class": "muted",
+                "tag": "span",
+                "text": "未提供"
+              }
+            ],
+            "class": "small",
+            "tag": "p"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "b",
+                "text": "节点 / 关系："
+              },
+              {
+                "class": "muted",
+                "tag": "span",
+                "text": "4 / 3"
+              }
+            ],
+            "class": "small",
+            "tag": "p"
+          }
+        ],
+        "class": "panel",
+        "tag": "section"
+      },
+      {
+        "children": [
+          {
+            "class": "",
+            "tag": "h2",
+            "text": "实体清单"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "h3",
+                "text": "事件源"
+              },
+              {
+                "class": "",
+                "tag": "small",
+                "text": "sensor · Component"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "事实等级："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "Hypothetical"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "证据："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "示例"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "action": {
+                  "id": "sensor",
+                  "type": "locate-node"
+                },
+                "class": "action",
+                "tag": "button",
+                "text": "定位关系"
+              }
+            ],
+            "class": "fact",
+            "tag": "div"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "h3",
+                "text": "消息队列"
+              },
+              {
+                "class": "",
+                "tag": "small",
+                "text": "queue · Service"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "事实等级："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "Hypothetical"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "证据："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "示例"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "action": {
+                  "id": "queue",
+                  "type": "locate-node"
+                },
+                "class": "action",
+                "tag": "button",
+                "text": "定位关系"
+              }
+            ],
+            "class": "fact",
+            "tag": "div"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "h3",
+                "text": "规则引擎"
+              },
+              {
+                "class": "",
+                "tag": "small",
+                "text": "rule · Service"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "事实等级："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "Hypothetical"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "证据："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "示例"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "action": {
+                  "id": "rule",
+                  "type": "locate-node"
+                },
+                "class": "action",
+                "tag": "button",
+                "text": "定位关系"
+              }
+            ],
+            "class": "fact",
+            "tag": "div"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "h3",
+                "text": "通知服务"
+              },
+              {
+                "class": "",
+                "tag": "small",
+                "text": "notify · Service"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "事实等级："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "Hypothetical"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "证据："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "示例"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "action": {
+                  "id": "notify",
+                  "type": "locate-node"
+                },
+                "class": "action",
+                "tag": "button",
+                "text": "定位关系"
+              }
+            ],
+            "class": "fact",
+            "tag": "div"
+          }
+        ],
+        "class": "panel",
+        "tag": "section"
+      }
+    ],
+    "headline": "结构基线示例",
+    "kicker": "1D / LINEAR FACTS"
+  },
+  "graph": {
+    "body": [
+      {
+        "children": [
+          {
+            "class": "",
+            "tag": "h2",
+            "text": "统一 Node–Edge 结构图"
+          },
+          {
+            "children": [
+              {
+                "attrs": {
+                  "class": "canvas",
+                  "viewBox": "0 0 1010 360"
+                },
+                "children": [
+                  {
+                    "action": {
+                      "id": "e1",
+                      "type": "select-edge"
+                    },
+                    "attrs": {
+                      "class": "edge-group",
+                      "data-edge": "e1"
+                    },
+                    "children": [
+                      {
+                        "attrs": {
+                          "class": "edge",
+                          "d": "M164 70 C224 70 196 70 256 70",
+                          "data-edge": "e1"
+                        },
+                        "tag": "path"
+                      },
+                      {
+                        "attrs": {
+                          "class": "edge-hit",
+                          "d": "M164 70 C224 70 196 70 256 70",
+                          "data-edge-hit": "e1"
+                        },
+                        "tag": "path"
+                      }
+                    ],
+                    "tag": "g"
+                  },
+                  {
+                    "action": {
+                      "id": "e2",
+                      "type": "select-edge"
+                    },
+                    "attrs": {
+                      "class": "edge-group",
+                      "data-edge": "e2"
+                    },
+                    "children": [
+                      {
+                        "attrs": {
+                          "class": "edge",
+                          "d": "M404 70 C464 70 436 70 496 70",
+                          "data-edge": "e2"
+                        },
+                        "tag": "path"
+                      },
+                      {
+                        "attrs": {
+                          "class": "edge-hit",
+                          "d": "M404 70 C464 70 436 70 496 70",
+                          "data-edge-hit": "e2"
+                        },
+                        "tag": "path"
+                      }
+                    ],
+                    "tag": "g"
+                  },
+                  {
+                    "action": {
+                      "id": "e3",
+                      "type": "select-edge"
+                    },
+                    "attrs": {
+                      "class": "edge-group",
+                      "data-edge": "e3"
+                    },
+                    "children": [
+                      {
+                        "attrs": {
+                          "class": "edge",
+                          "d": "M644 70 C704 70 676 70 736 70",
+                          "data-edge": "e3"
+                        },
+                        "tag": "path"
+                      },
+                      {
+                        "attrs": {
+                          "class": "edge-hit",
+                          "d": "M644 70 C704 70 676 70 736 70",
+                          "data-edge-hit": "e3"
+                        },
+                        "tag": "path"
+                      }
+                    ],
+                    "tag": "g"
+                  },
+                  {
+                    "action": {
+                      "id": "sensor",
+                      "type": "select-node"
+                    },
+                    "attrs": {
+                      "class": "node",
+                      "data-node": "sensor",
+                      "tabindex": "0"
+                    },
+                    "children": [
+                      {
+                        "attrs": {
+                          "height": 36,
+                          "rx": 6,
+                          "width": 148,
+                          "x": 16,
+                          "y": 52
+                        },
+                        "tag": "rect"
+                      },
+                      {
+                        "attrs": {
+                          "class": "node-label",
+                          "x": 26,
+                          "y": 74
+                        },
+                        "tag": "text",
+                        "text": "事件源"
+                      }
+                    ],
+                    "tag": "g"
+                  },
+                  {
+                    "action": {
+                      "id": "queue",
+                      "type": "select-node"
+                    },
+                    "attrs": {
+                      "class": "node",
+                      "data-node": "queue",
+                      "tabindex": "0"
+                    },
+                    "children": [
+                      {
+                        "attrs": {
+                          "height": 36,
+                          "rx": 6,
+                          "width": 148,
+                          "x": 256,
+                          "y": 52
+                        },
+                        "tag": "rect"
+                      },
+                      {
+                        "attrs": {
+                          "class": "node-label",
+                          "x": 266,
+                          "y": 74
+                        },
+                        "tag": "text",
+                        "text": "消息队列"
+                      }
+                    ],
+                    "tag": "g"
+                  },
+                  {
+                    "action": {
+                      "id": "rule",
+                      "type": "select-node"
+                    },
+                    "attrs": {
+                      "class": "node",
+                      "data-node": "rule",
+                      "tabindex": "0"
+                    },
+                    "children": [
+                      {
+                        "attrs": {
+                          "height": 36,
+                          "rx": 6,
+                          "width": 148,
+                          "x": 496,
+                          "y": 52
+                        },
+                        "tag": "rect"
+                      },
+                      {
+                        "attrs": {
+                          "class": "node-label",
+                          "x": 506,
+                          "y": 74
+                        },
+                        "tag": "text",
+                        "text": "规则引擎"
+                      }
+                    ],
+                    "tag": "g"
+                  },
+                  {
+                    "action": {
+                      "id": "notify",
+                      "type": "select-node"
+                    },
+                    "attrs": {
+                      "class": "node",
+                      "data-node": "notify",
+                      "tabindex": "0"
+                    },
+                    "children": [
+                      {
+                        "attrs": {
+                          "height": 36,
+                          "rx": 6,
+                          "width": 148,
+                          "x": 736,
+                          "y": 52
+                        },
+                        "tag": "rect"
+                      },
+                      {
+                        "attrs": {
+                          "class": "node-label",
+                          "x": 746,
+                          "y": 74
+                        },
+                        "tag": "text",
+                        "text": "通知服务"
+                      }
+                    ],
+                    "tag": "g"
+                  }
+                ],
+                "tag": "svg"
+              }
+            ],
+            "class": "graph",
+            "tag": "div"
+          }
+        ],
+        "class": "panel",
+        "tag": "section"
+      }
+    ],
+    "graph": {
+      "edgeIds": [
+        "e1",
+        "e2",
+        "e3"
+      ],
+      "nodeIds": [
+        "sensor",
+        "queue",
+        "rule",
+        "notify"
+      ]
+    },
+    "headline": "节点与依赖关系",
+    "kicker": "2D / GRAPH VIEW"
+  },
+  "inspector": {
+    "body": [
+      {
+        "class": "hint",
+        "tag": "p",
+        "text": "选择节点或关系查看关联信息"
+      }
+    ]
+  },
+  "space": {
+    "body": [
+      {
+        "children": [
+          {
+            "class": "",
+            "tag": "h2",
+            "text": "三维工程空间"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "h3",
+                "text": "主系统"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "语义类别："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "系统"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "语义来源："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "来自架构层定义"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "信任边界："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "否"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "h4",
+                    "text": "应用层"
+                  },
+                  {
+                    "children": [
+                      {
+                        "class": "",
+                        "tag": "b",
+                        "text": "语义来源："
+                      },
+                      {
+                        "class": "muted",
+                        "tag": "span",
+                        "text": "来自架构层定义"
+                      }
+                    ],
+                    "class": "small",
+                    "tag": "p"
+                  },
+                  {
+                    "children": [
+                      {
+                        "class": "",
+                        "tag": "span",
+                        "text": "服务簇"
+                      },
+                      {
+                        "children": [
+                          {
+                            "class": "",
+                            "tag": "b",
+                            "text": "语义来源："
+                          },
+                          {
+                            "class": "muted",
+                            "tag": "span",
+                            "text": "来自模块分组"
+                          }
+                        ],
+                        "class": "small",
+                        "tag": "p"
+                      }
+                    ],
+                    "class": "space-room",
+                    "tag": "div"
+                  }
+                ],
+                "class": "space-floor",
+                "tag": "div"
+              }
+            ],
+            "class": "space-building",
+            "tag": "div"
+          }
+        ],
+        "class": "panel",
+        "tag": "section"
+      },
+      {
+        "children": [],
+        "class": "space-3d",
+        "tag": "div"
+      }
+    ],
+    "headline": "3D 空间与分类",
+    "kicker": "3D / BUILDING · FLOOR · ROOM",
+    "mount": "space3d"
+  },
+  "timeline": {
+    "body": [
+      {
+        "children": [
+          {
+            "class": "",
+            "tag": "h2",
+            "text": "事件时间轴"
+          },
+          {
+            "action": {
+              "id": "normal",
+              "type": "scenario"
+            },
+            "attrs": {
+              "value": "normal"
+            },
+            "children": [
+              {
+                "attrs": {
+                  "value": "normal"
+                },
+                "class": "",
+                "tag": "option",
+                "text": "正常事件传播"
+              }
+            ],
+            "tag": "select"
+          },
+          {
+            "class": "hint",
+            "tag": "p",
+            "text": "证据等级：hypothetical"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "class": "time",
+                    "tag": "span",
+                    "text": "0ms"
+                  },
+                  {
+                    "class": "module",
+                    "tag": "span",
+                    "text": "sensor"
+                  },
+                  {
+                    "class": "name",
+                    "tag": "span",
+                    "text": "emit"
+                  },
+                  {
+                    "class": "state",
+                    "tag": "span",
+                    "text": "delivered"
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "small",
+                    "text": "trace-0000"
+                  }
+                ],
+                "class": "event event-delivered current",
+                "tag": "li"
+              },
+              {
+                "children": [
+                  {
+                    "class": "time",
+                    "tag": "span",
+                    "text": "10ms"
+                  },
+                  {
+                    "class": "module",
+                    "tag": "span",
+                    "text": "queue"
+                  },
+                  {
+                    "class": "name",
+                    "tag": "span",
+                    "text": "ingest"
+                  },
+                  {
+                    "class": "state",
+                    "tag": "span",
+                    "text": "delivered"
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "small",
+                    "text": "trace-0001 ← trace-0000"
+                  }
+                ],
+                "class": "event event-delivered",
+                "tag": "li"
+              },
+              {
+                "children": [
+                  {
+                    "class": "time",
+                    "tag": "span",
+                    "text": "30ms"
+                  },
+                  {
+                    "class": "module",
+                    "tag": "span",
+                    "text": "rule"
+                  },
+                  {
+                    "class": "name",
+                    "tag": "span",
+                    "text": "evaluate"
+                  },
+                  {
+                    "class": "state",
+                    "tag": "span",
+                    "text": "delivered"
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "small",
+                    "text": "trace-0002 ← trace-0001"
+                  }
+                ],
+                "class": "event event-delivered",
+                "tag": "li"
+              },
+              {
+                "children": [
+                  {
+                    "class": "time",
+                    "tag": "span",
+                    "text": "40ms"
+                  },
+                  {
+                    "class": "module",
+                    "tag": "span",
+                    "text": "notify"
+                  },
+                  {
+                    "class": "name",
+                    "tag": "span",
+                    "text": "send"
+                  },
+                  {
+                    "class": "state",
+                    "tag": "span",
+                    "text": "delivered"
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "small",
+                    "text": "trace-0003 ← trace-0002"
+                  }
+                ],
+                "class": "event event-delivered",
+                "tag": "li"
+              }
+            ],
+            "class": "timeline",
+            "tag": "ol"
+          },
+          {
+            "children": [
+              {
+                "action": {
+                  "delta": 1,
+                  "type": "step"
+                },
+                "class": "action",
+                "tag": "button",
+                "text": "下一步"
+              },
+              {
+                "action": {
+                  "delta": 0,
+                  "type": "step"
+                },
+                "class": "action",
+                "tag": "button",
+                "text": "重置"
+              }
+            ],
+            "class": "controls",
+            "tag": "div"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "b",
+                "text": "送达 / 阻断："
+              },
+              {
+                "class": "muted",
+                "tag": "span",
+                "text": "4 / 0"
+              }
+            ],
+            "class": "small",
+            "tag": "p"
+          }
+        ],
+        "class": "panel",
+        "tag": "section"
+      }
+    ],
+    "headline": "动态流程与时间轴",
+    "kicker": "4D / EVENT TIME",
+    "trace": 4
+  },
+  "views": {
+    "body": [
+      {
+        "children": [
+          {
+            "class": "",
+            "tag": "h2",
+            "text": "模型中登记的图示"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "h3",
+                "text": "逻辑架构"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "图示类型："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "logical-view"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "维度："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "2D"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "关注点："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "事件依赖"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "节点数："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "4"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "关系类型："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "sends"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "action": {
+                  "id": "logical",
+                  "type": "view-filter"
+                },
+                "class": "action",
+                "tag": "button",
+                "text": "在 2D 中查看"
+              }
+            ],
+            "class": "fact",
+            "tag": "div"
+          }
+        ],
+        "class": "panel",
+        "tag": "section"
+      }
+    ],
+    "headline": "图示定义",
+    "kicker": "VIEWS / DIAGRAM TYPES"
+  },
+  "workflow": {
+    "body": [
+      {
+        "children": [
+          {
+            "class": "",
+            "tag": "h2",
+            "text": "工作流"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "h3",
+                "text": "通知流程"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "类型："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "task"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "节点数："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "3"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "边数："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "2"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "语义校验："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "通过"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              }
+            ],
+            "class": "fact",
+            "tag": "div"
+          }
+        ],
+        "class": "panel",
+        "tag": "section"
+      }
+    ],
+    "headline": "工作流语义",
+    "kicker": "WORKFLOW / MACHINE READABLE"
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "meta": {
+    "system": "结构基线示例",
+    "schemaVersion": "0.2.0",
+    "language": "zh-CN",
+    "evidenceState": "Hypothetical",
+    "description": "用于结构回归的固定示例模型",
+    "source": {"repository": null, "branch": null, "commit": null, "localPath": null, "analyzedAt": null}
+  },
+  "nodes": [
+    {"id": "sensor", "name": "事件源", "kind": "Component", "layer": "设备层", "verification": "illustrative", "evidence": "示例"},
+    {"id": "queue", "name": "消息队列", "kind": "Service", "layer": "中间件层", "verification": "illustrative", "evidence": "示例"},
+    {"id": "rule", "name": "规则引擎", "kind": "Service", "layer": "应用层", "verification": "illustrative", "evidence": "示例"},
+    {"id": "notify", "name": "通知服务", "kind": "Service", "layer": "应用层", "verification": "illustrative", "evidence": "示例"}
+  ],
+  "edges": [
+    {"id": "e1", "sourceId": "sensor", "targetId": "queue", "type": "sends", "description": "上传事件", "verification": "illustrative", "evidence": "示例"},
+    {"id": "e2", "sourceId": "queue", "targetId": "rule", "type": "sends", "description": "传递事件", "verification": "illustrative", "evidence": "示例"},
+    {"id": "e3", "sourceId": "rule", "targetId": "notify", "type": "sends", "description": "触发通知", "verification": "illustrative", "evidence": "示例"}
+  ],
+  "evidence": [
+    {"id": "ev1", "kind": "code", "level": "illustrative", "source": {"locator": "src/demo.py:10"}}
+  ],
+  "space": {
+    "buildings": [
+      {"id": "b1", "name": "主系统", "kind": "系统", "semanticSource": "来自架构层定义", "trustBoundary": false}
+    ],
+    "floors": [
+      {"id": "f1", "buildingId": "b1", "name": "应用层", "kind": "应用层", "semanticSource": "来自架构层定义"}
+    ],
+    "rooms": [
+      {"id": "r1", "floorId": "f1", "name": "服务簇", "kind": "服务簇", "semanticSource": "来自模块分组"}
+    ]
+  },
+  "views": [
+    {"id": "logical", "title": "逻辑架构", "diagramType": "logical-view", "dimension": "2D", "concerns": ["事件依赖"], "nodeIds": ["sensor", "queue", "rule", "notify"], "edgeKinds": ["sends"]}
+  ],
+  "scenarios": [
+    {"id": "normal", "name": "正常事件传播", "evidenceClass": "hypothetical",
+     "events": [{"module": "sensor", "event": "emit", "timeMs": 0}],
+     "rules": [
+       {"source": "sensor", "whenEvent": "emit", "target": "queue", "emit": "ingest", "delayMs": 10},
+       {"source": "queue", "whenEvent": "ingest", "target": "rule", "emit": "evaluate", "delayMs": 20},
+       {"source": "rule", "whenEvent": "evaluate", "target": "notify", "emit": "send", "delayMs": 10}
+     ]}
+  ],
+  "cases": [
+    {"id": "normal__baseline", "scenarioId": "normal", "category": "normal", "title": "基线", "disabledNodeIds": []}
+  ],
+  "workflows": [
+    {"id": "wf1", "name": "通知流程", "kind": "task",
+     "nodes": [
+       {"id": "n1", "kind": "start", "name": "开始", "canonicalNodeId": "sensor"},
+       {"id": "n2", "kind": "task", "name": "入队", "canonicalNodeId": "queue"},
+       {"id": "n3", "kind": "end", "name": "结束", "canonicalNodeId": "notify"}
+     ],
+     "edges": [
+       {"id": "we1", "sourceId": "n1", "targetId": "n2", "kind": "sequence", "directed": true},
+       {"id": "we2", "sourceId": "n2", "targetId": "n3", "kind": "sequence", "directed": true}
+     ]}
+  ],
+  "prototypes": []
+}

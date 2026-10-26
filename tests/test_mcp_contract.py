@@ -24,11 +24,11 @@ class MCPRegistrationTests(unittest.TestCase):
         smod.MCPServer=FakeServer
         with patch.dict(sys.modules,{'mcp':mod,'mcp.server':smod}):
             app=server.create_server()
-        self.assertEqual(len(app.tools),13)
-        self.assertEqual(len(set(app.tools)),13)
+        self.assertEqual(len(app.tools),14)
+        self.assertEqual(len(set(app.tools)),14)
         self.assertEqual(len(app.resources),2)
         self.assertEqual(len(app.prompts),1)
-        for name in ('gemarc.scaffold','gemarc.contracts'):
+        for name in ('gemarc.scaffold','gemarc.contracts','gemarc.brief'):
             self.assertIn(name, app.tools)
 
 if __name__=='__main__':unittest.main()

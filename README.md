@@ -6,17 +6,17 @@
 
 | 能力 | 状态 | 说明 |
 |---|---|---|
-| 11 个 MCP 工具 | 实现 | 基于 MCP Python SDK v2 的 `MCPServer`。**已用官方客户端完成真实 stdio 与 Streamable HTTP 握手核验**（11 tool / 2 resource / 1 prompt 全部调通） |
+| 14 个 MCP 工具 | 实现 | 基于 MCP Python SDK v2 的 `MCPServer`。**已用官方客户端完成真实 stdio 与 Streamable HTTP 握手核验**（14 tool / 2 resource / 1 prompt 全部调通） |
 | 2 个 MCP Resources + 1 Prompt | 实现 | Registry、简化 Schema 和标准设计策略 |
 | 统一模型和安全验证 | 实现 | 稳定 ID、证据等级、Node–Edge、View、Case 约束 |
 | 组件注册中心 | MVP | JSON 检索；无独立 UI 与组件包签名 |
 | 1D / 2D / UI 原型 | 实现 MVP | 文本、SVG Node–Edge、数据驱动多标签页；暂无 Konva 编辑器 |
-| 3D | **复用适配器** | 接入用户自行构建的原仓库 Three.js `dist/`；不伪造 3D 页面 |
+| 3D | **实现** | 自带 Three.js 适配器（Building–Floor–Room 真实渲染 + 节点/关系各自可拾取 + 跨维选择同步）；亦可复用用户自行构建的原仓库 `dist/` |
 | 4D | 实现 MVP | 离散事件、步进时间轴、确定性规则传播；无动画流体场景 |
 | 5D | 实现 MVP | 显式规则与模块屏蔽反事实对照；非一般性因果识别引擎 |
 | 增量编译与缓存 | 未完成 | `diff` 提供影响分析，build 仍全量重建 |
-| Graphology / Dagre / Dexie | 未完成 | 独立适配器尚待实现，不宣称已集成 |
-| 浏览器自动化、视觉回归 | 未完成 | `verify` 仅静态文件和模型检查 |
+| Graphology / Dagre / Dexie | 可选适配器 | 运行时**零第三方硬依赖**：这些库一律工厂函数注入 + 内置兜底；不装也能跑 |
+| 浏览器自动化、视觉回归 | 部分 | 有 view-model 结构快照门禁（跑在**构建产物**上）；**像素级视觉回归仍未实现** |
 | 远程 MCP 端点（Vercel） | 实现，**受限形态** | Streamable HTTP + 静态站同在一个函数；写工具默认关闭；文件系统临时，跨调用状态会丢。详见 `docs/09_部署/01_Vercel部署.md` |
 | 安装时完全离线 | 不保证 | Python MCP SDK 需 pip 获取；生成的基础站点不使用 CDN |
 
@@ -89,10 +89,13 @@ Claude Code、Codex、Cursor 和其他 MCP Host 的配置容器键名可能不�
 ### 使用流程
 
 ```powershell
+# 0. 先取工作指令：模型不必自己读文件推导该做什么
+E:\GemArc\.venv\Scripts\python.exe -m gemarc_mcp.cli brief demo
+
 # 1. 生成脚手架：固定件 + 待填槽位
 E:\GemArc\.venv\Scripts\python.exe -m gemarc_mcp.cli scaffold demo --profile static
 
-# 2. 填写 <workspace>/demo/model/architecture.json
+# 2. 填写 <workspace>/demo/model/architecture.json 的槽位
 #    槽位清单在 demo/scaffold/scaffold-manifest.json 与 FILL-IN.md 里
 #    每个槽位都写明了 JSON Pointer、填什么、以及约束它的规则
 
@@ -103,7 +106,13 @@ E:\GemArc\.venv\Scripts\python.exe -m gemarc_mcp.cli validate demo --strict
 E:\GemArc\.venv\Scripts\python.exe -m gemarc_mcp.cli build demo --profile static
 ```
 
-对应的 MCP 工具是 `gemarc.scaffold` 与 `gemarc.contracts`（后者可读取契约与词表内容）。
+对应的 MCP 工具是 `gemarc.brief`（精简工作指令）、`gemarc.scaffold`（落固定件与槽位）
+与 `gemarc.contracts`（读取契约与词表内容）。
+
+`gemarc.brief` 一次性返回：目标、五步流程、六条硬规则、12 个槽位（带 JSON Pointer 与规则）、
+全部允许词值（6 级证据 / 21 实体类型 / 21 关系类型 / 19 图示类型 / Case 分类 / 空间层级）、
+构建命令，以及「哪些固定件已经写好、不要重写」的清单。**实测 8858 字节**，
+用来替掉原先 13323 字节的提示词规格。
 
 ### 两种交付 profile，共用一份源码
 
@@ -113,6 +122,24 @@ E:\GemArc\.venv\Scripts\python.exe -m gemarc_mcp.cli build demo --profile static
 | `vite` | Vite alias | npm 安装 three / graphology / dagre / dexie / sigma | `npm install && npm run dev` |
 
 应用源码用与 profile 无关的 `@gemarc/runtime/...` 导入，因此不会出现两份实现漂移。
+
+### 3D 空间适配器（Three.js）
+
+`runtime/space/space-viewer-three.js` 是随脚手架一起下发的 3D 渲染器，**不硬依赖 three**：
+
+```js
+const renderer = createThreeSpaceRenderer(THREE, { container, model, space, store, onSelectNode, onSelectEdge, onHover });
+```
+
+`static` profile 走 import map 指向 CDN 的 three，`vite` profile 走 `node_modules`，测试注入行为对齐的桩。
+
+- **空间语义落到三维**：Building 与 Room 画线框，Floor 是唯一实心板；Room 有垂直体量，节点站在房间地板上。
+- **拾取按屏幕像素度量**：节点用射线 + 10px 容差，关系用投影线段 + 12px 容差；节点重叠时节点胜出。
+  世界半径不是目标大小——同一条边近处 1px、远处 10px，细管在斜视角下几乎打不中。
+- **取景按视锥精确贴合包围盒**（`fitDistanceToBox()`），不用包围球半径——工程空间通常扁长。
+- **WebGL 不可用时显式降级并说明原因**（`GEMARC_SPACE_010`），绝不用静态图或 2D 伪装三维。
+
+设计细节与决策理由见 `docs/02_基本设计/09_脚手架与共用运行时设计.md` §6.4。
 
 ### 4D/5D 仿真内核：两端同构
 
@@ -140,7 +167,7 @@ npx vercel@65.2.0 deploy --prod
 |---|---|
 | `https://<domain>/mcp` | MCP Streamable HTTP 端点 |
 | `https://<domain>/healthz` | 健康检查与部署状态 |
-| `https://<domain>/` | 5D 架构静态站 |
+| `https://<domain>/` | 5D 架构静态站（冷启动时从包内源码物化，附 3D 适配器） |
 
 远程客户端接入：
 
@@ -177,7 +204,9 @@ $env:GEMARC_ALLOW_WRITE = '1'
 python -m gemarc_mcp.cli build demo --legacy-dist E:\GemArcWork\legacy-build\dist
 ```
 
-> 上述命令借用原仓库演示数据；**不能将演示 3D 架构错当成当前项目真实架构**。正式使用时，须将目标工程转成原仓库支持的 Architecture Model，严格核对适配和事实证据。3D 的跨维双向选择同步仍未完成。
+> 上述命令借用原仓库演示数据；**不能将演示 3D 架构错当成当前项目真实架构**。正式使用时，须将目标工程转成原仓库支持的 Architecture Model，严格核对适配和事实证据。
+> 自带的 Three.js 适配器已实现 3D 与 2D 之间的**跨维双向选择同步**（浏览器实测通过）；
+> 复用原仓库 Viewer 的路径仍然保留，作为「已有产物直接接入」的手段。
 
 ## 代码模块
 
@@ -196,7 +225,14 @@ $env:PYTHONPATH = 'src'
 python -m unittest discover -s tests -v
 ```
 
-测试包含 30 项 Python UT/集成检查；另使用无网络 Mock JSON 的浏览器 DOM/交互冒烟测试验证过 1D/2D/4D/5D/原型切换，不含真实 WebGL 测试。
+测试包含 **77 项 Python UT/集成检查**（`unittest discover`），另有一批 **125 项 Node 运行时测试**
+（`node --test src/gemarc_mcp/scaffold/runtime/tests/*.test.mjs`）覆盖脚手架运行层：图引擎、Focus 退避、
+3D 空间与 **Three.js 适配器**、仿真内核、工作流语义、互操作适配器。
+
+3D 适配器的自动化测试用的是**行为对齐真实 three 的桩**（`runtime/tests/helpers/three-stub.mjs`：
+`Vector3` / `Quaternion` / `Object3D` 矩阵语义、射线-盒、射线-开口圆柱、`Vector3.project`）。
+真实 WebGL 渲染另有一次**浏览器实测**记录（见设计文档 §7），但**像素级视觉回归尚未实现**，
+自动化测试也不构成「像素正确」的证据。
 
 其中 `tests/test_http_transport.py` 会**真实启动 ASGI 应用并用官方 MCP 客户端完成一次 Streamable HTTP 握手**（`initialize` → `list_tools` → `call_tool`），覆盖工具面完整性、只读工具可用、模拟确定性、写工具门禁、工作区越界拒绝、健康检查与静态站托管。`tests/test_mcp_contract.py` 只用 FakeServer 替换 SDK，验证装饰器接线，**不构成握手证据**——两者缺一不可。未安装 MCP SDK 时 HTTP 传输测试自动跳过。
 
@@ -209,4 +245,15 @@ python -m unittest discover -s tests -v
 
 ## 随附预览
 
-`examples/demo-site/` 为预先生成的离线静态站点（示例事实）；在目录内运行 `py -3.11 -m http.server 8000 --bind 127.0.0.1` 后访问 http://127.0.0.1:8000 。
+`examples/demo-site/` 是**随包发布的离线预览**（`mvp` 档，示例事实，不是真实工程）：
+在目录内运行 `py -3.11 -m http.server 8000 --bind 127.0.0.1` 后访问 http://127.0.0.1:8000 。
+
+它是**生成物**，必须与生成它的代码同步。`tests/test_generated_artifacts.py` 会用真实构建路径
+重新生成一份并与仓库里的这份**逐字节比对**，防止再次出现「仓库里有新代码、随附站点还是旧的」。
+
+> 这道门禁是被迫加上的：上一次模型字段从 `source`/`target`/`kind` 迁到
+> `sourceId`/`targetId`/`type` 时，随附站点的 `app.js` 没有一起更新，
+> 浏览器实测显示它**画出 4 个节点、0 条关系**——仓库里的一切测试都是绿的，站点却是坏的。
+
+完整的 5D 脚手架站（含 3D 适配器）请用 `gemarc build --profile static` 生成；
+远程端点提供的也是这一档（冷启动时从包内源码物化，见部署文档）。

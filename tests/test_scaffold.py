@@ -79,21 +79,34 @@ class ScaffoldBuilderTests(unittest.TestCase):
         for slot in builder.SLOTS:
             self.assertIn(slot["id"], text)
 
-    def test_static_profile_resolves_the_runtime_through_an_import_map(self):
+    def test_static_profile_resolves_only_optional_libraries_through_the_import_map(self):
         builder.build_scaffold(self.root, "demo", "static")
         html = (self.root / "index.html").read_text(encoding="utf-8")
-        self.assertIn('"@gemarc/runtime/"', html)
+        # The runtime is reached by a relative path, so the import map only has
+        # to carry the optional third-party libraries.
+        self.assertNotIn("@gemarc/runtime", html)
+        self.assertIn('"three"', html)
 
-    def test_vite_profile_resolves_the_runtime_through_an_alias(self):
+    def test_vite_profile_resolves_optional_libraries_from_node_modules(self):
         builder.build_scaffold(self.root, "demo", "vite")
         config = (self.root / "vite.config.js").read_text(encoding="utf-8")
-        self.assertIn("'@gemarc/runtime'", config)
+        self.assertNotIn("@gemarc/runtime", config)
+        package = json.loads((self.root / "package.json").read_text(encoding="utf-8"))
+        self.assertIn("three", package["dependencies"])
 
-    def test_application_source_uses_the_profile_neutral_specifier(self):
+    def test_application_source_reaches_the_runtime_by_a_relative_path(self):
         builder.build_scaffold(self.root, "demo", "static")
         app = (self.root / "app.js").read_text(encoding="utf-8")
-        self.assertIn("from '@gemarc/runtime/", app)
-        self.assertNotIn("'./runtime/", app)
+        self.assertIn("from './runtime/", app)
+        self.assertNotIn("@gemarc/runtime", app)
+
+    def test_both_profiles_ship_the_same_application_source(self):
+        builder.build_scaffold(self.root / "a", "demo", "static")
+        builder.build_scaffold(self.root / "b", "demo", "vite")
+        self.assertEqual((self.root / "a" / "app.js").read_text(encoding="utf-8"),
+                         (self.root / "b" / "app.js").read_text(encoding="utf-8"))
+        self.assertEqual((self.root / "a" / "style.css").read_text(encoding="utf-8"),
+                         (self.root / "b" / "style.css").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

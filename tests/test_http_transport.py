@@ -161,23 +161,34 @@ class HttpTransportTests(unittest.TestCase):
         self.assertTrue(payload["staticSiteAvailable"])
         self.assertEqual(payload["sessionManagerError"], "")
 
-    def test_static_site_is_served(self):
+    def test_home_page_is_the_mcp_console(self):
+        """The home page is a tuning panel for the MCP, not a rendering of one design."""
         import urllib.request
 
         with urllib.request.urlopen(
             f"http://127.0.0.1:{self.port}/", timeout=10
         ) as response:
             body = response.read().decode("utf-8", "replace")
-        self.assertIn("GemArc", body)
-        self.assertIn("5D Architecture", body)
+        self.assertIn("GemArc MCP", body)
+        self.assertIn("功能微调控制台", body)
+        # Every placeholder must have been filled by the server.
+        self.assertNotIn("__MCP_PATH__", body)
+        self.assertNotIn("__WRITE_TOOLS__", body)
+        # The write-tool list must come from the running server, not a copy.
+        self.assertIn('"gemarc.scaffold"', body)
 
-    def test_served_site_is_the_scaffold_build_not_a_stale_snapshot(self):
-        """The remote site must be generated from the package sources.
+        for asset in ("/console.css", "/console.js"):
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{self.port}{asset}", timeout=10
+            ) as response:
+                self.assertEqual(response.status, 200, asset)
+                self.assertTrue(response.read())
 
-        A committed snapshot of the site would silently drift from the runtime
-        it is supposed to expose — the deployed 3D adapter would be missing
-        while the repository claims it exists. This test pins the served site
-        to the scaffold build.
+    def test_scaffold_site_is_served_under_the_site_prefix(self):
+        """The scaffold product stays reachable, but no longer at the root.
+
+        It is generated from the package sources on a cold start, so the
+        deployed site can never drift from the runtime it exposes.
         """
         import urllib.request
 
@@ -186,22 +197,36 @@ class HttpTransportTests(unittest.TestCase):
         ) as response:
             payload = json.loads(response.read())
         self.assertEqual(payload["staticSiteSource"], "scaffold-static")
+        self.assertEqual(payload["staticSitePath"], "/site/")
+        self.assertTrue(payload["consoleAvailable"])
 
         with urllib.request.urlopen(
-            f"http://127.0.0.1:{self.port}/", timeout=10
+            f"http://127.0.0.1:{self.port}/site/", timeout=10
         ) as response:
             index = response.read().decode("utf-8", "replace")
-        # The scaffold shell resolves three.js through an import map; the legacy
-        # MVP shell has no import map at all.
+        # The scaffold shell resolves three.js through an import map; the
+        # console shell has no import map at all.
         self.assertIn('"three"', index)
         self.assertIn("importmap", index)
 
         with urllib.request.urlopen(
-            f"http://127.0.0.1:{self.port}/runtime/space/space-viewer-three.js",
+            f"http://127.0.0.1:{self.port}/site/runtime/space/space-viewer-three.js",
             timeout=10,
         ) as response:
             adapter = response.read().decode("utf-8", "replace")
         self.assertIn("createThreeSpaceRenderer", adapter)
+
+    def test_health_lists_the_write_tools(self):
+        import urllib.request
+
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{self.port}/healthz", timeout=10
+        ) as response:
+            payload = json.loads(response.read())
+        self.assertEqual(
+            sorted(payload["writeTools"]),
+            ["gemarc.build", "gemarc.export", "gemarc.init", "gemarc.model", "gemarc.scaffold"],
+        )
 
 
 if __name__ == "__main__":

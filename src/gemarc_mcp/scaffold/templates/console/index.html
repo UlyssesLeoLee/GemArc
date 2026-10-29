@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>GemArc MCP · 功能微调控制台</title>
+  <link rel="stylesheet" href="./console.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="gem">◆</span><span>GemArc MCP</span><small>功能微调控制台</small>
+    </div>
+    <div class="conn">
+      <span class="dot" id="conn-dot"></span>
+      <span id="conn-text">正在连接 MCP…</span>
+    </div>
+  </header>
+
+  <section class="statbar" id="statbar">
+    <span class="stat muted">等待 /healthz…</span>
+  </section>
+
+  <main>
+    <aside class="pane col-tools">
+      <p class="section-title">TOOLS · 工具</p>
+      <input id="tool-filter" class="filter" type="search" placeholder="过滤工具名或说明…" autocomplete="off">
+      <nav id="tool-list" class="tool-list"></nav>
+      <p class="section-title" style="margin-top:14px">ENDPOINTS</p>
+      <div class="endpoints">
+        <div><code>POST /mcp</code><span>Streamable HTTP · JSON-RPC</span></div>
+        <div><code>GET /healthz</code><span>服务器状态</span></div>
+        <div><code><a href="__SITE_PATH__">/__SITE_PATH__</a></code><span>脚手架产出的 5D 站</span></div>
+      </div>
+    </aside>
+
+    <section class="pane col-stage">
+      <div class="stage-head">
+        <div class="stage-title">
+          <h1 id="tool-name">选择一个工具</h1>
+          <p id="tool-desc" class="muted">左侧列表里的每一项都是 MCP 协议里真实注册的工具。选中后可调整参数并直接调用。</p>
+        </div>
+        <div class="stage-actions">
+          <span id="tool-kind" class="chip"></span>
+          <button id="call-btn" class="primary" type="button" disabled>调用</button>
+        </div>
+      </div>
+
+      <p class="section-title">PARAMETERS · 参数</p>
+      <form id="params" class="params" autocomplete="off"></form>
+
+      <p class="section-title">RESULT · 结果</p>
+      <div class="result-bar">
+        <span id="result-meta" class="muted">尚未调用</span>
+        <button id="copy-btn" class="ghost" type="button" hidden>复制 JSON</button>
+      </div>
+      <div id="result" class="result"><p class="muted">调用结果会显示在这里。出错时显示原始 JSON-RPC 错误,不做美化。</p></div>
+    </section>
+
+    <aside class="pane col-side">
+      <p class="section-title">SCHEMA · 输入契约</p>
+      <div id="schema" class="code muted">—</div>
+
+      <p class="section-title">RESOURCES · 资源</p>
+      <div id="resources" class="list"></div>
+
+      <p class="section-title">PROMPTS · 提示词</p>
+      <div id="prompts" class="list"></div>
+
+      <p class="section-title">HISTORY · 调用历史</p>
+      <div id="history" class="list"></div>
+    </aside>
+  </main>
+
+  <footer class="foot">
+    <span id="foot-meta"></span>
+    <span>控制台只调用本服务器上真实注册的 MCP 工具;它不模拟任何能力。</span>
+  </footer>
+
+  <!-- Injected by the server: paths and the write-tool list come from the
+       running server, so the panel can never claim a tool the server does
+       not actually register. -->
+  <script>
+    window.GEMARC = {
+      mcpPath: "__MCP_PATH__",
+      healthPath: "__HEALTH_PATH__",
+      sitePath: "__SITE_PATH__",
+      writeTools: __WRITE_TOOLS__,
+      version: "__VERSION__"
+    };
+  </script>
+  <script type="module" src="./console.js"></script>
+</body>
+</html>

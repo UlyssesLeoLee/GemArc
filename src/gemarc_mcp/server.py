@@ -13,52 +13,69 @@ def workspace() -> Workspace:
     return Workspace(root)
 
 
+#: Tools that mutate the workspace. The flag is declared on the registration
+#: itself, so the server and the web console can never disagree about which
+#: tools need GEMARC_ALLOW_WRITE=1.
+WRITE_TOOLS: set[str] = set()
+
+
 def create_server():
     # Import only when MCP is actually launched, allowing offline core unit tests.
     from mcp.server import MCPServer
     app = MCPServer("GemArc MCP", instructions="只使用已授权工作区。事实不可臆造；模拟输出必须标注证据等级。")
 
-    @app.tool(name="gemarc.inspect")
+    WRITE_TOOLS.clear()
+    _app_tool = app.tool
+
+    def tool(name: str, write: bool = False):
+        """Register a tool and remember whether it mutates the workspace."""
+        def deco(fn):
+            if write:
+                WRITE_TOOLS.add(name)
+            return _app_tool(name=name)(fn)
+        return deco
+
+    @tool("gemarc.inspect")
     def inspect(path: str) -> dict:
         """Read-only scan of a local repository in GEMARC_WORKSPACE_ROOT; candidate facts are unconfirmed."""
         return safe_response(lambda: service.inspect_path(workspace(), path))
 
-    @app.tool(name="gemarc.plan")
+    @tool("gemarc.plan")
     def plan(project: str, goals: list[str] | None = None) -> dict:
         """Prepare dimension availability and evidence gaps without changing the project."""
         return safe_response(lambda: service.plan(workspace(), project, goals))
 
-    @app.tool(name="gemarc.assets")
+    @tool("gemarc.assets")
     def assets(query: str = "") -> dict:
         """Find reusable standardized components and clearly labeled future components."""
         return safe_response(lambda: service.assets(query))
 
-    @app.tool(name="gemarc.contracts")
+    @tool("gemarc.contracts")
     def contracts(query: str = "") -> dict:
         """List the fixed contracts, vocabularies and fill-in slots; optionally return one document."""
         return safe_response(lambda: service.contracts(query))
 
-    @app.tool(name="gemarc.brief")
+    @tool("gemarc.brief")
     def brief(project: str = "", section: str = "") -> dict:
         """The compact work order for a language model: purpose, procedure, slots with their rules, vocabulary, commands. Use this instead of restating the specification."""
         return safe_response(lambda: service.brief(project, section))
 
-    @app.tool(name="gemarc.scaffold")
+    @tool("gemarc.scaffold", write=True)
     def scaffold(project: str, profile: str = "static") -> dict:
         """Materialise the fixed parts (contracts, vocabulary, shared runtime, site shell) plus the fill-in slots; requires GEMARC_ALLOW_WRITE=1."""
         return safe_response(lambda: service.scaffold_project(workspace(), project, profile))
 
-    @app.tool(name="gemarc.init")
+    @tool("gemarc.init", write=True)
     def init(project: str) -> dict:
         """Create a new example-backed GemArc project; requires GEMARC_ALLOW_WRITE=1."""
         return safe_response(lambda: service.init_project(workspace(), project))
 
-    @app.tool(name="gemarc.model")
+    @tool("gemarc.model", write=True)
     def update_model(project: str, replacement_model: dict, expected_sha256: str) -> dict:
         """Replace the model using optimistic concurrency, reject invalid model changes."""
         return safe_response(lambda: service.replace_model(workspace(), project, replacement_model, expected_sha256))
 
-    @app.tool(name="gemarc.validate")
+    @tool("gemarc.validate")
     def validate(project: str, strict: bool = False) -> dict:
         """Validate node/edge/view references, scenario rules, and evidence status."""
         def action():
@@ -68,12 +85,12 @@ def create_server():
             return output
         return safe_response(action)
 
-    @app.tool(name="gemarc.build")
+    @tool("gemarc.build", write=True)
     def build(project: str, legacy_dist: str = "", profile: str = "mvp") -> dict:
         """Compile a static site; profile selects mvp (small viewer), static (zero-build ESM) or vite (npm project)."""
         return safe_response(lambda: service.build(workspace(), project, legacy_dist or None, profile))
 
-    @app.tool(name="gemarc.simulate")
+    @tool("gemarc.simulate")
     def simulate(project: str, scenario_id: str, disabled_nodes: list[str] | None = None,
                  compare_baseline: bool = False) -> dict:
         """Run bounded deterministic event propagation; optional causal intervention comparison."""
@@ -83,17 +100,17 @@ def create_server():
                     simulation.simulate(data, scenario_id, disabled_nodes or []))
         return safe_response(action)
 
-    @app.tool(name="gemarc.verify")
+    @tool("gemarc.verify")
     def verify(project: str) -> dict:
         """Verify generated file integrity and schema only; browser/WebGL tests are not claimed."""
         return safe_response(lambda: service.verify(workspace(), project))
 
-    @app.tool(name="gemarc.diff")
+    @tool("gemarc.diff")
     def diff(base_project: str, target_project: str) -> dict:
         """Show changed entities and adjacent impact in two project models."""
         return safe_response(lambda: service.diff(workspace(), base_project, target_project))
 
-    @app.tool(name="gemarc.export")
+    @tool("gemarc.export", write=True)
     def export(project: str) -> dict:
         """Export a validated static site ZIP within the authorized project directory."""
         return safe_response(lambda: service.export_zip(workspace(), project))

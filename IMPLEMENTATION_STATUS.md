@@ -43,6 +43,7 @@
 | 表现层纯函数化（view-model） | 实现 | `test_view_model_structure` 在构建产物上比对基线 | 像素级基线仍缺 |
 | `static` / `vite` 双 profile 共用一份源码 | 实现 | `test_scaffold_flow`（含 Node 实际 import 站点 runtime） | 离线 vendor 流程 |
 | 随附预览站与生成代码同步 | 实现 | `test_generated_artifacts` 逐字节比对真实构建产物 | 无 |
+| MCP 功能微调控制台（主页） | 实现 | `test_http_transport`：主页占位符全部替换、写工具名单与 `server.py` 同源；浏览器实测调用/资源读取/写工具上锁 | 像素级视觉回归 |
 | 浏览器端视觉回归 | **未实现** | 只有结构快照，非像素比对 | 需要确定基线环境与容差 |
 
 ## 远程端点（Vercel）

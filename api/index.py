@@ -49,7 +49,7 @@ from pathlib import Path
 import anyio
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
-from starlette.responses import JSONResponse, Response
+from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
@@ -88,6 +88,12 @@ if os.environ.get("GEMARC_ALLOW_WRITE") != "1":
 SEED_PROJECT = "demo"
 SEED_MODEL = REPO_ROOT / "examples" / "demo-site" / "data" / "architecture.json"
 LEGACY_STATIC_DIR = REPO_ROOT / "examples" / "demo-site"
+
+#: The console is a fixed part of the package, not a generated artefact: it is
+#: the tuning panel for the MCP itself, so it must ship with the server.
+CONSOLE_DIR = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "templates" / "console"
+CONSOLE_HTML = CONSOLE_DIR / "index.html"
+SITE_PATH = "/site/"
 
 
 def materialise_static_site() -> tuple[Path | None, str]:
@@ -187,6 +193,55 @@ static_app = (
 )
 
 
+# --- console ----------------------------------------------------------------
+def _console_config() -> dict:
+    """Values the browser needs, taken from the running server."""
+    return {
+        "mcpPath": "/mcp",
+        "healthPath": "/healthz",
+        "sitePath": SITE_PATH,
+        "writeTools": sorted(gemarc_server.WRITE_TOOLS),
+        "version": getattr(gemarc_server, "__version__", "0.2.0"),
+    }
+
+
+def render_console() -> str:
+    """Fill the console shell with the server's own configuration."""
+    html = CONSOLE_HTML.read_text(encoding="utf-8")
+    config = _console_config()
+    html = html.replace("__MCP_PATH__", config["mcpPath"])
+    html = html.replace("__HEALTH_PATH__", config["healthPath"])
+    html = html.replace("__SITE_PATH__", config["sitePath"])
+    html = html.replace("__VERSION__", config["version"])
+    html = html.replace("__WRITE_TOOLS__", json.dumps(config["writeTools"], ensure_ascii=False))
+    return html
+
+
+async def _console_endpoint(scope, receive, send):
+    if not CONSOLE_HTML.is_file():
+        response = Response(
+            "The console shell is not present in this deployment bundle. "
+            "The MCP endpoint at /mcp is unaffected.",
+            status_code=404,
+            media_type="text/plain; charset=utf-8",
+        )
+        await response(scope, receive, send)
+        return
+    response = HTMLResponse(render_console())
+    await response(scope, receive, send)
+
+
+async def _console_asset(scope, receive, send, name: str):
+    """Serve one console asset (css/js) from the package."""
+    target = (CONSOLE_DIR / name).resolve()
+    if target.parent != CONSOLE_DIR.resolve() or not target.is_file():
+        response = Response("not found", status_code=404, media_type="text/plain; charset=utf-8")
+    else:
+        media = "text/css" if name.endswith(".css") else "text/javascript"
+        response = Response(target.read_bytes(), media_type=media)
+    await response(scope, receive, send)
+
+
 # --- dispatch --------------------------------------------------------------
 def _health_payload() -> dict:
     return {
@@ -200,6 +255,9 @@ def _health_payload() -> dict:
         "seeded": SEEDED,
         "staticSiteAvailable": STATIC_AVAILABLE,
         "staticSiteSource": STATIC_SOURCE,
+        "staticSitePath": SITE_PATH,
+        "consoleAvailable": CONSOLE_HTML.is_file(),
+        "writeTools": sorted(gemarc_server.WRITE_TOOLS),
         "sessionManagerThreadAlive": _session_thread.is_alive(),
         "sessionManagerError": _session_error,
     }
@@ -223,6 +281,18 @@ async def _mcp_endpoint(scope, receive, send):
 
 
 MCP_PATHS = ("/mcp", "/api/index", "/api/index.py", "/index.py")
+CONSOLE_ASSETS = ("console.css", "/console.js")
+
+
+def _strip_site_prefix(scope, path: str):
+    """Rewrite /site/... to the path the static mount actually serves."""
+    remainder = "/" + path[len(SITE_PATH):]
+    rewritten = dict(scope)
+    rewritten["path"] = remainder
+    raw = scope.get("raw_path")
+    if isinstance(raw, (bytes, bytearray)):
+        rewritten["raw_path"] = remainder.encode("utf-8")
+    return rewritten
 
 
 async def dispatch(scope, receive, send):
@@ -231,6 +301,14 @@ async def dispatch(scope, receive, send):
         await _health_endpoint(scope, receive, send)
     elif path in MCP_PATHS or path.rstrip("/").endswith("/mcp"):
         await _mcp_endpoint(scope, receive, send)
+    elif path in ("/console.css", "/console.js"):
+        await _console_asset(scope, receive, send, path.rsplit("/", 1)[-1])
+    elif path == "/" or path == "":
+        # The home page is the MCP console, not a rendering of one design.
+        await _console_endpoint(scope, receive, send)
+    elif path == SITE_PATH or path.startswith(SITE_PATH):
+        # The scaffold product itself stays reachable, under /site/.
+        await static_app(_strip_site_prefix(scope, path), receive, send)
     else:
         await static_app(scope, receive, send)
 

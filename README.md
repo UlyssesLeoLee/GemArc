@@ -167,7 +167,12 @@ npx vercel@65.2.0 deploy --prod
 |---|---|
 | `https://<domain>/mcp` | MCP Streamable HTTP 端点 |
 | `https://<domain>/healthz` | 健康检查与部署状态 |
-| `https://<domain>/` | 5D 架构静态站（冷启动时从包内源码物化，附 3D 适配器） |
+| `https://<domain>/` | **MCP 功能微调控制台**（Web 面板：选工具 → 调参数 → 看真实返回） |
+| `https://<domain>/site/` | 脚手架产出的 5D 架构站（含 3D 适配器，冷启动时从包内源码物化） |
+
+主页是**控制台**而不是设计图：远程端点的主角是 MCP 本身。面板里列出的工具、参数表单、
+输入契约全部来自 `tools/list` 的真实返回，写工具由服务端下发的名单上锁，
+所以它不会声称服务器没有的能力。
 
 远程客户端接入：
 
@@ -225,7 +230,7 @@ $env:PYTHONPATH = 'src'
 python -m unittest discover -s tests -v
 ```
 
-测试包含 **77 项 Python UT/集成检查**（`unittest discover`），另有一批 **125 项 Node 运行时测试**
+测试包含 **82 项 Python UT/集成检查**（`unittest discover`），另有一批 **125 项 Node 运行时测试**
 （`node --test src/gemarc_mcp/scaffold/runtime/tests/*.test.mjs`）覆盖脚手架运行层：图引擎、Focus 退避、
 3D 空间与 **Three.js 适配器**、仿真内核、工作流语义、互操作适配器。
 

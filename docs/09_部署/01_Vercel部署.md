@@ -12,7 +12,24 @@
 |---|---|---|
 | `/mcp` | MCP Streamable HTTP 端点 | `api/index.py` → `MCPServer.streamable_http_app()` |
 | `/healthz` | 健康检查与部署状态 | `api/index.py` |
-| `/` 及其他 | 5D 架构静态站（**冷启动时从包内源码物化**） | `api/index.py` → Starlette `StaticFiles` |
+| `/` | **MCP 功能微调控制台**（Web 面板） | `api/index.py` → `templates/console/` |
+| `/site/` | 脚手架产出的 5D 架构站 | `api/index.py` → Starlette `StaticFiles`（冷启动物化） |
+
+**主页是控制台，不是设计图**。远程端点的主角是 MCP 本身：主页是一个「功能微调面板」，
+列出服务器上**真实注册**的工具，让人在浏览器里改参数、直接调用、看真实返回。
+它不是一个架构可视化页面——那类页面是脚手架的*产物*，放在 `/site/`。
+
+控制台的三条硬约束：
+
+| 约束 | 做法 |
+|---|---|
+| 不许声称服务器没有的能力 | 工具列表、参数表单、输入契约全部来自 `tools/list` 的真实返回 |
+| 写工具的名单不能手抄 | `server.py` 的装饰器自带 `write=True` 标记，`/healthz` 暴露该名单，页面据此上锁 |
+| 路径不能写死 | 服务端渲染时注入 `mcpPath` / `healthPath` / `sitePath` / `writeTools` |
+
+浏览器直连 `/mcp` 走的是**无状态 JSON-RPC**（`stateless_http=True` + `json_response=True`）：
+POST 一次拿一个 JSON 响应，不需要 session id，也就不需要跨域许可。
+
 
 配置文件：
 
@@ -180,8 +197,11 @@ async def m():
 asyncio.run(m())"
 # 期望输出：14 tools
 
-# 3. 静态站
+# 3. 静态站与主页
 curl -I https://<domain>/
+# 期望：200，控制台页面
+curl -I https://<domain>/site/
+# 期望：200，脚手架 5D 站
 ```
 
 ## 8. 验证范围（已实测 vs 待验证）
@@ -193,9 +213,10 @@ curl -I https://<domain>/
 - 去掉 lifespan 触发 `Task group is not initialized`，改用后台线程后恢复
 - 写工具默认关闭（`GEMARC_AUTH_002`）且无副作用；越界路径被拒（`GEMARC_AUTH_001`）
 - 新容器 + 空工作区导致项目状态丢失（`GEMARC_IO_001`）
-- 静态站 `/`、`/app.js`、`/data/*.json` 均 200
-- 静态站是**冷启动物化**的脚手架构建（`staticSiteSource: "scaffold-static"`），
-  含 import map 与 `/runtime/space/space-viewer-three.js`
+- `/` 返回 MCP 控制台（占位符全部被服务端替换；写工具名单与 `server.py` 同源）
+- `/site/` 返回脚手架 5D 站；`/site/runtime/space/space-viewer-three.js` 200
+- 浏览器实测：控制台调 `gemarc.validate` 返回 `status: ok`、0 error；
+  选写工具时调用按钮显示「写工具已关闭」并禁用；读 `gemarc://registry` 成功；控制台零报错
 - `/mcp` 与 `/api/index` 两条路径都可用
 - 真实域名 Host 头下 `/healthz` 返回 200
 - 以上行为已固化为回归测试 `tests/test_http_transport.py`（真实启动应用 + 官方客户端握手），

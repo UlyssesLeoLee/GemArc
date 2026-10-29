@@ -39,6 +39,7 @@
     {"id":"gemarc.runtime.interop","version":"0.2.0","dimension":"shared","status":"implemented","license":"MIT","purpose":"BPMN, UML XMI, ER and Draw.io adapters"},
 
     {"id":"gemarc.profile.static","version":"0.2.0","dimension":"delivery","status":"implemented","license":"MIT","purpose":"Zero build site: native ESM with an import map"},
+    {"id":"gemarc.console","version":"0.2.0","dimension":"delivery","status":"implemented","license":"MIT","purpose":"Web tuning panel for the MCP itself: real tool list, schema-driven parameter forms, server-declared write gating"},
     {"id":"gemarc.profile.vite","version":"0.2.0","dimension":"delivery","status":"implemented","license":"MIT","purpose":"npm project sharing the same runtime sources"},
     {"id":"gemarc.scaffold","version":"0.2.0","dimension":"scaffolding","status":"implemented","license":"MIT","purpose":"Materialises the fixed parts and the fill-in slots for a project"},
     {"id":"gemarc.scaffold.brief","version":"0.2.0","dimension":"scaffolding","status":"implemented","license":"MIT","purpose":"Tool-returned work instruction, slot list and vocabulary whitelist that replaces the prose prompt spec"},

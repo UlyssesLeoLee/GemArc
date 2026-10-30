@@ -1,0 +1,567 @@
+{
+  "schema": "gemarc-atlas-element-templates/1",
+  "note": "Bodies for use=<element kind>. A template never carries elementId, kind or ports (the expander derives ports); authored keys override template keys.",
+  "kinds": {
+    "NewService": {
+      "role": "new service on the path",
+      "stateMachine": {
+        "states": [
+          "IDLE",
+          "SERVING"
+        ],
+        "initial": "IDLE",
+        "transitions": [
+          {
+            "from": "IDLE",
+            "to": "SERVING",
+            "on": "receive"
+          }
+        ]
+      },
+      "eventHandlers": [
+        {
+          "on": "receive",
+          "do": "forward",
+          "setState": "SERVING"
+        }
+      ],
+      "guardRules": [],
+      "errorRules": [
+        {
+          "on": "timeout",
+          "do": "fail"
+        }
+      ],
+      "resourceLimits": {
+        "maxEvents": 20
+      },
+      "terminationConditions": [
+        "case finished"
+      ],
+      "latencyMs": 5
+    },
+    "Proxy": {
+      "role": "pass-through proxy",
+      "stateMachine": {
+        "states": [
+          "IDLE",
+          "RELAYING"
+        ],
+        "initial": "IDLE",
+        "transitions": [
+          {
+            "from": "IDLE",
+            "to": "RELAYING",
+            "on": "receive"
+          }
+        ]
+      },
+      "eventHandlers": [
+        {
+          "on": "receive",
+          "do": "forward",
+          "setState": "RELAYING"
+        }
+      ],
+      "guardRules": [],
+      "errorRules": [
+        {
+          "on": "timeout",
+          "do": "fail"
+        }
+      ],
+      "resourceLimits": {
+        "maxEvents": 20
+      },
+      "terminationConditions": [
+        "case finished"
+      ],
+      "latencyMs": 1
+    },
+    "Cache": {
+      "role": "answers repeated requests",
+      "stateMachine": {
+        "states": [
+          "EMPTY",
+          "WARM"
+        ],
+        "initial": "EMPTY",
+        "transitions": [
+          {
+            "from": "EMPTY",
+            "to": "WARM",
+            "on": "receive"
+          }
+        ]
+      },
+      "eventHandlers": [
+        {
+          "on": "receive",
+          "do": "respond",
+          "when": {
+            "elementState": "WARM"
+          }
+        },
+        {
+          "on": "receive",
+          "do": "forward",
+          "setState": "WARM"
+        }
+      ],
+      "guardRules": [],
+      "errorRules": [
+        {
+          "on": "timeout",
+          "do": "fail"
+        }
+      ],
+      "resourceLimits": {
+        "maxEvents": 20
+      },
+      "terminationConditions": [
+        "case finished"
+      ],
+      "latencyMs": 2
+    },
+    "StorageAdapter": {
+      "role": "storage access adapter",
+      "stateMachine": {
+        "states": [
+          "IDLE",
+          "ACCESSING"
+        ],
+        "initial": "IDLE",
+        "transitions": [
+          {
+            "from": "IDLE",
+            "to": "ACCESSING",
+            "on": "receive"
+          }
+        ]
+      },
+      "eventHandlers": [
+        {
+          "on": "receive",
+          "do": "forward",
+          "setState": "ACCESSING",
+          "retry": 1
+        }
+      ],
+      "guardRules": [],
+      "errorRules": [
+        {
+          "on": "timeout",
+          "do": "fail"
+        }
+      ],
+      "resourceLimits": {
+        "maxEvents": 20
+      },
+      "terminationConditions": [
+        "case finished"
+      ],
+      "latencyMs": 3
+    },
+    "Validator": {
+      "role": "input validator",
+      "stateMachine": {
+        "states": [
+          "IDLE",
+          "CHECKED"
+        ],
+        "initial": "IDLE",
+        "transitions": [
+          {
+            "from": "IDLE",
+            "to": "CHECKED",
+            "on": "receive"
+          }
+        ]
+      },
+      "eventHandlers": [
+        {
+          "on": "receive",
+          "do": "forward",
+          "setState": "CHECKED"
+        }
+      ],
+      "guardRules": [
+        {
+          "param": "payload",
+          "op": "present"
+        }
+      ],
+      "errorRules": [
+        {
+          "on": "timeout",
+          "do": "fail"
+        }
+      ],
+      "resourceLimits": {
+        "maxEvents": 20
+      },
+      "terminationConditions": [
+        "case finished"
+      ],
+      "latencyMs": 1
+    },
+    "MessageQueue": {
+      "role": "buffers messages",
+      "stateMachine": {
+        "states": [
+          "EMPTY",
+          "BUFFERING"
+        ],
+        "initial": "EMPTY",
+        "transitions": [
+          {
+            "from": "EMPTY",
+            "to": "BUFFERING",
+            "on": "receive"
+          }
+        ]
+      },
+      "eventHandlers": [
+        {
+          "on": "receive",
+          "do": "forward",
+          "setState": "BUFFERING"
+        }
+      ],
+      "guardRules": [],
+      "errorRules": [
+        {
+          "on": "timeout",
+          "do": "fail"
+        }
+      ],
+      "resourceLimits": {
+        "maxEvents": 50
+      },
+      "terminationConditions": [
+        "case finished"
+      ],
+      "latencyMs": 4
+    },
+    "EventRouter": {
+      "role": "routes events",
+      "stateMachine": {
+        "states": [
+          "IDLE",
+          "ROUTING"
+        ],
+        "initial": "IDLE",
+        "transitions": [
+          {
+            "from": "IDLE",
+            "to": "ROUTING",
+            "on": "receive"
+          }
+        ]
+      },
+      "eventHandlers": [
+        {
+          "on": "receive",
+          "do": "forward",
+          "setState": "ROUTING"
+        }
+      ],
+      "guardRules": [],
+      "errorRules": [
+        {
+          "on": "timeout",
+          "do": "fail"
+        }
+      ],
+      "resourceLimits": {
+        "maxEvents": 20
+      },
+      "terminationConditions": [
+        "case finished"
+      ],
+      "latencyMs": 1
+    },
+    "CircuitBreaker": {
+      "role": "stops calls to a failing target",
+      "stateMachine": {
+        "states": [
+          "CLOSED",
+          "OPEN",
+          "HALF_OPEN"
+        ],
+        "initial": "CLOSED",
+        "transitions": [
+          {
+            "from": "CLOSED",
+            "to": "OPEN",
+            "on": "failure"
+          },
+          {
+            "from": "OPEN",
+            "to": "HALF_OPEN",
+            "on": "timer"
+          },
+          {
+            "from": "HALF_OPEN",
+            "to": "CLOSED",
+            "on": "success"
+          }
+        ]
+      },
+      "eventHandlers": [
+        {
+          "on": "receive",
+          "do": "drop",
+          "when": {
+            "elementState": "OPEN"
+          }
+        },
+        {
+          "on": "receive",
+          "do": "forward"
+        }
+      ],
+      "guardRules": [],
+      "errorRules": [
+        {
+          "on": "timeout",
+          "do": "fail"
+        }
+      ],
+      "resourceLimits": {
+        "maxEvents": 20
+      },
+      "terminationConditions": [
+        "case finished"
+      ]
+    },
+    "RetryController": {
+      "role": "retries the target",
+      "stateMachine": {
+        "states": [
+          "IDLE",
+          "RETRYING"
+        ],
+        "initial": "IDLE",
+        "transitions": [
+          {
+            "from": "IDLE",
+            "to": "RETRYING",
+            "on": "receive"
+          }
+        ]
+      },
+      "eventHandlers": [
+        {
+          "on": "receive",
+          "do": "forward",
+          "setState": "RETRYING",
+          "retry": 2
+        }
+      ],
+      "guardRules": [],
+      "errorRules": [
+        {
+          "on": "timeout",
+          "do": "fail"
+        }
+      ],
+      "resourceLimits": {
+        "maxEvents": 20
+      },
+      "terminationConditions": [
+        "case finished"
+      ]
+    },
+    "FaultSource": {
+      "role": "injects a failure",
+      "stateMachine": {
+        "states": [
+          "IDLE",
+          "FAULTY"
+        ],
+        "initial": "IDLE",
+        "transitions": [
+          {
+            "from": "IDLE",
+            "to": "FAULTY",
+            "on": "receive"
+          }
+        ]
+      },
+      "eventHandlers": [
+        {
+          "on": "receive",
+          "do": "fail",
+          "setState": "FAULTY"
+        }
+      ],
+      "guardRules": [],
+      "errorRules": [
+        {
+          "on": "timeout",
+          "do": "fail"
+        }
+      ],
+      "resourceLimits": {
+        "maxEvents": 20
+      },
+      "terminationConditions": [
+        "case finished"
+      ]
+    },
+    "RecoveryHandler": {
+      "role": "recovers a failed call",
+      "stateMachine": {
+        "states": [
+          "IDLE",
+          "RECOVERING"
+        ],
+        "initial": "IDLE",
+        "transitions": [
+          {
+            "from": "IDLE",
+            "to": "RECOVERING",
+            "on": "receive"
+          }
+        ]
+      },
+      "eventHandlers": [
+        {
+          "on": "receive",
+          "do": "forward",
+          "setState": "RECOVERING",
+          "retry": 1
+        }
+      ],
+      "guardRules": [],
+      "errorRules": [
+        {
+          "on": "timeout",
+          "do": "fail"
+        }
+      ],
+      "resourceLimits": {
+        "maxEvents": 20
+      },
+      "terminationConditions": [
+        "case finished"
+      ],
+      "latencyMs": 5
+    },
+    "CompensationHandler": {
+      "role": "undoes finished work",
+      "stateMachine": {
+        "states": [
+          "IDLE",
+          "COMPENSATING"
+        ],
+        "initial": "IDLE",
+        "transitions": [
+          {
+            "from": "IDLE",
+            "to": "COMPENSATING",
+            "on": "receive"
+          }
+        ]
+      },
+      "eventHandlers": [
+        {
+          "on": "receive",
+          "do": "forward",
+          "setState": "COMPENSATING"
+        }
+      ],
+      "guardRules": [],
+      "errorRules": [
+        {
+          "on": "timeout",
+          "do": "fail"
+        }
+      ],
+      "resourceLimits": {
+        "maxEvents": 20
+      },
+      "terminationConditions": [
+        "case finished"
+      ],
+      "latencyMs": 5
+    },
+    "HumanApproval": {
+      "role": "waits for a person",
+      "stateMachine": {
+        "states": [
+          "PENDING",
+          "APPROVED"
+        ],
+        "initial": "PENDING",
+        "transitions": [
+          {
+            "from": "PENDING",
+            "to": "APPROVED",
+            "on": "approve"
+          }
+        ]
+      },
+      "eventHandlers": [
+        {
+          "on": "receive",
+          "do": "forward",
+          "setState": "APPROVED"
+        }
+      ],
+      "guardRules": [],
+      "errorRules": [
+        {
+          "on": "timeout",
+          "do": "fail"
+        }
+      ],
+      "resourceLimits": {
+        "maxEvents": 20
+      },
+      "terminationConditions": [
+        "case finished"
+      ],
+      "latencyMs": 200
+    },
+    "ExternalServiceStub": {
+      "role": "stands in for an external service",
+      "stateMachine": {
+        "states": [
+          "IDLE",
+          "ANSWERING"
+        ],
+        "initial": "IDLE",
+        "transitions": [
+          {
+            "from": "IDLE",
+            "to": "ANSWERING",
+            "on": "receive"
+          }
+        ]
+      },
+      "eventHandlers": [
+        {
+          "on": "receive",
+          "do": "respond",
+          "setState": "ANSWERING"
+        }
+      ],
+      "guardRules": [],
+      "errorRules": [
+        {
+          "on": "timeout",
+          "do": "fail"
+        }
+      ],
+      "resourceLimits": {
+        "maxEvents": 20
+      },
+      "terminationConditions": [
+        "case finished"
+      ],
+      "latencyMs": 2
+    }
+  }
+}

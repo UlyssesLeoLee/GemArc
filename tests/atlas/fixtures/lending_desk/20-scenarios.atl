@@ -1,0 +1,19 @@
+#atlas 1
+## tests: id | title
+TS-1 | A member can borrow a copy
+## cases: id | cat | title | opts
+CS-BORROW-OK | normal | Member borrows an available copy | req=RQ-1 ev=EVD-1
+## events: type | from | to | opts
+@set case=CS-BORROW-OK
+Call | usr.member | svc.loan | ruleId=R-BORROW
+Call | svc.loan | svc.stock | ruleId=R-CHECK latencyMs=20
+Return | svc.stock | svc.loan
+Call | svc.loan | tbl.loan | ruleId=R-WRITE
+Return | tbl.loan | svc.loan
+Return | svc.loan | usr.member
+## expect: case | nodes | opts
+CS-BORROW-OK | usr.member,svc.loan,svc.stock,tbl.loan | by=author
+## interventions: id | type | description | opts
+IV-STOCK-DOWN | disable_module | Stock service is down while borrowing | target=svc.stock applies=CS-BORROW-OK class=DIVERGED terminal={"svc.stock":"Blocked"}
+## requirements: id | title | source | opts
+RQ-1 | A member can borrow an available copy | interview 1 | nodes=usr.member,svc.loan,svc.stock,tbl.loan tests=TS-1

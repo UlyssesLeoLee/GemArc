@@ -1,0 +1,26 @@
+path	origin	reference_unit	treatment	deviations
+src/gemarc_mcp/atlas/slices.py	new	-	The slice store authored from design section 6: put (replace and patch), red drafts, row-level patch by identity, sha8 and base concurrency, history cap, project lock, atomic writes, ownership map, commit hook for the oracle lane	-
+src/gemarc_mcp/atlas/tools.py	new	-	Pure service functions behind the atlas tools and the command line (init, put, check, status, index, brief) with the reply envelope and the size-capping helper, authored from design 4.1	-
+src/gemarc_mcp/atlas/status.py	new	-	status view=next: priority list of design 5.4, dimension readiness, to-be elicitation order of 8.3 and the completion contract of addendum A1 (done, phase, next, blockers, needsUser) with pluggable gates	-
+src/gemarc_mcp/atlas/project.py	new	-	Project layout under a workspace root, the atlas.toml writer and reader (tomllib for reading) and the workspace-root resolution that mirrors server.py without importing it	-
+src/gemarc_mcp/atlas/indexer.py	new	-	The index scopes (nodes, room, req, case, ids) as compact lines over the expanded model and its provenance map, authored from design 4.1	-
+src/gemarc_mcp/atlas/brief.py	new	-	Loader and placeholder filler of the brief sections (headers, derived keys and vocabulary ids come from the code that enforces them), authored from design 4.1	-
+src/gemarc_mcp/atlas/cli.py	new	-	Command line front-end (init, put, check, status, index, brief) over the pure tool functions	-
+src/gemarc_mcp/atlas/__main__.py	new	-	Entry point for python -m gemarc_mcp.atlas	-
+src/gemarc_mcp/atlas/brief/all.zh-CN.md	new	-	The compact work order of the work order (zh-CN), prose authored for this repository from design 4.1; placeholders are filled from code	-
+src/gemarc_mcp/atlas/brief/all.en-US.md	new	-	The compact work order of the work order (en-US), prose authored for this repository from design 4.1; placeholders are filled from code	-
+src/gemarc_mcp/atlas/brief/format.zh-CN.md	new	-	The format section of the work order (zh-CN), prose authored for this repository from design 4.1; placeholders are filled from code	-
+src/gemarc_mcp/atlas/brief/format.en-US.md	new	-	The format section of the work order (en-US), prose authored for this repository from design 4.1; placeholders are filled from code	-
+src/gemarc_mcp/atlas/brief/vocab.zh-CN.md	new	-	The vocabulary section of the work order (zh-CN), prose authored for this repository from design 4.1; placeholders are filled from code	-
+src/gemarc_mcp/atlas/brief/vocab.en-US.md	new	-	The vocabulary section of the work order (en-US), prose authored for this repository from design 4.1; placeholders are filled from code	-
+src/gemarc_mcp/atlas/brief/derived.zh-CN.md	new	-	The derived-never-authored section of the work order (zh-CN), prose authored for this repository from design 4.1; placeholders are filled from code	-
+src/gemarc_mcp/atlas/brief/derived.en-US.md	new	-	The derived-never-authored section of the work order (en-US), prose authored for this repository from design 4.1; placeholders are filled from code	-
+src/gemarc_mcp/atlas/brief/slices.zh-CN.md	new	-	The slicing and repair section of the work order (zh-CN), prose authored for this repository from design 4.1; placeholders are filled from code	-
+src/gemarc_mcp/atlas/brief/slices.en-US.md	new	-	The slicing and repair section of the work order (en-US), prose authored for this repository from design 4.1; placeholders are filled from code	-
+src/gemarc_mcp/atlas/brief/oracle.zh-CN.md	new	-	The oracle section of the work order (zh-CN), prose authored for this repository from design 4.1; placeholders are filled from code	-
+src/gemarc_mcp/atlas/brief/oracle.en-US.md	new	-	The oracle section of the work order (en-US), prose authored for this repository from design 4.1; placeholders are filled from code	-
+src/gemarc_mcp/atlas/brief/docs.zh-CN.md	new	-	The documents section of the work order (zh-CN), prose authored for this repository from design 4.1; placeholders are filled from code	-
+src/gemarc_mcp/atlas/brief/docs.en-US.md	new	-	The documents section of the work order (en-US), prose authored for this repository from design 4.1; placeholders are filled from code	-
+src/gemarc_mcp/atlas/brief/economics.zh-CN.md	new	-	The economics section of the work order (zh-CN), prose authored for this repository from design 4.1; placeholders are filled from code	-
+src/gemarc_mcp/atlas/brief/economics.en-US.md	new	-	The economics section of the work order (en-US), prose authored for this repository from design 4.1; placeholders are filled from code	-
+tests/atlas/test_authoring_fixes.py	new	-	Regression tests for the authoring flow: loop economy, needs-user that cannot be bypassed, restart-proof loop guards, open BLOCK visibility, prompt and project hygiene, read-only promises	-

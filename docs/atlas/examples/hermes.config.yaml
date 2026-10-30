@@ -1,0 +1,17 @@
+# GemArc Atlas, local stdio, tool set "atlas" (the authoring tools).
+# Merge into ~/.hermes/config.yaml  (Windows native: %LOCALAPPDATA%\hermes\config.yaml; HERMES_HOME overrides the folder).
+# Replace <repo> with the folder of this repository (the one with .venv) and <workspace> with an EXISTING empty folder
+# that is NOT inside any repository you analyse: the atlas projects are written there.
+mcp_servers:
+  gemarc_atlas:
+    command: '<repo>\.venv\Scripts\python.exe'   # a real executable; do NOT wrap it in cmd / powershell / bash -c
+    args: ["-m", "gemarc_mcp"]
+    # Hermes starts stdio servers with a FILTERED environment: every variable the server needs must be listed here.
+    env:
+      GEMARC_TOOLSET: "atlas"
+      GEMARC_WORKSPACE_ROOT: '<workspace>'
+      GEMARC_ALLOW_WRITE: "1"            # "0" makes the toolset read-only (init and put then answer GEMARC_AUTH_002)
+      GEMARC_ATLAS_ROOTS: 'main=<repo>'  # alias=path, separated by ";"; the model can only name the alias
+      PYTHONUTF8: "1"
+    timeout: 120          # seconds per tool call (Hermes default 300)
+    connect_timeout: 60   # seconds to start and initialise (Hermes default 60)

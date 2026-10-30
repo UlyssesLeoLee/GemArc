@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "gemarc_atlas": {
+      "type": "stdio",
+      "command": "<repo>\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "gemarc_mcp"],
+      "env": {
+        "GEMARC_TOOLSET": "atlas",
+        "GEMARC_WORKSPACE_ROOT": "<workspace>",
+        "GEMARC_ALLOW_WRITE": "1",
+        "GEMARC_ATLAS_ROOTS": "main=<repo>",
+        "PYTHONUTF8": "1"
+      }
+    }
+  }
+}

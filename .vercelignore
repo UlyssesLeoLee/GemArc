@@ -15,4 +15,5 @@ install.ps1
 # Atlas (ported/clean-room design-material engine) is not published until the user
 # gives an explicit publish/deploy go (see src/gemarc_mcp/atlas/PROVENANCE.md).
 /src/gemarc_mcp/atlas
+/src/gemarc_mcp/atlas_tools.py
 /tools

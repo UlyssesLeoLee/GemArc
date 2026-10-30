@@ -48,7 +48,7 @@ CJK_RUN = re.compile("[぀-ヿ㐀-䶿一-鿿豈-﫿]+")
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 #: Pin of ``denylist.sha256``: the sha256 of its bytes and its number of digest lines (without the canary line).
 #: Update both ONLY after the maintainer rebuilt the list: ``python tests/atlas/test_denylist.py --print-pin``.
-PIN = {"sha256": "668b45bab1f005a350f11dd944b2c9731041861a9e6247bb4bc4bee032217067", "digests": 6246}
+PIN = {"sha256": "86b793958e40036e706f2d8936639677b641f64b70217adc41a848863e1d1fcc", "digests": 6211}
 #: Digests of two reference tokens that must be on the list (a list made of random digests cannot contain them).
 #: Only the hex values are written here, never the words.
 PROBE_DIGESTS = ("9261ceef0b969e70ac20f1510f07a1e0d8db05f20c75161a2ef43b4eba27a7aa", "211074b6238601653abaed100a2a70e6c28dc2b9febd9564b50155e0878d4ffe")

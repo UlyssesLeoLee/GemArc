@@ -1,0 +1,103 @@
+{
+  "skeleton": {
+    "label": "IPA-inspired structure (not an official IPA template)",
+    "docs": {"REQ": "Requirements document", "BD": "Basic design document", "DD": "Detailed design document"},
+    "doc_info": {"kind": "Document", "level": "Level", "docno": "Document number", "upper": "Upper document", "lower": "Lower document", "model": "Model stamp", "status": "Review status", "draft": "Draft", "target": "Target", "unselected": "nothing selected", "purpose": "Purpose"},
+    "chapters": {
+      "REQ": {"1": "Document control", "2": "Position of this document and its sources", "3": "Requirement register", "4": "Parties and business scope", "5": "Usage scenarios", "6": "Information handled", "7": "Entry and exit points", "8": "Business statuses", "9": "Non-functional requirements", "10": "Constraints and open decisions", "11": "Completion criteria", "12": "Review and sign-off"},
+      "BD": {"1": "Document control", "2": "Position of this document and its sources", "3": "Requirement coverage", "4": "System structure", "5": "Functional structure and processing outline", "6": "Data structure", "7": "External connection specification", "8": "State transition rules", "9": "Non-functional requirements", "10": "Constraints and open decisions", "11": "Verification approach and criteria", "12": "Review and sign-off"},
+      "DD": {"1": "Document control", "2": "Position of this document and its sources", "3": "Traceability maps", "4": "Component detail", "5": "Processing steps in detail", "6": "Data item detail", "7": "Connection port detail", "8": "Conditions and results of each transition", "9": "Non-functional requirements", "10": "Constraints and open decisions", "11": "Verification viewpoints", "12": "Review and sign-off"}
+    },
+    "upper_note": "Elaborates {doc} section {n}",
+    "th": {
+      "evidence": ["Evidence", "Location", "Proves", "Grade"],
+      "requirement": ["Id", "Title", "Origin", "Tests"],
+      "coverage": ["Requirement", "Title", "Upper section", "Design refs", "Realised by", "Tests"],
+      "node_req": ["Id", "Name", "Kind", "Summary", "Requirements"],
+      "node_bd": ["Id", "Name", "Kind", "Summary", "Placement", "Grade", "Requirements"],
+      "edge_min": ["Id", "From", "To", "Relation", "Label"],
+      "edge_bd": ["Id", "From", "To", "Relation and cardinality", "Label", "Grade"],
+      "edge_dd": ["Id", "From", "From port", "To", "To port", "Relation", "Cardinality", "Guard", "Evidence", "Grade"],
+      "case": ["Id", "Title", "Category", "Requirements", "Expected end state"],
+      "event": ["Seq", "Type", "From", "To", "Step", "Parameters and options"],
+      "entity": ["Id", "Name", "Owner", "Store", "Columns"],
+      "column": ["Column", "Type", "Flags", "Note"],
+      "port": ["Node", "Direction", "Type", "Connected edges"],
+      "transition": ["Id", "From state", "To state", "Guard", "Error code"],
+      "tbd": ["Id", "Title", "Decision", "Evidence"],
+      "policy": ["Statement", "Source", "Written by"],
+      "exception": ["Step", "Outcome", "Error code", "Case"],
+      "testplan": ["Requirement or case", "Tests"],
+      "crossmap": ["Element", "Name", "Upper section", "This section"],
+      "signoff": ["Role", "Person", "Date", "Result"]
+    },
+    "field": {"kind": "Kind", "grade": "Grade", "placement": "Placement", "reqs": "Requirements", "evidence": "Evidence", "summary": "Summary", "owner": "Owner", "store": "Store", "initial": "Initial state", "terminal": "End states", "error_code": "Error code", "policy": "Policy", "timeout": "timeout", "retry": "retries", "backoff": "backoff", "pre": "Initial states", "expected": "Expected end state", "outcomes": "Expected results", "participants": "Participants", "event_types": "Event types", "states": "States", "methods": "Methods", "dedup": "Duplicate handling", "aggregator": "Aggregator", "incoming": "Incoming edges", "outgoing": "Outgoing edges", "diagrams": "Related diagrams", "trust": "Trust zone", "pii": "Personal data"},
+    "empty": {
+      "nodes": "The selection contains no building blocks.",
+      "cases": "The selection contains no cases.",
+      "requirements": "The selection contains no requirements.",
+      "entities": "The selection contains no data tables.",
+      "interfaces": "The selection contains no external interfaces.",
+      "machines": "The selection contains no state machines.",
+      "tbds": "There are no open decisions.",
+      "acceptance": "No acceptance item can be derived from the selection.",
+      "constraints": "No constraint has been declared for this selection."
+    },
+    "marker": {"not_authored": "not yet authored", "na": "not applicable"},
+    "bool": {"true": "yes", "false": "no"},
+    "flag": {"pk": "PK", "fk": "FK", "unique": "unique", "required": "required", "nullable": "nullable", "pii": "personal data"},
+    "by": {"ai": "AI", "user": "user"},
+    "facts_note": [
+      "This document is derived mechanically from the validated atlas model; each statement comes from an authored fact.",
+      "A value nobody authored is shown as a NOT-AUTHORED marker. Nothing is guessed, defaulted or filled in.",
+      "Acceptance items are derived from expected end states, expected results and test ids; their quality equals the quality of those fields."
+    ],
+    "signoff": {"roles": ["Author", "Reviewer", "Approver"], "judgement": "The document is approved only when every marker above is resolved and the approver signs."}
+  },
+  "prompts": {
+    "title": {"REQ": "Write the requirements document", "BD": "Write the basic design document", "DD": "Write the detailed design document", "implement": "Implement the designed elements", "test": "Write tests for the sealed cases", "failure-analysis": "Explain a divergence from the design"},
+    "goal": {
+      "REQ": "Write the requirements document for the selected elements ({targets}) using only the facts below.",
+      "BD": "Write the basic design document for the selected elements ({targets}) using only the facts below.",
+      "DD": "Write the detailed design document for the selected elements ({targets}) using only the facts below.",
+      "implement": "Implement the selected elements ({targets}) so that every selected case ends in its authored expected state.",
+      "test": "Write automated tests for the selected cases ({targets}); each test asserts the sealed expectation.",
+      "failure-analysis": "Explain, with the causal chain below, why the run diverged ({targets}), and name the design sections that justify each step."
+    },
+    "artifacts": {
+      "REQ": ["The requirements document with the twelve chapters listed under the section structure", "A list of every marker left in the text"],
+      "BD": ["The basic design document with the twelve chapters listed under the section structure", "A list of every marker left in the text"],
+      "DD": ["The detailed design document with the twelve chapters listed under the section structure", "A list of every marker left in the text"],
+      "implement": ["Source changes for the selected elements", "A short note mapping each change to an element id", "The results of running the selected cases"],
+      "test": ["One automated test per selected case", "A note on which expectation each test asserts"],
+      "failure-analysis": ["A step-by-step explanation that cites element ids and design sections", "A list of facts that are missing for a firm conclusion"]
+    },
+    "acceptance": {
+      "case_terminal": "Case {id} ends with: {state}",
+      "outcome": "In case {id}, step {rule} has outcome {outcome}{code}",
+      "tests": "Requirement {id} is shown by tests: {tests}",
+      "fallback": "Select at least one requirement or case to derive acceptance items.",
+      "no_marker": "No marker is left unresolved without being listed in the artifact list."
+    },
+    "constraints": {
+      "base": ["Use only the facts in this prompt; never invent an id, a column, a rule or a number.", "When a fact is missing write the marker and list it; do not fill the gap.", "Keep every id exactly as written; do not rename or merge elements."],
+      "machine": "State machine {id} may only move along the listed transitions; its states are: {states}.",
+      "dedup": "Element {id} handles duplicate keys with mode {mode}.",
+      "aggregator": "Element {id} tolerates failed sections and ends degraded instead of failed.",
+      "entity": "Table {id} has the columns: {columns}.",
+      "tbd": "Open decision {id} is unresolved: do not decide it; keep it listed."
+    },
+    "headings": {"goal": "Goal", "targets": "Selected elements", "evidence": "Grounds", "constraints": "Constraints", "artifacts": "Expected artifacts", "acceptance": "Acceptance criteria", "objects": "Facts in scope", "cases": "Cases", "chain": "Causal chain", "structure": "Section structure", "id": "Prompt id", "status": "Review status", "rules": "Working rules"},
+    "empty": "This prompt type needs a sealed expectation first: author the expectation of each selected case, then ask again. Nothing has been generated.",
+    "rules": ["Write in the requested language.", "Cite element ids in code spans.", "Leave markers visible."]
+  },
+  "diagrams": {
+    "component": "Components of {name}",
+    "class": "Class view of {name}",
+    "state": "State machine of {name}",
+    "er": "Data model ({name})",
+    "unplaced": "Unplaced elements",
+    "unspecified": "unspecified",
+    "all": "all elements"
+  }
+}

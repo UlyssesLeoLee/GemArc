@@ -97,6 +97,17 @@ class VercelIgnoreTests(unittest.TestCase):
         self.assertIn(ATLAS_IGNORE_LINE, ignore_lines(),
                       ".vercelignore must list /src/gemarc_mcp/atlas while PUBLICATION is PENDING (Vercel uploads src/**)")
 
+    def test_the_atlas_tool_binding_is_excluded_too_and_its_absence_is_a_clean_refusal(self):
+        if not pending():
+            self.skipTest("publication was granted by the user")
+        self.assertIn("/src/gemarc_mcp/atlas_tools.py", ignore_lines())
+        from gemarc_mcp import server
+        from gemarc_mcp.paths import GemArcError
+        with mock.patch.dict(sys.modules, {"gemarc_mcp.atlas_tools": None}):  # what a deploy without the file looks like
+            with self.assertRaises(GemArcError) as caught:
+                server.create_server("atlas_remote")
+        self.assertEqual(caught.exception.code, "GEMARC_TOOLSET_001")
+
     def test_no_negation_re_includes_the_atlas(self):
         if not pending():
             self.skipTest("publication was granted by the user")

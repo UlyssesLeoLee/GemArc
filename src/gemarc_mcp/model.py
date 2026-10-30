@@ -222,9 +222,9 @@ def validate(model: dict, strict: bool = False) -> dict:
             else:
                 warn("GEMARC_MODEL_022", "未登记的实体类型", ident)
         _check_evidence_refs(node, evidence_ids, err, warn)
-        if strict and (evidence_rank(node.get("verification")) < STRICT_MINIMUM_RANK or not node.get("evidence")):
+        if strict and (evidence_rank(node.get("verification")) < STRICT_MINIMUM_RANK or not _has_evidence_refs(node)):
             err("GEMARC_EVIDENCE_002", "节点缺少可确认的证据", ident)
-        elif not node.get("evidence"):
+        elif not _has_any_evidence(node):
             warn("GEMARC_EVIDENCE_003", "节点无证据，必须在页面标注", ident)
 
     edge_ids = set()
@@ -246,9 +246,9 @@ def validate(model: dict, strict: bool = False) -> dict:
             if not isinstance(edge.get(key), str) or edge.get(key) not in ids:
                 err("GEMARC_MODEL_012", f"{key} 节点不存在", str(eid))
         _check_evidence_refs(edge, evidence_ids, err, warn)
-        if strict and (evidence_rank(edge.get("verification")) < STRICT_MINIMUM_RANK or not edge.get("evidence")):
+        if strict and (evidence_rank(edge.get("verification")) < STRICT_MINIMUM_RANK or not _has_evidence_refs(edge)):
             err("GEMARC_EVIDENCE_004", "边缺少可确认的证据", str(eid))
-        elif not edge.get("evidence"):
+        elif not _has_any_evidence(edge):
             warn("GEMARC_EVIDENCE_005", "关系无证据", str(eid))
 
     view_ids = set()
@@ -267,6 +267,16 @@ def validate(model: dict, strict: bool = False) -> dict:
     _validate_workflows(canonical.get("workflows"), ids, err, warn)
     _validate_scenarios(canonical.get("scenarios"), ids, err, warn, strict)
     return _result(issues)
+
+
+def _has_evidence_refs(entity) -> bool:
+    """True when the entity cites evidence records through the canonical ``evidenceIds`` field."""
+    return bool(_as_array(entity.get("evidenceIds")))
+
+
+def _has_any_evidence(entity) -> bool:
+    """Lenient (non-strict) test: cited records, or the legacy free-text ``evidence`` note."""
+    return _has_evidence_refs(entity) or bool(entity.get("evidence"))
 
 
 def _check_evidence_refs(entity, evidence_ids, err, warn) -> None:

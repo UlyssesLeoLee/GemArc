@@ -18,4 +18,4 @@ gemarc-mcp = "gemarc_mcp.server:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-gemarc_mcp = ["web/*", "registry.json", "scaffold/vocab/*.json", "scaffold/contracts/*.json", "scaffold/cases/*.json", "scaffold/templates/**/*", "scaffold/runtime/**/*.js", "scaffold/runtime/**/*.mjs", "scaffold/runtime/**/*.json", "scaffold/runtime/**/*.css", "scaffold/runtime/*.json"]
+gemarc_mcp = ["web/*", "registry.json", "scaffold/vocab/*.json", "scaffold/contracts/*.json", "scaffold/cases/*.json", "scaffold/templates/**/*", "scaffold/runtime/**/*.js", "scaffold/runtime/**/*.mjs", "scaffold/runtime/**/*.json", "scaffold/runtime/**/*.css", "scaffold/runtime/*.json", "atlas/profiles/*.json", "atlas/derive/i18n/*.json", "atlas/derive/templates/*.json", "atlas/brief/*.md", "atlas/gate/*.js", "atlas/gate/*.json", "atlas/viewer/src/*.js", "atlas/viewer/dist/*"]

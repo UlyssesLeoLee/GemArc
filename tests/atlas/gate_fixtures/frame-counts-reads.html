@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gate fixture: frame-counts-reads</title>
+<!--ATLAS_SELFTEST-->
+<style>
+  body { margin: 0; font: 14px/1.4 sans-serif; background: #fff; color: #123; }
+  header { display: flex; gap: 4px; padding: 6px 8px; border-bottom: 1px solid #ccc; }
+  header button { width: 84px; height: 30px; }
+  main { padding: 8px; }
+</style>
+</head>
+<body>
+<header data-gate="header">
+  <button type="button">One</button>
+  <button type="button">Two</button>
+</header>
+<main><p>renderOnce does nothing; frame() counts its own calls.</p></main>
+<script>
+(function () {
+  "use strict";
+  var reads = 0;
+  AtlasGate.run({
+    tabs: ["main"],
+    renderOnce: function () {},
+    frame: function () { reads += 1; return reads; }
+  });
+})();
+</script>
+</body>
+</html>

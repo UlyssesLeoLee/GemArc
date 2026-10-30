@@ -1,0 +1,172 @@
+{
+  "schema": "gemarc-atlas-profile/1",
+  "id": "software",
+  "version": 1,
+  "description": "Generic software-system profile for gemarc-atlas/1: vocabulary the engine, viewer and document builders read.",
+  "locales": ["zh-CN", "ja-JP", "en-US"],
+  "defaults": {"trust": "internal"},
+  "verification": [
+    {"id": "Implemented", "rank": 6, "label": {"zh-CN": "已实现", "ja-JP": "実装済み", "en-US": "Implemented"}},
+    {"id": "Observed", "rank": 5, "label": {"zh-CN": "已观测", "ja-JP": "観測済み", "en-US": "Observed"}},
+    {"id": "Designed", "rank": 4, "label": {"zh-CN": "已设计", "ja-JP": "設計済み", "en-US": "Designed"}},
+    {"id": "Inferred", "rank": 3, "label": {"zh-CN": "已推断", "ja-JP": "推定", "en-US": "Inferred"}},
+    {"id": "Hypothetical", "rank": 2, "label": {"zh-CN": "假设", "ja-JP": "仮説", "en-US": "Hypothetical"}},
+    {"id": "Unknown", "rank": 1, "label": {"zh-CN": "未知", "ja-JP": "不明", "en-US": "Unknown"}}
+  ],
+  "sourceKinds": [
+    {"id": "source-code", "verification": "Implemented", "label": {"zh-CN": "源代码", "ja-JP": "ソースコード", "en-US": "Source code"}},
+    {"id": "document", "verification": "Designed", "label": {"zh-CN": "文档", "ja-JP": "ドキュメント", "en-US": "Document"}},
+    {"id": "user-requirement", "verification": "Designed", "label": {"zh-CN": "用户需求", "ja-JP": "ユーザー要求", "en-US": "User requirement"}}
+  ],
+  "docExt": [".md", ".markdown", ".mdx", ".rst", ".adoc", ".asciidoc", ".org", ".pdf", ".doc", ".docx", ".ppt", ".pptx", ".odt", ".rtf", ".tex", ".xls", ".xlsx", ".ods", ".odp", ".vsd", ".vsdx", ".drawio"],
+  "trust": [
+    {"id": "external", "domain": "external", "label": {"zh-CN": "外部", "ja-JP": "外部", "en-US": "External"}},
+    {"id": "perimeter", "domain": "perimeter", "label": {"zh-CN": "边界", "ja-JP": "境界", "en-US": "Perimeter"}},
+    {"id": "internal", "domain": "internal", "label": {"zh-CN": "内部", "ja-JP": "内部", "en-US": "Internal"}},
+    {"id": "restricted", "domain": "restricted", "label": {"zh-CN": "受限", "ja-JP": "制限", "en-US": "Restricted"}}
+  ],
+  "domains": [
+    {"id": "external", "color": "#e0a84b", "label": {"zh-CN": "外部域", "ja-JP": "外部ドメイン", "en-US": "External domain"}},
+    {"id": "perimeter", "color": "#d9776a", "label": {"zh-CN": "边界域", "ja-JP": "境界ドメイン", "en-US": "Perimeter domain"}},
+    {"id": "internal", "color": "#6fa3ef", "label": {"zh-CN": "内部域", "ja-JP": "内部ドメイン", "en-US": "Internal domain"}},
+    {"id": "restricted", "color": "#5fbf98", "label": {"zh-CN": "受限域", "ja-JP": "制限ドメイン", "en-US": "Restricted domain"}},
+    {"id": "business", "color": "#56b9c4", "label": {"zh-CN": "业务域", "ja-JP": "業務ドメイン", "en-US": "Business domain"}}
+  ],
+  "tiers": [
+    {"id": "T1", "rank": 1, "label": {"zh-CN": "客户端层", "ja-JP": "クライアント層", "en-US": "Client tier"}},
+    {"id": "T2", "rank": 2, "label": {"zh-CN": "应用层", "ja-JP": "アプリケーション層", "en-US": "Application tier"}},
+    {"id": "T3", "rank": 3, "label": {"zh-CN": "集成层", "ja-JP": "連携層", "en-US": "Integration tier"}},
+    {"id": "T4", "rank": 4, "label": {"zh-CN": "数据层", "ja-JP": "データ層", "en-US": "Data tier"}},
+    {"id": "T5", "rank": 5, "label": {"zh-CN": "平台层", "ja-JP": "基盤層", "en-US": "Platform tier"}}
+  ],
+  "layers": [
+    {"id": "business", "domain": "business", "level": "REQ", "levelKinds": ["Module", "Service", "Component", "State"], "label": {"zh-CN": "业务层", "ja-JP": "業務レイヤー", "en-US": "Business layer"}}
+  ],
+  "levels": [
+    {"id": "REQ", "rank": 1, "label": {"zh-CN": "需求", "ja-JP": "要件", "en-US": "Requirements"}},
+    {"id": "BD", "rank": 2, "label": {"zh-CN": "基本设计", "ja-JP": "基本設計", "en-US": "Basic design"}},
+    {"id": "DD", "rank": 3, "label": {"zh-CN": "详细设计", "ja-JP": "詳細設計", "en-US": "Detailed design"}}
+  ],
+  "kinds": [
+    {"id": "Actor", "shape": "round", "scale": 1.1, "level": "REQ", "domain": null, "record": false, "lane": 3, "authorable": true, "label": {"zh-CN": "参与者", "ja-JP": "アクター", "en-US": "Actor"}},
+    {"id": "API", "shape": "tri", "scale": 0.9, "level": "REQ", "domain": null, "record": false, "lane": 3, "authorable": true, "label": {"zh-CN": "接口入口", "ja-JP": "APIエンドポイント", "en-US": "API endpoint"}},
+    {"id": "Workflow", "shape": "hex", "scale": 1.0, "level": "REQ", "domain": null, "record": false, "lane": 2, "authorable": true, "label": {"zh-CN": "工作流", "ja-JP": "ワークフロー", "en-US": "Workflow"}},
+    {"id": "Module", "shape": "hex", "scale": 1.0, "level": "BD", "domain": null, "record": false, "lane": 2, "authorable": true, "label": {"zh-CN": "模块", "ja-JP": "モジュール", "en-US": "Module"}},
+    {"id": "Service", "shape": "hex", "scale": 1.0, "level": "BD", "domain": null, "record": false, "lane": 2, "authorable": true, "label": {"zh-CN": "服务", "ja-JP": "サービス", "en-US": "Service"}},
+    {"id": "Component", "shape": "hex", "scale": 1.0, "level": "BD", "domain": null, "record": false, "lane": 2, "authorable": true, "label": {"zh-CN": "组件", "ja-JP": "コンポーネント", "en-US": "Component"}},
+    {"id": "Class", "shape": "box", "scale": 0.85, "level": "DD", "domain": null, "record": false, "lane": 2, "authorable": true, "label": {"zh-CN": "类", "ja-JP": "クラス", "en-US": "Class"}},
+    {"id": "Interface", "shape": "tri", "scale": 0.9, "level": "BD", "domain": null, "record": false, "lane": 2, "authorable": true, "label": {"zh-CN": "接口", "ja-JP": "インターフェース", "en-US": "Interface"}},
+    {"id": "Entity", "shape": "box", "scale": 0.85, "level": "BD", "domain": null, "record": false, "lane": 0, "authorable": true, "label": {"zh-CN": "实体", "ja-JP": "エンティティ", "en-US": "Entity"}},
+    {"id": "Table", "shape": "box", "scale": 0.85, "level": "BD", "domain": null, "record": false, "lane": 0, "authorable": true, "label": {"zh-CN": "数据表", "ja-JP": "テーブル", "en-US": "Table"}},
+    {"id": "Storage", "shape": "box", "scale": 1.25, "level": "BD", "domain": null, "record": false, "lane": 0, "authorable": true, "label": {"zh-CN": "存储", "ja-JP": "ストレージ", "en-US": "Storage"}},
+    {"id": "Event", "shape": "diamond", "scale": 0.8, "level": "DD", "domain": null, "record": true, "lane": 0, "authorable": true, "label": {"zh-CN": "事件", "ja-JP": "イベント", "en-US": "Event"}},
+    {"id": "State", "shape": "octa", "scale": 0.85, "level": "BD", "domain": "business", "record": false, "lane": 1, "authorable": true, "label": {"zh-CN": "状态机", "ja-JP": "状態", "en-US": "State"}},
+    {"id": "Element", "shape": "crown", "scale": 1.05, "level": "DD", "domain": null, "record": false, "lane": 2, "authorable": false, "label": {"zh-CN": "插入元素", "ja-JP": "挿入要素", "en-US": "Inserted element"}}
+  ],
+  "relations": [
+    {"id": "calls", "category": "behavior", "runtime": true, "static": false, "level": "REQ", "views": ["logical-view", "process-view", "security-view"], "color": "#6fa3ef", "trustBoundary": false, "label": {"zh-CN": "调用", "ja-JP": "呼び出し", "en-US": "Calls"}},
+    {"id": "sends", "category": "flow", "runtime": true, "static": false, "level": "REQ", "views": ["logical-view", "process-view", "security-view"], "color": "#e0a84b", "trustBoundary": true, "label": {"zh-CN": "发送", "ja-JP": "送信", "en-US": "Sends"}},
+    {"id": "receives", "category": "flow", "runtime": true, "static": false, "level": "BD", "views": ["logical-view", "process-view", "security-view"], "color": "#e0a84b", "trustBoundary": true, "label": {"zh-CN": "接收", "ja-JP": "受信", "en-US": "Receives"}},
+    {"id": "reads", "category": "data", "runtime": true, "static": false, "level": "BD", "views": ["logical-view", "process-view", "security-view", "data-view"], "color": "#5fbf98", "trustBoundary": false, "label": {"zh-CN": "读取", "ja-JP": "読み取り", "en-US": "Reads"}},
+    {"id": "writes", "category": "data", "runtime": true, "static": false, "level": "BD", "views": ["logical-view", "process-view", "security-view", "data-view", "dependency-diagram"], "color": "#5fbf98", "trustBoundary": false, "label": {"zh-CN": "写入", "ja-JP": "書き込み", "en-US": "Writes"}},
+    {"id": "publishes", "category": "flow", "runtime": true, "static": false, "level": "BD", "views": ["logical-view", "process-view", "security-view", "data-view", "dependency-diagram"], "color": "#e0a84b", "trustBoundary": true, "label": {"zh-CN": "发布", "ja-JP": "発行", "en-US": "Publishes"}},
+    {"id": "subscribes", "category": "flow", "runtime": true, "static": false, "level": "BD", "views": ["logical-view", "process-view", "security-view", "data-view"], "color": "#e0a84b", "trustBoundary": true, "label": {"zh-CN": "订阅", "ja-JP": "購読", "en-US": "Subscribes"}},
+    {"id": "owns", "category": "data", "runtime": true, "static": false, "level": "REQ", "views": ["logical-view", "process-view", "dependency-diagram"], "color": "#5fbf98", "trustBoundary": false, "label": {"zh-CN": "拥有", "ja-JP": "所有", "en-US": "Owns"}},
+    {"id": "triggers", "category": "behavior", "runtime": true, "static": false, "level": "DD", "views": ["logical-view", "process-view", "security-view", "data-view", "dependency-diagram"], "color": "#6fa3ef", "trustBoundary": false, "label": {"zh-CN": "触发", "ja-JP": "トリガー", "en-US": "Triggers"}},
+    {"id": "dependsOn", "category": "structure", "runtime": false, "static": true, "level": "BD", "views": ["logical-view", "development-view", "dependency-diagram", "process-view", "security-view"], "color": "#7d8fb3", "trustBoundary": false, "label": {"zh-CN": "依赖", "ja-JP": "依存", "en-US": "Depends on"}},
+    {"id": "implements", "category": "behavior", "runtime": false, "static": true, "level": "BD", "views": ["logical-view", "development-view", "dependency-diagram", "process-view", "security-view"], "color": "#6fa3ef", "trustBoundary": false, "label": {"zh-CN": "实现", "ja-JP": "実装", "en-US": "Implements"}},
+    {"id": "contains", "category": "structure", "runtime": false, "static": true, "level": "BD", "views": ["logical-view", "process-view", "security-view"], "color": "#7d8fb3", "trustBoundary": false, "label": {"zh-CN": "包含", "ja-JP": "包含", "en-US": "Contains"}},
+    {"id": "belongsTo", "category": "structure", "runtime": false, "static": true, "level": "BD", "views": ["logical-view", "process-view", "security-view", "data-view"], "color": "#7d8fb3", "trustBoundary": false, "label": {"zh-CN": "隶属", "ja-JP": "所属", "en-US": "Belongs to"}},
+    {"id": "constrains", "category": "constraint", "runtime": false, "static": true, "level": "DD", "views": ["logical-view", "process-view", "security-view"], "color": "#b48ad9", "trustBoundary": false, "label": {"zh-CN": "约束", "ja-JP": "制約", "en-US": "Constrains"}},
+    {"id": "references", "category": "data", "runtime": false, "static": true, "level": "DD", "views": ["logical-view", "data-view"], "color": "#5fbf98", "trustBoundary": false, "label": {"zh-CN": "逻辑外键", "ja-JP": "論理外部キー", "en-US": "References"}}
+  ],
+  "views": [
+    {"id": "logical-view", "kinds": null, "label": {"zh-CN": "逻辑视图", "ja-JP": "論理ビュー", "en-US": "Logical view"}},
+    {"id": "development-view", "kinds": ["Module", "Component", "Service", "Class", "Interface"], "label": {"zh-CN": "开发视图", "ja-JP": "開発ビュー", "en-US": "Development view"}},
+    {"id": "dependency-diagram", "kinds": null, "label": {"zh-CN": "依赖视图", "ja-JP": "依存ビュー", "en-US": "Dependency view"}},
+    {"id": "process-view", "kinds": null, "label": {"zh-CN": "过程视图", "ja-JP": "プロセスビュー", "en-US": "Process view"}},
+    {"id": "data-view", "kinds": ["Storage", "Table", "Entity", "Event"], "label": {"zh-CN": "数据视图", "ja-JP": "データビュー", "en-US": "Data view"}},
+    {"id": "security-view", "kinds": null, "label": {"zh-CN": "安全视图", "ja-JP": "セキュリティビュー", "en-US": "Security view"}}
+  ],
+  "caseCategories": [
+    {"id": "normal", "label": {"zh-CN": "正常", "ja-JP": "正常", "en-US": "Normal"}},
+    {"id": "abnormal", "label": {"zh-CN": "异常", "ja-JP": "異常", "en-US": "Abnormal"}},
+    {"id": "boundary", "label": {"zh-CN": "边界", "ja-JP": "境界", "en-US": "Boundary"}},
+    {"id": "concurrency", "label": {"zh-CN": "并发", "ja-JP": "並行", "en-US": "Concurrency"}},
+    {"id": "recovery", "label": {"zh-CN": "恢复", "ja-JP": "回復", "en-US": "Recovery"}},
+    {"id": "combination", "label": {"zh-CN": "组合", "ja-JP": "組み合わせ", "en-US": "Combination"}}
+  ],
+  "aliases": {"caseCategories": {"combined": "combination"}},
+  "eventTypes": [
+    {"id": "Call", "delivery": true, "label": {"zh-CN": "调用", "ja-JP": "呼び出し", "en-US": "Call"}},
+    {"id": "Message", "delivery": true, "label": {"zh-CN": "消息", "ja-JP": "メッセージ", "en-US": "Message"}},
+    {"id": "Return", "delivery": false, "label": {"zh-CN": "返回", "ja-JP": "戻り", "en-US": "Return"}},
+    {"id": "Transition", "delivery": false, "label": {"zh-CN": "状态迁移", "ja-JP": "状態遷移", "en-US": "Transition"}},
+    {"id": "Failure", "delivery": false, "label": {"zh-CN": "失败", "ja-JP": "失敗", "en-US": "Failure"}},
+    {"id": "Compensation", "delivery": false, "label": {"zh-CN": "补偿", "ja-JP": "補償", "en-US": "Compensation"}},
+    {"id": "Recovery", "delivery": false, "label": {"zh-CN": "恢复", "ja-JP": "復旧", "en-US": "Recovery"}},
+    {"id": "Wait", "delivery": false, "label": {"zh-CN": "等待", "ja-JP": "待機", "en-US": "Wait"}}
+  ],
+  "interventionTypes": [
+    {"id": "disable_module", "atomic": true, "required": ["targetNodeId"], "optional": [], "label": {"zh-CN": "停用模块", "ja-JP": "モジュール停止", "en-US": "Disable module"}},
+    {"id": "disable_edge", "atomic": true, "required": ["targetEdgeId"], "optional": [], "label": {"zh-CN": "断开连接", "ja-JP": "接続遮断", "en-US": "Disable edge"}},
+    {"id": "resource_failure", "atomic": true, "required": ["targetNodeId"], "optional": [], "label": {"zh-CN": "资源故障", "ja-JP": "リソース障害", "en-US": "Resource failure"}},
+    {"id": "identity_failure", "atomic": true, "required": ["targetNodeId"], "optional": [], "label": {"zh-CN": "身份故障", "ja-JP": "認証障害", "en-US": "Identity failure"}},
+    {"id": "change_timeout", "atomic": true, "required": ["timeoutMs"], "optional": [], "label": {"zh-CN": "修改超时", "ja-JP": "タイムアウト変更", "en-US": "Change timeout"}},
+    {"id": "change_retry", "atomic": true, "required": ["retryMax"], "optional": ["retryBackoffMs"], "label": {"zh-CN": "修改重试", "ja-JP": "リトライ変更", "en-US": "Change retry"}},
+    {"id": "delay_message", "atomic": true, "required": ["addLatencyMs"], "optional": ["targetEdgeId", "targetEventId", "targetRuleId"], "label": {"zh-CN": "延迟消息", "ja-JP": "メッセージ遅延", "en-US": "Delay message"}},
+    {"id": "change_guard", "atomic": true, "required": ["machineId", "transitionId", "guard"], "optional": [], "label": {"zh-CN": "修改守卫", "ja-JP": "ガード変更", "en-US": "Change guard"}},
+    {"id": "insert_element", "atomic": true, "required": ["element", "rewrite"], "optional": [], "label": {"zh-CN": "插入元素", "ja-JP": "要素挿入", "en-US": "Insert element"}},
+    {"id": "combined_intervention", "atomic": false, "required": ["parts"], "optional": [], "label": {"zh-CN": "组合干预", "ja-JP": "複合介入", "en-US": "Combined intervention"}}
+  ],
+  "outcomeClasses": [
+    {"id": "NO_DIFFERENCE", "label": {"zh-CN": "无差异", "ja-JP": "差異なし", "en-US": "No difference"}},
+    {"id": "CONVERGED", "label": {"zh-CN": "收敛", "ja-JP": "収束", "en-US": "Converged"}},
+    {"id": "DIVERGED", "label": {"zh-CN": "分叉", "ja-JP": "乖離", "en-US": "Diverged"}}
+  ],
+  "nodeStates": [
+    {"id": "Idle", "active": false, "label": {"zh-CN": "空闲", "ja-JP": "待機中", "en-US": "Idle"}},
+    {"id": "Running", "active": true, "label": {"zh-CN": "运行中", "ja-JP": "実行中", "en-US": "Running"}},
+    {"id": "Waiting", "active": true, "label": {"zh-CN": "等待中", "ja-JP": "待ち", "en-US": "Waiting"}},
+    {"id": "Completed", "active": true, "label": {"zh-CN": "已完成", "ja-JP": "完了", "en-US": "Completed"}},
+    {"id": "Recovered", "active": true, "label": {"zh-CN": "已恢复", "ja-JP": "回復済み", "en-US": "Recovered"}},
+    {"id": "Degraded", "active": true, "label": {"zh-CN": "降级", "ja-JP": "縮退", "en-US": "Degraded"}},
+    {"id": "Blocked", "active": false, "label": {"zh-CN": "被阻断", "ja-JP": "遮断", "en-US": "Blocked"}},
+    {"id": "Failed", "active": false, "label": {"zh-CN": "失败", "ja-JP": "失敗", "en-US": "Failed"}}
+  ],
+  "eventOutcomes": [
+    {"id": "OK", "label": {"zh-CN": "成功", "ja-JP": "成功", "en-US": "OK"}},
+    {"id": "Blocked", "label": {"zh-CN": "阻断", "ja-JP": "遮断", "en-US": "Blocked"}},
+    {"id": "Denied", "label": {"zh-CN": "拒绝访问", "ja-JP": "拒否", "en-US": "Denied"}},
+    {"id": "Failed", "label": {"zh-CN": "失败", "ja-JP": "失敗", "en-US": "Failed"}},
+    {"id": "Timeout", "label": {"zh-CN": "超时", "ja-JP": "タイムアウト", "en-US": "Timeout"}},
+    {"id": "Rejected", "label": {"zh-CN": "驳回", "ja-JP": "却下", "en-US": "Rejected"}},
+    {"id": "Starved", "label": {"zh-CN": "无输入", "ja-JP": "入力なし", "en-US": "Starved"}},
+    {"id": "Skipped", "label": {"zh-CN": "跳过", "ja-JP": "スキップ", "en-US": "Skipped"}},
+    {"id": "Ignored", "label": {"zh-CN": "忽略", "ja-JP": "無視", "en-US": "Ignored"}},
+    {"id": "Unbound", "label": {"zh-CN": "未绑定", "ja-JP": "未接続", "en-US": "Unbound"}}
+  ],
+  "elementKinds": [
+    {"id": "NewService", "label": {"zh-CN": "新服务", "ja-JP": "新規サービス", "en-US": "New service"}},
+    {"id": "Proxy", "label": {"zh-CN": "代理", "ja-JP": "プロキシ", "en-US": "Proxy"}},
+    {"id": "Cache", "label": {"zh-CN": "缓存", "ja-JP": "キャッシュ", "en-US": "Cache"}},
+    {"id": "StorageAdapter", "label": {"zh-CN": "存储适配器", "ja-JP": "ストレージアダプタ", "en-US": "Storage adapter"}},
+    {"id": "Validator", "label": {"zh-CN": "校验器", "ja-JP": "バリデータ", "en-US": "Validator"}},
+    {"id": "MessageQueue", "label": {"zh-CN": "消息队列", "ja-JP": "メッセージキュー", "en-US": "Message queue"}},
+    {"id": "EventRouter", "label": {"zh-CN": "事件路由", "ja-JP": "イベントルーター", "en-US": "Event router"}},
+    {"id": "CircuitBreaker", "label": {"zh-CN": "熔断器", "ja-JP": "サーキットブレーカー", "en-US": "Circuit breaker"}},
+    {"id": "RetryController", "label": {"zh-CN": "重试控制器", "ja-JP": "リトライ制御", "en-US": "Retry controller"}},
+    {"id": "FaultSource", "label": {"zh-CN": "故障源", "ja-JP": "障害源", "en-US": "Fault source"}},
+    {"id": "RecoveryHandler", "label": {"zh-CN": "恢复处理器", "ja-JP": "復旧ハンドラ", "en-US": "Recovery handler"}},
+    {"id": "CompensationHandler", "label": {"zh-CN": "补偿处理器", "ja-JP": "補償ハンドラ", "en-US": "Compensation handler"}},
+    {"id": "HumanApproval", "label": {"zh-CN": "人工审批", "ja-JP": "人手承認", "en-US": "Human approval"}},
+    {"id": "ExternalServiceStub", "label": {"zh-CN": "外部服务桩", "ja-JP": "外部サービススタブ", "en-US": "External service stub"}}
+  ],
+  "policyKinds": [
+    {"id": "constraint", "label": {"zh-CN": "约束", "ja-JP": "制約", "en-US": "Constraint"}},
+    {"id": "nfr", "label": {"zh-CN": "非功能要求", "ja-JP": "非機能要件", "en-US": "Non-functional requirement"}},
+    {"id": "data", "label": {"zh-CN": "数据规则", "ja-JP": "データルール", "en-US": "Data rule"}}
+  ],
+  "enums": {"portDirections": ["in", "out"], "portTypes": ["Message", "Record"], "elementPortTypes": ["Message", "Record", "Any"], "handlerActions": ["forward", "respond", "drop", "fail"], "dispositions": ["replace", "keep", "disable"], "faultModes": ["fail", "deny"], "guardOps": ["present", "absent", "eq", "neq", "in"], "guardCombinators": ["all", "any", "not"], "eventRoles": ["recovery"], "modes": ["asis", "tobe"], "runStatuses": ["OK", "DRAFT", "REJECTED", "LIMIT_EXCEEDED"], "expectBy": ["author", "user"], "policyBy": ["ai", "user"], "dedupModes": ["reject", "ignore"], "edgeTypes": ["directed"]},
+  "knownProps": {"aggregator": "bool: node tolerates failed sections and ends Degraded (engine, documents)", "dedup": "object {mode: reject|ignore, key?, errorCode?, httpStatus?}: duplicate-key handling; key names the deduplication key (engine, documents)", "columns": "list of column names or objects {name, type?, pk?, fk?, unique?, nullable?, required?, pii?} (ER diagram, documents)", "methods": "list of method signatures (class diagram, documents)", "enums": "object {EnumName: [value, ...]} (class diagram, documents)", "owner": "node id of the owning module (documents)", "store": "node id of the backing store (documents)", "route": "string: externally visible path or route (documents)", "stack": "string: implementation stack (display)", "perms": "list of permission names (display)", "role": "string: role label (display)", "tier": "room tier, inherited by the expander (viewer, diagrams)", "area": "room area, inherited by the expander (display)", "trust": "building trust, inherited by the expander unless authored (viewer, security view)"}
+}

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gate fixture: canvas-2d-blank</title>
+<!--ATLAS_SELFTEST-->
+<style>
+  body { margin: 0; font: 14px/1.4 sans-serif; background: #fff; color: #123; }
+  header { display: flex; gap: 4px; padding: 6px 8px; border-bottom: 1px solid #ccc; }
+  header button { width: 84px; height: 30px; }
+  main { padding: 8px; }
+  canvas { display: block; width: 320px; height: 200px; border: 1px solid #999; }
+</style>
+</head>
+<body>
+<header data-gate="header">
+  <button type="button">One</button>
+  <button type="button">Two</button>
+</header>
+<main><canvas id="scene" width="320" height="200"></canvas></main>
+<script>
+(function () {
+  "use strict";
+  document.getElementById("scene").getContext("2d");
+  var frame = 0;
+  AtlasGate.run({
+    tabs: ["main"],
+    renderOnce: function () { frame += 1; return { frame: frame }; },
+    frame: function () { return frame; }
+  });
+})();
+</script>
+</body>
+</html>

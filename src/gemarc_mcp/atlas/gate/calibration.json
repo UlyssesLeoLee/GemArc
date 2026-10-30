@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "note": "widthOffset = --window-size width minus the page's reported innerWidth. Measured with smoke.py --calibrate (neutral first probe, then a verification launch per width); it differs per browser family and clamps below about 500 px, so the runner always re-checks the reported innerWidth and FAILs on a mismatch.",
+  "browsers": {
+    "edge": {
+      "version": "152.0.4191.53",
+      "widthOffset": 24,
+      "windowHeight": 800,
+      "innerHeight": 708,
+      "measured": {"1024": 24, "1256": 24, "1366": 24, "1576": 24, "1600": 24},
+      "observed": {"700": 24, "800": 24, "2536": 24, "500": 8, "300": -192},
+      "minInnerWidth": 492
+    },
+    "chrome": {
+      "version": "156.0.8078.73",
+      "widthOffset": 16,
+      "windowHeight": 800,
+      "innerHeight": 705,
+      "measured": {"1024": 16, "1256": 16, "1366": 16, "1576": 16, "1600": 16},
+      "observed": {"700": 16, "800": 16, "500": 0, "300": -200},
+      "minInnerWidth": 500
+    }
+  },
+  "thresholds": {"headerOverlapPx": 2, "scrollOverflowPx": 0, "nonBgFloor": 0.0005},
+  "gl": {"rendererSubstring": "SwiftShader"},
+  "provisional": {
+    "thresholds.nonBgFloor": "not measured on a real atlas scene; only the synthetic stub (nonBgRatio 0.125) and blank canvases (0.0) were observed. Re-tune at the 3D milestone.",
+    "gl.rendererSubstring": "measured on Edge 152 and Chrome 156 with the three SwiftShader flags; a build that no longer reports it FAILs with RENDERER until re-calibrated."
+  },
+  "console": {
+    "errorLevels": ["ERROR", "FATAL"],
+    "errorMessagePatterns": ["^Uncaught\\b", "^WebGL: (INVALID_|OUT_OF_MEMORY|CONTEXT_LOST)"]
+  },
+  "limits": {"timeoutSeconds": 30, "launchSecondsMax": 8, "virtualTimeBudgetMs": 20000, "walkerSleepMs": 50}
+}

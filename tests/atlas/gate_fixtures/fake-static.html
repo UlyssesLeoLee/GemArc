@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gate fixture: fake-static</title>
+<!--ATLAS_SELFTEST-->
+<style>
+  body { margin: 0; font: 14px/1.4 sans-serif; background: #fff; color: #123; }
+  header { display: flex; gap: 4px; padding: 6px 8px; border-bottom: 1px solid #ccc; }
+  header button { width: 84px; height: 30px; }
+  main { padding: 8px; }
+</style>
+</head>
+<body>
+<header data-gate="header">
+  <button type="button">One</button>
+  <button type="button">Two</button>
+</header>
+<main><p>Never rendered anything; carries a hard-coded passing result.</p></main>
+<pre id="atlas-gate" data-done="1">{"v":2,"tabs":[{"tab":"main","threw":null,"frames":[0,1,2],"header":{"roots":1,"n":2,"maxOverlapPx":0,"pair":null,"outside":[]},"scrollWidth":1000,"clientWidth":1366,"fit":{"n":0,"clipped":[]},"textBad":[],"draws":0,"canvases":[]}],"steps":[],"errors":[],"missingHooks":[],"tabStateChecked":false,"innerWidth":1366,"innerHeight":708}</pre>
+<script>
+(function () {
+  "use strict";
+  /* the page never calls AtlasGate.run */
+})();
+</script>
+</body>
+</html>

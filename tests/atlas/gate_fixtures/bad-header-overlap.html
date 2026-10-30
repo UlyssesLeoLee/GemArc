@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gate fixture: bad-header-overlap</title>
+<!--ATLAS_SELFTEST-->
+<style>
+  /* Two absolutely positioned control groups of fixed width: 10 x 70 px on the left and 10 x 75 px on
+     the right (1450 px in total). They collide whenever the viewport is narrower than 1450 px and
+     stay clear above it. Nothing overflows horizontally, so only the overlap assertion can trip. */
+  body { margin: 0; font: 14px/1.4 sans-serif; background: #fff; color: #123; }
+  header { position: relative; height: 44px; border-bottom: 1px solid #ccc; }
+  .group { position: absolute; top: 6px; display: flex; }
+  .left { left: 0; }
+  .right { right: 0; }
+  .group button { flex: none; box-sizing: border-box; height: 30px; margin: 0; padding: 0; }
+  .left button { width: 70px; }
+  .right button { width: 75px; }
+  main { padding: 8px; }
+</style>
+</head>
+<body>
+<header data-gate="header">
+  <div class="group left">
+    <button type="button">L1</button><button type="button">L2</button><button type="button">L3</button>
+    <button type="button">L4</button><button type="button">L5</button><button type="button">L6</button>
+    <button type="button">L7</button><button type="button">L8</button><button type="button">L9</button>
+    <button type="button">L10</button>
+  </div>
+  <div class="group right">
+    <button type="button">R1</button><button type="button">R2</button><button type="button">R3</button>
+    <button type="button">R4</button><button type="button">R5</button><button type="button">R6</button>
+    <button type="button">R7</button><button type="button">R8</button><button type="button">R9</button>
+    <button type="button">R10</button>
+  </div>
+</header>
+<main><p>Header controls collide below 1450 px.</p></main>
+<script>
+(function () {
+  "use strict";
+  var frame = 0;
+  AtlasGate.run({
+    tabs: ["main"],
+    renderOnce: function () { frame += 1; return { frame: frame }; },
+    frame: function () { return frame; }
+  });
+})();
+</script>
+</body>
+</html>

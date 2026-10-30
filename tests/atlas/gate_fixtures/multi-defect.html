@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gate fixture: multi-defect</title>
+<!--ATLAS_SELFTEST-->
+<style>
+  body { margin: 0; font: 14px/1.4 sans-serif; background: #fff; color: #123; }
+  header { position: relative; height: 44px; border-bottom: 1px solid #ccc; }
+  header button { position: absolute; top: 6px; width: 84px; height: 30px; }
+  .a { left: 100px; }
+  .b { left: -40px; }   /* half outside the viewport; a negative left does not widen the scroll area */
+  main { padding: 8px; }
+  .fit { width: 100px; overflow: hidden; white-space: nowrap; }
+</style>
+</head>
+<body>
+<header data-gate="header">
+  <button class="a" type="button">Inside</button>
+  <button class="b" type="button">Outside</button>
+</header>
+<main>
+  <p data-gate="fit" class="fit">a label that is far too long for its one hundred pixel box</p>
+  <p id="count"></p>
+</main>
+<script>
+(function () {
+  "use strict";
+  var frame = 0;
+  var items; // never assigned: the classic bug that leaks the word into the UI
+  document.getElementById("count").textContent = "Total: " + items + " items";
+  AtlasGate.run({
+    tabs: ["main"],
+    renderOnce: function () { frame += 1; return { frame: frame }; },
+    frame: function () { return frame; }
+  });
+})();
+</script>
+</body>
+</html>

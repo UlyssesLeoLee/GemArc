@@ -1,0 +1,3 @@
+scope	status	by	date	note
+ported-code	GRANTED	user	2026-10-30	Generic engine and viewer code of the reference may be ported (re-implemented or carried over) and genericised; the reference model data, prose, ids and constants may not.
+publication	PENDING	-	-	.vercelignore excludes /src/gemarc_mcp/atlas and no atlas route is registered in api/index.py; nothing is pushed, deployed or served until the user grants publication by editing this row.

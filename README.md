@@ -212,6 +212,7 @@ npx vercel@65.8.0 deploy --prod
 **鉴权**：设置环境变量 `GEMARC_MCP_TOKEN`（可逗号分隔多个，便于轮换）后，`POST /mcp` 必须带 `Authorization: Bearer <token>`；
 不设置则端点对知道 URL 的人开放（claude.ai 自定义 connector 需要这种形态）。`/healthz`、控制台、`/site/`、`/kit/` 始终公开且不含密钥或路径。
 完整说明、已实测/待验证清单见 `docs/09_部署/01_Vercel部署.md`。
+**账号（可选，默认关闭）**：Google 登录、个人访问令牌（PAT）与数据库存储的设计、运营手册见 `docs/09_部署/02_账号与安全.md`。
 
 ## 复用现有 GemArc Three.js Viewer
 

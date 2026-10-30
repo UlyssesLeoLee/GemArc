@@ -7,7 +7,7 @@ name = "gemarc-mcp"
 version = "0.3.0"
 description = "GemArc 5D architecture design scaffolding MCP server (MVP)"
 requires-python = ">=3.11"
-dependencies = ["mcp>=2.3.0,<3.0"]
+dependencies = ["mcp>=2.3.0,<3.0", "psycopg[binary]>=3.2,<4", "cryptography>=43,<51"]
 license = {text = "MIT"}
 
 [project.scripts]
@@ -18,4 +18,4 @@ gemarc-mcp = "gemarc_mcp.server:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-gemarc_mcp = ["web/*", "registry.json", "scaffold/vocab/*.json", "scaffold/contracts/*.json", "scaffold/cases/*.json", "scaffold/templates/**/*", "scaffold/runtime/**/*.js", "scaffold/runtime/**/*.mjs", "scaffold/runtime/**/*.json", "scaffold/runtime/**/*.css", "scaffold/runtime/*.json", "atlas/profiles/*.json", "atlas/derive/i18n/*.json", "atlas/derive/templates/*.json", "atlas/brief/*.md", "atlas/gate/*.js", "atlas/gate/*.json", "atlas/viewer/src/*.js", "atlas/viewer/dist/*"]
+gemarc_mcp = ["web/*", "registry.json", "scaffold/vocab/*.json", "scaffold/contracts/*.json", "scaffold/cases/*.json", "scaffold/templates/**/*", "scaffold/runtime/**/*.js", "scaffold/runtime/**/*.mjs", "scaffold/runtime/**/*.json", "scaffold/runtime/**/*.css", "scaffold/runtime/*.json", "atlas/profiles/*.json", "atlas/derive/i18n/*.json", "atlas/derive/templates/*.json", "atlas/brief/*.md", "atlas/gate/*.js", "atlas/gate/*.json", "atlas/viewer/src/*.js", "atlas/viewer/dist/*", "accounts/migrations/*.sql"]

@@ -61,6 +61,14 @@ Security posture:
   logged or echoed. Public static content stays public.
 * Write tools stay OFF unless ``GEMARC_ALLOW_WRITE`` is exactly ``1``, and the
   stateless tool set contains no write tool at all.
+
+Optional accounts (Google sign-in, personal access tokens; docs/09_部署/02_账号与安全.md):
+off unless ``GEMARC_ACCOUNTS=1`` and the configuration is complete. With them off and no
+login intent this module behaves exactly as described above and imports nothing from
+``gemarc_mcp.accounts`` except the stdlib-only ``flags``. A login intent
+(``GEMARC_REQUIRE_LOGIN`` or a PAT mode) with accounts that are not usable answers
+``POST /mcp`` with 503 (fail closed), never with an open endpoint. The three switches are
+interpreted only by ``gemarc_mcp.accounts.flags``.
 """
 from __future__ import annotations
 
@@ -92,6 +100,7 @@ if str(REPO_ROOT / "src") not in sys.path:
 import gemarc_mcp  # noqa: E402
 from gemarc_mcp import server as gemarc_server  # noqa: E402
 from gemarc_mcp import stateless  # noqa: E402
+from gemarc_mcp.accounts import flags as account_flags  # noqa: E402  (stdlib only; nothing else of the package)
 
 log = logging.getLogger("gemarc.api")
 
@@ -332,7 +341,8 @@ class _State:
 
 def build_app(*, token: str | None = None, toolset: str | None = None,
               allow_write: bool | None = None,
-              workspace_root: str | Path | None = None) -> Starlette:
+              workspace_root: str | Path | None = None,
+              accounts: dict | None = None) -> Starlette:
     """Build one deployable ASGI app.
 
     Every argument defaults to its environment variable, read *now*:
@@ -340,8 +350,12 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
     ``GEMARC_ALLOW_WRITE`` (default off) and ``GEMARC_WORKSPACE_ROOT``.
     Tests build variants with explicit arguments; production uses ``app`` below.
     ``token=""`` forces an open endpoint regardless of the environment.
+    ``accounts`` is for tests: a dict that may carry ``environ`` (a mapping used instead of
+    ``os.environ`` for the accounts switches and configuration), ``idp`` (fake identity-provider
+    endpoints), ``clock``, ``db``, ``opener``, ``limit_overrides`` and ``prefilter``.
     """
-    tokens = parse_tokens(os.environ.get(TOKEN_ENV) if token is None else token)
+    env_source = (accounts or {}).get("environ", os.environ)
+    tokens = parse_tokens(env_source.get(TOKEN_ENV) if token is None else token)
 
     # The service layer reads the write flag and the workspace from the process
     # environment, so those two are normalised there. Anything other than the
@@ -360,6 +374,57 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
     # create_server refills these module-level lists on every call; keep this app's copy.
     registered = tuple(gemarc_server.REGISTERED_TOOLS)
     write_tools = tuple(sorted(gemarc_server.WRITE_TOOLS))
+
+    # --- accounts: decided once, here. Off and no login intent: nothing below runs. ---
+    env_view = dict(env_source)
+    if token is not None:
+        env_view[TOKEN_ENV] = token
+    switches = account_flags.evaluate(env_view)
+    accounts_state = "disabled"          # disabled | ok | misconfigured
+    account_config = None
+    owns_account_path = None
+    account_pages = None
+    if switches.accounts_present:
+        from gemarc_mcp.accounts import config as accounts_config  # stdlib only
+        from gemarc_mcp.accounts import pages as account_pages  # noqa: F811
+        from gemarc_mcp.accounts import security as account_security
+        owns_account_path = account_security.owns
+        loaded = accounts_config.load(env_view, toolset=mode)
+        if loaded.ok:
+            account_config, accounts_state = loaded.config, "ok"
+            for warning in loaded.warnings:  # slugs only (no values); the operator CLI `doctor` explains each
+                log.warning("accounts config warning: %s", warning)
+        else:
+            accounts_state = "misconfigured"
+            log.error("accounts are misconfigured (GEMARC_ACCT_001)")  # names and values only via the operator CLI
+    elif switches.login_intent:
+        accounts_state = "misconfigured"
+        log.error("a login is required but accounts are not enabled (GEMARC_ACCT_001)")
+    #: Login required but accounts unusable: /mcp answers 503 to everything, even with a valid env token.
+    fail_closed = switches.login_intent and accounts_state != "ok"
+    account_runtime: list = []           # at most one AccountsRuntime, built on first use
+    account_mcp_auth: list = []
+    account_lock = threading.Lock()
+
+    def get_account_runtime():
+        with account_lock:
+            if not account_runtime:
+                from gemarc_mcp.accounts import routes as account_routes
+                extra = {k: v for k, v in (accounts or {}).items()
+                         if k in ("idp", "clock", "db", "opener", "limit_overrides", "prefilter")}
+                account_runtime.append(account_routes.AccountsRuntime(
+                    account_config, environ=env_source, registered_tools=registered,
+                    write_tools=write_tools, allow_write=allow_write, **extra))
+            return account_runtime[0]
+
+    def get_account_mcp_auth():
+        runtime = get_account_runtime()
+        with account_lock:
+            if not account_mcp_auth:
+                account_mcp_auth.append(runtime.mcp_auth(
+                    switches.mode, lambda presented: token_matches(presented, tokens),
+                    registered_tools=registered, write_tools=write_tools))
+            return account_mcp_auth[0]
 
     def make_inner():
         """A new inner MCP app. Each call creates a NEW session manager (the SDK enters one once)."""
@@ -445,8 +510,15 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
 
     # --- endpoints ----------------------------------------------------------
 
+    def accounts_health() -> str:
+        if accounts_state != "ok":
+            return "misconfigured"
+        if not account_runtime:
+            return "ok"
+        return {"ok": "ok", "unreachable": "db-unreachable"}.get(account_runtime[0].db_state, "misconfigured")
+
     def health_payload() -> dict:
-        return {
+        payload = {
             "status": "degraded" if (state.failed or state.stopped) else "ok",
             "server": "gemarc-mcp",
             "version": gemarc_mcp.__version__,
@@ -456,7 +528,7 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
             "tools": list(registered),
             "writeEnabled": allow_write,
             "writeTools": list(write_tools),
-            "authRequired": bool(tokens),
+            "authRequired": bool(tokens) or switches.login_intent,
             "sessionManager": state.mode,
             "seedProject": SEED_PROJECT,
             "seeded": seeded,
@@ -465,6 +537,9 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
             "staticSitePath": SITE_PATH,
             "consoleAvailable": CONSOLE_HTML.is_file(),
         }
+        if switches.accounts_present or switches.login_intent:
+            payload["accounts"] = accounts_health()
+        return payload
 
     def render_console() -> str:
         html = CONSOLE_HTML.read_text(encoding="utf-8")
@@ -507,7 +582,22 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
             await reply(_json(405, {"error": "method_not_allowed"}, {"Allow": "POST"}), scope, receive, send)
             return
         # 2. Authentication (header only; the query string is never consulted).
-        if tokens and not token_matches(_presented_token(Headers(scope=scope)), tokens):
+        if fail_closed:
+            await reply(_json(503, {"error": "accounts_unavailable", "code": "GEMARC_ACCT_001"},
+                              {"Cache-Control": "no-store"}), scope, receive, send)
+            return
+        if switches.uses_pat:
+            headers = Headers(scope=scope)
+            decision = await get_account_mcp_auth().authenticate(scope, headers, _presented_token(headers), receive)
+            if not decision.allowed:
+                if decision.body_consumed:
+                    await decision.response(scope, receive, send)
+                else:
+                    await reply(decision.response, scope, receive, send)
+                return
+            if decision.receive is not None:
+                receive = decision.receive
+        elif tokens and not token_matches(_presented_token(Headers(scope=scope)), tokens):
             await reply(_json(401, {"error": "unauthorized"},
                               {"WWW-Authenticate": "Bearer", "Cache-Control": "no-store"}),
                         scope, receive, send)
@@ -523,6 +613,12 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
         normalised["path"] = MCP_PATH
         normalised["raw_path"] = MCP_PATH.encode("ascii")
         await inner(normalised, receive, send)
+
+    async def accounts_endpoint(scope, receive, send):
+        if accounts_state != "ok":
+            await reply(account_pages.unavailable("GEMARC_ACCT_001"), scope, receive, send)
+            return
+        await get_account_runtime().handle(scope, receive, send)
 
     async def health_endpoint(scope, receive, send):
         if await read_only(scope, receive, send):
@@ -602,6 +698,8 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
             await console_endpoint(scope, receive, send)
         elif path == "/site":
             await reply(Response(status_code=307, headers={"Location": SITE_PATH}), scope, receive, send)
+        elif owns_account_path is not None and owns_account_path(path):
+            await accounts_endpoint(scope, receive, send)
         else:
             await reply(_json(404, {"error": "not_found"}), scope, receive, send)
 
@@ -609,6 +707,9 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
     # In-process handles for tests and diagnostics.
     starlette_app.state.gemarc_health = health_payload
     starlette_app.state.gemarc_mcp_server = mcp_server
+    starlette_app.state.gemarc_accounts = get_account_runtime if accounts_state == "ok" else None
+    starlette_app.state.gemarc_account_mcp_auth = (
+        get_account_mcp_auth if accounts_state == "ok" and switches.uses_pat else None)
     return starlette_app
 
 

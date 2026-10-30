@@ -1,6 +1,10 @@
 # Dependency floor for pip users and for hosts that install with `pip install -r requirements.txt`
 # (the Vercel dashboard of a Python-preset project shows exactly that install command).
-# Keep this line identical to `dependencies` in pyproject.toml.
+# Keep these lines identical to `dependencies` in pyproject.toml.
 # 2.3.0 is the lower bound the Streamable HTTP deployment was verified against
 # (mcp.server.MCPServer + streamable_http_app + session_manager.run()).
 mcp>=2.3.0,<3.0
+# psycopg[binary] and cryptography serve the optional accounts feature (Google sign-in, docs/09_部署/02_账号与安全.md); they are
+# only imported when GEMARC_ACCOUNTS=1 (or a login mode) is set.
+psycopg[binary]>=3.2,<4
+cryptography>=43,<51

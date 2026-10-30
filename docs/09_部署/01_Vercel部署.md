@@ -73,7 +73,7 @@ POST 一次拿一个 JSON 响应，不需要 session id，控制台与 `/mcp` �
 
 ### 2.1 依赖与打包（本地实测）
 
-- 依赖下限：`pyproject.toml` 与 `requirements.txt` 都是 `mcp>=2.3.0,<3.0`。
+- 依赖下限：`pyproject.toml` 与 `requirements.txt` 一致：`mcp>=2.3.0,<3.0`，加上账号功能用的 `psycopg[binary]>=3.2,<4` 与 `cryptography>=43,<51`。
   控制台里的 Install Command 显示为 `pip install -r requirements.txt`，但在 `builds` 配置下它不生效：
   第 12 节的构建日志写明依赖按 `pyproject.toml` 安装（实测）。`requirements.txt` 只服务 pip 用户与其它宿主；
   改依赖时两处都要改（没有测试把两者绑在一起）。
@@ -262,6 +262,18 @@ Sensitive 变量创建后无法再读出明文，所以**必须自己保存令�
 2. 把所有客户端的头换成 `N`；
 3. 把变量改为只含 `N` → 重新部署；
 4. 用 `scripts/verify_remote.py --token N` 确认。
+
+### 4.2 账号与个人访问令牌（可选，默认关闭）
+
+`GEMARC_ACCOUNTS=1` 且配置完整时，同一个函数多出 `/auth/google/start`、`/auth/google/callback`、`/account*` 等路由
+（Google 登录、个人访问令牌、导出与删除账号），数据放在 Neon Postgres。`/mcp` 的认证**不会**因此改变，
+除非显式设置 `GEMARC_MCP_AUTH=pat|pat-or-env` 或 `GEMARC_REQUIRE_LOGIN=1`；这些意图遇到不可用的账号配置时
+`POST /mcp` 一律 503（关闭失败），不会退回开放。没设这些变量时，本文第 4 节的全部行为逐字节不变，
+`/healthz` 也没有 `accounts` 键。设计、变量表、运营手册与残余风险见 `docs/09_部署/02_账号与安全.md`。
+
+依赖提示：账号功能额外需要 `psycopg[binary]` 与 `cryptography`，已写进 `pyproject.toml`（本文第 2 节：`builds` 配置按它安装）；
+`requirements.txt` 已同步这两项（2026-10-30，由主线补上）。账号路由只认 `GEMARC_ACCOUNTS_BASE_URL` 里的那一个主机名（生产别名），
+预览地址或 `*.vercel.app` 部署地址会得到 421，请只在生产别名上测试登录。
 
 ## 5. 工具可用性
 

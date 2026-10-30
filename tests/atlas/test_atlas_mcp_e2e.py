@@ -210,7 +210,9 @@ class StdioAuthoringSession(unittest.TestCase):
         self.assertEqual(policy["status"], "committed", policy)
         _, review = await call("gemarc_atlas_status", project="lending-desk")
         # later lanes register gates (oracle, build, browser): then the phase may be author or build, with a gate or dims blocker
-        self.assertIn(review["phase"], ("review", "build", "author"), review)
+        # an as-is project with no evidence root configured stops at needs-user (the operator sets GEMARC_ATLAS_ROOTS, or the user lowers verif=)
+        self.assertIn(review["phase"], ("review", "build", "author", "needs-user"), review)
+        self.assertFalse(any("GEMARC_ALLOW_WRITE" in x for x in review["needsUser"]))
         if review["phase"] != "review":
             self.assertTrue([b for b in review["blockers"] if b.startswith(("gate-", "dims:"))], review)
         self.assertFalse(review["done"], "done needs the review record (the review tool is a later lane)")
@@ -285,6 +287,253 @@ class StdioReadOnlySession(unittest.TestCase):
         self.assertFalse(result.is_error)
         result, missing = await call("gemarc_atlas_status", project="nope")
         self.assertTrue(result.is_error)
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Batch 3: the whole product flow through the OFFICIAL client over real stdio (acceptance (b), (c), (d), (e) of task tools-b3)
+# ---------------------------------------------------------------------------------------------------------------------
+
+#: The reply cap of every tool of design 4.1 (bytes; ``put`` 4.5 KB, ``status next`` 1.2 KB, ``doc`` outline 1 KiB, a chapter page 20 KiB).
+REPLY_CAPS = {"gemarc_atlas_brief": 9000, "gemarc_atlas_init": 1024, "gemarc_atlas_put": 4500, "gemarc_atlas_check": 4500,
+              "gemarc_atlas_status": 4500, "gemarc_atlas_index": 4500, "gemarc_atlas_simulate": 3000, "gemarc_atlas_doc": 20 * 1024,
+              "gemarc_atlas_outline": 4500, "gemarc_atlas_evidence": 3000, "gemarc_atlas_build": 2000, "gemarc_atlas_verify": 3000,
+              "gemarc_atlas_review": 4500}
+SOURCE_FILES = {"src/loan.py": "class Loans:\n    def create_loan(self, member):\n        return 1\n",
+                "src/stock.py": "def find_copy(title):\n    return None\n",
+                "docs/lending.md": "# Lending\nThe borrower opens the page to borrow.\n"}
+BROWSER_ENV = ("ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "LOCALAPPDATA", "TMP", "TEMP", "SystemRoot", "GEMARC_ATLAS_BROWSER")
+
+
+def tree_hash(root: Path) -> str:
+    import hashlib
+
+    digest = hashlib.sha256()
+    for path in sorted(p for p in root.rglob("*") if p.is_file()):
+        digest.update(path.relative_to(root).as_posix().encode("utf-8"))
+        digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def full_env(roots: Path, write: bool = True, no_browser: bool = False) -> dict:
+    """What a client config gives the server: the explicit variables plus what the browser gate needs to find Edge or Chrome
+    (``no_browser`` pins GEMARC_ATLAS_BROWSER to a file that does not exist: the gate then has no browser, a loud SKIP)."""
+    env = {key: os.environ[key] for key in BROWSER_ENV if key in os.environ}
+    if no_browser:
+        env["GEMARC_ATLAS_BROWSER"] = str(roots / "no-such-browser.exe")
+    env["GEMARC_ATLAS_ROOTS"] = f"main={roots}"
+    if write:
+        env["GEMARC_ALLOW_WRITE"] = "1"
+    return env
+
+
+@unittest.skipUnless(_sdk_available(), "MCP SDK is not installed")
+class StdioFullFlow(unittest.TestCase):
+    """init, puts, status until the structure is done, simulate (count), doc, evidence, build, verify (skip-aware), review report and
+    record, status says done: on a synthetic requirement, over two server processes (the first one is killed mid-run)."""
+
+    no_browser = False
+
+    def test_the_flow_from_one_sentence_to_done_with_a_restart_in_the_middle(self):
+        self.run_flow()
+
+    def run_flow(self):
+        from gemarc_mcp import atlas_tools
+
+        with temp_dir("atlas-e2e-ws-") as workspace, temp_dir("atlas-e2e-src-") as roots:
+            for rel, text in SOURCE_FILES.items():
+                (roots / rel).parent.mkdir(parents=True, exist_ok=True)
+                (roots / rel).write_text(text, encoding="utf-8")
+            self.sizes: list = []
+            first_err = asyncio.run(stdio_session(full_env(roots, no_browser=self.no_browser), workspace, lambda s, i: self.first_half(s, i, workspace, roots)))
+            # the first server process is gone (the client closed the pipe and ended it): every fact below comes from the directory
+            second_err = asyncio.run(stdio_session(full_env(roots, no_browser=self.no_browser), workspace, lambda s, i: self.second_half(s, i, workspace, roots)))
+        for err in (first_err, second_err):
+            self.assertNotIn("Traceback", err)
+        for name, size in self.sizes:
+            self.assertLessEqual(size, REPLY_CAPS[name], f"{name}: {size} B")
+        by_tool: dict = {}
+        for name, size in self.sizes:
+            by_tool[name] = max(by_tool.get(name, 0), size)
+        print(f"\n[full flow over stdio] {len(self.sizes)} calls; largest reply per tool: " + ", ".join(f"{k.replace('gemarc_atlas_', '')} {v}" for k, v in sorted(by_tool.items())))
+        self.assertEqual(sorted(by_tool), sorted(set(by_tool) & set(REPLY_CAPS)))
+        self.assertTrue(atlas_tools.REGISTRY)
+
+    async def next_lines(self, caller):
+        """``status view=next`` with the design cap of 1.2 KB checked on the reply that was really sent."""
+        _, state = await caller.call("gemarc_atlas_status", project="desk")
+        self.assertLessEqual(caller.sizes[-1][1], 1200, "status next is at most 1.2 KB")
+        return None, state
+
+    async def first_half(self, session, init, workspace: Path, roots: Path):
+        from gemarc_mcp import atlas_tools
+
+        caller = Caller(session, self)
+        call = caller.call
+        tools = (await session.list_tools()).tools
+        names = [t.name for t in tools]
+        self.assertEqual(names, list(atlas_tools.tool_names("atlas")))
+        self.assertEqual(len(names), 13, "the 12 tools of design 4.1 plus the review tool of addendum A1")
+        listed = len(json.dumps([t.model_dump(by_alias=True, exclude_none=True) for t in tools], ensure_ascii=False, separators=(",", ":")).encode())
+        self.assertLessEqual(listed, 10 * 1024, f"tools/list is {listed} B")
+        for tool in tools:
+            self.assertLessEqual(len((tool.description or "").encode("utf-8")), 800, tool.name)
+        prompt = (await session.get_prompt("gemarc-atlas-create", {"requirement": "An invented lending desk.", "mode": "asis", "project": "desk"})).messages[0].content.text
+        for tool in ("gemarc_atlas_simulate", "gemarc_atlas_evidence", "gemarc_atlas_build", "gemarc_atlas_verify", "gemarc_atlas_doc", "oracle-sheet.md", "waive-browser.txt"):
+            self.assertIn(tool, prompt, tool)
+        _, created = await call("gemarc_atlas_init", project="desk", title="Library lending desk", mode="asis", languages=["en-US"], repos=["main"])
+        self.assertEqual(created["status"], "created", created)
+        for name in ("00-space", "10-structure", "20-scenarios", "30-policy"):
+            text = DESK[name] if name in DESK else POLICY
+            _, put = await call("gemarc_atlas_put", project="desk", slice=name, text=text)
+            self.assertEqual(put["status"], "committed", put)
+        # status next until the structure is done: the next phase is the gates, never done
+        _, state = await self.next_lines(caller)
+        self.assertEqual((state["done"], state["phase"]), (False, "build"), state)
+        self.assertTrue(state["next"][0].startswith("oracle:") and "gemarc_atlas_simulate" in state["next"][0], state["next"])
+        # reads never write: the tree hash before and after every read tool
+        before = tree_hash(workspace)
+        for tool, args in (("gemarc_atlas_status", {"project": "desk"}), ("gemarc_atlas_status", {"project": "desk", "view": "dims"}),
+                           ("gemarc_atlas_check", {"project": "desk", "mode": "full"}), ("gemarc_atlas_index", {"project": "desk"}),
+                           ("gemarc_atlas_doc", {"project": "desk"}), ("gemarc_atlas_doc", {"project": "desk", "chapter": "2"}),
+                           ("gemarc_atlas_outline", {"root": "main", "path": "src/loan.py"}),
+                           ("gemarc_atlas_review", {"project": "desk", "action": "report"}), ("gemarc_atlas_brief", {})):
+            _, reply = await call(tool, **args)
+            self.assertNotEqual(reply["status"], "error", (tool, reply))
+        self.assertEqual(tree_hash(workspace), before, "no read tool may change a byte of the workspace")
+        _, outline = await call("gemarc_atlas_outline", root="main", path="src/loan.py")
+        self.assertIn('"def create_loan"', outline["text"])
+        # doc: outline within 1 KiB, a chapter page whole
+        _, doc = await call("gemarc_atlas_doc", project="desk", unit="req:RQ-1", level="REQ")
+        self.assertEqual((doc["status"], doc["markers"]), ("ok", 0))
+        self.assertLessEqual(len(json.dumps(doc, ensure_ascii=False, separators=(",", ":")).encode()), 1024)
+        # review before the gates: refused, the pass is not burnt
+        result, early = await call("gemarc_atlas_review", project="desk", action="record")
+        self.assertTrue(result.is_error)
+        self.assertEqual(early["code"], "GEMARC_ATLAS_REVIEW_003")
+        # simulate (count) after sealing: the verdict is blind
+        _, sim = await call("gemarc_atlas_simulate", project="desk")
+        self.assertTrue(sim["clean"], sim)
+        self.assertEqual(sim["detail"], "count")
+        self.assertEqual(sim["summary"]["baselines"]["pass"], 1)
+        text = json.dumps(sim)
+        for leaked in ("svc.stock", "Completed", "trace"):
+            self.assertNotIn(leaked, text, "count-only: no node id, no state, no trace")
+        _, state = await self.next_lines(caller)
+        self.assertEqual(state["phase"], "build")
+        self.assertTrue(state["next"][0].startswith("evidence:"), state["next"])
+        self.sizes += caller.sizes
+        # ---- the server is killed here (the context manager of the caller ends the process) -------------
+
+    async def second_half(self, session, init, workspace: Path, roots: Path):
+        caller = Caller(session, self)
+        call = caller.call
+        # state is restored from the directory: the new process says where the old one stopped
+        _, state = await self.next_lines(caller)
+        self.assertEqual((state["done"], state["phase"]), (False, "build"), state)
+        self.assertTrue(state["next"][0].startswith("evidence:"), f"the restart lost the verdicts: {state['next']}")
+        _, evidence = await call("gemarc_atlas_evidence", project="desk")
+        self.assertEqual((evidence["status"], evidence["pass"], evidence["fail"], evidence["skip"]), ("ok", 3, 0, 0), evidence)
+        self.assertEqual(evidence["claims"], {"implemented": 5, "unverified": 0})
+        _, state = await self.next_lines(caller)
+        self.assertTrue(state["next"][0].startswith("build:"), state["next"])
+        _, built = await call("gemarc_atlas_build", project="desk")
+        self.assertEqual(built["status"], "ok", built)
+        self.assertEqual(built["sheet"], "atlas/dist/oracle-sheet.md")
+        dist = workspace / "desk" / "atlas" / "dist"
+        for rel in ("index.html", "build-info.json", "oracle-sheet.md", "docs/en-US/BD.md"):
+            self.assertTrue((dist / rel).is_file(), rel)
+        self.assertFalse((workspace / "desk" / "atlas" / "oracle-confirm.txt").exists(), "the MCP never writes the user's confirmation file")
+        # verify (skip-aware): a real browser when there is one, else the loud SKIP and the user's waiver
+        result, verified = await call("gemarc_atlas_verify", project="desk")
+        _, state = await self.next_lines(caller)
+        if verified["status"] == "ok":
+            self.assertFalse(self.no_browser, "a pinned browser that does not exist must not be replaced by another one")
+            self.assertEqual(verified["gate"], "PASS", verified)
+            self.assertEqual([w["width"] for w in verified["widths"]], [1024, 1366, 1600])
+            self.browser = "PASS"
+        else:
+            self.assertEqual((result.is_error, verified["code"], verified["gate"]), (True, "GEMARC_ATLAS_BUILD_031", "SKIP"), verified)
+            self.assertEqual((state["done"], state["phase"]), (False, "needs-user"), "a missing browser blocks and the user must decide")
+            self.assertTrue(any("waive-browser.txt" in x for x in state["needsUser"]), state["needsUser"])
+            (workspace / "desk" / "atlas" / "waive-browser.txt").write_text("this machine has no browser; the user opens the page by hand\n", encoding="utf-8")
+            _, state = await self.next_lines(caller)
+            self.browser = "WAIVED"
+        self.assertEqual((state["done"], state["phase"]), (False, "review"), state)
+        self.assertEqual(state["blockers"], ["review:missing"])
+        # the one review: report is read-only, record once
+        before = tree_hash(workspace)
+        _, report = await call("gemarc_atlas_review", project="desk", action="report")
+        self.assertEqual(report["status"], "ok")
+        self.assertEqual(len(report["sample"]), 8)
+        self.assertEqual(tree_hash(workspace), before)
+        _, recorded = await call("gemarc_atlas_review", project="desk", action="record", notes="fixed=; open=RV-O1")
+        self.assertEqual((recorded["status"], recorded["done"], recorded["phase"]), ("recorded", True, "done"), recorded)
+        _, done = await self.next_lines(caller)
+        self.assertEqual((done["done"], done["phase"], done["blockers"], done["needsUser"]), (True, "done", [], []), done)
+        if self.browser == "PASS":
+            self.assertIn("gates green: oracle, evidence, docs, build, browser", done["next"][0])
+            self.assertNotIn("waived", done)
+        else:       # a waiver is not a pass: the state says so, in a field and in a line, and the done line does not call the browser green
+            self.assertIn("gates green: oracle, evidence, docs, build;", done["next"][0])
+            self.assertEqual(done["waived"], ["browser"])
+            self.assertTrue(any("WAIVED by the user" in x and "UNVERIFIED" in x for x in done["next"]), done["next"])
+        # a second review is never demanded, and never accepted
+        result, again = await call("gemarc_atlas_review", project="desk", action="record")
+        self.assertTrue(result.is_error)
+        self.assertEqual(again["code"], "GEMARC_ATLAS_REVIEW_002")
+        self.sizes += caller.sizes
+        print(f"[full flow over stdio] browser gate: {self.browser}; sheet {built['sheet']}")
+
+
+@unittest.skipUnless(_sdk_available(), "MCP SDK is not installed")
+class StdioFullFlowWithoutABrowser(StdioFullFlow):
+    """The same flow with no browser: verify is a loud SKIP (isError, NOT passed), status stops for the user, only the user's waiver file
+    lets it finish, and then exactly one review ends it."""
+
+    no_browser = True
+
+    def test_the_flow_from_one_sentence_to_done_with_a_restart_in_the_middle(self):
+        self.run_flow()
+        self.assertEqual(self.browser, "WAIVED")
+
+
+@unittest.skipUnless(_sdk_available(), "MCP SDK is not installed")
+class StdioWriteGateOnTheNewTools(unittest.TestCase):
+    """Without GEMARC_ALLOW_WRITE=1 every write tool refuses and every read works, in a second server on a finished project."""
+
+    def test_refusals_and_reads_on_a_project_made_by_another_process(self):
+        with temp_dir("atlas-e2e-ws-") as workspace, temp_dir("atlas-e2e-src-") as roots:
+            for rel, text in SOURCE_FILES.items():
+                (roots / rel).parent.mkdir(parents=True, exist_ok=True)
+                (roots / rel).write_text(text, encoding="utf-8")
+            asyncio.run(stdio_session(full_env(roots), workspace, lambda s, i: self.make(s, i)))
+            before = tree_hash(workspace)
+            asyncio.run(stdio_session(full_env(roots, write=False), workspace, lambda s, i: self.refused(s, i)))
+            self.assertEqual(tree_hash(workspace), before, "refusals and reads change no byte")
+
+    async def make(self, session, init):
+        call = Caller(session, self).call
+        await call("gemarc_atlas_init", project="desk", title="Desk", mode="asis", languages=["en-US"], repos=["main"])
+        for name in ("00-space", "10-structure", "20-scenarios", "30-policy"):
+            await call("gemarc_atlas_put", project="desk", slice=name, text=DESK[name] if name in DESK else POLICY)
+        await call("gemarc_atlas_simulate", project="desk")
+
+    async def refused(self, session, init):
+        call = Caller(session, self).call
+        for tool, args in (("gemarc_atlas_simulate", {"project": "desk"}), ("gemarc_atlas_evidence", {"project": "desk"}),
+                           ("gemarc_atlas_build", {"project": "desk"}), ("gemarc_atlas_verify", {"project": "desk"}),
+                           ("gemarc_atlas_review", {"project": "desk", "action": "record"}),
+                           ("gemarc_atlas_put", {"project": "desk", "slice": "40-x", "text": POLICY})):
+            result, reply = await call(tool, **args)
+            self.assertTrue(result.is_error, tool)
+            self.assertEqual(reply["code"], "GEMARC_AUTH_002", (tool, reply))
+        for tool, args in (("gemarc_atlas_status", {"project": "desk"}), ("gemarc_atlas_doc", {"project": "desk"}),
+                           ("gemarc_atlas_outline", {"root": "main", "path": "src/loan.py"}), ("gemarc_atlas_index", {"project": "desk"}),
+                           ("gemarc_atlas_check", {"project": "desk", "mode": "full"}), ("gemarc_atlas_review", {"project": "desk", "action": "report"})):
+            result, reply = await call(tool, **args)
+            self.assertFalse(result.is_error, (tool, reply))
+        _, state = await call("gemarc_atlas_status", project="desk")
+        self.assertEqual(state["phase"], "build", "status keeps working and still names the next gate")
 
 
 @unittest.skipUnless(_sdk_available() and _http_available(), "MCP SDK, uvicorn or httpx2 is not installed")

@@ -8,8 +8,7 @@ form the Mermaid builders and the DG lint rules read; ``mermaid`` is the diagram
 **Nothing here raises.** The reference crashes on a State node without an owner edge, an Entity without columns and a
 node in an unknown room; here each of those yields an issue and an explicit marker and the rest is still drawn. The
 deletion-matrix test deletes every required field in turn and asserts exactly that. Sequence diagrams are not built
-here: they are drawn from sealed traces by the oracle lane through ``register_unit_builder`` /
-``mermaid.register_builder``.
+here: ``run_units`` (below) draws them, and only from the sealed runs that ``oracle.sealed_runs`` hands over.
 """
 from __future__ import annotations
 
@@ -427,3 +426,116 @@ def links_line(units: Iterable[Mapping], node_ids: Iterable[str], lang: str, lim
 def diagram_files(units: Iterable[Mapping]) -> dict:
     """``{"<unit id>.mmd": text}`` for ``dist/diagrams/``."""
     return {f"{u['id']}.mmd": u["mermaid"] for u in units}
+
+
+# --------------------------------------------------------------------------------------------- runs (sealed items only)
+
+RUN_TRACE_LINES = 60
+RUN_STATE_NODES = 6
+_RUN_TITLE = {
+    "sequence": {"en-US": "Sequence: {name}", "zh-CN": "时序：{name}", "ja-JP": "メッセージの流れ：{name}"},
+    "staterun": {"en-US": "State changes: {name}", "zh-CN": "状态变化：{name}", "ja-JP": "状態の推移：{name}"},
+}
+_ARROW_FAILED = frozenset({"Blocked", "Starved", "Rejected", "Denied", "Failed", "Timeout", "Unbound"})
+
+
+def _run_title(kind: str, lang: str, name: str) -> str:
+    table = _RUN_TITLE[kind]
+    return T.clip(table.get(lang, table["en-US"]).format(name=name), 120)
+
+
+def _sequence_text(ix: Index, run: Mapping) -> tuple:
+    """``sequenceDiagram`` of a run's trace entries (at most ``RUN_TRACE_LINES``; the cut is announced)."""
+    pid = M.IdMap("p")
+    trace = [t for t in run.get("trace", []) if isinstance(t, Mapping)]
+    lines = ["sequenceDiagram"]
+    seen: list = []
+    for t in trace[:RUN_TRACE_LINES]:
+        for node in (t.get("sourceNodeId"), t.get("targetNodeId")):
+            if isinstance(node, str) and node not in seen:
+                seen.append(node)
+    for node in seen:
+        lines.append(f"  participant {pid(node)} as {M.quoted(_node_title(ix, node), 40)}")
+    for t in trace[:RUN_TRACE_LINES]:
+        a, b = t.get("sourceNodeId"), t.get("targetNodeId")
+        if not (isinstance(a, str) and isinstance(b, str)):
+            continue
+        outcome = str(t.get("outcome"))
+        arrow = "-x" if outcome in _ARROW_FAILED else "-->>" if t.get("eventType") == "Return" else "->>"
+        lines.append(f"  {pid(a)}{arrow}{pid(b)}: {M.raw(str(t.get('eventType')) + ' ' + outcome, 40)}")
+    issues: list = []
+    if len(trace) > RUN_TRACE_LINES:
+        lines.append(f"  Note over {pid(seen[0])}: {len(trace) - RUN_TRACE_LINES} more entries not drawn" if seen else "")
+        issues.append(T.issue("DG-009", "INFO", "trace", f"the trace has {len(trace)} entries; the first {RUN_TRACE_LINES} are drawn"))
+    return M._finish([x for x in lines if x], issues), seen
+
+
+def _slug(state) -> str:
+    return "".join(ch if ch.isalnum() else "_" for ch in str(state)) or "x"
+
+
+def _state_run_text(ix: Index, run: Mapping) -> tuple:
+    """``stateDiagram-v2`` of the state changes of the most active nodes of a run (flat, one state per node and name)."""
+    changes: dict = {}
+    for t in run.get("trace", []):
+        for c in (t.get("stateChanges") or []) if isinstance(t, Mapping) else []:
+            if isinstance(c, Mapping) and isinstance(c.get("nodeId"), str):
+                changes.setdefault(c["nodeId"], []).append((t.get("index"), c.get("from"), c.get("to")))
+    busiest = sorted(changes, key=lambda n: (-len(changes[n]), n))[:RUN_STATE_NODES]
+    nid = M.IdMap("n")
+    lines = ["stateDiagram-v2"]
+    declared: set = set()
+    body: list = []
+    for node in busiest:
+        for index, a, b in changes[node]:
+            for state in (a, b):
+                if (node, state) not in declared:
+                    declared.add((node, state))
+                    lines.append(f"  state {M.quoted(_node_title(ix, node) + ': ' + str(state), 60)} as {nid(node)}_{_slug(state)}")
+            body.append(f"  {nid(node)}_{_slug(a)} --> {nid(node)}_{_slug(b)} : {M.raw('#' + str(index), 12)}")
+    return M._finish(lines + body, []), busiest
+
+
+def run_units(model, baselines: Mapping, pairs: Iterable[Mapping], lang: str = T.PRIMARY_LANG) -> dict:
+    """Sequence and state-change diagram units drawn from SEALED runs: ``baselines`` ``{caseId: {"run": ...}}`` and ``pairs``
+    ``[{interventionId, caseId, result}]`` exactly as ``oracle.sealed_runs`` returns them. Nothing is drawn for an item that is
+    not in the arguments, so an unsealed case can never get a diagram. Never raises; returns ``{"units", "issues"}``."""
+    lang = T.normalize_lang(lang)
+    units: list = []
+    issues: list = []
+    try:
+        ix = Index(model)
+    except Exception as exc:  # noqa: BLE001
+        return {"units": [], "issues": [T.issue("DG-099", "ERROR", "model", "the model could not be indexed", got=type(exc).__name__)]}
+    for cid in sorted(baselines):
+        run = (baselines[cid] or {}).get("run") if isinstance(baselines[cid], Mapping) else None
+        if not isinstance(run, Mapping) or run.get("status") != "OK":
+            continue
+        case = ix.case.get(cid, {})
+        title = str(case.get("title") or cid)
+        try:
+            (text, found), seen = _sequence_text(ix, run)
+            units.append(_unit(ix, "sequence", "sequence-" + T.dg_id(cid), _run_title("sequence", lang, title), seen, [], [cid],
+                               {"caseId": cid, "source": "run"}, text, found))
+            issues.extend(found)
+            (stext, sfound), busiest = _state_run_text(ix, run)
+            if busiest:
+                units.append(_unit(ix, "staterun", "staterun-" + T.dg_id(cid), _run_title("staterun", lang, title), busiest, [], [cid],
+                                   {"caseId": cid, "source": "run"}, stext, sfound))
+        except Exception as exc:  # noqa: BLE001 - the deletion matrix asserts the builders never raise
+            issues.append(T.issue("DG-099", "ERROR", f"units.run.{cid}", "internal unit builder error", got=type(exc).__name__))
+    for pair in pairs:
+        result = pair.get("result") if isinstance(pair, Mapping) else None
+        run = (result or {}).get("B") if isinstance(result, Mapping) else None
+        if not isinstance(run, Mapping) or run.get("status") != "OK":
+            continue
+        label = f"{pair.get('interventionId')} x {pair.get('caseId')}"
+        try:
+            (text, found), seen = _sequence_text(ix, run)
+            units.append(_unit(ix, "sequence", "sequence-" + T.dg_id(f"{pair.get('interventionId')}-{pair.get('caseId')}"),
+                               _run_title("sequence", lang, label), seen, [], [str(pair.get("caseId"))],
+                               {"caseId": pair.get("caseId"), "interventionId": pair.get("interventionId"), "source": "run"}, text, found))
+            issues.extend(found)
+        except Exception as exc:  # noqa: BLE001
+            issues.append(T.issue("DG-099", "ERROR", f"units.run.{label}", "internal unit builder error", got=type(exc).__name__))
+    return {"units": units, "issues": issues}

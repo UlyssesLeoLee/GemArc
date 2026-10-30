@@ -13,7 +13,7 @@ Subcommands::
     python scripts/atlas_mcp.py call gemarc_atlas_check '{"text":"#atlas 1\\n## nodes: id | name | sub | opts\\n"}'
 
 The server environment is NOT inherited wholesale (the SDK passes a filtered environment, as Claude Code, Codex and Hermes do):
-``GEMARC_*`` variables of this shell are forwarded, ``GEMARC_TOOLSET`` defaults to ``atlas``, ``PYTHONUTF8=1`` is set, and
+``GEMARC_*`` variables of this shell are forwarded (and ``ProgramFiles``, ``ProgramFiles(x86)``, ``LOCALAPPDATA``, so the browser gate finds Edge), ``GEMARC_TOOLSET`` defaults to ``atlas``, ``PYTHONUTF8=1`` is set, and
 ``PYTHONPATH`` is the checkout's ``src`` directory when this script lives in a checkout. ``--env K=V`` adds or overrides one.
 Writing tools need ``GEMARC_ALLOW_WRITE=1`` in the environment (or ``--allow-write``) and a workspace
 (``GEMARC_WORKSPACE_ROOT``, default ``~/.gemarc/workspace``).
@@ -45,9 +45,16 @@ def compact(value) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
+#: Variables the browser gate (verify, build gate=smoke) needs to locate an installed Edge or Chrome on Windows.
+BROWSER_LOOKUP_ENV = ("ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "LOCALAPPDATA")
+
+
 def server_env(args) -> dict:
     """The explicit environment of the server process (see the module docstring)."""
     env = {key: value for key, value in os.environ.items() if key.startswith("GEMARC_")}
+    for key in BROWSER_LOOKUP_ENV:                     # the SDK's filtered environment lacks these, and the browser gate finds Edge or Chrome through them
+        if key in os.environ:
+            env.setdefault(key, os.environ[key])
     env.setdefault("GEMARC_TOOLSET", "atlas")
     if args.toolset:
         env["GEMARC_TOOLSET"] = args.toolset

@@ -40,6 +40,7 @@ NOT_TOOLS = {"gemarc_mcp": "the Python package", "gemarc_atlas": "the server nam
 TOOLSETS = ("atlas", "atlas_remote")
 DESCRIPTION_BYTES = 800
 LIST_BYTES = 10 * 1024
+LIST_HEADROOM = 600
 #: The six tools of milestone M2b: later lanes may add tools, never remove these.
 M2B_LOCAL = ("gemarc_atlas_brief", "gemarc_atlas_init", "gemarc_atlas_put", "gemarc_atlas_check", "gemarc_atlas_status",
              "gemarc_atlas_index")
@@ -176,6 +177,8 @@ class ToolListTests(Base):
                 self.assertLessEqual(len((tool.description or "").encode("utf-8")), DESCRIPTION_BYTES, tool.name)
             size = len(json.dumps([_dump(t) for t in tools], ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
             self.assertLessEqual(size, LIST_BYTES if toolset == "atlas" else 4096, f"{toolset} tools/list is {size} B")
+            if toolset == "atlas":     # headroom for the next lane's parameter or longer description (it was 175 B once)
+                self.assertLessEqual(size, LIST_BYTES - LIST_HEADROOM, f"tools/list is {size} B: keep {LIST_HEADROOM} B of headroom")
             print(f"\n[tools/list] {toolset}: {len(tools)} tools, {size} B")
 
     def test_remote_check_has_the_documented_inputs_and_no_project(self):
@@ -465,6 +468,110 @@ class PromptTests(Base):
             self.assertIn("to-be", text)
             self.assertIn('languages=["ja-JP"]', text)
             self.assertIn('lang="en-US"', text)    # brief only exists in zh-CN and en-US
+
+
+#: The twelve tools of design 4.1 (task tools-b3): the local tool set is exactly these plus the review tool of addendum A1 (D15).
+DESIGN_TOOLS = ("gemarc_atlas_brief", "gemarc_atlas_init", "gemarc_atlas_put", "gemarc_atlas_check", "gemarc_atlas_status", "gemarc_atlas_index",
+                "gemarc_atlas_simulate", "gemarc_atlas_doc", "gemarc_atlas_outline", "gemarc_atlas_evidence", "gemarc_atlas_build",
+                "gemarc_atlas_verify")
+#: Inputs of design 4.1 and their defaults (``None`` = required): the live schema must say exactly this.
+DESIGN_INPUTS = {
+    "gemarc_atlas_simulate": {"project": None, "case": "", "intervention": "", "detail": "count"},
+    "gemarc_atlas_doc": {"project": None, "unit": "system", "level": "BD", "lang": "", "chapter": "", "page": 0},
+    "gemarc_atlas_outline": {"root": None, "path": None, "offset": 0},
+    "gemarc_atlas_evidence": {"project": None, "ids": []},
+    "gemarc_atlas_build": {"project": None, "release": False, "docs": True, "gate": "none"},
+    "gemarc_atlas_verify": {"project": None, "widths": [1024, 1366, 1600]},
+}
+#: (readOnly, destructive, idempotent) of the new tools; destructive and idempotent only exist for write tools.
+DESIGN_HINTS = {
+    "gemarc_atlas_simulate": (False, False, True), "gemarc_atlas_doc": (True, None, None), "gemarc_atlas_outline": (True, None, None),
+    "gemarc_atlas_evidence": (False, False, True), "gemarc_atlas_build": (False, True, True), "gemarc_atlas_verify": (False, False, True),
+}
+
+
+class BatchThreeSurfaceTests(Base):
+    def test_the_local_set_is_the_twelve_design_tools_plus_the_review_tool_and_nothing_is_planned_any_more(self):
+        local = self.at.tool_names("atlas")
+        self.assertEqual(sorted(local), sorted(DESIGN_TOOLS + (self.at.REVIEW_TOOL,)))
+        self.assertEqual(len(local), 13)
+        self.assertEqual(self.at.tool_names("atlas_remote"), M2B_REMOTE, "atlas_remote stays the two read-only tools")
+        self.assertEqual((self.at.PLANNED_TOOLS, self.at.PENDING_TOOLS), ((), ()))
+        live = [t.name for t in self.live("atlas")[1]]
+        self.assertEqual(live, list(local))
+
+    def test_the_inputs_and_defaults_are_exactly_those_of_the_design_table(self):
+        by_name = {t.name: _dump(t)["inputSchema"] for t in self.live("atlas")[1]}
+        for name, expected in DESIGN_INPUTS.items():
+            schema = by_name[name]
+            self.assertEqual(sorted(schema["properties"]), sorted(expected), name)
+            self.assertEqual(sorted(schema.get("required", [])), sorted(k for k, v in expected.items() if v is None), name)
+            for key, default in expected.items():
+                if default is not None:
+                    self.assertEqual(schema["properties"][key].get("default"), default, f"{name}.{key}")
+        self.assertEqual(by_name["gemarc_atlas_verify"]["properties"]["widths"]["items"]["type"], "integer")
+        self.assertEqual(by_name["gemarc_atlas_evidence"]["properties"]["ids"]["items"]["type"], "string")
+
+    def test_the_hints_of_the_new_tools_are_honest(self):
+        specs = {s.name: s for s in self.at.tools_of("atlas")}
+        by_name = {t.name: _dump(t)["annotations"] for t in self.live("atlas")[1]}
+        for name, (read_only, destructive, idempotent) in DESIGN_HINTS.items():
+            hints = by_name[name]
+            self.assertIs(hints["readOnlyHint"], read_only, name)
+            self.assertIs(specs[name].write, not read_only, name)
+            if read_only:
+                self.assertNotIn("destructiveHint", hints)
+                self.assertNotIn("idempotentHint", hints)
+            else:
+                self.assertIs(hints["destructiveHint"], destructive, name)
+                self.assertIs(hints["idempotentHint"], idempotent, name)
+            self.assertIs(hints["openWorldHint"], False, name)
+
+    def test_the_write_tools_are_the_ones_that_write_files(self):
+        _, _, _, write = self.live("atlas")
+        self.assertEqual(write, {"gemarc_atlas_init", "gemarc_atlas_put", "gemarc_atlas_simulate", "gemarc_atlas_evidence", "gemarc_atlas_build",
+                                 "gemarc_atlas_verify", "gemarc_atlas_review"})
+
+    def test_the_list_budget_keeps_a_margin(self):
+        tools = self.live("atlas")[1]
+        size = len(json.dumps([_dump(t) for t in tools], ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+        self.assertLessEqual(size, LIST_BYTES)
+        print(f"\n[tools/list] 13 tools {size} B of {LIST_BYTES} B")
+        longest = max(len((t.description or "").encode("utf-8")) for t in tools)
+        self.assertLessEqual(longest, 400, "descriptions are about 300 B each; the details live in brief and ATLAS_TOOLS.md")
+
+    def test_the_bound_tools_run_inside_the_product_gate_context_and_nothing_else_does(self):
+        from gemarc_mcp.atlas import status as status_mod
+
+        seen = []
+        bound = self.at._bind(lambda: seen.append(status_mod.product_gates_active()) or {"status": "ok"}, lambda fn: fn())  # noqa: SLF001
+        self.assertFalse(status_mod.product_gates_active())
+        bound()
+        self.assertEqual((seen, status_mod.product_gates_active()), ([True], False))
+
+    def test_every_new_tool_has_a_section_a_row_and_is_cited_by_the_skill_and_the_prompt(self):
+        doc = _text(DOC)
+        skill = _text(SKILL_DIR / "SKILL.md")
+        prompt = self.at.create_prompt_local(requirement="x", project="desk")
+        for name in DESIGN_INPUTS:
+            self.assertIn(f"### `{name}`", doc, name)
+            self.assertIn(name, skill, name)
+            if name != "gemarc_atlas_outline":      # the prompt names the outline only through the brief (source reading)
+                self.assertIn(name, prompt, name)
+        self.assertIn("waive-browser.txt", doc)
+        self.assertIn("waive-browser.txt", skill)
+
+    def test_the_prompt_walks_the_gates_in_the_status_order_with_one_review(self):
+        text = self.at.create_prompt_local(requirement="x", project="desk")
+        positions = [text.index(f"gemarc_atlas_{name}(project") for name in ("simulate", "evidence", "build", "verify")]
+        self.assertEqual(positions, sorted(positions))
+        self.assertLess(positions[-1], text.index("gemarc_atlas_review(project"))
+        self.assertIn("SKIPPED", text)
+        self.assertIn("绝不写这个文件", text)
+        self.assertIn("oracle-sheet.md", text)
+        self.assertEqual(text.count("恰好一次"), 1)
+        self.assertIn("不得再开第二轮自审", text)
+        self.assertIn("这不是第二轮自审", text, "re-running the gates after a review fix is not a second review")
 
 
 if __name__ == "__main__":

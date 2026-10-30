@@ -174,6 +174,42 @@ register(Rule("RQ-001", 1, E, "add nodes=<ids> to the requirement so it is trace
 register(Rule("RQ-002", 1, I, _REF, "requirement and node coverage", modes=("full",)))
 
 
+# ---------------------------------------------------------------------------------------------------------------
+# Wave 2 (design 5.1): the rules that need the engine or the oracle ledger. The OR-, IV- and PT- rows live next to their
+# checks (``or_.py``, ``iv.py``, ``pt.py``); the case, machine and evidence rows are registered here.
+# ---------------------------------------------------------------------------------------------------------------
+
+register(Rule("CS-001", 2, E, "add edge {a} | <rel> | {b} (a runtime relation), or set edge=<id> on the event",
+              "every event is bound to a runtime edge (Unbound is an error)", cascade=("node", "edge"), binding=True))
+register(Rule("CS-005", 2, W, "{detail}", "category cover and renamed copies"))
+register(Rule("CS-008", 2, I, "give the events that expectations or delays name a ruleId", "events without a ruleId"))
+register(Rule("SM-004", 2, W, "merge the transitions or give them different targets", "no two transitions share the same from -> to pair"))
+register(Rule("SM-006", 2, W, "{detail}", "guard sweep: every guard can be satisfied and rejected, and the engine agrees with the table oracle",
+              modes=("full",)))
+register(Rule("SM-007", 2, W, "state {state} cannot reach a terminal state: add a closing transition or declare it terminal",
+              "every non-terminal state can reach a terminal state (machines that declare terminals)"))
+
+# Wave 3 rows whose findings come from the evidence verifier (``evidence.py``); the id and meaning of each come from its table.
+_EV_ROWS = {
+    "EV-003": (E, "anchor in range: the file, the anchor text and the cited range must agree"),
+    "EV-004": (I, "revision pin: the source root moved since the anchors were stamped"),
+    "EV-005": (W, "fingerprint stamp: the stamped block around the anchor changed"),
+    "EV-012": (W, "a user: anchor quotes text that is not in the saved requirement text"),
+}
+for _id, (_sev, _summary) in _EV_ROWS.items():
+    register(Rule(_id, 3, _sev, "{detail}", _summary, modes=("full",), source="evidence"))
+
+
+# Wave 3 build-time rows (M4). The findings come from ``build.vocab_findings`` while the page is built (they need the profile and
+# the card geometry, not the slices), so they run in no slice or full check: ``modes`` is ``("build",)``.
+register(Rule("RC-001", 3, W, "give each floor of a building its own level: two floors share level {level}, or the level is not a usable number",
+              "floor levels are unique numbers within a building", modes=("build",), source="build"))
+register(Rule("RC-002", 3, W, "use a kind or trust value of the profile: {value} is not known and is drawn with a neutral default",
+              "node kinds and trust values are known to the profile", modes=("build",), source="build"))
+register(Rule("LB-001", 3, I, "shorten the name of {id} (or accept the ellipsis): it does not fit its card label",
+              "node names fit the 2D card label", modes=("build",), source="build"))
+
+
 def _selfcheck() -> None:  # the registry is data, keep it honest at import time
     for r in REGISTRY.values():
         if len(r.hint) > dg.HINT_LIMIT:

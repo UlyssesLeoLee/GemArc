@@ -72,6 +72,9 @@ CODES = {
     "GL_ERROR": "GEMARC_GATE_020",
     "NO_DRAW": "GEMARC_GATE_021",
     "TAB_STATE": "GEMARC_GATE_022",
+    "FRAME_CLIPPED": "GEMARC_GATE_023",
+    "NODE_CLIPPED": "GEMARC_GATE_024",
+    "SCENE_SPARSE": "GEMARC_GATE_025",
 }
 
 # Minimal page used by calibrate(): reports the viewport and nothing else.
@@ -127,7 +130,8 @@ class GateResult:
     console: list[dict[str, Any]] = field(default_factory=list)
     attempts: int = 0
     process_failures: list[str] = field(default_factory=list)
-    seconds: float = 0.0
+    seconds: float = 0.0  # the LAST launch attempt
+    total_seconds: float = 0.0  # every attempt together (what the caller actually waited)
     spawn_seconds: float = 0.0
     leftovers: list[str] = field(default_factory=list)
     message: str = ""
@@ -150,6 +154,7 @@ class GateResult:
             "attempts": self.attempts,
             "processFailures": self.process_failures,
             "seconds": round(self.seconds, 3),
+            "totalSeconds": round(self.total_seconds, 3),
             "spawnSeconds": round(self.spawn_seconds, 3),
             "leftovers": self.leftovers,
             "message": self.message,
@@ -564,6 +569,64 @@ def _canvas_findings(
     return out
 
 
+def _scene_findings(rec: Mapping[str, Any], tab: str, clip_px: float, occupancy_min: float) -> list[Finding]:
+    """Verdicts on the projected scene geometry of one tab (3D, 4D, 5D): frames and nodes inside the canvas, and the occupancy.
+
+    ``rec["scene"]`` is what the page's ``sceneBounds(tab)`` hook returned (frames ``{id, x, y, w, h}`` and nodes ``{id, x, y}`` in CSS
+    pixels from the canvas corner; a null ``w``, ``h``, ``x`` or ``y`` means "behind the camera or not finite") and
+    ``rec["sceneCanvas"]`` the CSS size of the visible ``data-gate=canvas`` element, which the self-test measured itself. A tab whose hook
+    returned nothing has no scene and nothing is judged. Occupancy is the area of the bounding box of the nodes over the area of the
+    bounding box of the frames; a scene that fills less than ``occupancy_min`` of its frames is "nodes in huge frames".
+    A hook may say ``"occupancy": false`` for a tab whose frames are not meant to be filled (the 4D and 5D stages frame whole rooms): only
+    the occupancy is skipped, the inside-the-canvas tests always run."""
+    scene = rec.get("scene")
+    if scene is None:
+        return []
+    if rec.get("sceneError"):
+        return [Finding("RENDER", f"sceneBounds hook threw: {rec.get('sceneError')}", tab)]
+    if not isinstance(scene, dict) or not isinstance(scene.get("frames"), list) or not isinstance(scene.get("nodes"), list):
+        return [Finding("BAD_RESULT", "sceneBounds did not return {frames: [...], nodes: [...]}", tab)]
+    box = rec.get("sceneCanvas")
+    width, height = (_num(box.get("w")), _num(box.get("h"))) if isinstance(box, dict) else (None, None)
+    if width is None or height is None or not (width > 0 and height > 0):
+        return [Finding("FRAME_CLIPPED", "scene bounds were reported but no visible canvas marked data-gate=canvas could be measured", tab)]
+    out: list[Finding] = []
+
+    def inside(x: float, y: float) -> bool:
+        return -clip_px <= x <= width + clip_px and -clip_px <= y <= height + clip_px
+
+    bad_frames = []
+    frame_boxes = []
+    for frame in scene["frames"]:
+        x, y, w, h = (_num(frame.get("x")), _num(frame.get("y")), _num(frame.get("w")), _num(frame.get("h"))) if isinstance(frame, dict) else (None,) * 4
+        if None in (x, y, w, h) or not (inside(x, y) and inside(x + w, y + h)):
+            bad_frames.append(str(frame.get("id")) if isinstance(frame, dict) else "?")
+        else:
+            frame_boxes.append((x, y, x + w, y + h))
+    if bad_frames:
+        out.append(Finding("FRAME_CLIPPED", f"{len(bad_frames)} projected frame(s) leave the {width:g} x {height:g} canvas by more than {clip_px:g}px, first: {bad_frames[:3]}", tab))
+    points = []  # (x0, y0, x1, y1) of each node: a node is not a point, it has the projected radius `r` the page reports (missing: 0)
+    bad_nodes = []
+    for node in scene["nodes"]:
+        x, y = (_num(node.get("x")), _num(node.get("y"))) if isinstance(node, dict) else (None, None)
+        if x is None or y is None or not inside(x, y):
+            bad_nodes.append(str(node.get("id")) if isinstance(node, dict) else "?")
+        else:
+            r = max(0.0, _num(node.get("r")) or 0.0)
+            points.append((x - r, y - r, x + r, y + r))
+    if bad_nodes:
+        out.append(Finding("NODE_CLIPPED", f"{len(bad_nodes)} projected node(s) leave the {width:g} x {height:g} canvas by more than {clip_px:g}px, first: {bad_nodes[:3]}", tab))
+    if frame_boxes and not bad_frames:
+        frame_area = (max(b[2] for b in frame_boxes) - min(b[0] for b in frame_boxes)) * (max(b[3] for b in frame_boxes) - min(b[1] for b in frame_boxes))
+        if not points:
+            out.append(Finding("SCENE_SPARSE", "frames are projected but no node is", tab))
+        elif frame_area > 0 and occupancy_min > 0 and scene.get("occupancy") is not False:
+            node_area = (max(p[2] for p in points) - min(p[0] for p in points)) * (max(p[3] for p in points) - min(p[1] for p in points))
+            if node_area / frame_area < occupancy_min:
+                out.append(Finding("SCENE_SPARSE", f"the nodes fill {node_area / frame_area:.3f} of the area of their frames (floor {occupancy_min:g}): nodes in huge frames", tab))
+    return out
+
+
 def evaluate(
     result: Mapping[str, Any],
     target_width: int,
@@ -574,6 +637,7 @@ def evaluate(
     require_renderer: str | None = None,
     require_header: bool = True,
     expected_nonce: str | None = None,
+    scan_text: bool = True,
 ) -> list[Finding]:
     """All assertions, from the raw measurements. An empty list is the only PASS.
 
@@ -584,6 +648,8 @@ def evaluate(
         False is the explicit opt-out for pages that have no header.
     expected_nonce: when given, a result whose nonce differs was not produced by this launch's
         self-test and nothing else in it is trusted.
+    scan_text: False is the explicit opt-out of the undefined/NaN/[object scan (a page whose visible prose must
+        say those words and cannot list them through the textAllow hook).
     """
     thresholds = calibration.get("thresholds", {})
     overlap_max = float(thresholds.get("headerOverlapPx", 2))
@@ -592,6 +658,8 @@ def evaluate(
     renderer_needle = (
         require_renderer if require_renderer is not None else str(calibration.get("gl", {}).get("rendererSubstring", ""))
     )
+    clip_px = float(thresholds.get("sceneClipPx", 2))
+    occupancy_min = float(thresholds.get("sceneOccupancyMin", 0))
     out: list[Finding] = []
 
     if expected_nonce is not None and result.get("nonce") != expected_nonce:
@@ -709,10 +777,11 @@ def evaluate(
         fit = rec.get("fit")
         if isinstance(fit, dict) and fit.get("clipped"):
             out.append(Finding("FIT_CLIPPED", f"[data-gate=fit] elements clipped: {fit.get('clipped')}", tab))
-        if rec.get("textBad"):
+        if scan_text and rec.get("textBad"):
             out.append(Finding("TEXT_BAD", f"text or title/aria-label/alt contains undefined/NaN/[object: {rec.get('textBad')}", tab))
         if not rec.get("walkerError"):
             out.extend(_canvas_findings(rec.get("canvases"), rec.get("draws"), tab, floor, renderer_needle))
+            out.extend(_scene_findings(rec, tab, clip_px, occupancy_min))
         if check_state:
             state = rec.get("state")
             if state is None:
@@ -849,6 +918,8 @@ def run_gate(
     require_renderer: str | None = None,
     require_header: bool = True,
     calibration: Mapping[str, Any] | None = None,
+    scan_text: bool = True,
+    retry_on_timeout: bool = True,
 ) -> GateResult:
     """Run the gate once at one target innerWidth. Never raises for page problems.
 
@@ -856,7 +927,8 @@ def run_gate(
     the header check is on unless require_header=False. inline_selftest is for self-contained
     fixtures only (the assembled copy lives in a temporary directory, relative assets would not be
     found there). Every launch attempt gets its own random nonce, so a retry can never accept the
-    DOM of an earlier attempt."""
+    DOM of an earlier attempt. ``scan_text=False`` turns the undefined/NaN/[object scan off; ``retry_on_timeout=False`` makes a timed-out
+    launch final (a second launch on a loaded machine only repeats it)."""
     page = pathlib.Path(page)
     calibration = calibration if calibration is not None else load_calibration()
     limits = calibration.get("limits", {})
@@ -908,6 +980,7 @@ def run_gate(
                     result.leftovers.append(str(profile))
             result.attempts = attempt + 1
             result.seconds = launch.seconds
+            result.total_seconds += launch.seconds
             result.spawn_seconds = launch.spawn_seconds
             reason = process_failure_reason(launch)
             if reason is None:
@@ -915,6 +988,8 @@ def run_gate(
             result.process_failures.append(reason)
             if launch.error:
                 break  # the browser cannot be started; another attempt would fail the same way
+            if launch.timed_out and not retry_on_timeout:
+                break
         if reason is not None or launch is None:
             result.findings = [Finding("PROCESS", f"{len(result.process_failures)} launch(es) failed: {'; '.join(result.process_failures)}")]
             result.message = str(result.findings[0])
@@ -939,6 +1014,7 @@ def run_gate(
             require_renderer=require_renderer,
             require_header=require_header,
             expected_nonce=nonce,
+            scan_text=scan_text,
         )
         result.status = "PASS" if not result.findings else "FAIL"
         result.message = "; ".join(str(f) for f in result.findings) if result.findings else "all assertions passed"
@@ -954,6 +1030,99 @@ def run_widths(
     **kwargs: Any,
 ) -> list[GateResult]:
     return [run_gate(page, int(w), **kwargs) for w in widths]
+
+
+DEFAULT_WIDTHS = (1024, 1366, 1600)
+#: Wall-clock limit per launch on the tool path (build gate=smoke, verify). A good launch is 2 to 3 s on an idle machine and about 23 s at
+#: worst with eight launches in parallel; a machine with as many busy processes as cores goes past 30 s (a cliff, measured). The page's own
+#: time is bounded by the virtual-time budget, so a larger wall limit costs nothing on a good page.
+VERIFY_TIMEOUT_SECONDS = 90.0
+
+
+def summarize_result(result: GateResult) -> dict[str, Any]:
+    """One width of a verdict as plain data (what the build and verify tools report)."""
+    raw = result.result or {}
+    tabs = [str(t.get("tab")) for t in raw.get("tabs", []) if isinstance(t, dict)]
+    steps = [s for s in raw.get("steps", []) if isinstance(s, dict)]
+    status, message = result.status, result.message
+    if is_inconclusive(result):
+        status = "INCONCLUSIVE"
+        message = (f"INCONCLUSIVE, not a pass and not a page defect: the browser did not finish within {result.total_seconds / max(1, result.attempts):.0f} s "
+                   "(a loaded machine does this); run it again when the machine is idle; if it times out again on an idle machine, the page itself hangs. " + result.message)
+    return {
+        "width": result.width,
+        "status": status,
+        "codes": result.codes,
+        "findings": [f.as_dict() for f in result.findings],
+        "innerWidth": raw.get("innerWidth"),
+        "tabs": tabs,
+        "steps": {"ok": sum(1 for s in steps if s.get("ok")), "total": len(steps)},
+        "stepNames": [str(s.get("name")) for s in steps],
+        "seconds": round(result.total_seconds, 2),
+        "attempts": result.attempts,
+        "message": message,
+    }
+
+
+def is_inconclusive(result: GateResult) -> bool:
+    """A width whose ONLY failure is that every launch timed out: the page was never judged (load on the machine, not a measurement of
+    the page). It is still not a PASS."""
+    return (result.status == "FAIL" and result.codes == ["PROCESS"] and bool(result.process_failures)
+            and all(reason.startswith("timeout") for reason in result.process_failures))
+
+
+def verify_gate(
+    page: pathlib.Path | str,
+    widths: Sequence[int] = DEFAULT_WIDTHS,
+    *,
+    browser: Browser | None = None,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """The gate of a built page at several widths (one launch per width), as one verdict. Fail-closed.
+
+    ``status``: ``PASS`` only when every width passed; ``SKIP`` when no browser was found (loud: ``message`` says it was NOT
+    verified, and a SKIP is never counted as a pass); ``FAIL`` otherwise, including an unexpected exception at any width.
+    ``INCONCLUSIVE`` (when nothing FAILED and no width was SKIPPED) means a launch timed out on a loaded machine: not a pass, not a page defect.
+    The browser is looked up once. ``kwargs`` go to ``run_gate`` (``tmp_root``, ``retries``, ``require_header`` ...); the wall-clock limit per
+    launch is :data:`VERIFY_TIMEOUT_SECONDS` unless ``timeout`` is given (virtual time, not wall time, bounds a good page), and a timeout is
+    not retried."""
+    widths = tuple(int(w) for w in widths)
+    if not widths:
+        raise ValueError("verify_gate needs at least one width")
+    browser = browser or find_browser()
+    kwargs.setdefault("timeout", VERIFY_TIMEOUT_SECONDS)
+    kwargs.setdefault("retry_on_timeout", False)
+    rows: list[dict[str, Any]] = []
+    if browser is None:
+        message = no_browser_message()
+        rows = [{"width": w, "status": "SKIP", "codes": ["NO_BROWSER"], "findings": [Finding("NO_BROWSER", "no Edge or Chrome found").as_dict()],
+                 "innerWidth": None, "tabs": [], "steps": {"ok": 0, "total": 0}, "seconds": 0.0, "attempts": 0, "message": message} for w in widths]
+        return {"status": "SKIP", "widths": rows, "lines": [f"SKIP {w}: no browser; the gate was NOT run (a skip is not a pass)" for w in widths],
+                "browser": None, "message": message}
+    for w in widths:
+        try:
+            rows.append(summarize_result(run_gate(page, w, browser=browser, **kwargs)))
+        except Exception as exc:  # fail closed: a crash of the runner is a failed gate, never a pass
+            rows.append({"width": w, "status": "FAIL", "codes": ["PROCESS"], "findings": [Finding("PROCESS", f"runner error {type(exc).__name__}: {exc}"[:200]).as_dict()],
+                         "innerWidth": None, "tabs": [], "steps": {"ok": 0, "total": 0}, "seconds": 0.0, "attempts": 0, "message": f"runner error {type(exc).__name__}"})
+    if any(r["status"] == "SKIP" for r in rows):
+        status = "SKIP"
+    elif any(r["status"] == "FAIL" for r in rows):
+        status = "FAIL"
+    elif any(r["status"] == "INCONCLUSIVE" for r in rows):
+        status = "INCONCLUSIVE"
+    else:
+        status = "PASS"
+    lines = []
+    for r in rows:
+        head = f"{r['status']} {r['width']}"
+        if r["status"] == "PASS":
+            lines.append(f"{head}: {len(r['tabs'])} tabs, {r['steps']['ok']}/{r['steps']['total']} steps, {r['seconds']} s")
+        elif r["status"] == "INCONCLUSIVE":
+            lines.append(f"{head}: the browser timed out after {r['seconds']} s: NOT verified, no page defect found; run again when the machine is idle")
+        else:
+            lines.append(f"{head}: {', '.join(f['code'] + ' ' + f['name'] for f in r['findings'][:3]) or r['message']}"[:200])
+    return {"status": status, "widths": rows, "lines": lines, "browser": {"family": browser.family, "version": browser.version}, "message": ""}
 
 
 def calibrate(
@@ -1054,6 +1223,7 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         help="override gl.rendererSubstring of calibration.json (WebGL canvases must report it); empty string = off",
     )
     parser.add_argument("--no-header", action="store_true", help="explicit opt-out: the page has no [data-gate=header] element")
+    parser.add_argument("--no-text-scan", action="store_true", help="explicit opt-out of the undefined/NaN/[object text scan")
     parser.add_argument("--json", action="store_true", help="print one JSON object per width")
     parser.add_argument("--calibrate", action="store_true", help="measure window offsets for this browser and print JSON")
     return parser.parse_args(argv)
@@ -1108,11 +1278,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             non_bg_floor=args.non_bg_floor,
             require_renderer=args.require_renderer,
             require_header=not args.no_header,
+            scan_text=not args.no_text_scan,
         )
         if args.json:
             print(json.dumps(res.as_dict(), ensure_ascii=False))
         else:
-            print(f"{res.status} width={width} window={res.window} t={res.seconds:.2f}s attempts={res.attempts}: {res.message}")
+            print(f"{res.status} width={width} window={res.window} t={res.total_seconds:.2f}s attempts={res.attempts}: {res.message}")
             for finding in res.findings:
                 print(f"  - {finding}")
         worst = max(worst, {"PASS": 0, "FAIL": 1, "SKIP": 3}[res.status])

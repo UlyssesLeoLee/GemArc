@@ -6,6 +6,7 @@ example-workspace/
 *.egg-info/
 build/
 dist/
+!src/gemarc_mcp/atlas/viewer/dist/
 .vercel/
 .vercel
 .env*

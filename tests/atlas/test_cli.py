@@ -213,7 +213,8 @@ class LendingDeskSessionTests(Base):
         reply, code, _ = self.proc("put", "lending-desk", "30-policy", "-", stdin=POLICY.encode("utf-8"))
         self.assertEqual((reply["status"], code), ("committed", 0), reply)
         statuses.append(self.proc("status", "lending-desk")[0])
-        self.assertEqual(statuses[-1]["phase"], "review")
+        self.assertEqual(statuses[-1]["phase"], "needs-user", statuses[-1])    # the shell applies the product gates: no evidence root yet
+        self.assertFalse(statuses[-1]["done"])
         again, code, _ = self.proc("put", "lending-desk", "30-policy", "-", stdin=POLICY.encode("utf-8"))
         self.assertEqual((again["unchanged"], again["sha8"], code), (True, reply["sha8"], 0))
         edited, code, _ = self.proc("put", "lending-desk", "30-policy", "--base", reply["sha8"], "-",
@@ -226,7 +227,7 @@ class LendingDeskSessionTests(Base):
         full, code, _ = self.proc("check", "lending-desk", "--mode", "full")
         self.assertEqual((full["clean"], code), (True, 0), full)
         final, code, _ = self.proc("status", "lending-desk")
-        self.assertEqual(final["phase"], "review")
+        self.assertEqual(final["phase"], "needs-user")
         self.assertFalse(final["done"])
         nodes, code, _ = self.proc("index", "lending-desk", "--with-edges")
         self.assertEqual((nodes["total"], code), (7, 0), nodes)   # 4 nodes and their 3 edges

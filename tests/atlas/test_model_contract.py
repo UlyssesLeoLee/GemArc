@@ -1709,5 +1709,155 @@ class ProfileHardeningTests(unittest.TestCase):
             self.assertIn(name, row)
 
 
+class EncodingIssueTests(unittest.TestCase):
+    """A lone UTF-16 surrogate (GEMARC_ATLAS_MODEL_012) and a non-finite number (GEMARC_ATLAS_MODEL_013) anywhere in a model.
+
+    Both make ``canonical_bytes`` / ``model_sha`` and every UTF-8 file write fail, so the gate must name them.
+    """
+
+    LONE = "x" + chr(0xD800) + "y"  # written with chr(): this file itself must stay encodable
+
+    def issues_of(self, mutate):
+        model = rich_model()
+        mutate(model)
+        return model, am.contract_issues(model)
+
+    def codes_at(self, issues, code: str) -> list[str]:
+        return [i["path"] for i in issues if i["code"] == code]
+
+    def test_the_two_codes_are_new_and_distinct(self):
+        self.assertEqual(am.E_SURROGATE, "GEMARC_ATLAS_MODEL_012")
+        self.assertEqual(am.E_NONFINITE, "GEMARC_ATLAS_MODEL_013")
+        old = {am.E_BAD_PART, am.E_BAD_ARG, am.E_SHAPE, am.E_FIELD, am.E_ID, am.E_DUP, am.E_ENUM, am.E_REF, am.E_DERIVED, am.E_CLAIM, am.E_MACHINE}
+        self.assertFalse({am.E_SURROGATE, am.E_NONFINITE} & old)
+
+    def test_a_clean_model_has_neither_issue(self):
+        self.assertEqual(am.contract_issues(rich_model()), [])
+        self.assertEqual(am.contract_issues(lending_model()), [])
+
+    def test_a_surrogate_in_every_free_text_field_class_is_reported_at_its_path(self):
+        lone = self.LONE
+        cases = {
+            "$.meta.title": lambda m: m["meta"].__setitem__("title", lone),
+            "$.space.buildings[0].name": lambda m: m["space"]["buildings"][0].__setitem__("name", lone),
+            "$.space.floors[0].name": lambda m: m["space"]["floors"][0].__setitem__("name", lone),
+            "$.space.rooms[0].name": lambda m: m["space"]["rooms"][0].__setitem__("name", lone),
+            "$.nodes[0].name": lambda m: m["nodes"][0].__setitem__("name", lone),
+            "$.nodes[0].sub": lambda m: m["nodes"][0].__setitem__("sub", lone),
+            "$.nodes[0].props.tier": lambda m: m["nodes"][0]["props"].__setitem__("tier", lone),
+            "$.edges[0].label": lambda m: m["edges"][0].__setitem__("label", lone),
+            "$.evidences[0].filePath": lambda m: m["evidences"][0].__setitem__("filePath", lone),
+            "$.evidences[0].anchor": lambda m: m["evidences"][0].__setitem__("anchor", lone),
+            "$.evidences[0].topic": lambda m: m["evidences"][0].__setitem__("topic", lone),
+            "$.machines[0].errorCode": lambda m: m["machines"][0].__setitem__("errorCode", lone),
+            "$.cases[0].title": lambda m: m["cases"][0].__setitem__("title", lone),
+            "$.cases[0].context.locale": lambda m: m["cases"][0]["context"].__setitem__("locale", lone),
+            "$.interventions[0].description": lambda m: m["interventions"][0].__setitem__("description", lone),
+            "$.requirements[0].title": lambda m: m["requirements"][0].__setitem__("title", lone),
+            "$.tests[0].title": lambda m: m["tests"][0].__setitem__("title", lone),
+            "$.tbds[0].decision": lambda m: m["tbds"][0].__setitem__("decision", lone),
+            "$.policies[0].text": lambda m: m["policies"][0].__setitem__("text", lone),
+        }
+        for path, mutate in cases.items():
+            model, issues = self.issues_of(mutate)
+            self.assertIn(path, self.codes_at(issues, am.E_SURROGATE), f"{path}: {issues[:3]}")
+            self.assertEqual(self.codes_at(issues, am.E_NONFINITE), [], path)
+            for issue in issues:
+                issue["path"].encode("utf-8")
+                issue["message"].encode("utf-8")  # an issue must be printable and writable itself
+
+    def test_the_surrogate_is_found_in_an_id_a_list_item_and_an_object_key(self):
+        _, issues = self.issues_of(lambda m: m["nodes"][0].__setitem__("evidenceIds", ["EVD-1", self.LONE]))
+        self.assertIn("$.nodes[0].evidenceIds[1]", self.codes_at(issues, am.E_SURROGATE))
+        _, issues = self.issues_of(lambda m: m["nodes"][0].__setitem__("id", self.LONE))
+        self.assertIn("$.nodes[0].id", self.codes_at(issues, am.E_SURROGATE))
+        _, issues = self.issues_of(lambda m: m["nodes"][0]["props"].__setitem__("k" + chr(0xDC00), "v"))
+        paths = self.codes_at(issues, am.E_SURROGATE)
+        self.assertEqual(len(paths), 1)
+        self.assertTrue(paths[0].startswith("$.nodes[0].props["), paths)
+        paths[0].encode("utf-8")
+        self.assertNotIn(chr(0xDC00), paths[0])
+
+    def test_both_halves_of_a_pair_split_apart_are_lone_but_a_real_pair_is_fine(self):
+        for text in (chr(0xDC00) + "a", "a" + chr(0xDBFF)):
+            _, issues = self.issues_of(lambda m, t=text: m["nodes"][0].__setitem__("sub", t))
+            self.assertIn("$.nodes[0].sub", self.codes_at(issues, am.E_SURROGATE))
+        astral = "ok \U0001F600 中文"  # a real astral character is one code point, not a surrogate
+        _, issues = self.issues_of(lambda m: m["nodes"][0].__setitem__("sub", astral))
+        self.assertEqual(issues, [])
+        am.model_sha(rich_model())
+
+    def test_a_non_finite_number_inside_nested_options_and_params_is_reported(self):
+        bad = {"inf": float("inf"), "-inf": float("-inf"), "nan": float("nan")}
+        for name, value in bad.items():
+            def put(m, v=value):
+                m["cases"][0]["events"][1]["latencyMs"] = v
+                m["cases"][0]["events"][5]["params"]["deep"] = {"list": [1, {"x": v}]}
+                m["nodes"][0]["props"]["dedup"]["httpStatus"] = v
+                m["interventions"][1]["element"]["resourceLimits"]["maxHops"] = v
+                m["cases"][0]["policy"]["timeoutMs"] = v
+            _, issues = self.issues_of(put)
+            paths = self.codes_at(issues, am.E_NONFINITE)
+            for expected in ("$.cases[0].events[1].latencyMs", "$.cases[0].events[5].params.deep.list[1].x",
+                             "$.nodes[0].props.dedup.httpStatus", "$.interventions[1].element.resourceLimits.maxHops",
+                             "$.cases[0].policy.timeoutMs"):
+                self.assertIn(expected, paths, f"{name}: {paths}")
+            self.assertEqual(self.codes_at(issues, am.E_SURROGATE), [], name)
+
+    def test_a_finite_float_and_a_bool_are_not_reported(self):
+        def put(m):
+            m["cases"][0]["events"][1]["latencyMs"] = 12.5
+            m["nodes"][0]["props"]["flag"] = True
+        _, issues = self.issues_of(put)
+        self.assertEqual([i for i in issues if i["code"] in (am.E_SURROGATE, am.E_NONFINITE)], [])
+
+    def test_a_non_finite_number_in_a_top_level_field_and_a_tuple_is_reported(self):
+        _, issues = self.issues_of(lambda m: m["space"]["floors"][0].__setitem__("level", float("nan")))
+        self.assertIn("$.space.floors[0].level", self.codes_at(issues, am.E_NONFINITE))
+        _, issues = self.issues_of(lambda m: m["nodes"][0]["props"].__setitem__("pair", (1, float("inf"))))
+        self.assertIn("$.nodes[0].props.pair[1]", self.codes_at(issues, am.E_NONFINITE))
+
+    def test_what_the_gate_accepts_can_be_hashed_and_what_it_names_could_not(self):
+        model = rich_model()
+        self.assertEqual(am.contract_issues(model), [])
+        self.assertEqual(len(am.model_sha(model)), 64)
+        for mutate in (lambda m: m["nodes"][0].__setitem__("sub", self.LONE),
+                       lambda m: m["nodes"][0]["props"].__setitem__("x", float("nan"))):
+            bad, issues = self.issues_of(mutate)
+            self.assertTrue({am.E_SURROGATE, am.E_NONFINITE} & {i["code"] for i in issues})
+            with self.assertRaises((am.AtlasModelError, UnicodeEncodeError)):
+                am.model_sha(bad)
+
+    def test_existing_codes_keep_their_meaning_next_to_the_new_ones(self):
+        def put(m):
+            m["nodes"][0]["name"] = self.LONE
+            m["nodes"][1]["kind"] = "Teapot"
+        _, issues = self.issues_of(put)
+        codes = {i["code"] for i in issues}
+        self.assertIn(am.E_SURROGATE, codes)
+        self.assertIn(am.E_ENUM, codes)
+
+    def test_the_report_is_capped_per_code_and_says_how_many_more(self):
+        def put(m):
+            m["nodes"][0]["props"]["many"] = [float("inf")] * 250
+            m["nodes"][1]["props"]["many"] = [self.LONE] * 250
+        _, issues = self.issues_of(put)
+        for code in (am.E_NONFINITE, am.E_SURROGATE):
+            listed = [i for i in issues if i["code"] == code]
+            self.assertEqual(len(listed), 101, code)
+            self.assertIn("150 more", listed[-1]["message"])
+            self.assertEqual(listed[-1]["path"], "$")
+
+    def test_a_hostile_value_inside_a_deep_but_legal_nest_never_raises(self):
+        value: object = float("nan")
+        for _ in range(am.MAX_NESTING - 12):
+            value = [value]
+        model = rich_model()
+        model["nodes"][0]["props"]["deep"] = value
+        issues = am.contract_issues(model)
+        self.assertTrue(any(i["code"] == am.E_NONFINITE for i in issues), issues[:3])
+        self.assertFalse(any("internal checker error" in i["message"] for i in issues))
+
+
 if __name__ == "__main__":
     unittest.main()

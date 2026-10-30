@@ -619,11 +619,20 @@ class _Generator:
                 out.append(pick)
         return out
 
-    def _verification_override(self, rng: Rng, default: str) -> str | None:
+    def _verification_override(self, rng: Rng, default: str, evidence_ids: Iterable[str] = ()) -> str | None:
+        """A random authored downgrade of the default level.
+
+        ``Designed`` on an item that has source-code evidence is rule EV-002 (WARN) by design, so such an item never gets it:
+        the draw is still made (the random stream, and with it every other generated value, stays unchanged) and a ``Designed``
+        result becomes ``Inferred``.
+        """
         if not rng.chance(self.s.override_share):
             return None
         if default == "Implemented":
-            return rng.choice(("Designed", "Inferred"))
+            pick = rng.choice(("Designed", "Inferred"))
+            if pick == "Designed" and "source-code" in self.ev_kinds(evidence_ids):
+                return "Inferred"
+            return pick
         if default == "Designed":
             return "Inferred"
         return None
@@ -654,7 +663,7 @@ class _Generator:
                 evidence_ids = []
                 default = am.default_verification_for_node([], self.mode, profile=self.profile)
             node = am.build_node(
-                node_id, kind, name, room["id"], sub, evidence_ids, self._verification_override(rng, default), props,
+                node_id, kind, name, room["id"], sub, evidence_ids, self._verification_override(rng, default, evidence_ids), props,
                 rng.choice(GROUPS) if rng.chance(s.group_share) else None, "DD" if (kind == "Module" and rng.chance(0.02)) else None,
                 evidence_kinds=self.ev_kinds(evidence_ids), mode=self.mode, room=room, building=building, profile=self.profile)
             self._add_node(node)
@@ -809,7 +818,7 @@ class _Generator:
             default = am.default_verification_for_edge(self.ev_kinds(evidence_ids), self.mode, inherited, profile=self.profile)
             card = rng.choice(("N:1", "1:N", "N:N", "1:0..1")) if relation == "references" else None
             edge = am.build_edge(
-                source["id"], relation, target["id"], t.label(s.label_len), evidence_ids, self._verification_override(rng, default), card,
+                source["id"], relation, target["id"], t.label(s.label_len), evidence_ids, self._verification_override(rng, default, evidence_ids), card,
                 rng.choice(GROUPS) if rng.chance(s.group_share * 0.5) else None, alias, evidence_kinds=self.ev_kinds(evidence_ids),
                 inherited=inherited, machine_ids=self.machine_ids, mode=self.mode, profile=self.profile)
             authored.append(edge)

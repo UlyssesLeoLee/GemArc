@@ -1636,6 +1636,10 @@ def _check_element(c: _Checker, r: Mapping, path: str, ctx: _Ctx, elements: dict
     else:
         elements[element_id] = element
     c.enum("elementKinds", element.get("kind"), f"{path}.element.kind")
+    if "latencyMs" in element:
+        lat = element["latencyMs"]
+        if lat is not None and (isinstance(lat, bool) or not isinstance(lat, (int, float)) or lat != lat or lat in (float("inf"), float("-inf")) or lat < 0):
+            c.add(E_FIELD, f"{path}.element.latencyMs", "must be a finite non-negative number")
     for handler in element.get("eventHandlers", []) if isinstance(element.get("eventHandlers"), list) else []:
         if isinstance(handler, dict) and handler.get("do") not in p.enums["handlerActions"]:
             c.add(E_ENUM, f"{path}.element.eventHandlers", f"action {handler.get('do')!r} not in enums.handlerActions")

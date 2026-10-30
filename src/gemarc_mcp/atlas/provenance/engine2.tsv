@@ -1,0 +1,9 @@
+path	origin	reference_unit	treatment	deviations
+src/gemarc_mcp/atlas/engine/sweep.py	clean-room	guard scan	Generic guard scan written from the design: variables and complete candidate pools derived from the guard itself (literals, empty, null, missing, fresh strings), exhaustive search judged by the engine interpreter, never-satisfiable and always-true findings per guard and branch, engine probe of every guarded transition; no hard-coded value table	none
+src/gemarc_mcp/atlas/engine/mutate.py	clean-room	mutant check	Deterministic mutants per case (single-participant disable for the highest-degree participants, single-event deletion spread over the case), expectation-set violation check and kill counts, written from the design text of the kill-rate rule	none
+src/gemarc_mcp/atlas/engine/elements.py	clean-room	element templates	Loader, builder and completion of inserted-element bodies from the template data (use=<kind>), port derivation through the model helpers, template-aware compile and simulate wrappers	none
+src/gemarc_mcp/atlas/derive/templates/elements.json	clean-room	element templates	One generic body per element kind of the vocabulary profile (role, state machine, handlers, limits); original data, no reference values	none
+tests/atlas/test_engine_sweep.py	new	-	Hand vectors for the synthesis, the guard vectors of the engine fixtures, planted dead and always-true guards, engine probe and its mutation check	-
+tests/atlas/test_engine_mutants.py	new	-	Hand-computed mutant lists, caps, determinism and kill semantics on the synthetic lending-desk fixture	-
+tests/atlas/test_engine_elements.py	new	-	Template coverage of every element kind, hygiene, contract and engine validity, equivalence with the authored element fixture, expander wiring	-
+tests/atlas/test_engine_perf.py	new	-	Timing budgets of the verdict-style and build-style runs on the reference-scale synthetic model	-

@@ -1,0 +1,26 @@
+# GemArc Atlas, local stdio, tool set "atlas" (the authoring tools).
+# Append to ~/.codex/config.toml (or to .codex/config.toml of a trusted project).
+# Replace <repo> with the folder of this repository (the one with .venv) and <workspace> with an EXISTING empty folder
+# that is NOT inside any repository you analyse: the atlas projects are written there.
+# The server name differs from the v1 entry ("gemarc"), so both can be configured side by side.
+
+[mcp_servers.gemarc_atlas]
+command = '<repo>\.venv\Scripts\python.exe'
+args = ["-m", "gemarc_mcp"]
+startup_timeout_sec = 30
+tool_timeout_sec = 120
+
+[mcp_servers.gemarc_atlas.env]
+GEMARC_TOOLSET = "atlas"
+GEMARC_WORKSPACE_ROOT = '<workspace>'
+# 1 lets the model write atlas projects into <workspace> only (gemarc_atlas_init, gemarc_atlas_put); 0 makes it read-only.
+GEMARC_ALLOW_WRITE = "1"
+# Where the cited source files live: alias=path, separated by ";". The model can only name the alias.
+GEMARC_ATLAS_ROOTS = 'main=<repo>'
+PYTHONUTF8 = "1"
+
+# Approval: by default Codex asks before a tool unless readOnlyHint is true or
+# (destructiveHint = false and openWorldHint = false). gemarc_atlas_put is destructive (a replace archives the previous
+# version, a patch deletes rows), so it prompts; gemarc_atlas_init runs without a prompt. To make init ask too, uncomment:
+# [mcp_servers.gemarc_atlas.tools.gemarc_atlas_init]
+# approval_mode = "prompt"

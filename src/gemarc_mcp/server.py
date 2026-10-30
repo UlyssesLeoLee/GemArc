@@ -7,6 +7,9 @@ Two tool sets share one implementation:
 ``stateless``  only the tools that take the model as an argument and keep no
                state. The default for a remote (Vercel) deployment, where there
                is no durable filesystem and no caller identity.
+``atlas``      the GemArc Atlas authoring tools (``atlas_tools.py``), local stdio.
+``atlas_remote``  the two read-only Atlas tools (work order, grammar lint) for a
+               remote deployment. One tool set per server process.
 
 Tool names use ``[a-z0-9_]`` only. Claude, OpenAI-style function calling (Codex)
 and most agent frameworks restrict function names to ``[a-zA-Z0-9_-]{1,64}``;
@@ -20,7 +23,7 @@ from .paths import Workspace, GemArcError, safe_response, digest
 from . import service, simulation, stateless, __version__
 from . import model as model_lib
 
-TOOLSETS = ("full", "stateless")
+TOOLSETS = ("full", "stateless", "atlas", "atlas_remote")
 
 #: Tools that mutate the workspace. The flag is declared on the registration
 #: itself, so the server and the web console can never disagree about which
@@ -36,6 +39,17 @@ INSTRUCTIONS = (
     "Never invent facts: every node and edge must point at evidence, otherwise mark it Unknown. "
     "Simulation output is only as strong as the evidence class of its scenario. "
     "只使用已授权工作区；事实不可臆造；模拟输出必须标注证据等级。"
+)
+
+
+#: Instructions of the Atlas tool sets (the client shows at most 4096 characters of them).
+ATLAS_INSTRUCTIONS = (
+    "GemArc Atlas: you write only FACTS in a compact validated text format; tested code derives and checks everything else. "
+    "Start with gemarc_atlas_brief (the work order). To create a design end to end use the prompt gemarc-atlas-create, "
+    "or: gemarc_atlas_init once, then repeat gemarc_atlas_status(view=next) -> gemarc_atlas_put one slice -> repair a red draft "
+    "with gemarc_atlas_put(mode=patch), until status says done or needs-user. needs-user means ask the user: never invent a fact. "
+    "gemarc_atlas_check never writes; writes need GEMARC_ALLOW_WRITE=1 in the server config. "
+    "只写事实，不写文档；不确定的事实标 TBD 或降低证据等级；需要用户决定的事项必须询问用户。"
 )
 
 
@@ -81,11 +95,13 @@ def create_server(toolset: str | None = None):
     from mcp.types import CallToolResult, TextContent, ToolAnnotations
 
     mode = active_toolset(toolset)
-    remote = mode == "stateless"
+    remote = mode in ("stateless", "atlas_remote")
+    atlas = mode.startswith("atlas")
     # ``subscriptions=False``: nothing here changes at run time, and ``subscriptions/listen`` (protocol
     # 2026-07-28) answers with a never-ending SSE stream even when ``json_response=True``: one POST would
     # pin a serverless invocation, which the POST-only gate in api/index.py exists to prevent.
-    app = MCPServer("GemArc MCP", instructions=INSTRUCTIONS, version=__version__, subscriptions=False)
+    app = MCPServer("GemArc MCP", instructions=ATLAS_INSTRUCTIONS if atlas else INSTRUCTIONS, version=__version__,
+                    subscriptions=False)
 
     WRITE_TOOLS.clear()
     REGISTERED_TOOLS.clear()
@@ -97,6 +113,10 @@ def create_server(toolset: str | None = None):
         Clients (and the model) can then tell "the tool refused" from "the tool
         ran and the answer is X" without parsing the payload.
         """
+        if atlas and isinstance(payload, dict):
+            # safety net: every atlas tool already caps itself; nothing may exceed the hard cap (24 KiB client limit)
+            from .atlas import tools as atlas_core
+            payload = atlas_core.fit_result(payload, atlas_core.HARD_CAP)
         failed = isinstance(payload, dict) and payload.get("status") in ("invalid", "error")
         return CallToolResult(
             content=[TextContent(type="text", text=json.dumps(payload, ensure_ascii=False,
@@ -107,10 +127,16 @@ def create_server(toolset: str | None = None):
         return reply(safe_response(action))
 
     def tool(name: str, title: str, *, write: bool = False, stateless_ok: bool = False,
-             destructive: bool = False, idempotent: bool = False):
-        """Register a tool, declare its safety hints and whether it mutates the workspace."""
+             destructive: bool = False, idempotent: bool = False, sets: tuple | None = None):
+        """Register a tool, declare its safety hints and whether it mutates the workspace.
+
+        ``sets`` names the tool sets that contain the tool; by default it follows ``stateless_ok``
+        (``full`` plus ``stateless`` when set), so every v1 registration is unchanged.
+        """
+        in_sets = tuple(sets) if sets is not None else (("full", "stateless") if stateless_ok else ("full",))
+
         def deco(fn):
-            if remote and not stateless_ok:
+            if mode not in in_sets:
                 return fn  # not part of this tool set; the function stays importable
             if write:
                 WRITE_TOOLS.add(name)
@@ -224,6 +250,15 @@ def create_server(toolset: str | None = None):
     def export(project: str):
         """Pack a verified site into a ZIP inside the project directory and return its local path and sha256. Requires GEMARC_ALLOW_WRITE=1."""
         return run(lambda: service.export_zip(workspace(), project))
+
+    if atlas:
+        # lazy import: the atlas package and its binding are loaded only for the atlas tool sets
+        try:
+            from .atlas_tools import register_atlas
+        except ImportError as ex:  # a deployment that does not ship the atlas (see .vercelignore)
+            raise GemArcError("GEMARC_TOOLSET_001", f"the {mode} tool set is not part of this deployment") from ex
+        register_atlas(tool, run, remote, prompt=app.prompt)
+        return app
 
     # ---- resources and prompt -------------------------------------------------------
 

@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "note": "The calibration fixtures of design 9.3 and where they live. 'file' is a stored fixture of this directory (the gate runner inlines the self-test at the marker); 'built' means the page is generated at test time from a synthetic model, because a stored built page would go stale with every viewer edit. 'expect' maps an innerWidth to the verdict and the sorted finding names. clipped-scene and sparse-scene live in scene/ (not in this directory itself: test_gate_smoke enumerates the *.html files here and wants each used by its own source); they were 'pending' placeholders until viewer-B (M6) added the 3D assertions (frames and nodes inside the canvas, occupancy floor), and are flipped to their real expectation.",
+  "fixtures": [
+    {"name": "bad-header-overlap", "file": "bad-header-overlap.html", "expect": {"1256": {"status": "FAIL", "codes": ["HEADER_OVERLAP"]}, "1366": {"status": "FAIL", "codes": ["HEADER_OVERLAP"]}, "1576": {"status": "PASS", "codes": []}}},
+    {"name": "frozen-scene", "file": "frozen-scene.html", "expect": {"1366": {"status": "FAIL", "codes": ["HEARTBEAT"]}}},
+    {"name": "missing-result", "file": "no-result.html", "expect": {"1366": {"status": "FAIL", "codes": ["NO_RESULT"]}}},
+    {"name": "unknown-building", "built": "unknown-building", "expect": {"1024": {"status": "PASS", "codes": []}, "1366": {"status": "PASS", "codes": []}}},
+    {"name": "clipped-scene", "file": "scene/clipped-scene.html", "expect": {"1366": {"status": "FAIL", "codes": ["FRAME_CLIPPED"]}}},
+    {"name": "sparse-scene", "file": "scene/sparse-scene.html", "expect": {"1366": {"status": "FAIL", "codes": ["SCENE_SPARSE"]}}}
+  ]
+}

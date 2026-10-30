@@ -13,17 +13,28 @@
               states, coverage; the last line is the dimension readiness.
 ``blockers``  what keeps ``done`` false, as short tokens. ``needsUser`` decisions that only the user can make.
 
-Pluggable conditions (**not applicable yet**, they default to passing; later lanes call ``register_gate``): ``oracle`` (every
-expectation sealed), ``build`` (the build wrote its outputs), ``browser`` (the browser gate is green). A registered gate is
-``fn(snapshot) -> {"applicable": bool, "ok": bool, "detail": str}``. Dimensions 4D and 5D become *required* only when the
-oracle gate is applicable; until then they are reported but never block.
+Pluggable conditions (**not applicable yet**, they default to passing; ``register_gate`` plugs one in): ``oracle`` (every
+expectation sealed or confirmed, a fresh verdict for each), ``evidence`` (every as-is Implemented claim rests on a stamped anchor),
+``docs`` (no NOT-AUTHORED slot in the derived documents), ``build`` (``dist/`` is the build of this very model),
+``browser`` (the browser gate passed on this very page, or the user waived it). A registered gate is
+``fn(snapshot) -> {"applicable": bool, "ok": bool, "detail": str}`` (optional ``requires``: the dimensions it makes required,
+``needsUser``: a decision only the user can make). Dimensions 4D and 5D become *required* only when the oracle gate is applicable;
+until then they are reported but never block.
 
-Records read here (written by other lanes): ``.atlas/oracle.json`` (provisional shape in ``oracle_summary``) and
+The REAL gates (``PRODUCT_GATES``, section "Product gates") are active only inside ``with product_gates():`` (the MCP binding and the
+shell entry open it around every call); a plain call of ``evaluate`` (the unit tests of the authoring core) sees only what
+``register_gate`` put into ``GATES``. A gate only READS records (ledger, stamp, ``dist/``): status never runs a verdict, the
+verifier or the browser.
+
+Records read here (written by other lanes): ``.atlas/oracle.json`` (the ledger of ``oracle.py``) and
 ``.atlas/review.json`` ``{"modelSha": <8 or 64 hex of the model>, "findings": [...], "fixed": [...], "notes": "..."}``.
 Standard library only.
 """
 from __future__ import annotations
 
+import contextlib
+import contextvars
+import hashlib
 import json
 import re
 from dataclasses import dataclass, field
@@ -35,11 +46,18 @@ from . import model as am
 from . import slicecheck
 from .project import Config, Paths
 from .rules.completeness import Report, completeness_report
-from .slices import SliceFile, list_red, list_slices, read_bytes
+from .slices import SliceFile, atomic_write, list_red, list_slices, read_bytes
 
 MAX_NEXT = 10
 LINE_BYTES = 118
-GATE_NAMES = ("oracle", "build", "browser")
+NEEDS_LINE_BYTES = 150          # a question for the user is a whole sentence: clipped at a word boundary, never mid-sentence
+GATE_NAMES = ("oracle", "evidence", "docs", "build", "browser")
+#: Rule sets of a full check. Wave 2 (the engine and oracle rules: CS-001, CS-005, CS-008, PT-003, SM-004/006/007, IV-001/002,
+#: OR-001..005) is OFF by default because it adds findings (an ERROR for a synthetic intervention whose ``expect.status`` is not its
+#: compile status, INFO lines on every sealed project) that the existing sessions of the other lanes were written without; a caller
+#: asks for it with ``load_snapshot(..., wave_set=(1, 2))`` and ``check mode=full rule=<family>`` does. The wave-2 rules every full
+#: check adds are OR-000 (INFO: an expectation no write call has sealed yet), OR-003 (coverage floor) and CS-001 (event bound to an edge).
+FULL_WAVE_SET = (1,)
 DIMENSIONS = ("1D", "2D", "3D", "4D", "5D")
 ALWAYS_REQUIRED = ("1D", "2D", "3D")
 USER_TEXT_GLOB = "*.txt"
@@ -79,6 +97,7 @@ class Snapshot:
     check: "slicecheck.CheckResult"  # full mode, red drafts reported as ST-009
     model: dict
     prov: dict
+    report_cache: object = None      # the completeness report ``evaluate`` computed (the product gates reuse it)
 
     @property
     def mode(self) -> str:
@@ -89,7 +108,44 @@ class Snapshot:
         return am.model_sha8(self.model)
 
 
-def load_snapshot(paths: Paths, config: Config, *, mode: str = "full", only: "str | None" = None) -> Snapshot:
+def _oracle_reading(paths: Paths, mode: str):
+    """The oracle rules read the ledger (read-only) during a full check; any other check runs without it."""
+    import contextlib
+
+    if mode != "full":
+        return contextlib.nullcontext()
+    try:
+        from . import oracle
+    except ImportError:  # pragma: no cover - the oracle lane ships in the same package
+        return contextlib.nullcontext()
+    return oracle.reading(paths)
+
+
+#: The wave-2 rules that every full check runs (static or read-only, none of them depends on the engine or on a verdict).
+DEFAULT_WAVE2 = ("OR-000", "OR-003", "CS-001")
+
+
+def _with_registration(result: "slicecheck.CheckResult", paths: Paths) -> None:
+    """Add OR-000 (not registered), OR-003 (coverage floor) and CS-001 (event bound to an edge) to a default full check, without
+    the rest of wave 2 (read-only, no verdict, no engine)."""
+    try:
+        from . import oracle
+        from .rules import cs, or_
+        from .rules.context import Context
+
+        ctx = Context(result.expansion.model, result.expansion.provenance, mode="full", meta=None, finals=result.expansion.finals)
+        with or_.reading(oracle.make_view(paths)):
+            or_.unregistered(ctx)
+            or_.anti_vacuity(ctx)
+            cs.events_are_bound(ctx)
+        extra = [d for d in ctx.out if d.rule in DEFAULT_WAVE2]
+    except (ImportError, OSError, ValueError, KeyError, TypeError, AttributeError):
+        return
+    if extra:
+        result.diagnostics = sorted(list(result.diagnostics) + extra, key=dg.Diag.sort_key)
+
+
+def load_snapshot(paths: Paths, config: Config, *, mode: str = "full", only: "str | None" = None, wave_set: "tuple | None" = None) -> Snapshot:
     """Read the committed slices and check them. Reads only: nothing is written, no lock is taken (writes are atomic).
 
     ``mode="slice"`` with ``only=<file name>`` checks one slice against the committed rest (``check slice=...``).
@@ -99,9 +155,12 @@ def load_snapshot(paths: Paths, config: Config, *, mode: str = "full", only: "st
     parsed = [ex.parse_source(f.fname, texts[f.fname]) for f in files]
     red = list_red(paths)
     decoded = {name: data.decode("utf-8", errors="replace") for name, data in texts.items()}
-    result = slicecheck.check_slices(parsed, config.meta(), mode=mode, incoming=None if only is None else [only],
-                                     red_drafts=[r.fname for r in red] if mode == "full" else (), element_templates=element_templates(),
-                                     texts=decoded)
+    with _oracle_reading(paths, mode):
+        result = slicecheck.check_slices(parsed, config.meta(), mode=mode, incoming=None if only is None else [only],
+                                         red_drafts=[r.fname for r in red] if mode == "full" else (), element_templates=element_templates(),
+                                         wave_set=(tuple(wave_set) if wave_set else FULL_WAVE_SET) if mode == "full" else (1,), texts=decoded)
+    if mode == "full" and not wave_set and 2 not in FULL_WAVE_SET:
+        _with_registration(result, paths)
     expansion = result.expansion
     return Snapshot(paths, config, files, red, parsed, result, expansion.model, expansion.provenance)
 
@@ -126,6 +185,12 @@ def read_review(paths: Paths) -> "dict | None":
     return _read_json(paths.review)
 
 
+def review_is_valid_record(paths: Paths) -> bool:
+    """A review record exists that the review tool wrote (a second ``record`` is then refused by the review core)."""
+    record = read_review(paths)
+    return bool(record) and _is_valid_record(record)
+
+
 def review_is_current(record: "Mapping | None", model: Mapping) -> bool:
     """A review record counts for the model whose sha (8 hex digits, or the full 64) it carries."""
     if not record:
@@ -139,14 +204,10 @@ def read_oracle(paths: Paths) -> "dict | None":
     return _read_json(paths.oracle)
 
 
-def oracle_summary(data: "Mapping | None") -> dict:
-    """Counts from ``.atlas/oracle.json`` (the oracle lane owns the file; this reader is defensive).
-
-    Provisional shape: ``{"seals": {<key>: {"kind": "case"|"intervention", "state": "sealed"|"revised"|"confirmed"}}}`` (a list of
-    such entries also works). ``sealed`` counts entries in state ``sealed`` or ``confirmed``.
-    """
-    out = {"present": data is not None, "total": 0, "sealed": 0, "revised": 0, "confirmed": 0, "cases": 0, "interventions": 0,
-           "unconfirmed": 0}
+def _legacy_summary(data: "Mapping | None") -> dict:
+    """The provisional ledger shape ``{"seals": {key: {"kind", "state"}}}`` (or a list under ``entries``) that tests of the
+    first authoring core write; the oracle lane itself never writes it. ``sealed`` counts ``sealed`` and ``confirmed``."""
+    out = {"present": data is not None, "total": 0, "sealed": 0, "revised": 0, "confirmed": 0, "cases": 0, "interventions": 0, "unconfirmed": 0}
     if not data:
         return out
     seals = data.get("seals", data.get("entries", {}))
@@ -169,6 +230,31 @@ def oracle_summary(data: "Mapping | None") -> dict:
     return out
 
 
+def oracle_summary(data: "Mapping | None") -> dict:
+    """Counts from a raw ``.atlas/oracle.json``. The real schema (``gemarc-atlas-oracle/1``, see ``oracle.py``) maps
+    ``case:<id>`` / ``intervention:<id>`` to an entry with ``kind``, ``state`` (``sealed`` or ``revised``), ``ah`` and the cache
+    ``confirmedAh8``; ``cases`` / ``interventions`` count the sealed or confirmed ones and a withdrawn entry is not counted. The
+    provisional ``seals`` shape is still read. ``evaluate`` prefers ``oracle.effective_summary`` (the user's confirmation file and
+    the model are part of it)."""
+    if isinstance(data, Mapping) and isinstance(data.get("items"), Mapping):
+        from . import oracle
+
+        return oracle.ledger_summary(data)
+    return _legacy_summary(data)
+
+
+def _oracle_state(snap: "Snapshot") -> dict:
+    raw = read_oracle(snap.paths)
+    if isinstance(raw, Mapping) and raw.get("schema") == "gemarc-atlas-oracle/1":
+        from . import oracle
+
+        try:
+            return oracle.effective_summary(snap.paths, snap.model)
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+    return oracle_summary(raw)
+
+
 # ---------------------------------------------------------------------------------------------------------------
 # Gates (pluggable, default: not applicable yet)
 # ---------------------------------------------------------------------------------------------------------------
@@ -176,11 +262,32 @@ def oracle_summary(data: "Mapping | None") -> dict:
 GATES: dict = {}
 
 
-def register_gate(name: str, fn: Callable) -> None:
-    """Plug a condition into ``done``: ``fn(snapshot) -> {"applicable": bool, "ok": bool, "detail": str}``."""
+#: The real gates, active only inside ``with product_gates():`` (see the module doc); filled at the end of this module.
+PRODUCT_GATES: dict = {}
+_PRODUCT: "contextvars.ContextVar[bool]" = contextvars.ContextVar("gemarc_atlas_product_gates", default=False)
+
+
+def register_gate(name: str, fn: Callable, *, product: bool = False) -> None:
+    """Plug a condition into ``done``: ``fn(snapshot) -> {"applicable": bool, "ok": bool, "detail": str}``.
+
+    ``product=True`` registers it among the real gates (``PRODUCT_GATES``), which only ``with product_gates():`` activates."""
     if name not in GATE_NAMES:
         raise ValueError(f"unknown gate {name!r}; one of {', '.join(GATE_NAMES)}")
-    GATES[name] = fn
+    (PRODUCT_GATES if product else GATES)[name] = fn
+
+
+@contextlib.contextmanager
+def product_gates():
+    """Activate the real gates for the calls made inside the ``with`` block (the MCP binding and the shell entry do)."""
+    token = _PRODUCT.set(True)
+    try:
+        yield
+    finally:
+        _PRODUCT.reset(token)
+
+
+def product_gates_active() -> bool:
+    return _PRODUCT.get()
 
 
 def unregister_gate(name: str) -> None:
@@ -189,6 +296,8 @@ def unregister_gate(name: str) -> None:
 
 def _gate(name: str, snap: Snapshot) -> dict:
     fn = GATES.get(name)
+    if fn is None and _PRODUCT.get():
+        fn = PRODUCT_GATES.get(name)
     if fn is None:
         return {"applicable": False, "ok": True, "detail": "not applicable yet"}
     try:
@@ -199,6 +308,318 @@ def _gate(name: str, snap: Snapshot) -> dict:
     out.setdefault("ok", False)
     out.setdefault("detail", "")
     return out
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Product gates (the A1 completion contract; every one only READS records)
+# ---------------------------------------------------------------------------------------------------------------
+
+DIST_DIR = "dist"
+VERIFY_DIR = ".verify"
+GATE_STAMP_NAME = "gate-stamp.json"
+GATE_STAMP_SCHEMA = "gemarc-atlas-gate-stamp/1"
+REQUIRED_WIDTHS = (1024, 1366, 1600)   # the browser gate counts only a run that passed at all of them (design A2)
+WAIVER_NAME = "waive-browser.txt"      # the USER's file (no tool writes it), like atlas/oracle-confirm.txt: attestation, not authentication
+WAIVER_MAX_BYTES = 4096
+#: Blocker kinds of the oracle release gate that keep ``done`` false (``no-bite``, the mutant run, belongs to ``build release=true``).
+ORACLE_DONE_KINDS = ("unsealed", "no-verdict", "mismatch", "vacuous", "revised", "provenance")
+_ORACLE_ADVICE = {
+    "unsealed": "it names an undefined node: define every node it names, then put it again",
+    "no-verdict": "run gemarc_atlas_simulate (detail=count) for this model",
+    "mismatch": "the last verdict failed: check the case events first",
+    "vacuous": "assert more of the nodes the case exercises (coverage floor)",
+    "revised": "run gemarc_atlas_build; the user then approves the edit on the oracle sheet",
+    "provenance": "the ledger was altered: the user confirms every expectation",
+}
+
+
+def _structure_open(snap: "Snapshot") -> bool:
+    """True while the structure is not authored cleanly: the later gates have nothing to say yet."""
+    if snap.red or snap.check.errors or not snap.model.get("nodes"):
+        return True
+    report = snap.report_cache
+    return bool(report is not None and report.blockers())
+
+
+def _sha256_file(path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as stream:
+        for chunk in iter(lambda: stream.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _gate_oracle(snap: "Snapshot") -> dict:
+    """Every expectation sealed or confirmed, a fresh passing verdict for each, nothing vacuous; ``revised`` ones wait for the user.
+
+    The blockers are those of ``oracle.release_gate`` (kept in step by a test) minus ``no-bite``, computed from the snapshot's model
+    without loading the project a second time."""
+    from . import oracle
+    from .rules import or_
+
+    model = snap.model
+    if not model.get("nodes"):
+        return {"applicable": False, "ok": True, "detail": "nothing authored yet"}
+    sha8 = snap.sha8
+    view = oracle.make_view(snap.paths)
+    items = or_.collect_items(model)
+    view.bind(items)
+    cases = {c.get("caseId"): c for c in model.get("cases", ())}
+    case_ids = set(cases)
+    kinds: dict = {}
+    first: dict = {}
+    revised_of = {"cases": 0, "interventions": 0}
+
+    def add(kind: str, ident: str) -> None:
+        kinds[kind] = kinds.get(kind, 0) + 1
+        first.setdefault(kind, ident)
+
+    states = {}
+    for key, item in items.items():
+        state, why = view.state_of(item)
+        states[key] = (item, state, why)
+        entry = view.entries.get(key) or {}
+        if state == "unregistered":
+            add("unsealed", item.id)
+            continue
+        if item.kind == or_.CASE:
+            if or_.coverage_gap(cases.get(item.id, {})) is not None:
+                add("vacuous", item.id)
+            bite = entry.get("bite")
+            if isinstance(bite, Mapping) and bite.get("sha") == sha8 and bite.get("holds") and (not bite.get("total") or not bite.get("killed")):
+                add("vacuous", item.id)
+        if state == "revised":
+            add("revised", item.id)
+            revised_of["cases" if item.kind == or_.CASE else "interventions"] += 1
+        last = entry.get("last")
+        fresh = isinstance(last, Mapping) and last.get("sha") == sha8
+        if item.kind == or_.INTERVENTION:
+            wanted = {c for c in next((i.get("appliesTo", ()) for i in model.get("interventions", ()) if i.get("interventionId") == item.id), ())
+                      if c in case_ids}
+            fresh = fresh and wanted <= {c for c, p in (entry.get("pairs") or {}).items() if isinstance(p, Mapping) and p.get("sha") == sha8}
+        if not fresh:
+            add("no-verdict", item.id)
+        elif last.get("pass") is False:
+            add("mismatch", item.id)
+    counts = oracle.counts_of(states)
+    lang = snap.config.languages[0] if snap.config.languages else "en-US"
+    badge = oracle.attestation(lang, counts, view)
+    if badge["class"] == "unverified-provenance" and counts["total"] and counts["confirmed"] < counts["total"]:
+        add("provenance", "")
+    out = {"applicable": True, "ok": not any(k in kinds for k in ORACLE_DONE_KINDS), "requires": ("4D", "5D"), "kinds": dict(kinds),
+           "revised": revised_of}
+    if out["ok"]:
+        out["detail"] = f"{counts['sealed']} sealed, {counts['confirmed']} confirmed"
+        return out
+    kind = next(k for k in ORACLE_DONE_KINDS if k in kinds)
+    ident = f" ({first[kind]})" if first.get(kind) else ""
+    out["detail"] = f"{kinds[kind]} {kind}{ident}: {_ORACLE_ADVICE[kind]}"
+    out["short"] = f"{kinds[kind]} {kind}"
+    if ("revised" in kinds or "provenance" in kinds) and _sheet_is_current(snap):
+        # the user is asked only when there IS a sheet to approve: before that the way on is the build (phase build, not needs-user)
+        n = kinds.get("revised", 0) + kinds.get("provenance", 0)
+        out["needsUser"] = f"approve the oracle sheet atlas/dist/oracle-sheet.md ({n} edited expectation(s))"
+        out["needsHow"] = ("hand the sheet to the user: they tick lines or keep APPROVE-ALL in atlas/oracle-confirm.txt "
+                           "(you never write it); then run simulate")
+    return out
+
+
+def _sheet_is_current(snap: "Snapshot") -> bool:
+    """``dist/`` is the current build of this model and ``oracle-sheet.md`` (written by ``gemarc_atlas_build``) exists."""
+    _info, _sha, problem = _page_state(snap)
+    return not problem and (snap.paths.atlas / DIST_DIR / "oracle-sheet.md").is_file()
+
+
+def _stamp_matches(entry, row: Mapping) -> bool:
+    from . import evidence as ev
+
+    return isinstance(entry, Mapping) and ev._entry_matches(entry, row)  # noqa: SLF001 - the verifier's own identity test
+
+
+def claims_unverified(model: Mapping, entries: Mapping) -> tuple:
+    """``(implemented claims, ids of those without a verified anchor)`` for the as-is evidence policy (design 8.2): an Implemented node or
+    edge needs source-code evidence, and every such row must have a stamp entry for the SAME file and anchor (the stamp is the verifier's
+    record of a PASS)."""
+    by_id = {e.get("evidenceId"): e for e in model.get("evidences", ()) if isinstance(e, dict)}
+    total, bad = 0, []
+    for kind in ("nodes", "edges"):
+        for item in model.get(kind, ()):
+            if not isinstance(item, dict) or item.get("verification") != "Implemented":
+                continue
+            total += 1
+            code = [i for i in item.get("evidenceIds", ()) if by_id.get(i, {}).get("sourceKind") == "source-code"]
+            if not code or any(not _stamp_matches(entries.get(i), by_id[i]) for i in code):
+                bad.append(str(item.get("id") or "?"))
+    return total, bad
+
+
+def _gate_evidence(snap: "Snapshot") -> dict:
+    """As-is: every Implemented claim rests on a stamped source-code anchor. To-be has no such claim (the ceiling is Designed)."""
+    from . import evidence as ev
+
+    if snap.mode != "asis":
+        return {"applicable": False, "ok": True, "detail": "to-be: no Implemented claim"}
+    claims = [i for k in ("nodes", "edges") for i in snap.model.get(k, ()) if isinstance(i, dict) and i.get("verification") == "Implemented"]
+    if not claims:
+        return {"applicable": False, "ok": True, "detail": "no Implemented claim"}
+    try:
+        entries = ev.load_stamp(snap.paths.atlas).get("entries") or {}
+    except ev.EvidenceError:
+        return {"applicable": True, "ok": False, "detail": "the evidence stamp is unreadable: run gemarc_atlas_evidence again"}
+    total, bad = claims_unverified(snap.model, entries)
+    if not bad:
+        return {"applicable": True, "ok": True, "detail": f"{total} Implemented claim(s) verified"}
+    out = {"applicable": True, "ok": False, "short": f"{len(bad)}/{total} unverified",
+           "detail": f"{len(bad)}/{total} Implemented claims lack a verified anchor ({bad[0]}): run gemarc_atlas_evidence, or lower verif="}
+    missing = _unmapped_aliases(snap, bad, entries)
+    if missing:                      # no source root exists for any of them: the AI cannot make progress, the operator or the user decides
+        out["needsUser"] = (f"no evidence root for {', '.join(missing[:3])}: the operator sets GEMARC_ATLAS_ROOTS {missing[0]}=<dir>, "
+                            f"or the user accepts a lower verif= for {len(bad)} claim(s)")
+        out["needsHow"] = "without a root, evidence skips every row; after the operator sets it run gemarc_atlas_evidence, or lower verif= once the user agrees"
+    return out
+
+
+def _unmapped_aliases(snap: "Snapshot", bad: list, entries: Mapping) -> list:
+    """The repository aliases that have NO available root among the code evidence rows that the unverified claims still lack a stamp for.
+    A row of such an alias can only be SKIPPED, never verified, so no amount of work by the AI turns it green (an empty list when every
+    such alias has a root, or when the roots cannot be read)."""
+    from . import roots as roots_mod
+
+    try:
+        table = roots_mod.roots_from_env()
+    except roots_mod.RootsError:
+        return []
+    if snap.config.repos:
+        table = {k: v for k, v in table.items() if k in snap.config.repos}
+    by_id = {e.get("evidenceId"): e for e in snap.model.get("evidences", ()) if isinstance(e, dict)}
+    wanted = set(bad)
+    missing = []
+    for kind in ("nodes", "edges"):
+        for item in snap.model.get(kind, ()):
+            if not isinstance(item, dict) or str(item.get("id")) not in wanted:
+                continue
+            for ident in item.get("evidenceIds", ()):
+                row = by_id.get(ident) or {}
+                alias = row.get("repository")
+                if row.get("sourceKind") != "source-code" or _stamp_matches(entries.get(ident), row) or alias in missing:
+                    continue
+                if not (alias in table and roots_mod.root_available(table[alias])):
+                    missing.append(alias)
+    return [str(a) for a in missing]
+
+
+def _gate_docs(snap: "Snapshot") -> dict:
+    """The derived documents print no NOT-AUTHORED slot (a release blocker, DC-L-004)."""
+    from .derive import docbuild
+
+    if _structure_open(snap):
+        return {"applicable": False, "ok": True, "detail": "waits for the structure"}
+    lang = snap.config.languages[0] if snap.config.languages else "en-US"
+    total = 0
+    for level in docbuild.LEVELS:
+        outline = docbuild.doc_outline(snap.model, None, level, lang)
+        if not outline.get("ok"):
+            return {"applicable": True, "ok": False, "detail": f"the {level} document cannot be derived: {outline.get('code', '')}"}
+        total += int(outline.get("markers") or 0)
+    if total:
+        return {"applicable": True, "ok": False, "short": f"{total} NOT-AUTHORED", "detail": f"{total} NOT-AUTHORED slot(s) in the documents: gemarc_atlas_doc shows where"}
+    return {"applicable": True, "ok": True, "detail": "no NOT-AUTHORED slot"}
+
+
+def _page_state(snap: "Snapshot") -> tuple:
+    """``(info, page sha, problem)``: ``problem`` is empty when ``dist/`` is the current, unedited build of the snapshot's model."""
+    dist = snap.paths.atlas / DIST_DIR
+    page, info_path = dist / "index.html", dist / "build-info.json"
+    if not page.is_file() or not info_path.is_file():
+        return None, "", "no built page yet: run gemarc_atlas_build"
+    try:
+        info = json.loads(read_bytes(info_path).decode("utf-8-sig"))
+    except (OSError, ValueError):
+        return None, "", "dist/build-info.json is unreadable: run gemarc_atlas_build"
+    if not isinstance(info, dict):
+        return None, "", "dist/build-info.json is unreadable: run gemarc_atlas_build"
+    if info.get("modelSha") != am.model_sha(snap.model):
+        return info, "", "dist/ is the build of an older model: run gemarc_atlas_build"
+    try:
+        sha = _sha256_file(page)
+    except OSError:
+        return info, "", "dist/index.html cannot be read: run gemarc_atlas_build"
+    if (info.get("page") or {}).get("sha256") != sha:
+        return info, sha, "dist/index.html was changed after the build: run gemarc_atlas_build"
+    if info.get("docs") is None:
+        return info, sha, "the build skipped the documents (docs=false): run gemarc_atlas_build"
+    return info, sha, ""
+
+
+def _gate_build(snap: "Snapshot") -> dict:
+    """``dist/`` is the build of this very model: page unedited, documents written."""
+    if _structure_open(snap):
+        return {"applicable": False, "ok": True, "detail": "waits for the structure"}
+    info, _sha, problem = _page_state(snap)
+    if problem:
+        return {"applicable": True, "ok": False, "short": "no current build", "detail": problem}
+    return {"applicable": True, "ok": True, "detail": f"dist/index.html {(info.get('page') or {}).get('bytes', 0)} bytes"}
+
+
+def read_gate_stamp(paths: Paths) -> "dict | None":
+    """``dist/.verify/gate-stamp.json``: the browser verdict bound to a page (``None`` when absent or not this schema)."""
+    data = _read_json(paths.atlas / DIST_DIR / VERIFY_DIR / GATE_STAMP_NAME)
+    return data if isinstance(data, dict) and data.get("schema") == GATE_STAMP_SCHEMA else None
+
+
+def write_gate_stamp(paths: Paths, *, model_sha8: str, page_sha256: str, verdict: Mapping) -> None:
+    """Bind a browser verdict to the page it was run on (so a PASS of an earlier build can never satisfy the gate). No timestamp."""
+    doc = {"schema": GATE_STAMP_SCHEMA, "modelSha8": model_sha8, "pageSha256": page_sha256, "status": verdict.get("status", ""),
+           "widths": [{"width": w.get("width"), "status": w.get("status")} for w in verdict.get("widths", ())]}
+    atomic_write(paths.atlas / DIST_DIR / VERIFY_DIR / GATE_STAMP_NAME, (json.dumps(doc, indent=1, sort_keys=True) + "\n").encode("utf-8"))
+
+
+def read_waiver(paths: Paths) -> str:
+    """The reason text of ``atlas/waive-browser.txt`` (the user's file); empty when there is none."""
+    path = paths.atlas / WAIVER_NAME
+    try:
+        if not path.is_file() or path.stat().st_size > WAIVER_MAX_BYTES:
+            return ""
+        return " ".join(read_bytes(path).decode("utf-8-sig").split())
+    except (OSError, ValueError):
+        return ""
+
+
+def _gate_browser(snap: "Snapshot") -> dict:
+    """The browser gate passed on THIS page, or the user waived it. A missing browser is a loud SKIP that blocks, and the way out is
+    the user's (install a browser, or write ``atlas/waive-browser.txt``); a FAIL is never covered by the waiver."""
+    if _structure_open(snap):
+        return {"applicable": False, "ok": True, "detail": "waits for the structure"}
+    _info, sha, problem = _page_state(snap)
+    if problem:
+        return {"applicable": True, "ok": False, "short": "waits for build", "detail": "waits for a current build"}
+    stamp = read_gate_stamp(snap.paths)
+    current = bool(stamp and stamp.get("modelSha8") == snap.sha8 and stamp.get("pageSha256") == sha)
+    state = stamp.get("status") if current else None
+    waiver = read_waiver(snap.paths)
+    if state == "PASS":
+        passed = {w.get("width") for w in stamp.get("widths", ()) if isinstance(w, dict) and w.get("status") == "PASS"}
+        short = [w for w in REQUIRED_WIDTHS if w not in passed]
+        if short:       # a verify run at one width only (the model chose widths=[1024]) does not verify the page
+            return {"applicable": True, "ok": False, "short": "widths missing",
+                    "detail": f"the browser gate did not pass at {', '.join(str(w) for w in short)} px: run gemarc_atlas_verify with the default widths"}
+        return {"applicable": True, "ok": True, "detail": "browser gate PASS on this page"}
+    if state == "FAIL":
+        return {"applicable": True, "ok": False, "short": "FAIL", "detail": "the browser gate FAILED on this page: fix what gemarc_atlas_verify lists, rebuild, verify"}
+    if state == "INCONCLUSIVE":
+        return {"applicable": True, "ok": False, "short": "inconclusive", "detail": "the browser gate was INCONCLUSIVE (a launch timed out): run gemarc_atlas_verify again when the machine is idle"}
+    if waiver:
+        return {"applicable": True, "ok": True, "waived": True, "detail": f"browser gate waived by the user: {waiver[:60]}"}
+    if state == "SKIP":
+        return {"applicable": True, "ok": False, "skipped": True, "short": "skipped", "detail": "the browser gate was SKIPPED (no browser found): the page is NOT verified",
+                "needsUser": f"browser SKIPPED, the page is unverified: install Edge or Chrome, or write a reason in atlas/{WAIVER_NAME}",
+                "needsHow": f"then run gemarc_atlas_verify again; you never write {WAIVER_NAME}"}
+    return {"applicable": True, "ok": False, "short": "not verified", "detail": "the page has not been verified: run gemarc_atlas_verify"}
+
+
+def _register_product_gates() -> None:
+    for name, fn in (("oracle", _gate_oracle), ("evidence", _gate_evidence), ("docs", _gate_docs), ("build", _gate_build), ("browser", _gate_browser)):
+        register_gate(name, fn, product=True)
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -249,20 +670,54 @@ class State:
     oracle: dict = field(default_factory=dict)
     open_blocks: list = field(default_factory=list)
     counters: dict = field(default_factory=dict)
+    waived: list = field(default_factory=list)
 
     def as_dict(self) -> dict:
         out = {"done": self.done, "phase": self.phase, "next": self.next, "blockers": self.blockers, "needsUser": self.needs_user}
         if self.open_blocks:
             out["openBlocks"] = self.open_blocks
+        if self.waived:
+            out["waived"] = self.waived       # a user waiver is not a verification: a client reading only this must not report the gate green
         if self.counters:
             out["counters"] = self.counters
         return out
 
 
+def _is_valid_record(record: Mapping) -> bool:
+    try:
+        from . import review
+    except ImportError:  # pragma: no cover - the review lane ships in the same package
+        return False
+    return review.valid_record(record)
+
+
+def _stale_text(snap: "Snapshot", record: Mapping) -> str:
+    try:
+        from . import review
+
+        found = review.record_state(snap, record)
+    except (ImportError, OSError, ValueError, KeyError, TypeError):
+        return "the model changed after the review"
+    new = found.get("newBlock") or []
+    return ("new BLOCK finding(s) " + ", ".join(str(x) for x in new)) if new else "the model changed after the review"
+
+
 def _clip(text: str, limit: int = LINE_BYTES) -> str:
+    """At most ``limit`` UTF-8 bytes. A longer text is cut at a word boundary and ends in `` ...`` (never mid-word without a mark)."""
     text = " ".join(str(text).split())
     raw = text.encode("utf-8")
-    return text if len(raw) <= limit else raw[: limit - 3].decode("utf-8", "ignore") + "..."
+    if len(raw) <= limit:
+        return text
+    head = raw[: limit - 4].decode("utf-8", "ignore")
+    cut = head.rfind(" ")
+    if cut >= len(head) // 2:
+        head = head[:cut]
+    return head.rstrip(" ,;:") + " ..."
+
+
+def _clip_line(text: str) -> str:
+    """A ``next`` line: the questions for the user (``ask the user: ...``) get the longer limit, they are read out to the user whole."""
+    return _clip(text, NEEDS_LINE_BYTES + len("ask the user: ")) if text.startswith("ask the user: ") else _clip(text)
 
 
 def _some(items, limit: int = 3) -> str:
@@ -358,24 +813,48 @@ def vanished_tbds(snap: "Snapshot") -> list:
     return sorted(seen - current - decided)
 
 
-def _needs_user(snap: Snapshot, oracle: Mapping, oracle_applicable: bool) -> list:
+def _needs_user(snap: Snapshot, oracle: Mapping, oracle_applicable: bool, gates: "Mapping | None" = None) -> list:
+    """The decisions only the user (or the operator) can make, as whole sentences meant to be read out to the user. What the AI does
+    afterwards is ``_needs_how`` (it goes into ``next``, never into this list)."""
     model, out = snap.model, []
     texts = saved_text(snap.paths)
-    if snap.mode == "tobe" and not _user_texts(snap.paths):
-        out.append("requirement facts: no requirement text is saved under atlas/user/; ask the user for it and save it verbatim (to-be cannot be invented)")
+    # In the product (MCP) the driver saves the requirement text itself right after init: an empty project does not ask the user yet.
+    fresh = not snap.files and not snap.red and product_gates_active()
+    if snap.mode == "tobe" and not _user_texts(snap.paths) and not fresh:
+        out.append("requirement facts: no requirement text is saved under atlas/user/ yet; please provide the requirement text (to-be cannot be invented)")
     done = _tbd_resolved(model, texts)
     open_tbds = [t for t in model.get("tbds", ()) if t.get("id") not in done]
     for t in open_tbds[:3]:
-        out.append(_clip(f"decide TBD {t.get('id')}: {t.get('title')}"))
+        out.append(_clip(f"decide TBD {t.get('id')}: {t.get('title')}", NEEDS_LINE_BYTES))
     if len(open_tbds) > 3:
-        out.append(f"{len(open_tbds) - 3} more open TBDs (answered by the user: save the answer to atlas/user/<name>.txt, then a policies row by=user src=<tbd id> whose text quotes it)")
-    elif open_tbds:
-        out.append("after the user answers: save the answer verbatim to atlas/user/<name>.txt, then a policies row by=user src=<tbd id> whose text quotes it in \"...\"")
+        out.append(f"{len(open_tbds) - 3} more open TBDs: please decide them too")
     gone = vanished_tbds(snap)
     if gone:
-        out.append(_clip(f"TBD {_some(gone)} was deleted without a user decision: restore the row, or ask the user to void it (policy by=user src=<id>)"))
-    if oracle_applicable and oracle["unconfirmed"]:
+        out.append(_clip(f"TBD {_some(gone)} was deleted without a user decision: restore the row, or ask the user to void it (policy by=user src=<id>)",
+                         NEEDS_LINE_BYTES))
+    own = (gates or {}).get("oracle", {}).get("needsUser")
+    if own:
+        out.append(own)                      # the real oracle gate: only EDITED (revised) expectations need the user
+    elif oracle_applicable and "kinds" not in (gates or {}).get("oracle", {}) and oracle["unconfirmed"]:
         out.append(f"oracle confirmation: {oracle['unconfirmed']} expectation(s) wait for the user's approval of the oracle sheet")
+    for name in ("evidence", "browser"):
+        extra = (gates or {}).get(name, {}).get("needsUser")
+        if extra:
+            out.append(extra)                # no evidence root / no browser: the operator or the user must act
+    return out
+
+
+def _needs_how(snap: Snapshot, gates: "Mapping | None" = None) -> list:
+    """What the AI does once the user has decided: lines for ``next`` in phase needs-user (the questions themselves are ``needsUser``)."""
+    out = []
+    texts = saved_text(snap.paths)
+    done = _tbd_resolved(snap.model, texts)
+    if any(t.get("id") not in done for t in snap.model.get("tbds", ())):
+        out.append("TBD answered: save the user's words to atlas/user/<name>.txt, then a policies row by=user src=<tbd id> quoting them")
+    for name in ("oracle", "evidence", "browser"):
+        how = (gates or {}).get(name, {}).get("needsHow")
+        if how:
+            out.append(how)
     return out
 
 
@@ -585,15 +1064,23 @@ def evaluate(snap: Snapshot) -> State:
     """The completion contract (see the module doc) for a snapshot."""
     model, paths = snap.model, snap.paths
     report = completeness_report(model, snap.prov)
-    oracle = oracle_summary(read_oracle(paths))
+    snap.report_cache = report
+    oracle = _oracle_state(snap)
     gates = {name: _gate(name, snap) for name in GATE_NAMES}
     oracle_applicable = gates["oracle"]["applicable"]
     dims = dimensions(snap, report, oracle)
-    required = ALWAYS_REQUIRED + (("4D", "5D") if oracle_applicable else ())
+    waiting = gates["oracle"].get("revised") or {}
+    for dim, key in (("4D", "cases"), ("5D", "interventions")):         # an edited expectation that waits for the user is registered work, not a gap
+        if oracle_applicable and not dims[dim]["ready"] and waiting.get(key):
+            dims[dim] = {"ready": True, "why": f"{waiting[key]} edited expectation(s) wait for the user"}
+    required = ALWAYS_REQUIRED + (tuple(gates["oracle"].get("requires") or ("4D", "5D")) if oracle_applicable else ())
     review = read_review(paths)
     review_ok = review_is_current(review, model) or _review_accepts(snap, review)
     errors = snap.check.errors
-    needs = _needs_user(snap, oracle, oracle_applicable)
+    needs = _needs_user(snap, oracle, oracle_applicable, gates)
+    # A record the review tool wrote (it carries blockKeys) is the ONE review: when new BLOCK findings made it stale, the way back
+    # is fixing them, never a second review (``record`` would refuse it).
+    stale_record = bool(review) and not review_ok and isinstance(review.get("blockKeys"), list) and _is_valid_record(review)
     elicit = _elicitation(snap) if snap.mode == "tobe" else None
     unmet_dims = [d for d in required if not dims[d]["ready"]]
     red_gate = [n for n in GATE_NAMES if gates[n]["applicable"] and not gates[n]["ok"]]
@@ -609,7 +1096,7 @@ def evaluate(snap: Snapshot) -> State:
     if unmet_dims:
         blockers.append("dims:" + ",".join(unmet_dims))
     for name in red_gate:
-        blockers.append(f"gate-{name}:{gates[name]['detail'] or 'red'}"[:60])
+        blockers.append(f"gate-{name}" + (f":{gates[name]['short']}" if gates[name].get("short") else ""))   # a whole token, never a cut sentence
     if needs:
         blockers.append(f"needs-user:{len(needs)}")
     if not review_ok:
@@ -627,6 +1114,8 @@ def evaluate(snap: Snapshot) -> State:
         phase = "needs-user"
     elif red_gate:
         phase = "build"
+    elif stale_record:
+        phase = "author"
     elif not review_ok:
         phase = "review"
     else:
@@ -638,17 +1127,27 @@ def evaluate(snap: Snapshot) -> State:
     if phase == "done":
         open_blocks = _open_blocks(snap)
         applicable = [n for n in GATE_NAMES if gates[n]["applicable"]]
-        checked = "check full is clean, 1D-3D ready" + (f", gates green: {', '.join(applicable)}" if applicable else "; no generate gate is available yet")
+        waived = [n for n in applicable if gates[n].get("waived")]
+        green = [n for n in applicable if n not in waived]
+        checked = f"check full is clean, {required[0]}-{required[-1]} ready" + (f", gates green: {', '.join(green)}" if green else "; no generate gate is available yet")
         lines.append(f"done: {checked}; the review is recorded")
+        for name in waived:       # a waiver is not a pass: the final report must say so
+            lines.append(_clip(f"{name} gate WAIVED by the user, the page is UNVERIFIED: " + str(gates[name]["detail"]).partition(": ")[2]))
         if open_blocks:
             lines.append(_clip("open BLOCK (acknowledged at review, tell the user): " + ", ".join(open_blocks[:4])
                                + " (gemarc_atlas_review action=report shows them)"))
+        waiting = oracle["unconfirmed"] if oracle_applicable and "kinds" in gates["oracle"] else 0
+        if waiting:
+            lines.append(_clip(f"{waiting} expectation(s) await the user: hand atlas/dist/oracle-sheet.md (final report)"))
     elif phase == "needs-user":
-        lines.extend(_clip("ask the user: " + x) for x in needs[:3])
+        lines.extend(_clip_line("ask the user: " + x) for x in needs[:2])
+        lines.extend(_needs_how(snap, gates)[:2])
     elif phase == "review":
         lines.append("review: authoring is complete; call gemarc_atlas_review (action=report), fix the findings once, then action=record")
     elif phase == "build":
         lines.extend(_clip(f"{n}: {gates[n]['detail'] or 'not green'}") for n in red_gate[:2])
+    elif stale_record:
+        lines.append(_clip("review record is stale: " + _stale_text(snap, review) + " (fix with put mode=patch; NO second review)"))
     counters = read_counters(paths)
     guard = _guard_lines(counters, snap)
     lines.extend(guard)
@@ -674,8 +1173,11 @@ def evaluate(snap: Snapshot) -> State:
     if cov:
         lines.append(cov)
     tail = _dims_line(dims, required)
-    kept = _select([_clip(x) for x in lines], MAX_NEXT - 1)
+    kept = _select([_clip_line(x) for x in lines], MAX_NEXT - 1)
     kept.append(_clip(tail))
     shown = {k: v for k, v in _counter_view(counters).items() if v}
-    return State(done, phase, kept, blockers, [_clip(x) for x in needs], dims, required, gates, report, review, review_ok, oracle,
-                 open_blocks, shown)
+    return State(done, phase, kept, blockers, [_clip(x, NEEDS_LINE_BYTES) for x in needs], dims, required, gates, report, review, review_ok,
+                 oracle, open_blocks, shown, waived=[n for n in GATE_NAMES if gates[n].get("waived") and gates[n]["applicable"]])
+
+
+_register_product_gates()

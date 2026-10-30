@@ -13,5 +13,7 @@ mcp_servers:
       GEMARC_ALLOW_WRITE: "1"            # "0" makes the toolset read-only (init and put then answer GEMARC_AUTH_002)
       GEMARC_ATLAS_ROOTS: 'main=<repo>'  # alias=path, separated by ";"; the model can only name the alias
       PYTHONUTF8: "1"
+      # Filtered environment: the browser gate (gemarc_atlas_verify) cannot find Edge unless you pin it (a missing browser is a loud SKIPPED, never a pass):
+      # GEMARC_ATLAS_BROWSER: 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
     timeout: 120          # seconds per tool call (Hermes default 300)
     connect_timeout: 60   # seconds to start and initialise (Hermes default 60)

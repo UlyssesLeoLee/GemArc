@@ -1,0 +1,11 @@
+# Files that are pinned by hash or compared byte for byte (viewer bundle + SOURCES.sha256, denylist digests, goldens,
+# migration checksums) must come out of a Windows checkout exactly as they went in: autocrlf must not rewrite them.
+src/gemarc_mcp/atlas/** text=auto eol=lf
+src/gemarc_mcp/atlas_tools.py text=auto eol=lf
+src/gemarc_mcp/accounts/** text=auto eol=lf
+tests/atlas/** text=auto eol=lf
+tests/accounts/** text=auto eol=lf
+docs/atlas/** text=auto eol=lf
+tools/** text=auto eol=lf
+skills/gemarc-atlas/** text=auto eol=lf
+scripts/atlas_mcp.py text=auto eol=lf

@@ -1,6 +1,6 @@
 # 接入 GemArc Atlas 工具集
 
-本目录的配置把 GemArc 的 `atlas` 工具集（本地 stdio，撰写 5D 设计资料用的 6 个工具加一个入口提示）接到 Claude Code、Codex 和 Hermes。工具和提示的契约见 `../ATLAS_TOOLS.md`，使用流程见 `skills/gemarc-atlas/SKILL.md`。
+本目录的配置把 GemArc 的 `atlas` 工具集（本地 stdio，13 个工具加一个入口提示：写事实、校验、盲测判定、证据核验、构建、浏览器门、自审）接到 Claude Code、Codex 和 Hermes。工具和提示的契约见 `../ATLAS_TOOLS.md`，使用流程见 `skills/gemarc-atlas/SKILL.md`。
 
 这些示例故意放在 `docs/atlas/examples/`，不放在 `integration-examples/`：后者是 v1 工具集的示例，由 v1 的测试按 16 个工具逐一核对。
 
@@ -19,11 +19,12 @@
 |---|---|
 | `GEMARC_TOOLSET` | 必须是 `atlas`。一个服务器进程只带一个工具集；要同时用 v1 工具，另外再注册一个 `gemarc` 条目 |
 | `GEMARC_WORKSPACE_ROOT` | 项目目录所在的根（`<workspace>`）。写入只会发生在这里面 |
-| `GEMARC_ALLOW_WRITE` | `1` 允许 `gemarc_atlas_init` 和 `gemarc_atlas_put` 写项目；`0` 只读（这两个工具返回 `GEMARC_AUTH_002`，其余工具照常） |
-| `GEMARC_ATLAS_ROOTS` | 被分析源码所在的位置，`别名=路径;别名=路径`。模型只能写别名，不能写路径 |
+| `GEMARC_ALLOW_WRITE` | `1` 允许写项目的工具工作（`init`、`put`、`simulate`、`evidence`、`build`、`verify` 和 `review` 的 `record`）；`0` 只读（这些工具返回 `GEMARC_AUTH_002`，`brief`、`check`、`status`、`index`、`doc`、`outline` 和 `review` 的 `report` 照常） |
+| `GEMARC_ATLAS_ROOTS` | 被分析源码所在的位置，`别名=路径;别名=路径`。模型只能写别名，不能写路径；`gemarc_atlas_outline` 和 `gemarc_atlas_evidence` 用它读源码，没有它 as-is 的 Implemented 声明无法核验 |
+| `GEMARC_ATLAS_BROWSER` | 可选：Edge 或 Chrome 可执行文件的完整路径，供浏览器门（`gemarc_atlas_verify`）用。指向的文件不存在时门是醒目的 SKIPPED，不会改用别的浏览器 |
 | `PYTHONUTF8` | 保持 `1`，中文才不会乱码 |
 
-客户端启动 stdio 服务器时只传过滤后的环境，所以服务器需要的每个变量都要写在配置里，不能指望继承你的 shell。
+客户端启动 stdio 服务器时只传过滤后的环境，所以服务器需要的每个变量都要写在配置里，不能指望继承你的 shell。浏览器门在 Windows 上靠 `ProgramFiles`、`ProgramFiles(x86)`、`LOCALAPPDATA` 找到 Edge；这几个变量不在被过滤的环境里时，服务器在 `build gate=smoke` 和 `verify` 里会按默认安装目录（`C:\Program Files (x86)`、`C:\Program Files`）补上缺的 `ProgramFiles*`；Edge 装在别处时，在配置里转发这些变量，或设置 `GEMARC_ATLAS_BROWSER`。找不到浏览器时 `gemarc_atlas_verify` 回复 SKIPPED（不算通过），`gemarc_atlas_status` 停在 `needs-user`，由用户装浏览器，或把理由写进 `<workspace>/<项目>/atlas/waive-browser.txt`（只有用户写这个文件）。
 
 ## 3. Claude Code
 
@@ -72,6 +73,7 @@ export GEMARC_ALLOW_WRITE=1
 ## 7. 一次完整的会话
 
 1. `get-prompt gemarc-atlas-create requirement=...` 取出驱动文本（或在 Claude Code 里直接运行斜杠命令）。
-2. 驱动文本让模型：读工作指令、`gemarc_atlas_init`、保存需求原文、循环 `gemarc_atlas_status` 与 `gemarc_atlas_put`，红稿用 `mode=patch` 修复，到 `review` 阶段恰好自审一次，最后写报告。
+2. 驱动文本让模型：读工作指令、`gemarc_atlas_init`、保存需求原文、循环 `gemarc_atlas_status` 与 `gemarc_atlas_put`，红稿用 `mode=patch` 修复；结构写完后（phase `build`）按 `status` 点名的顺序过 `gemarc_atlas_simulate`、`gemarc_atlas_evidence`（as-is）、`gemarc_atlas_build`、`gemarc_atlas_verify`；phase `review` 时恰好自审一次；最后写报告，并把 `atlas/dist/oracle-sheet.md` 交给你。
 3. 随时可以用 `gemarc_atlas_status` 看进度；说"继续"就从 `status` 续上，状态都在 `<workspace>/<项目>/atlas/` 里。
-4. 模型遇到只有你能决定的事项会停下来问你（`needs-user`），不会自己编造；同一个切片修复超过 3 轮或 `put` 次数用完，会报告 `blocked` 和最后一次诊断。
+4. 交到你手里的有两样：`<workspace>/<项目>/atlas/dist/index.html`（查看器）和 `oracle-sheet.md`（每条还没经你确认的期望一行，外加一行 `APPROVE-ALL`；勾选行或保留 `APPROVE-ALL` 行，写进 `atlas/oracle-confirm.txt`，这个文件只有你写）。
+5. 模型遇到只有你能决定的事项会停下来问你（`needs-user`：TBD、改过的期望要你批准的 oracle 表、没有浏览器、as-is 没有配置证据根 `GEMARC_ATLAS_ROOTS`），不会自己编造；同一个切片修复超过 3 轮或 `put` 次数用完，会报告 `blocked` 和最后一次诊断。

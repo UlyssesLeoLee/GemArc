@@ -5,4 +5,4 @@
 - Chapter 9 needs a policy: `## policies: id | text` with `src=<requirement or tbd id> kind=nfr`; chapter 10 uses `kind=constraint`. `by=user` only for a statement the user made.
 - Entity and Table nodes need `props={"columns":[...]}` (DD level).
 - Every room needs a floor and a building; every node needs a room (3D).
-- `doc` is structure-only: it never shows an engine result.
+- `doc(project, unit, level, lang, chapter, page)` is structure-only: it never shows an engine result. Default: an outline of one `unit` (`system`, `req:<id>`, `case:<id>`, `node:<id>`) at `level` REQ, BD or DD: `ch` has one digit per chapter (0 empty state, 1 content, 2 content with a NOT-AUTHORED slot), `markers` counts the slots that block `done`. `chapter` 1-12 returns that chapter's text (about 15 KiB per `page`).

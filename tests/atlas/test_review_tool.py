@@ -35,6 +35,10 @@ REPORT_CAP = 4500
 DESK = {name: (DESK_DIR / f"{name}.atl").read_text(encoding="utf-8") for name in ("00-space", "10-structure", "20-scenarios")}
 DESK["30-policy"] = "#atlas 1\n## policies: id | text | opts\nPL-NFR-1 | Borrowing completes within two seconds. | src=RQ-1 kind=nfr\n"
 TOOL = "gemarc_atlas_review"
+# what the desk's anchors point at (invented files): with a root the evidence gate can pass
+SOURCE_FILES = {"src/loan.py": "class Loans:\n    def create_loan(self, member):\n        return 1\n",
+                "src/stock.py": "def find_copy(title):\n    return None\n",
+                "docs/lending.md": "# Lending\nThe borrower opens the page to borrow.\n"}
 
 
 def _sdk_available() -> bool:
@@ -119,8 +123,12 @@ def check_sample(case: unittest.TestCase, atlas_dir: Path, report: dict):
 @unittest.skipUnless(_sdk_available(), "MCP SDK is not installed")
 class ReviewFlowOverStdio(unittest.TestCase):
     def test_the_whole_flow_through_the_official_client(self):
-        with temp_dir("atlas-review-ws-") as workspace:
-            stderr = asyncio.run(stdio_session({"GEMARC_ALLOW_WRITE": "1"}, workspace, lambda s, i: self.session(s, i, workspace)))
+        with temp_dir("atlas-review-ws-") as workspace, temp_dir("atlas-review-src-") as roots:
+            for rel, text in SOURCE_FILES.items():
+                (roots / rel).parent.mkdir(parents=True, exist_ok=True)
+                (roots / rel).write_text(text, encoding="utf-8")
+            env = {"GEMARC_ALLOW_WRITE": "1", "GEMARC_ATLAS_ROOTS": f"main={roots}"}
+            stderr = asyncio.run(stdio_session(env, workspace, lambda s, i: self.session(s, i, workspace)))
         self.assertNotIn("Traceback", stderr)
 
     async def session(self, session, init, workspace: Path):
@@ -159,7 +167,13 @@ class ReviewFlowOverStdio(unittest.TestCase):
             _, put = await call("gemarc_atlas_put", project="lending-desk", slice=slice_, text=text)
             self.assertEqual(put["status"], "committed", put)
         _, state = await call("gemarc_atlas_status", project="lending-desk")
-        self.assertEqual((state["phase"], state["done"]), ("review", False))
+        self.assertEqual((state["phase"], state["done"]), ("build", False), "the product gates come before the one review")
+        for tool in ("gemarc_atlas_simulate", "gemarc_atlas_evidence", "gemarc_atlas_build"):
+            _, gate = await call(tool, project="lending-desk")
+            self.assertEqual(gate["status"], "ok", (tool, gate))
+        (atlas_dir / "waive-browser.txt").write_text("no browser in this test; the user would open the page by hand\n", encoding="utf-8")
+        _, state = await call("gemarc_atlas_status", project="lending-desk")
+        self.assertEqual((state["phase"], state["done"]), ("review", False), state)
         self.assertIn("review:missing", state["blockers"])
 
         # ---- report: compact, deterministic, read-only ---------------------------------------------------------
@@ -173,7 +187,7 @@ class ReviewFlowOverStdio(unittest.TestCase):
         self.assertLessEqual(len(json.dumps(report, ensure_ascii=False, separators=(",", ":")).encode("utf-8")), REPORT_CAP)
         self.assertEqual(report["counts"]["BLOCK"], 0)
         self.assertEqual(report["record"], {"state": "none"})
-        self.assertEqual([f["id"] for f in report["findings"]], ["RV-H1", "RV-E4"], "the by=ai policy and the anchors nobody verified yet")
+        self.assertEqual([f["id"] for f in report["findings"]], ["RV-H1", "RV-O1"], "the by=ai policy and the sealed expectations nobody confirmed (the evidence gate has verified the anchors)")
         check_sample(self, atlas_dir, report)
 
         # ---- bad calls are refusals (isError), nothing written ------------------------------------------------
@@ -223,7 +237,7 @@ class ReviewWithoutTheWriteGate(unittest.TestCase):
         self.assertFalse((atlas_dir / ".atlas" / "review.json").exists())
         self.assertEqual(tree(workspace), before, "neither call changed a byte of the project")
         _, state = await call("gemarc_atlas_status", project="lending-desk")
-        self.assertEqual((state["phase"], state["done"]), ("review", False))
+        self.assertEqual((state["phase"], state["done"]), ("needs-user", False), "no evidence root is configured here: the user is asked")
 
 
 if __name__ == "__main__":

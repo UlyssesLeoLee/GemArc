@@ -661,6 +661,8 @@ derive_element_ports(element_id, input_type, output_type)
 | `GEMARC_ATLAS_MODEL_002` | 辅助函数收到违反契约的参数（方向、序号、NaN 等） |
 | `GEMARC_ATLAS_MODEL_010` | 顶层结构：缺键、多键、`schema` 错误、集合不是数组 |
 | `GEMARC_ATLAS_MODEL_011` | 记录字段：缺必需字段、未知字段、类型不符 |
+| `GEMARC_ATLAS_MODEL_012` | 字符串（或对象键）含孤立的 UTF-16 代理码位（如 U+D800），无法编码为 UTF-8，`model_sha` 与文件写入都会失败 |
+| `GEMARC_ATLAS_MODEL_013` | 模型里任何位置出现非有限数（`NaN`、`Infinity`、`-Infinity`），无法写成规范 JSON |
 | `GEMARC_ATLAS_MODEL_020` | id 不满足对应语法 |
 | `GEMARC_ATLAS_MODEL_021` | id 重复（全局唯一、转移 id、元素与节点冲突） |
 | `GEMARC_ATLAS_MODEL_030` | 取值不在词表或枚举内 |
@@ -668,6 +670,8 @@ derive_element_ports(element_id, input_type, output_type)
 | `GEMARC_ATLAS_MODEL_050` | 推导字段与重新计算的值不一致 |
 | `GEMARC_ATLAS_MODEL_051` | `Implemented` 缺少 `source-code` 证据 |
 | `GEMARC_ATLAS_MODEL_060` | 机器完整性（重复转移 id 等） |
+
+**`012` 与 `013` 的范围**（新增，原有代码的含义不变）：检查器在其它检查之前迭代遍历整个模型，覆盖所有自由文本（`name`、`sub`、`title`、`label`、`anchor`、`filePath`、`topic`、`errorCode`、策略文本等）、id、数组项、`props`、`params`、`options`、`context` 里任意深度的值和对象键，包括 `tuple`。每处问题一条，`path` 形如 `$.nodes[0].props.dedup.httpStatus`；键含代理码位时路径写成 `[ascii(键)]`，`path` 与 `message` 本身永远可以编码为 UTF-8，也不回显出问题的原文。每个代码最多列出 100 条，超出时追加一条 `path` 为 `$` 的汇总（`N more issues of this kind are not listed`）。合法的增补平面字符（如表情符号）（一个码位）不算代理码位。格式层仍在自己的输入边界拒绝同样的值（ST-007、ST-008），本条覆盖用其它方式构造的模型。
 
 检查器核对：顶层与记录形态、id 语法与全局唯一、词表与枚举、引用完整性、每个推导字段、事件选项的类型与取值（4.8）、守卫与 `when` 的形态（7.5）、干预的必需参数、数值边界与引用（4.9，含 `appliesTo` 非空、`targetEventId`、`targetRuleId`）、`combined_intervention` 的每个展平后的部分、元素端口与 `rewrite` 链的推导、`expect.terminal` 的键与状态值、嵌套深度（2.1）。
 

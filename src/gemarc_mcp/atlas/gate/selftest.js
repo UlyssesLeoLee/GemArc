@@ -276,6 +276,8 @@
     var pair = null;
     for (var i = 0; i < items.length; i++) {
       for (var j = i + 1; j < items.length; j++) {
+        // A control that contains another one (a tab with a close button) is nesting, not a collision.
+        if (items[i].el.contains(items[j].el) || items[j].el.contains(items[i].el)) continue;
         var a = items[i].rect;
         var b = items[j].rect;
         var w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
@@ -322,9 +324,59 @@
 
   var BAD_TEXT = /undefined|NaN|\[object/g;
 
+  // Strings of the page's own DATA that legitimately contain a bad token (a node named "returns undefined"): the page may list them in
+  // the optional hook textAllow(); every occurrence of such a snippet is removed before the scan. Markup characters are dropped on
+  // both sides so rendered emphasis does not break a match. Without the hook nothing is exempt.
+  var allowSnippets = null;
+
+  function squash(text) {
+    return String(text).replace(/[*_`]/g, "").replace(/\s+/g, " ").trim();
+  }
+
+  function snippets() {
+    if (allowSnippets) return allowSnippets;
+    allowSnippets = [];
+    try {
+      var list = currentHooks && typeof currentHooks.textAllow === "function" ? currentHooks.textAllow() : [];
+      for (var i = 0; i < list.length && allowSnippets.length < 600; i++) {
+        var s = typeof list[i] === "string" ? squash(list[i]) : "";
+        if (s) allowSnippets.push(s);
+      }
+    } catch (e) {
+      note("textAllow", e);
+    }
+    return allowSnippets;
+  }
+
+  function maskAllowed(text) {
+    var list = snippets();
+    if (!list.length) return text;
+    text = squash(text);
+    // all occurrences are found in the ORIGINAL text and removed together: overlapping snippets must not destroy each other's context
+    var spans = [];
+    for (var i = 0; i < list.length; i++) {
+      var at = text.indexOf(list[i]);
+      while (at >= 0) {
+        spans.push([at, at + list[i].length]);
+        at = text.indexOf(list[i], at + 1);
+      }
+    }
+    if (!spans.length) return text;
+    spans.sort(function (a, b) { return a[0] - b[0]; });
+    var out = "";
+    var pos = 0;
+    for (var k = 0; k < spans.length; k++) {
+      if (spans[k][0] > pos) out += text.slice(pos, spans[k][0]);
+      out += " ";
+      pos = Math.max(pos, spans[k][1]);
+    }
+    return out + text.slice(pos);
+  }
+
   function scanString(text, prefix, bad) {
     var found = 0;
     var m;
+    text = maskAllowed(text);
     BAD_TEXT.lastIndex = 0;
     while ((m = BAD_TEXT.exec(text)) && found < 3) {
       bad.push(prefix + clip(text.slice(Math.max(0, m.index - 12), m.index + 24).replace(/\s+/g, " "), 40));
@@ -486,9 +538,37 @@
     return out;
   }
 
+  // ---- projected scene geometry (3D, 4D, 5D) -------------------------------------------------
+  // The page may provide hooks.sceneBounds(tab) -> { frames: [{id, x, y, w, h}], nodes: [{id, x, y}] } in CSS pixels from the corner of
+  // its canvas, or null for a tab without a scene. This file records it together with the CSS size of the first visible canvas that is
+  // marked data-gate=canvas (measured here, not reported by the page); the runner decides (frames and nodes inside the canvas, occupancy).
+  function sceneCanvasBox() {
+    var nodes = document.querySelectorAll("canvas[data-gate~=canvas]");
+    for (var i = 0; i < nodes.length; i++) {
+      if (visibleRect(nodes[i]) !== null) return { w: nodes[i].clientWidth, h: nodes[i].clientHeight };
+    }
+    return null;
+  }
+
+  function measureScene(tab, rec) {
+    var hook = currentHooks && currentHooks.sceneBounds;
+    if (typeof hook !== "function") return;
+    try {
+      rec.scene = jsonSafe(hook(tab));
+    } catch (e) {
+      rec.scene = null;
+      rec.sceneError = clip(fmt(e), 200);
+      note("sceneBounds", e);
+    }
+    rec.sceneCanvas = rec.scene ? sceneCanvasBox() : null;
+  }
+
+  var currentHooks = null;
+
   // ---- walker ---------------------------------------------------------------------------------
   function run(hooks) {
     hooks = hooks || {};
+    currentHooks = hooks;
     var tabs = hooks.tabs && hooks.tabs.length ? hooks.tabs.slice() : [];
     var sleepMs = typeof hooks.sleepMs === "number" ? hooks.sleepMs : 50;
     var headerSelector = hooks.headerSelector || HEADER_SELECTOR;
@@ -550,6 +630,7 @@
       rec.render = callRender(tab, rec); // the second call is the reported one: the heartbeat
       rec.draws = draws.gl + draws.c2d - d0;
       rec.canvases = probeCanvases(); // same task as renderOnce: the drawing buffer is still valid
+      measureScene(tab, rec); // same task again: the projected geometry belongs to the frame that was just drawn
       var f2 = readFrame();
       rec.frames = [f0, f1, f2];
       rec.header = measureHeader(headerSelector);
@@ -592,7 +673,12 @@
       var rec = { name: String(step && step.name), ok: true, msg: "" };
       try {
         var out = step.run();
-        if (out === false || typeof out === "string") {
+        if (out && typeof out.then === "function") {
+          // A step is synchronous: a value that arrives later cannot be judged, so it is not accepted.
+          if (typeof out.catch === "function") out.catch(function () {});
+          rec.ok = false;
+          rec.msg = "step returned a promise: steps must be synchronous";
+        } else if (out === false || typeof out === "string") {
           rec.ok = false;
           rec.msg = clip(out === false ? "returned false" : out, 200);
         }

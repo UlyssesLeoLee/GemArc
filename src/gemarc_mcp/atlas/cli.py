@@ -1,4 +1,4 @@
-"""``python -m gemarc_mcp.atlas <command>``: the atlas tools from a shell (check, status, index, put, init, brief).
+"""``python -m gemarc_mcp.atlas <command>``: the atlas tools from a shell (init, put, check, status, index, simulate, doc, outline, evidence, build, verify, review, brief).
 
 ::
 
@@ -8,12 +8,20 @@
     python -m gemarc_mcp.atlas check --text FILE|-            # inline text, advisory, no project
     python -m gemarc_mcp.atlas status <project> [--view next|report|dims|oracle|evidence] [--scope S]
     python -m gemarc_mcp.atlas index <project> [--scope nodes|room:ID|req:ID|case:ID|ids:PREFIX] [--with-edges] [--ids A,B] [--detail line|expanded] [--offset N]
+    python -m gemarc_mcp.atlas simulate <project> [--case C] [--intervention I] [--detail count|ids|trace]   # blind verdicts (seals first)
+    python -m gemarc_mcp.atlas simulate <project> --bite | --sheet | --gate                                    # mutants + guard scan | oracle sheet | release gate
+    python -m gemarc_mcp.atlas doc <project> [--unit system|req:ID|case:ID|node:ID] [--level REQ|BD|DD] [--lang L] [--chapter N] [--page N]
+    python -m gemarc_mcp.atlas outline <root-alias> <path> [--offset N]                                        # source outline with anchors
+    python -m gemarc_mcp.atlas evidence <project> [--ids A,B]                                                  # verify evidence, stamp the passes
+    python -m gemarc_mcp.atlas build <project> [--release] [--no-docs] [--gate none|smoke]                  # dist/index.html (+ documents, oracle sheet)
+    python -m gemarc_mcp.atlas verify <project> [--widths 1024,1366,1600]                                       # browser gate on the built page
     python -m gemarc_mcp.atlas review <project> [--action report|record] [--notes "fixed=RV-..; open=RV-.."]
     python -m gemarc_mcp.atlas brief [--section S] [--lang zh-CN|en-US]
 
 The workspace root is ``GEMARC_WORKSPACE_ROOT`` (default ``~/.gemarc/workspace``; ``--root`` overrides it for one call); ``init``,
-``put``, ``review --action record`` and ``check --emit-model`` write and need ``GEMARC_ALLOW_WRITE=1``; a read never creates the
-default workspace. Output is the compact JSON reply of the tool (UTF-8); ``--human`` prints only the human text (diagnostics,
+``put``, ``simulate`` (it seals and ledgers; ``--gate`` only reads), ``evidence`` (writes the stamp), ``build`` (also writes the oracle sheet), ``verify`` (writes ``dist/.verify``), ``review --action record`` and ``check --emit-model`` write and need ``GEMARC_ALLOW_WRITE=1``;
+``doc`` and ``outline`` only read (``outline`` takes an alias of ``GEMARC_ATLAS_ROOTS``, as ``evidence`` does); a read never creates the
+default workspace. ``status`` applies the real completion gates (as the MCP tools do) when it is run from this entry. Output is the compact JSON reply of the tool (UTF-8); ``--human`` prints only the human text (diagnostics,
 next lines, questions for the user, brief, index lines) and is about half the size, so a shell client should use it. Exit code 0 = ok / committed / created,
 1 = a refused or invalid request, ERROR findings or a red draft, 2 = bad command line. Standard library only.
 """
@@ -26,7 +34,7 @@ from typing import Sequence
 
 from ..paths import GemArcError
 from . import project as pj
-from . import review as review_mod
+from . import status as status_mod
 from . import tools
 
 
@@ -94,6 +102,37 @@ def _parser() -> argparse.ArgumentParser:
     s.add_argument("--ids", default="")
     s.add_argument("--detail", default="line", choices=["line", "expanded"])
     s.add_argument("--offset", type=int, default=0)
+    s = sub.add_parser("simulate", help="blind verdicts for the registered expectations (ids and trace are recorded reveals)")
+    s.add_argument("project")
+    s.add_argument("--case", default="")
+    s.add_argument("--intervention", default="")
+    s.add_argument("--detail", default="count", choices=["count", "ids", "trace"])
+    group = s.add_mutually_exclusive_group()
+    group.add_argument("--bite", action="store_true", help="verdicts, then the mutants of every case that held and the guard scan")
+    group.add_argument("--sheet", action="store_true", help="write atlas/dist/oracle-sheet.md")
+    group.add_argument("--gate", action="store_true", help="the oracle part of the release gate (read-only)")
+    s = sub.add_parser("doc", help="structure of the derived documents: outline, or one chapter page (never engine output)")
+    s.add_argument("project")
+    s.add_argument("--unit", default="system")
+    s.add_argument("--level", default="BD", choices=["REQ", "BD", "DD"])
+    s.add_argument("--lang", default="")
+    s.add_argument("--chapter", default="")
+    s.add_argument("--page", type=int, default=0)
+    s = sub.add_parser("outline", help="def/class/heading lines of one source file with unique anchors (root = an alias of GEMARC_ATLAS_ROOTS)")
+    s.add_argument("alias", metavar="root-alias")
+    s.add_argument("path")
+    s.add_argument("--offset", type=int, default=0)
+    s = sub.add_parser("evidence", help="verify the evidence rows against the real files and stamp what passes")
+    s.add_argument("project")
+    s.add_argument("--ids", default="")
+    s = sub.add_parser("build", help="write atlas/dist/index.html (and documents) from the project; sealed expectations only")
+    s.add_argument("project")
+    s.add_argument("--release", action="store_true", help="also require the release gate (oracle, evidence, no NOT-AUTHORED slot, browser gate)")
+    s.add_argument("--no-docs", action="store_true", help="do not write docs/, diagrams/ and prompts/")
+    s.add_argument("--gate", default="none", choices=["none", "smoke"], help="run the browser gate on the page after writing it")
+    s = sub.add_parser("verify", help="run the browser gate on the built page (exit 1 on FAIL, SKIP or INCONCLUSIVE)")
+    s.add_argument("project")
+    s.add_argument("--widths", default="1024,1366,1600", help="comma separated innerWidth values")
     s = sub.add_parser("review", help="the one self-review: report (read-only) or record (once)")
     s.add_argument("project")
     s.add_argument("--action", default="report", choices=["report", "record"])
@@ -117,6 +156,12 @@ def _human(reply: dict) -> str:
         lines.append(" ".join(head))
     if isinstance(reply.get("diagnostics"), str) and reply["diagnostics"].strip():
         lines.append(reply["diagnostics"].rstrip("\n"))
+    if isinstance(reply.get("page"), dict) and "bytes" in reply["page"]:       # build: where the page is and what it is made of
+        lines.append(f"{reply.get('dist', '')}: index.html {reply['page']['bytes']} bytes sha256 {str(reply['page'].get('sha256', ''))[:12]}")
+        lines.append("parts: " + ", ".join(f"{k} {v}" for k, v in (reply.get("parts") or {}).items()))
+        lines.append("data: " + ", ".join(f"{k} {v}" for k, v in (reply.get("data") or {}).items()))
+    if isinstance(reply.get("lines"), list):
+        lines.extend(str(x) for x in reply["lines"])
     if isinstance(reply.get("next"), list):
         lines.extend(str(x) for x in reply["next"])
     if isinstance(reply.get("needsUser"), list):
@@ -134,15 +179,32 @@ def _human(reply: dict) -> str:
             lines.append(f"check {row.get('at')} {row.get('k')} {row.get('id')}: {row.get('claim')} | vs {row.get('vs')}")
     if isinstance(reply.get("slots"), list):
         lines.extend(reply["slots"])
+    for key in ("fail", "refused", "undecided"):
+        if isinstance(reply.get(key), list):
+            lines.extend(str(x) for x in reply[key])
+    if isinstance(reply.get("pass"), list) and reply["pass"]:
+        lines.append("pass: " + ", ".join(str(x) for x in reply["pass"]))
+    if isinstance(reply.get("blockers"), list) and reply["blockers"] and isinstance(reply["blockers"][0], dict):
+        lines = [x for x in lines if not x.startswith("blockers: ")]
+        lines.extend(f"{b['rule']} {b['kind']} {b['id']}: {b['message']}" for b in reply["blockers"])
+    if isinstance(reply.get("bite"), dict):
+        b = reply["bite"]
+        lines.append(f"bite: {b.get('cases')} cases, {b.get('mutants')} mutants, {b.get('killed')} killed, rate {b.get('rate')}"
+                     + (f"; zero killed: {', '.join(b['zeroKilled'])}" if b.get("zeroKilled") else "")
+                     + (f"; weak: {', '.join(b['weak'])}" if b.get("weak") else "")
+                     + (f"; skipped: {', '.join(reply.get('skipped', []))}" if reply.get("skipped") else ""))
+    if isinstance(reply.get("attestation"), dict):
+        lines.append(reply["attestation"].get("badge", ""))
     return "\n".join(lines) if lines else json.dumps(reply, ensure_ascii=False, indent=2)
 
 
 def run(argv: Sequence[str]) -> "tuple[dict, int]":
     """Run one command; ``(reply, exit code)``. Never raises for a refused request."""
     args = _parser().parse_args(list(argv))
-    writes = args.cmd in ("init", "put") or (args.cmd == "check" and args.emit_model) or (args.cmd == "review" and args.action == "record")
+    writes = (args.cmd in ("init", "put") or (args.cmd == "check" and args.emit_model) or (args.cmd == "review" and args.action == "record")
+              or (args.cmd == "simulate" and not args.gate) or args.cmd in ("build", "verify", "evidence"))
     try:
-        ws = pj.get_workspace(args.root or None, create=writes) if not (args.cmd == "brief" or (args.cmd == "check" and args.text)) else None
+        ws = pj.get_workspace(args.root or None, create=writes) if not (args.cmd in ("brief", "outline") or (args.cmd == "check" and args.text)) else None
     except GemArcError as ex:
         reply = tools.invalid(ex.code, ex.message)
         return reply, 1
@@ -164,13 +226,38 @@ def run(argv: Sequence[str]) -> "tuple[dict, int]":
         reply = tools.status(ws, args.project, args.view, args.scope)
     elif args.cmd == "index":
         reply = tools.index(ws, args.project, args.scope, args.with_edges, args.ids, args.detail, args.offset)
+    elif args.cmd == "simulate":
+        if args.gate:
+            reply = tools.oracle_gate(ws, args.project)
+        elif args.sheet:
+            reply = tools.oracle_sheet(ws, args.project)
+        elif args.bite:
+            reply = tools.oracle_bite(ws, args.project)
+        else:
+            reply = tools.simulate(ws, args.project, args.case, args.intervention, args.detail)
+    elif args.cmd == "doc":
+        reply = tools.doc(ws, args.project, args.unit, args.level, args.lang, args.chapter, args.page)
+    elif args.cmd == "outline":
+        reply = tools.outline(args.alias, args.path, args.offset)
+    elif args.cmd == "evidence":
+        reply = tools.evidence(ws, args.project, args.ids)
+    elif args.cmd == "build":
+        reply = tools.build_all(ws, args.project, args.release, not args.no_docs, args.gate)
+    elif args.cmd == "verify":
+        try:
+            widths = [int(x) for x in args.widths.split(",") if x.strip()]
+        except ValueError:
+            raise SystemExit("--widths is a comma separated list of integers") from None
+        reply = tools.verify(ws, args.project, widths)
     elif args.cmd == "review":
-        reply = review_mod.run(ws, args.project, args.action, args.notes)
+        reply = tools.review(ws, args.project, args.action, args.notes, require_report=False)   # every shell call is its own process
     else:
         reply = tools.brief(args.section, args.lang)
     bad = reply.get("status") in ("invalid", "error")
-    if reply.get("status") == "ok" and reply.get("clean") is False:
-        bad = True
+    if reply.get("status") == "ok" and (reply.get("clean") is False or reply.get("ok") is False):
+        bad = True                                    # ERROR findings of check, a failing verdict, a closed release gate
+    if args.cmd == "simulate" and reply.get("status") == "ok" and "clean" in reply and reply["clean"] is not True:
+        bad = True                                    # nothing was verified (clean is null): not a success
     reply["_human"] = args.human
     return reply, 1 if bad else 0
 
@@ -186,7 +273,8 @@ def _file_or_text(value: str) -> str:
 
 def main(argv: "Sequence[str] | None" = None) -> int:
     try:
-        reply, code = run(sys.argv[1:] if argv is None else argv)
+        with status_mod.product_gates():          # the shell entry applies the same real completion gates as the MCP tools
+            reply, code = run(sys.argv[1:] if argv is None else argv)
     except SystemExit as ex:
         if isinstance(ex.code, str):
             print(ex.code, file=sys.stderr)

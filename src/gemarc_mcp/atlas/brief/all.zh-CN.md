@@ -5,8 +5,9 @@
 ## 循环
 1. 先 `init` 一次（project、title、mode asis|tobe；用户在服务器配置里设 `GEMARC_ALLOW_WRITE=1` 与 `GEMARC_WORKSPACE_ROOT`，遇到 `GEMARC_AUTH_002` 就停下告诉用户）。to-be 的需求文本原样存到 `atlas/user/<name>.txt`（目录已建好）。
 2. 重复：`status view=next` -> 用 `put` 写它指出的那个切片 -> 读 `put` 回复里的 `next` 行并照做；只在红稿之后、续接、大约每 5 次 put、阶段切换时再调 `status view=next`。`put` 返回 invalid 就用 `put mode=patch` 修。回复带 `retry:true` 不算修复轮：几秒后原样重发。
-3. 遇到 `done:true`、`phase:needs-user`（问用户，绝不替用户决定）或同一切片修了 3 轮仍不过（报告 `blocked` 并附最后的诊断）就停；`next` 里的 `0 STOP` 行是同一个意思。
-4. 然后做且只做一次自审：`gemarc_atlas_review action=report`，只修它列出的问题，`action=record`（命令行：`python -m gemarc_mcp.atlas review <project> --action report|record --human`），再给最终报告。
+3. 遇到 `done:true`、`phase:needs-user`（把 `needsUser` 原样交给用户，绝不替用户决定）或同一切片修了 3 轮仍不过（报告 `blocked` 并附最后的诊断）就停；`next` 里的 `0 STOP` 行是同一个意思。
+4. `phase` 为 `build` 时，按 `next` 点名的顺序过各道门：`simulate`（盲测判定，先封存）、`evidence`（as-is：把引用的锚点对着真实文件核验；没有配置证据根就是 needs-user：由操作者设置 `GEMARC_ATLAS_ROOTS`，或用户同意降低 `verif=`）、`build`（写 `dist/` 和 `oracle-sheet.md`）、`verify`（浏览器门；SKIPPED 不算通过：停下，告诉用户装 Edge 或 Chrome，或由用户把理由写进 `atlas/waive-browser.txt`，这个文件只有用户写）。可选：`doc` 显示文档里哪里还有 NOT-AUTHORED 空位。
+5. 然后做且只做一次自审（`phase:review` 时）：`gemarc_atlas_review action=report`，只修它列出的问题，`action=record` 并带 `notes="fixed=<ids>; open=<ids>"`（要先 report；命令行：`python -m gemarc_mcp.atlas review <project> --action report|record --human`）。修复改了模型，要把上面的门重新过一遍，`record` 才会被接受；这不是第二轮自审。再给最终报告（先读 status 回复里的 `openBlocks`、`waived` 和 `await` 行，逐条写进去），并把 `atlas/dist/oracle-sheet.md` 交给用户：这些期望等他确认。
 
 ## 写什么
 - 切片名 `[a-z0-9-]{1,40}`，按阅读顺序编号：`00-space`（buildings、floors、rooms），`10-structure`、`11-structure` ...（nodes、edges、evidences、machines、transitions），`20-scenarios` ...（tests、cases、events、expect、interventions、requirements、tbds、policies）。
@@ -21,10 +22,10 @@
 `put` 遇到 ERROR 什么都不提交，并把你的全文存成该切片的红色草稿（不会丢）。用 `put mode=patch` 只发改动的行：同一标识替换（id；边 from|rel|to；expect 的 case；转移 machine+from|to），`-id` 删除一行，事件块 `@set case=X` 替换 X 的全部事件。不要重发或重读整个切片。先修列出的第一条错误：其余常常是它的后果。WARN 和 INFO 不阻断；还没定义的 id 先记为 pending，接着写定义它的切片。
 
 ## 读 `status view=next`
-`{done, phase, next[], blockers[], needsUser[]}`。`next` 最多 10 行；行首数字是优先级（1 红色草稿或错误，2 BLOCK 空位，3 未定义的 id，4 需求缺口，5 没有期望的用例，6 不可达状态，7 覆盖）；最后一行是维度就绪度 1D-5D。phase 取值：collect、author、repair、build、review、done、needs-user。`index` 列出已有内容（nodes、room:、req:、case:、ids:前缀）；`check` 永不写入（mode=slice 检查单个切片，mode=full 检查整个项目）。
+`{done, phase, next[], blockers[], needsUser[]}`。`next` 最多 10 行；行首数字是优先级（1 红色草稿或错误，2 BLOCK 空位，3 未定义的 id，4 需求缺口，5 没有期望的用例，6 不可达状态，7 覆盖）；最后一行是维度就绪度 1D-5D。phase 取值：collect、author、repair、build（有门是红的：simulate、evidence、build 或 verify）、review、done、needs-user。`index` 列出已有内容（nodes、room:、req:、case:、ids:前缀）；`check` 永不写入（mode=slice 检查单个切片，mode=full 检查整个项目）。
 
 ## 期望
-`expect` 行写的是应该发生什么，依据需求或你读到的代码，在任何仿真之前写，绝不从引擎结果抄。详见 `brief section=oracle`。
+`expect` 行写的是应该发生什么，依据需求或你读到的代码，在任何仿真之前写，绝不从引擎结果抄。终态由固定规则推出：节点从 `Idle` 开始；`Call` 让接收方 `Running`，直到有 `Return`（发送方随之 `Completed`）；`Failure` 让接收方 `Failed`。详见 `brief section=oracle`。
 
 ## 成本
 不重发有效的行，不重读切片，引用唯一锚点而不是粘贴代码，sub、label、title 各写一短行。详见 `brief section=economics`；文档见 `brief section=docs`。

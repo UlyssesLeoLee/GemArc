@@ -10,6 +10,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import math
 import re
 from collections import Counter
 from types import MappingProxyType
@@ -86,6 +87,8 @@ E_BAD_PART = "GEMARC_ATLAS_MODEL_001"
 E_BAD_ARG = "GEMARC_ATLAS_MODEL_002"
 E_SHAPE = "GEMARC_ATLAS_MODEL_010"
 E_FIELD = "GEMARC_ATLAS_MODEL_011"
+E_SURROGATE = "GEMARC_ATLAS_MODEL_012"  # a lone UTF-16 surrogate in a string or key (cannot be encoded to UTF-8)
+E_NONFINITE = "GEMARC_ATLAS_MODEL_013"  # a NaN or infinite number (not representable in canonical JSON)
 E_ID = "GEMARC_ATLAS_MODEL_020"
 E_DUP = "GEMARC_ATLAS_MODEL_021"
 E_ENUM = "GEMARC_ATLAS_MODEL_030"
@@ -884,6 +887,58 @@ def nesting_exceeds(value, limit: int = MAX_NESTING) -> bool:
     return False
 
 
+_SURROGATE_RE = re.compile("[\ud800-\udfff]")
+_ENCODING_ISSUE_CAP = 100  # per code: a hostile model must not produce an unbounded issue list
+
+
+def _encoding_issues(model) -> list[dict]:
+    """Strings with a lone UTF-16 surrogate (values and keys) and non-finite numbers anywhere in ``model``.
+
+    Both make ``canonical_bytes`` / ``model_sha`` and every UTF-8 file write fail. Iterative (no recursion), document order,
+    at most ``_ENCODING_ISSUE_CAP`` issues per code (one more issue per capped code says how many are not listed). Paths and
+    messages never contain the offending text itself (it would not encode either).
+    """
+    issues: list[dict] = []
+    seen: Counter = Counter()
+
+    def report(code: str, path: str, message: str) -> None:
+        seen[code] += 1
+        if seen[code] <= _ENCODING_ISSUE_CAP:
+            issues.append({"code": code, "path": path, "message": message})
+
+    def key_part(key) -> str:
+        if isinstance(key, str):
+            return f"[{ascii(key)}]" if _SURROGATE_RE.search(key) else "." + key
+        return f"[{ascii(key)}]"
+
+    stack: list[tuple[Any, str]] = [(model, "$")]
+    visited = 0
+    while stack:
+        item, path = stack.pop()
+        visited += 1
+        if visited > 5_000_000:
+            break
+        if isinstance(item, str):
+            if _SURROGATE_RE.search(item):
+                report(E_SURROGATE, path, "a lone UTF-16 surrogate in a string (it cannot be encoded to UTF-8)")
+        elif isinstance(item, float):
+            if not math.isfinite(item):
+                report(E_NONFINITE, path, f"a non-finite number ({item!r}) is not allowed")
+        elif isinstance(item, Mapping):
+            children = []
+            for key, value in item.items():
+                if isinstance(key, str) and _SURROGATE_RE.search(key):
+                    report(E_SURROGATE, path + key_part(key), "a lone UTF-16 surrogate in an object key (it cannot be encoded to UTF-8)")
+                children.append((value, path + key_part(key)))
+            stack.extend(reversed(children))
+        elif isinstance(item, (list, tuple)):
+            stack.extend((child, f"{path}[{i}]") for i, child in reversed(list(enumerate(item))))
+    for code, count in seen.items():
+        if count > _ENCODING_ISSUE_CAP:
+            issues.append({"code": code, "path": "$", "message": f"{count - _ENCODING_ISSUE_CAP} more issues of this kind are not listed"})
+    return issues
+
+
 # --------------------------------------------------------------------------------------------------------
 # Contract checker
 # --------------------------------------------------------------------------------------------------------
@@ -1048,6 +1103,7 @@ def _contract_issues(model: Mapping, profile: "vocab.Profile | None" = None) -> 
         return [{"code": E_SHAPE, "path": "$", "message": "model must be an object"}]
     if nesting_exceeds(model):
         return [{"code": E_SHAPE, "path": "$", "message": f"the model is nested deeper than {MAX_NESTING} levels, is cyclic or is too large"}]
+    c.issues.extend(_encoding_issues(model))
     expected_keys = ("schema",) + COLLECTIONS
     for key in expected_keys:
         if key not in model:

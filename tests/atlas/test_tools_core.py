@@ -415,7 +415,7 @@ class StatusTests(Workspace):
         dims = tools.status(self.ws, "desk", view="dims")
         self.assertEqual(dims["required"], ["1D", "2D", "3D"])
         self.assertEqual({g["applicable"] for g in dims["gates"].values()}, {False})
-        self.assertFalse(dims["dimensions"]["4D"]["ready"])
+        self.assertTrue(dims["dimensions"]["4D"]["ready"])                            # put seals the desk's case and intervention
         with mock.patch.dict(st.GATES, clear=False):
             st.register_gate("build", lambda snap: {"applicable": True, "ok": False, "detail": "dist is missing"})
             reply = tools.status(self.ws, "desk")
@@ -455,7 +455,7 @@ class StatusTests(Workspace):
         self.assertTrue(any(x.startswith("BLOCK ch9.nfr") for x in report["slots"]))
         self.assertTrue(all(x.startswith("BLOCK ch9") or "ch9" in x for x in tools.status(self.ws, "desk", view="report", scope="ch9")["slots"]))
         oracle = tools.status(self.ws, "desk", view="oracle")
-        self.assertEqual((oracle["present"], oracle["total"]), (False, 0))
+        self.assertEqual((oracle["present"], oracle["total"]), (True, 2))             # put wrote the ledger: one case, one intervention
         evidence = tools.status(self.ws, "desk", view="evidence")
         self.assertEqual((evidence["evidences"], evidence["sourceCode"], evidence["stamped"]), (3, 2, 0))
         self.assertEqual(sorted(evidence["unstamped"]), ["EVD-1", "EVD-2"])

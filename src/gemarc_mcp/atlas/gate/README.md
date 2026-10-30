@@ -92,9 +92,21 @@ AtlasGate.run({
 
 结果 JSON(`v: 2`)里每个 tab 的原始量取:`frames=[f0,f1,f2]`、`frameReads=[a,b]`、`header={roots,n,maxOverlapPx,pair,outside}`、`scrollWidth`、`clientWidth`、`fit`、`textBad`、`draws`、`canvases[]`、`state`(给了 `tabState` 时)、`render`(页面自报,仅供参考);顶层另有 `nonce`、`innerWidth`、`errors`、`steps`、`missingHooks`、`tabStateChecked`、`ua`。`v: 1`(旧自检,没有 nonce / clientWidth / 画布读取)会被判为 `BAD_RESULT`。
 
+## 场景边界(`sceneBounds`,M6)
+
+页面可以提供钩子 `sceneBounds(tab)`,返回 `{ frames: [{id, x, y, w, h}], nodes: [{id, x, y, r?}], occupancy? }`(`r` = 节点投影后的半径,缺省 0;占用率按节点盒(中心 ± r)计)(相对画布左上角的 CSS 像素,用画出这一帧的相机),没有场景的 tab 返回 `null`。`selftest.js` 在第二次 `renderOnce` 之后的同一个任务里调用它,并**自己**量第一个可见的 `canvas[data-gate~=canvas]` 的 CSS 尺寸,一起写入 `rec.scene` 与 `rec.sceneCanvas`(页面报告的坐标是页面的话,画布尺寸不是)。判定只在 `smoke.py`:
+
+| 码 | 名称 | 触发 |
+|---|---|---|
+| 023 | FRAME_CLIPPED | 某个框越出画布超过 `thresholds.sceneClipPx`(2 px)、在相机背后(`w`/`h` 为 `null`)、或者量不到画布 |
+| 024 | NODE_CLIPPED | 某个节点越出画布或在相机背后 |
+| 025 | SCENE_SPARSE | 节点包围盒面积 / 框包围盒面积 < `thresholds.sceneOccupancyMin`(0.1),或有框没有节点;钩子写 `occupancy: false` 时跳过(画布内测试仍然执行) |
+
+只量节点会放过被裁掉的视图,所以框计入。夹具在 `tests/atlas/gate_fixtures/scene/`(`clipped-scene` 失败 `FRAME_CLIPPED`,`sparse-scene` 失败 `SCENE_SPARSE`,各 20 次);标定数字与 2 倍余量的写法见 `calibration.json` 的 `provisional` 与 `docs/atlas/spec/bundle-contract.md` 第 11 节。没有钩子的页面完全不受影响。
+
 ## 判定与错误码
 
-`GEMARC_GATE_NNN`,`findings` 为空才是 PASS。001-018 沿用,019-022 是新增。
+`GEMARC_GATE_NNN`,`findings` 为空才是 PASS。001-018 沿用,019-022 是新增,023-025 是场景边界(M6,见上一节)。
 
 | 码 | 名称 | 触发 |
 |---|---|---|
@@ -301,9 +313,17 @@ ok-stub (non-ASCII path)      1366  PASS  -                                  20/
 - 头部检查只检查标了 `data-gate="header"` 的容器;现在没标记会失败(`HEADER_MISSING`),只有显式 `--no-header` 才跳过。
 - 挂在 DOM 里、有尺寸但摆在屏外的辅助 canvas,和别的可见 canvas 一样被读、被判(空白就是 `NON_BG`);没挂进 DOM 的离屏 canvas 看不到,也不判。
 - `[data-gate=fit]` 只检查视口内与自身 `overflow` 裁剪,不检查祖先裁剪。
-- 3D 投影边界、占用率下限、脚本化步骤的真实场景(选案例、播放步进、搜索、检视器)属于 M6,本目录只证明钩子机制。
+- 3D 投影边界与占用率下限(M6)由页面的 `sceneBounds` 钩子提供数据,判定在 `smoke._scene_findings`;真实场景的脚本化步骤(选案例、播放步进、检视器页签)在页面侧(`ui/tab-slots.js`)。门禁看到的是"画出了场景",看不到部件有没有画出:框和边画出而部件一个也没画会通过。
 - 错误视界 = 虚拟时间预算(默认 20 s),之后的错误看不到。
 - 窗口偏移是在本机两个浏览器版本上测的;换版本或换平台必须重测(运行器会用 005 报警,而不是放过)。
 - 启动耗时是**安静机器上的数字**;见上一节,负载下会明显变长,8 s 的验收是安静机器的口径,运行器的 30 s 超时不变。
 - 进程树清理:Windows 用 `taskkill /T /F`(已用真实子进程验证);POSIX 用独立会话 + `os.killpg`(代码已写,本机没有 Linux 环境,未验证)。
 - 本任务没有在参考页面副本上做头部重叠校准(那是后续里程碑的工作,且副本必须留在仓库之外)。
+
+## 与构建的集成(M4)
+
+- `smoke.verify_gate(page, widths=(1024, 1366, 1600), **run_gate 的参数)`:同一个浏览器依次在每个宽度启动一次,返回一个裁决 `{status, widths[], lines[], browser, message}`。`PASS` 要求每个宽度都通过;找不到浏览器时每个宽度都是 `SKIP`,总裁决是 `SKIP`,`lines` 与 `message` 写明"没有运行,不算通过";任何宽度的断言失败、或运行器本身抛出异常,总裁决都是 `FAIL`(异常记为 `PROCESS`)。`summarize_result` 给出单个宽度的纯数据(状态、发现名、标签页、脚本步骤数、耗时)。
+- `tools.build(gate="smoke")` 与 `tools.verify` 调用它,报告写在 `<项目>/atlas/dist/.verify/gate-report.json`,浏览器的临时目录写在 `.verify/work` 下并在结束后删除。`build` 在没有浏览器时仍然成功,但回复里 `gate` 是 `SKIP` 并有一行"页面未验证";`verify` 在没有浏览器时回复 `invalid`(`GEMARC_ATLAS_BUILD_031`:SKIPPED, NOT PASSED);门禁失败是 `GEMARC_ATLAS_BUILD_030`。发布构建(`release`)要求门禁是 `PASS`。
+- 页面里的门禁钩子由 `viewer/src/ui/shell.js` 的 `gateConfig()` 提供(六个标签页、四个脚本步骤 `doc-twin`、`levels`、`inspector`、`search`);`selftest.js` 在构建时由 `htmlassemble.py` 放进 `<head>` 最前面,本目录的行走器没有为此改动。`doc-twin` 在页面里重新组装 20 个规范选择并比较哈希,孪生实现漂移时把一条记录写进 `window.__ATLAS_ERRORS__`,所以运行器报 `PAGE_ERRORS` 与 `STEP_FAILED`。
+- 校准夹具的清单在 `tests/atlas/gate_fixtures/MATRIX.json`:`bad-header-overlap`(1256、1366 失败,1576 通过)、`frozen-scene`、`missing-result`(即 `no-result.html`)、`unknown-building`(测试时由合成模型生成,不存已构建的页面)、以及 viewer-B 的 `clipped-scene`(`FRAME_CLIPPED`)、`sparse-scene`(`SCENE_SPARSE`),它们在 `gate_fixtures/scene/`(不放在 `gate_fixtures/` 根目录:`test_gate_smoke` 会枚举根目录的 `*.html` 并要求每个都被它自己的源码用到)。
+- 在构建出的页面上做 N 次测量:`python tests/atlas/gate_html_matrix.py --runs 20 --fixtures`(退出码 0 GO、1 NO-GO、3 没有浏览器)。

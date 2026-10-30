@@ -681,7 +681,8 @@ class ConditionMatrixTests(Project):
         self.assertEqual(state.phase, "build")
         st.unregister_gate("build")
         self.assertTrue(self.state().done)
-        # 5 the oracle gate is applicable: 4D and 5D become required and nothing is sealed
+        # 5 the oracle gate is applicable: 4D and 5D become required and nothing is sealed (put seals, so the ledger is emptied)
+        self.paths.oracle.write_text("{}", encoding="utf-8")
         st.register_gate("oracle", lambda snap: {"applicable": True, "ok": True, "detail": "sealed"})
         state = self.state()
         self.assertFalse(state.done)

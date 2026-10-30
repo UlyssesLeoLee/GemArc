@@ -1106,7 +1106,8 @@ class HardeningTests(unittest.TestCase):
     def test_a_lone_surrogate_does_not_crash_a_run(self):
         model = synth.generate("small", 2)
         model["nodes"][0]["name"] = "\ud800"
-        self.assertEqual(am.contract_issues(model), [])
+        issues = am.contract_issues(model)
+        self.assertEqual([(i["code"], i["path"]) for i in issues], [(am.E_SURROGATE, "$.nodes[0].name")])
         run = E.simulate(model, model["cases"][0], [], {})
         self.assertEqual(run["status"], "OK")
         self.assertIsNone(run["modelVersion"])

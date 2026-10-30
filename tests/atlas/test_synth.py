@@ -795,6 +795,23 @@ class ReferenceDistributionTests(unittest.TestCase):
         self.assertEqual(lengths, {12, 13})
 
 
+class VerificationOverrideTests(unittest.TestCase):
+    """The random authored downgrade never writes ``Designed`` on an item with source-code evidence (rule EV-002, a WARN).
+
+    A ``Designed`` that the contract derives (an endpoint or inheritance cap) is legal and is not an authored claim.
+    """
+
+    def test_valid_models_of_every_preset_give_no_ev_002_through_the_rules(self):
+        from gemarc_mcp.atlas import encode, slicecheck
+
+        for preset in ("tiny", "small", "reference"):
+            for seed in range(3):
+                model = synth.generate(preset, seed, "random")
+                files = encode.encode_atl(model, max_bytes=encode.ADVISORY_BYTES, state_hypothetical=True)
+                result = slicecheck.check(files, encode.meta_of(model), mode="full")
+                self.assertEqual([d.rule for d in result.diagnostics if d.rule == "EV-002"], [], (preset, seed))
+
+
 class SpreadHelperTests(unittest.TestCase):
     def test_lengths_sum_exactly_and_stay_in_range(self):
         for seed in range(30):

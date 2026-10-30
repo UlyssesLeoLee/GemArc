@@ -21,10 +21,11 @@
       "minInnerWidth": 500
     }
   },
-  "thresholds": {"headerOverlapPx": 2, "scrollOverflowPx": 0, "nonBgFloor": 0.0005},
+  "thresholds": {"headerOverlapPx": 2, "scrollOverflowPx": 0, "nonBgFloor": 0.0005, "sceneClipPx": 2, "sceneOccupancyMin": 0.1},
   "gl": {"rendererSubstring": "SwiftShader"},
   "provisional": {
-    "thresholds.nonBgFloor": "not measured on a real atlas scene; only the synthetic stub (nonBgRatio 0.125) and blank canvases (0.0) were observed. Re-tune at the 3D milestone.",
+    "thresholds.nonBgFloor": "measured at M6 on real synthetic atlases: 3D and 4D scenes give nonBgRatio 0.017 to 0.089 (lowest: the 4D stage of a reference-scale case), the stub 0.125, blank canvases 0.0; the floor stays 0.0005, 34x below the lowest real scene.",
+    "thresholds.sceneOccupancyMin": "calibrated at M6 on synthetic atlases (3D tab, innerWidth 1024, 1366, 1600; a part counts with its projected radius): 0.603 to 0.624 (40 parts), 0.762 to 0.768 (reference scale, 144 parts drawn), 0.829 to 0.835 (400 parts); in Node over every probe model at every level the lowest is 0.251 (one part) and 0.150 for a model trimmed to one part; the sparse-scene fixture is 0.0005. 0.1 is 6x below the lowest synthetic atlas view (the 2x margin needs at most 0.33) and 200x above the fixture. Re-measure on a real project before trusting it for atlases with very uneven rooms.",
     "gl.rendererSubstring": "measured on Edge 152 and Chrome 156 with the three SwiftShader flags; a build that no longer reports it FAILs with RENDERER until re-calibrated."
   },
   "console": {

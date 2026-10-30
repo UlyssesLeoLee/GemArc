@@ -1,4 +1,4 @@
-# GemArc MCP 源码 v0.1.0 — 可运行 MVP
+# GemArc MCP 源码 v0.3.0 — 可运行 MVP
 
 > 2026-10-25；面向《GemArc MCP IPA 设计资料包 v1.0》的首期实现。**不代表全量 SRS 已完成，也不宣称 IPA 官方认证。**
 
@@ -6,7 +6,7 @@
 
 | 能力 | 状态 | 说明 |
 |---|---|---|
-| 14 个 MCP 工具 | 实现 | 基于 MCP Python SDK v2 的 `MCPServer`。**已用官方客户端完成真实 stdio 与 Streamable HTTP 握手核验**（14 tool / 2 resource / 1 prompt 全部调通） |
+| 16 个 MCP 工具（两个工具集） | 实现 | 基于 MCP Python SDK v2 的 `MCPServer`。`full` 16 个（本地 stdio，含工作区工具）；`stateless` 8 个（远程，模型随调用传入）。工具名只含 `[a-z0-9_]`，每个带 `title` 与安全 `annotations`，失败置 `isError`。**已用官方客户端完成真实 stdio 与公网 Streamable HTTP 握手核验** |
 | 2 个 MCP Resources + 1 Prompt | 实现 | Registry、简化 Schema 和标准设计策略 |
 | 统一模型和安全验证 | 实现 | 稳定 ID、证据等级、Node–Edge、View、Case 约束 |
 | 组件注册中心 | MVP | JSON 检索；无独立 UI 与组件包签名 |
@@ -17,7 +17,7 @@
 | 增量编译与缓存 | 未完成 | `diff` 提供影响分析，build 仍全量重建 |
 | Graphology / Dagre / Dexie | 可选适配器 | 运行时**零第三方硬依赖**：这些库一律工厂函数注入 + 内置兜底；不装也能跑 |
 | 浏览器自动化、视觉回归 | 部分 | 有 view-model 结构快照门禁（跑在**构建产物**上）；**像素级视觉回归仍未实现** |
-| 远程 MCP 端点（Vercel） | 实现，**受限形态** | Streamable HTTP + 静态站同在一个函数；写工具默认关闭；文件系统临时，跨调用状态会丢。详见 `docs/09_部署/01_Vercel部署.md` |
+| 远程 MCP 端点（Vercel） | 实现，**已部署并公网实测** | 无状态：模型随调用传入，服务端不保存项目；可选 Bearer 令牌（`GEMARC_MCP_TOKEN`）；`GET /mcp` 返回 405；固定件经 `/kit/<profile>.zip` 下载。`scripts/verify_remote.py` 对公网域名 25/25 通过。详见 `docs/09_部署/01_Vercel部署.md` |
 | 安装时完全离线 | 不保证 | Python MCP SDK 需 pip 获取；生成的基础站点不使用 CDN |
 
 ## Windows 11 安装 / PowerShell
@@ -58,7 +58,7 @@ py -3.11 -m http.server 8000 --bind 127.0.0.1
   "mcpServers": {
     "gemarc": {
       "command": "E:\\GemArcMCP\\.venv\\Scripts\\python.exe",
-      "args": ["-m", "gemarc_mcp.server"],
+      "args": ["-m", "gemarc_mcp"],
       "env": {
         "GEMARC_WORKSPACE_ROOT": "E:\\GemArcWork",
         "GEMARC_ALLOW_WRITE": "1"
@@ -68,7 +68,23 @@ py -3.11 -m http.server 8000 --bind 127.0.0.1
 }
 ```
 
-Claude Code、Codex、Cursor 和其他 MCP Host 的配置容器键名可能不同，请以对应客户端当前文档为准；本示例仅说明服务器 command/args/env。
+`GEMARC_WORKSPACE_ROOT` 必须是**已存在**的目录；不设置时默认用 `~/.gemarc/workspace`（自动创建）。
+Claude Code、Codex、Hermes 的配置容器键名各不相同，下一节与 `integration-examples/` 给出逐个客户端、可直接复制的配置。
+
+## 接入 Claude / Codex / Hermes
+
+本地 stdio（16 个工具，写工具默认关）或远程 `/mcp`（8 个无状态工具）。完整说明、兼容矩阵和每项的验证状态见
+`integration-examples/README.md`；先运行 `python scripts/verify_stdio.py` 自检本地服务器，
+运行 `python scripts/verify_remote.py https://<project>.vercel.app` 自检远程端点。
+
+- Claude Code：`claude mcp add --transport http --scope project gemarc 'https://<project>.vercel.app/mcp' --header 'Authorization: Bearer ${GEMARC_MCP_TOKEN}'`。**用单引号**，否则令牌会明文写进 `.mcp.json`。
+- Codex：`codex mcp add gemarc --url 'https://<project>.vercel.app/mcp' --bearer-token-env-var GEMARC_MCP_TOKEN`。
+- Hermes：`hermes mcp add gemarc --url https://<project>.vercel.app/mcp`。
+- claude.ai / Claude Desktop 的远程 connector 只支持 OAuth 或无认证（本仓库未实现 OAuth）：要用就得让部署不设 `GEMARC_MCP_TOKEN`，代价是端点对知道 URL 的人开放。
+- `skills/gemarc-5d-design/` 是配套的技能（SKILL.md），教模型按 brief → new_model → 填写 → validate → simulate → render 的顺序使用这些工具。
+
+> 上述客户端命令中，只有 Claude Code 加载 `.mcp.json` 并调用本地工具、Codex 的 `mcp add/list/get` 与 `--strict-config`
+> 被实际运行过；Codex 真正调用工具、Hermes、Claude Desktop 未验证（见 `integration-examples/README.md` 矩阵）。
 
 **安全提示**：写权限仅应由本地用户在可信配置中授权。设置 `GEMARC_ALLOW_WRITE=1` 后，允许当前 MCP 客户端调用写入工具；生产环境应增加按调用授权、审计和隔离策略。不要将服务无认证直接暴露到公网。
 
@@ -106,12 +122,12 @@ E:\GemArc\.venv\Scripts\python.exe -m gemarc_mcp.cli validate demo --strict
 E:\GemArc\.venv\Scripts\python.exe -m gemarc_mcp.cli build demo --profile static
 ```
 
-对应的 MCP 工具是 `gemarc.brief`（精简工作指令）、`gemarc.scaffold`（落固定件与槽位）
-与 `gemarc.contracts`（读取契约与词表内容）。
+对应的 MCP 工具是 `gemarc_brief`（精简工作指令）、`gemarc_scaffold`（落固定件与槽位）
+与 `gemarc_contracts`（读取契约与词表内容）。
 
-`gemarc.brief` 一次性返回：目标、五步流程、六条硬规则、12 个槽位（带 JSON Pointer 与规则）、
+`gemarc_brief` 一次性返回：目标、五步流程、六条硬规则、12 个槽位（带 JSON Pointer 与规则）、
 全部允许词值（6 级证据 / 21 实体类型 / 21 关系类型 / 19 图示类型 / Case 分类 / 空间层级）、
-构建命令，以及「哪些固定件已经写好、不要重写」的清单。**实测 8858 字节**，
+构建命令，以及「哪些固定件已经写好、不要重写」的清单。**实测约 10 KB**，
 用来替掉原先 13323 字节的提示词规格。
 
 ### 两种交付 profile，共用一份源码
@@ -156,9 +172,9 @@ const renderer = createThreeSpaceRenderer(THREE, { container, model, space, stor
 
 ```powershell
 cd E:\GemArc
-npx vercel@65.2.0 login
-npx vercel@65.2.0 link
-npx vercel@65.2.0 deploy --prod
+npx vercel@65.8.0 login
+npx vercel@65.8.0 link
+npx vercel@65.8.0 deploy --prod
 ```
 
 部署后：
@@ -167,8 +183,9 @@ npx vercel@65.2.0 deploy --prod
 |---|---|
 | `https://<domain>/mcp` | MCP Streamable HTTP 端点 |
 | `https://<domain>/healthz` | 健康检查与部署状态 |
-| `https://<domain>/` | **MCP 功能微调控制台**（Web 面板：选工具 → 调参数 → 看真实返回） |
-| `https://<domain>/site/` | 脚手架产出的 5D 架构站（含 3D 适配器，冷启动时从包内源码物化） |
+| `https://<domain>/` | **MCP 功能微调控制台**（Web 面板：选工具 → 调参数 → 看真实返回；设了令牌时需先粘贴令牌） |
+| `https://<domain>/site/` | 脚手架产出的 5D 架构站（含 3D 适配器，首次访问时从包内源码物化） |
+| `https://<domain>/kit/static.zip` | 站点**固定件**（外壳 + 共用运行时 + 词表）的确定性压缩包；与 `gemarc_render` 返回的 `data/*.json` 合并即是完整站点 |
 
 主页是**控制台**而不是设计图：远程端点的主角是 MCP 本身。面板里列出的工具、参数表单、
 输入契约全部来自 `tools/list` 的真实返回，写工具由服务端下发的名单上锁，
@@ -187,8 +204,13 @@ npx vercel@65.2.0 deploy --prod
 }
 ```
 
-**远程形态是受限的，不是本地模式的等价物**：Vercel 函数文件系统临时，跨调用的项目状态会丢；
-`gemarc.export` 返回的是本地路径而非下载链接；写工具默认关闭（`GEMARC_ALLOW_WRITE` 未设为 `1` 时拒绝执行）。
+**远程形态与本地的区别**：远程默认是 `stateless` 工具集（`gemarc_brief / contracts / assets / new_model / validate / simulate / diff / render`），
+模型随每次调用传入，服务端不保存任何项目，因此没有跨调用状态丢失的问题，也没有写工具。
+`gemarc_render` 只返回随模型变化的 `data/*.json`（内联上限 24 KB，超出时只给清单与摘要）；固定件通过 `/kit/<profile>.zip` 下载。
+需要工作区、扫描本地仓库、`build/export` 时用本地 stdio 模式。
+
+**鉴权**：设置环境变量 `GEMARC_MCP_TOKEN`（可逗号分隔多个，便于轮换）后，`POST /mcp` 必须带 `Authorization: Bearer <token>`；
+不设置则端点对知道 URL 的人开放（claude.ai 自定义 connector 需要这种形态）。`/healthz`、控制台、`/site/`、`/kit/` 始终公开且不含密钥或路径。
 完整说明、已实测/待验证清单见 `docs/09_部署/01_Vercel部署.md`。
 
 ## 复用现有 GemArc Three.js Viewer
@@ -230,7 +252,7 @@ $env:PYTHONPATH = 'src'
 python -m unittest discover -s tests -v
 ```
 
-测试包含 **82 项 Python UT/集成检查**（`unittest discover`），另有一批 **125 项 Node 运行时测试**
+测试包含 **192 项 Python UT/集成检查**（`unittest discover`；另有 `tests/test_tool_surface_docs.py` 等守卫工具名与文档不漂移），另有一批 **125 项 Node 运行时测试**
 （`node --test src/gemarc_mcp/scaffold/runtime/tests/*.test.mjs`）覆盖脚手架运行层：图引擎、Focus 退避、
 3D 空间与 **Three.js 适配器**、仿真内核、工作流语义、互操作适配器。
 
@@ -261,4 +283,4 @@ python -m unittest discover -s tests -v
 > 浏览器实测显示它**画出 4 个节点、0 条关系**——仓库里的一切测试都是绿的，站点却是坏的。
 
 完整的 5D 脚手架站（含 3D 适配器）请用 `gemarc build --profile static` 生成；
-远程端点提供的也是这一档（冷启动时从包内源码物化，见部署文档）。
+远程端点提供的也是这一档（首次访问 `/site/` 时从包内源码物化，见部署文档）。

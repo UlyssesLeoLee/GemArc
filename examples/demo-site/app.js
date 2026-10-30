@@ -59,7 +59,7 @@ function render2D(el){head('节点与依赖关系','2D / GRAPH VIEW');const wrap
  select.addEventListener('change',draw);draw();
 }
 function render3D(el){head('3D 空间与分类','3D / WEBGL');if(state.capabilities.viewer3D==='not_available'){
- const p=panel(el,'未绑定现有 Three.js 构建产物');hint(p,'此 MVP 不使用 CSS 伪 3D。请先从 GemArc 原仓库构建真正 Three.js Viewer，再在 gemarc.build 指定 --legacy-dist，输出即可接入 3D。');
+ const p=panel(el,'未绑定现有 Three.js 构建产物');hint(p,'此 MVP 不使用 CSS 伪 3D。请先从 GemArc 原仓库构建真正 Three.js Viewer，再在 gemarc_build 指定 --legacy-dist，输出即可接入 3D。');
  text(p,'Viewer 状态','未安装，页面明确降级');return;}
  const p=panel(el,'已接入项目现有 3D Viewer');hint(p,'下方是单独构建的现有 GemArc Three.js Viewer；当前 MVP 未完成新旧 View 之间的选中状态双向同步。');
  const frame=node('iframe','',p);frame.title='GemArc 3D Legacy Viewer';frame.src='./legacy-3d/index.html';frame.setAttribute('sandbox','allow-scripts allow-same-origin');

@@ -67,6 +67,34 @@ body {
 .stat.good { border-color: #2b5c3a; color: var(--good); }
 .muted { color: var(--muted); }
 
+/* --- bearer token bar (only when the server requires one) --- */
+.authbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  border-bottom: 1px solid #5a4526;
+  background: #19140c;
+  font-size: 12.5px;
+}
+.authbar[hidden] { display: none; }
+.authbar label { color: var(--warn); font-family: var(--mono); font-size: 11.5px; }
+.authbar input {
+  flex: 1 1 280px;
+  max-width: 460px;
+  padding: 5px 9px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+.authbar input:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+.authbar #token-msg.bad { color: var(--bad); }
+.authbar #token-msg.good { color: var(--good); }
+
 /* --- layout --- */
 main {
   display: grid;

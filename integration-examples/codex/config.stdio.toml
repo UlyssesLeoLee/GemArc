@@ -1,0 +1,43 @@
+# GemArc MCP, local stdio, full toolset (16 tools).
+# Append to ~/.codex/config.toml (or to .codex/config.toml of a trusted project).
+# Replace <workspace> with an EXISTING directory; it must contain the repositories gemarc_inspect should scan.
+# Use ONE of config.stdio.toml / config.remote.toml: both define the server name "gemarc".
+
+[mcp_servers.gemarc]
+command = 'D:\GemArc\.venv\Scripts\python.exe'
+args = ["-m", "gemarc_mcp"]
+# Codex's source defaults (30 s / 300 s) and its docs (10 s / 60 s) disagree, so say it explicitly.
+startup_timeout_sec = 30
+tool_timeout_sec = 120
+
+# Raw tool names (underscores), exactly as the server registers them. Only the 11 read-only tools are
+# exposed; add gemarc_scaffold, gemarc_init, gemarc_model, gemarc_build, gemarc_export together with
+# GEMARC_ALLOW_WRITE = "1" below when you want the model to write into <workspace>.
+enabled_tools = [
+  "gemarc_brief", "gemarc_contracts", "gemarc_assets", "gemarc_new_model",
+  "gemarc_validate", "gemarc_simulate", "gemarc_diff", "gemarc_render",
+  "gemarc_inspect", "gemarc_plan", "gemarc_verify",
+]
+
+[mcp_servers.gemarc.env]
+GEMARC_TOOLSET = "full"
+GEMARC_WORKSPACE_ROOT = '<workspace>'
+GEMARC_ALLOW_WRITE = "0"
+PYTHONUTF8 = "1"
+
+# A large model rendered inline can exceed Codex's default output cap (about 10k tokens x 1.2).
+# tools.TOOL_NAME.output_token_limit exists in the Codex source we read (rust-v0.166.0); codex-cli 0.145.0 rejects it under
+# --strict-config and ignores it otherwise, so it is commented out. Enable it on a newer Codex if render output is cut off.
+# [mcp_servers.gemarc.tools.gemarc_render]
+# output_token_limit = 20000
+
+# Approval: with the default mode ("auto") Codex asks before a tool unless readOnlyHint is true or
+# (destructiveHint = false and openWorldHint = false). On this server that means gemarc_model and
+# gemarc_build prompt, while gemarc_scaffold, gemarc_init and gemarc_export run WITHOUT a prompt.
+# To make every write ask, uncomment (and add the tools to enabled_tools above):
+# [mcp_servers.gemarc.tools.gemarc_scaffold]
+# approval_mode = "prompt"
+# [mcp_servers.gemarc.tools.gemarc_init]
+# approval_mode = "prompt"
+# [mcp_servers.gemarc.tools.gemarc_export]
+# approval_mode = "prompt"

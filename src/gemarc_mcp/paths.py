@@ -17,7 +17,10 @@ class GemArcError(Exception):
 
 class Workspace:
     def __init__(self, root: str | Path):
-        self.root = Path(root).expanduser().resolve(strict=True)
+        try:
+            self.root = Path(root).expanduser().resolve(strict=True)
+        except OSError as ex:
+            raise GemArcError("GEMARC_AUTH_001", "GEMARC_WORKSPACE_ROOT 必须是现有目录") from ex
         if not self.root.is_dir():
             raise GemArcError("GEMARC_AUTH_001", "GEMARC_WORKSPACE_ROOT 必须是现有目录")
 
@@ -53,7 +56,8 @@ def read_json(path: Path) -> dict:
 
 
 def encode_json(value: dict) -> bytes:
-    raw = (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    # allow_nan=False: NaN / Infinity are not JSON; a file or a tool result holding them breaks strict parsers.
+    raw = (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True, allow_nan=False) + "\n").encode("utf-8")
     if len(raw) > MAX_MODEL_BYTES:
         raise GemArcError("GEMARC_MODEL_002", "模型大小超过 4MiB")
     return raw
@@ -76,6 +80,10 @@ def atomic_json(path: Path, value: dict):
 
 def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def digest_bytes(raw: bytes) -> str:
+    return hashlib.sha256(raw).hexdigest()
 
 
 def diagnostic(code: str, severity: str, message: str, entity: str = "") -> dict:

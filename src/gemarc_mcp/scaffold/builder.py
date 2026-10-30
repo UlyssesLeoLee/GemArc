@@ -148,8 +148,9 @@ def _copy_tree(source: Path, target: Path, skip: set[str] | None = None) -> list
 
 def _write_json(path: Path, payload) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
+    # newline="\n": text mode would write CRLF on Windows, and render + kit must equal a build byte for byte.
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-                    encoding="utf-8")
+                    encoding="utf-8", newline="\n")
     return path.name
 
 
@@ -225,7 +226,7 @@ def build_site(target: Path, model: dict, profile: str, scenarios: dict | None =
                capabilities: dict | None = None) -> list[str]:
     """Materialise a runnable 5D site into ``target``.
 
-    Used by ``gemarc.build`` when the caller asks for the ``static`` or the
+    Used by ``gemarc_build`` when the caller asks for the ``static`` or the
     ``vite`` profile. The output is a self-contained project: the site shell,
     the shared runtime and the model data.
     """
@@ -277,7 +278,7 @@ def fill_in_document(project: str, profile: str) -> str:
         f"# {project} — 脚手架填空说明",
         "",
         "本目录由 GemArc MCP 生成。**固定件**（契约、词表、共通代码、站点外壳）不要改动；",
-        "你只需要填下面列出的槽位。填完运行校验：`gemarc validate <project> --strict`。",
+        "你只需要填下面列出的槽位。填完运行校验：`gemarc validate <project>`；要宣称“已确认”时再加 `--strict`（strict 要求已实现或已观测的证据）。",
         "",
         "## 槽位",
         "",

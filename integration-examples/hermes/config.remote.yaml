@@ -1,0 +1,17 @@
+# GemArc MCP, remote Streamable HTTP, stateless toolset (8 tools, all read-only).
+# Merge into ~/.hermes/config.yaml  (Windows native: %LOCALAPPDATA%\hermes\config.yaml; HERMES_HOME overrides the folder).
+# Replace <project> with your Vercel project subdomain. Use the exact /mcp URL, not the site root.
+# Use ONE of config.stdio.yaml / config.remote.yaml: both define the server name "gemarc".
+mcp_servers:
+  gemarc:
+    url: "https://<project>.vercel.app/mcp"     # Streamable HTTP is the default transport
+    headers:
+      # ${VAR} is read from ~/.hermes/.env first, then the process environment.
+      # An unset variable in url/headers makes the server fail closed (it is not connected).
+      # If the server runs without GEMARC_MCP_TOKEN (authless), delete the whole headers block.
+      Authorization: "Bearer ${GEMARC_MCP_TOKEN}"
+    timeout: 120          # seconds per tool call (Hermes default 300)
+    connect_timeout: 60   # seconds to connect (Hermes default 60)
+    # Optional: expose only part of the toolset (fnmatch globs on the ORIGINAL tool names).
+    # tools:
+    #   include: ["gemarc_brief", "gemarc_new_model", "gemarc_validate", "gemarc_simulate", "gemarc_render"]

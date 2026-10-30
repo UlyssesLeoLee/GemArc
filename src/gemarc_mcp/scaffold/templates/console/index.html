@@ -22,6 +22,18 @@
     <span class="stat muted">等待 /healthz…</span>
   </section>
 
+  <!-- Shown only when /healthz says authRequired. The token is held in this
+       tab's sessionStorage (never localStorage, never in a URL) and is sent
+       only as an Authorization header with /mcp calls. -->
+  <section class="authbar" id="authbar" hidden>
+    <label for="token-input">MCP 访问令牌</label>
+    <input id="token-input" type="password" autocomplete="off" spellcheck="false"
+           placeholder="粘贴 Bearer 令牌(只保存在本标签页的 sessionStorage)">
+    <button id="token-save" class="primary" type="button">使用令牌</button>
+    <button id="token-clear" class="ghost" type="button">清除</button>
+    <span id="token-msg" class="muted" role="status"></span>
+  </section>
+
   <main>
     <aside class="pane col-tools">
       <p class="section-title">TOOLS · 工具</p>
@@ -31,7 +43,8 @@
       <div class="endpoints">
         <div><code>POST /mcp</code><span>Streamable HTTP · JSON-RPC</span></div>
         <div><code>GET /healthz</code><span>服务器状态</span></div>
-        <div><code><a href="__SITE_PATH__">/__SITE_PATH__</a></code><span>脚手架产出的 5D 站</span></div>
+        <div><code><a href="__SITE_PATH__">__SITE_PATH__</a></code><span>脚手架产出的 5D 站</span></div>
+        <div><code>GET /kit/static.zip</code><span>站点固定件(另有 vite)</span></div>
       </div>
     </aside>
 

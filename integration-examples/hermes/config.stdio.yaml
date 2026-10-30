@@ -1,0 +1,20 @@
+# GemArc MCP, local stdio, full toolset (16 tools).
+# Merge into ~/.hermes/config.yaml  (Windows native: %LOCALAPPDATA%\hermes\config.yaml; HERMES_HOME overrides the folder).
+# Replace <workspace> with an EXISTING directory; it must contain the repositories gemarc_inspect should scan.
+# Use ONE of config.stdio.yaml / config.remote.yaml: both define the server name "gemarc".
+mcp_servers:
+  gemarc:
+    command: 'D:\GemArc\.venv\Scripts\python.exe'   # a real executable; do NOT wrap it in cmd / powershell / bash -c
+    args: ["-m", "gemarc_mcp"]
+    # Hermes starts stdio servers with a FILTERED environment: every variable the server needs must be listed here.
+    env:
+      GEMARC_TOOLSET: "full"
+      GEMARC_WORKSPACE_ROOT: '<workspace>'
+      GEMARC_ALLOW_WRITE: "0"
+      PYTHONUTF8: "1"
+    timeout: 120          # seconds per tool call (Hermes default 300)
+    connect_timeout: 60   # seconds to start and initialise (Hermes default 60)
+    # include/exclude are fnmatch globs on the ORIGINAL tool names (include wins over exclude).
+    # With GEMARC_ALLOW_WRITE "0" the five write tools only return GEMARC_AUTH_002, so hide them.
+    tools:
+      exclude: ["gemarc_scaffold", "gemarc_init", "gemarc_model", "gemarc_build", "gemarc_export"]

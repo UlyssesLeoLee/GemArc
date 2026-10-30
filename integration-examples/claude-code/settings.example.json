@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__gemarc__gemarc_brief",
+      "mcp__gemarc__gemarc_contracts",
+      "mcp__gemarc__gemarc_assets",
+      "mcp__gemarc__gemarc_new_model",
+      "mcp__gemarc__gemarc_validate",
+      "mcp__gemarc__gemarc_simulate",
+      "mcp__gemarc__gemarc_diff",
+      "mcp__gemarc__gemarc_render",
+      "mcp__gemarc_local__gemarc_brief",
+      "mcp__gemarc_local__gemarc_contracts",
+      "mcp__gemarc_local__gemarc_assets",
+      "mcp__gemarc_local__gemarc_new_model",
+      "mcp__gemarc_local__gemarc_validate",
+      "mcp__gemarc_local__gemarc_simulate",
+      "mcp__gemarc_local__gemarc_diff",
+      "mcp__gemarc_local__gemarc_render",
+      "mcp__gemarc_local__gemarc_inspect",
+      "mcp__gemarc_local__gemarc_plan",
+      "mcp__gemarc_local__gemarc_verify"
+    ]
+  }
+}

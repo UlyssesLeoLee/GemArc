@@ -11,7 +11,7 @@ from importlib import resources
 from pathlib import Path
 from .paths import Workspace, GemArcError, read_json, atomic_json, digest
 from .model import validate, normalized_model
-from .simulation import simulate, compare
+from .stateless import precompute_scenarios, site_capabilities
 
 SKIP_DIRS = {".git", "node_modules", "target", "dist", "build", ".venv", ".next"}
 EXTS = {".py", ".rs", ".cs", ".java", ".ts", ".tsx", ".js", ".json", ".md", ".sql"}
@@ -125,7 +125,7 @@ def assets(query: str = "") -> dict:
     return data
 
 
-def brief(project: str = "", section: str = "") -> dict:
+def brief(project: str = "", section: str = "", stateless: bool = False) -> dict:
     """The compact work order handed to a language model.
 
     A long requirement document spends most of its length restating things
@@ -150,8 +150,9 @@ def brief(project: str = "", section: str = "") -> dict:
             "1. 读 scaffold-manifest.json 与 FILL-IN.md，确认槽位清单。",
             "2. 读 contracts/*.schema.json 确定每个对象该长什么样；读 vocab/*.json 确认允许哪些词。",
             "3. 填写 model/architecture.json 的槽位。证据必须能指回真实来源；指不回去就标 Unknown。",
-            "4. 运行 gemarc.validate <project> --strict，修掉所有 error。",
-            "5. 运行 gemarc.build <project> --profile static（或 vite），产出站点。",
+            "4. 运行 gemarc_validate <project>，修掉所有 error；要宣称“已确认”时再加 --strict"
+            "（strict 要求节点和边有已实现或已观测的证据，标 Unknown/Hypothetical 的事实必然不过，不要为此改证据等级）。",
+            "5. 运行 gemarc_build <project> --profile static（或 vite），产出站点。",
         ],
         "rules": [
             "事实不可臆造：节点与关系必须能指回 evidence 实体。",
@@ -198,6 +199,21 @@ def brief(project: str = "", section: str = "") -> dict:
             "site": "两套交付 profile 共用一份应用源码：static 零构建、vite 为 npm 工程",
         },
     }
+    if stateless:
+        # A remote deployment has no workspace: the work order must only name
+        # tools that exist there, and must not tell the model to run local CLIs.
+        payload["procedure"] = [
+            "1. gemarc_brief 取得规则与词表；需要完整契约时用 gemarc_contracts。",
+            "2. gemarc_new_model 取得空骨架；用你自己对用户仓库的访问能力读取事实并填写槽位。",
+            "3. 证据必须能指回真实来源；指不回去就标 Unknown，不要编造。",
+            "4. gemarc_validate(model=…) 反复修正，直到 0 个 error；要宣称“已确认”时再加 strict=true"
+            "（strict 要求节点和边有已实现或已观测的证据，标 Unknown/Hypothetical 的事实必然不过，不要为此改证据等级）。",
+            "5. gemarc_simulate(model=…, scenario_id=…, compare_baseline=true) 核对 4D/5D 场景。",
+            "6. gemarc_render(model=…) 取得 data/*.json 与固定件下载地址，在本地合并成站点。",
+        ]
+        payload["commands"] = {"render": "gemarc_render", "kit": "/kit/static.zip",
+                               "note": "远程端点无状态：模型每次随调用传入，服务端不保存任何项目。"}
+        payload["alreadyDone"]["site"] = "固定件由 kit 提供；render 只返回随模型变化的 data/*.json"
     if section:
         key = section.strip()
         if key not in payload:
@@ -222,10 +238,12 @@ def contracts(query: str = "") -> dict:
                    "required": s["required"], "rule": s["rule"]} for s in builder.SLOTS],
     }
     if query:
-        target = builder.CONTRACTS_DIR / query
-        if not target.is_file():
-            target = builder.VOCAB_DIR / query
-        if not target.is_file():
+        # ``query`` is a key into the listing above, never a path: an absolute path or ``..`` would
+        # otherwise read any JSON file the process can see (and tell which paths exist).
+        known = {p.name: p for p in builder.VOCAB_DIR.glob("*.json")}
+        known.update({p.name: p for p in builder.CONTRACTS_DIR.glob("*.json")})  # a contract wins a name clash
+        target = known.get(query)
+        if target is None:
             raise GemArcError("GEMARC_CONTRACT_001", f"未找到契约文件: {query}")
         payload["document"] = json.loads(target.read_text(encoding="utf-8"))
     return payload
@@ -268,7 +286,7 @@ def scaffold_project(ws: Workspace, name: str, profile: str = "static") -> dict:
         "slots": [slot["id"] for slot in manifest["slots"]],
         "fixedFileCount": sum(len(files) for files in manifest["fixed"].values()),
         "commands": manifest["commands"],
-        "notice": "固定件已就位；填写 model/architecture.json 的槽位后运行 gemarc.build",
+        "notice": "固定件已就位；填写 model/architecture.json 的槽位后运行 gemarc_build",
     }
 
 
@@ -290,6 +308,11 @@ def replace_model(ws: Workspace, name: str, value: dict, expected_sha256: str) -
 def diff(ws: Workspace, before: str, after: str) -> dict:
     bfile, b = load_model(ws, before)
     afile, a = load_model(ws, after)
+    return diff_models(b, a, digest(bfile), digest(afile))
+
+
+def diff_models(b: dict, a: dict, base_sha: str, target_sha: str) -> dict:
+    """Changed entities and their one-hop impact between two models."""
     b, a = normalized_model(b), normalized_model(a)
     def changed(kind):
         old = {e["id"]: e for e in b.get(kind, []) if isinstance(e, dict) and "id" in e}
@@ -298,11 +321,15 @@ def diff(ws: Workspace, before: str, after: str) -> dict:
                 "modified": sorted(k for k in new.keys() & old.keys() if new[k] != old[k])}
     n = changed("nodes")
     e = changed("edges")
-    impacted = set(n["added"] + n["removed"] + n["modified"])
+    changed_nodes = set(n["added"] + n["removed"] + n["modified"])
+    impacted = set(changed_nodes)
     for edge in a.get("edges", []) + b.get("edges", []):
-        if edge.get("sourceId") in impacted or edge.get("targetId") in impacted or edge.get("id") in e["modified"]:
+        # One hop: test against the changed nodes only. Testing against ``impacted`` while adding to it would
+        # spread along chains of edges and make the answer depend on the order the edges are listed in.
+        if edge.get("sourceId") in changed_nodes or edge.get("targetId") in changed_nodes \
+                or edge.get("id") in e["modified"]:
             impacted.update([edge.get("sourceId"), edge.get("targetId")])
-    return {"status": "ok", "baseSha256": digest(bfile), "targetSha256": digest(afile),
+    return {"status": "ok", "baseSha256": base_sha, "targetSha256": target_sha,
             "nodes": n, "edges": e, "affectedNodes": sorted(impacted - {None})}
 
 
@@ -322,10 +349,7 @@ def build(ws: Workspace, name: str, legacy_dist: str | None = None, profile: str
     stage = Path(tempfile.mkdtemp(prefix=".gemarc-build-", dir=project))
     try:
         canonical = normalized_model(model)
-        precomputed = {}
-        for sc in model.get("scenarios", []):
-            precomputed[sc["id"]] = {"normal": simulate(model, sc["id"]),
-                                     "disabledSample": compare(model, sc["id"], [model["nodes"][0]["id"]]) if model["nodes"] else None}
+        precomputed = precompute_scenarios(model)
         if profile == "mvp":
             source = resources.files("gemarc_mcp").joinpath("web")
             for filename in ("index.html", "app.js", "style.css"):
@@ -350,12 +374,7 @@ def build(ws: Workspace, name: str, legacy_dist: str | None = None, profile: str
                 raise GemArcError("GEMARC_BUILD_002", "legacy_dist 超过 50MiB")
             shutil.copytree(src, stage / "legacy-3d", symlinks=False, ignore=shutil.ignore_patterns("node_modules", ".git"))
             has_3d = True
-        atomic_json(stage / "data" / "capabilities.json", {
-            "viewer2D": "implemented", "viewer3D": "supplied_compiled_legacy_viewer" if has_3d else "not_available",
-            "dynamic4D": "model_driven_mvp" if model.get("scenarios") else "no_data",
-            "causal5D": "explicit_rule_mvp" if model.get("scenarios") else "no_data",
-            "prototype": "basic_tabs", "evidenceState": model.get("meta", {}).get("evidenceState", "unknown"),
-            "profile": profile})
+        atomic_json(stage / "data" / "capabilities.json", site_capabilities(model, profile, has_3d))
         if dist.exists():
             # No destructive overwrite of a user-owned non-generated folder.
             if not (dist / "data" / "capabilities.json").is_file():

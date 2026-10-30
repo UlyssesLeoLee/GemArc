@@ -1,0 +1,22 @@
+# GemArc MCP, remote Streamable HTTP, stateless toolset (8 tools, all read-only).
+# Append to ~/.codex/config.toml (or to .codex/config.toml of a trusted project).
+# Replace <project> with your Vercel project subdomain.
+# Use ONE of config.stdio.toml / config.remote.toml: both define the server name "gemarc".
+
+[mcp_servers.gemarc]
+url = "https://<project>.vercel.app/mcp"
+# The NAME of an environment variable, never the token itself (an inline bearer_token is rejected).
+# The variable must be set and non-empty in the environment Codex starts from, or startup fails.
+# If the server runs without GEMARC_MCP_TOKEN (authless), delete this line.
+bearer_token_env_var = "GEMARC_MCP_TOKEN"
+startup_timeout_sec = 30
+tool_timeout_sec = 120
+
+# Raw tool names (underscores). Optional: expose only part of the toolset.
+# enabled_tools = ["gemarc_brief", "gemarc_new_model", "gemarc_validate", "gemarc_simulate", "gemarc_render"]
+
+# A large model rendered inline can exceed Codex's default output cap (about 10k tokens x 1.2).
+# tools.TOOL_NAME.output_token_limit exists in the Codex source we read (rust-v0.166.0); codex-cli 0.145.0 rejects it under
+# --strict-config and ignores it otherwise, so it is commented out. Enable it on a newer Codex if render output is cut off.
+# [mcp_servers.gemarc.tools.gemarc_render]
+# output_token_limit = 20000

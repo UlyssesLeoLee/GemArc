@@ -12,6 +12,28 @@ const MCP_PATH = CFG.mcpPath || '/mcp';
 const HEALTH_PATH = CFG.healthPath || '/healthz';
 const WRITE_TOOLS = new Set(CFG.writeTools || []);
 
+const TOKEN_KEY = 'gemarc.mcp.token';
+
+/**
+ * The bearer token lives in this tab's sessionStorage only (never
+ * localStorage, never a URL). Storage can be blocked or throw, so every access
+ * is guarded and the in-memory copy in `state.token` is the working value.
+ */
+function readStoredToken() {
+  try {
+    return sessionStorage.getItem(TOKEN_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function storeToken(value) {
+  try {
+    if (value) sessionStorage.setItem(TOKEN_KEY, value);
+    else sessionStorage.removeItem(TOKEN_KEY);
+  } catch { /* the in-memory copy still works for this page load */ }
+}
+
 const state = {
   tools: [],
   resources: [],
@@ -21,6 +43,8 @@ const state = {
   health: null,
   history: [],
   seq: 0,
+  token: readStoredToken(),
+  bootSeq: 0,
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -34,14 +58,27 @@ const el = (tag, cls, text) => {
 /* ---------------------------------------------------------------- transport */
 
 async function rpc(method, params) {
+  // The token this request carries: a 401 that arrives late is judged against it, not against
+  // whatever token the user has pasted in the meantime.
+  const tokenUsed = state.token;
+  const headers = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json, text/event-stream',
+  };
+  if (tokenUsed) headers.Authorization = `Bearer ${tokenUsed}`;
   const response = await fetch(MCP_PATH, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json, text/event-stream',
-    },
+    headers,
     body: JSON.stringify({ jsonrpc: '2.0', id: ++state.seq, method, params }),
   });
+  if (response.status === 401) {
+    const err = new Error(tokenUsed
+      ? '令牌无效或已被轮换 (HTTP 401)。请在上方重新粘贴令牌。'
+      : '该服务器需要访问令牌 (HTTP 401)。请在上方粘贴令牌。');
+    err.unauthorized = true;
+    err.tokenUsed = tokenUsed;
+    throw err;
+  }
   const raw = await response.text();
   let data;
   try {
@@ -52,7 +89,11 @@ async function rpc(method, params) {
     throw err;
   }
   if (data.error) {
-    const err = new Error(data.error.message || 'JSON-RPC 错误');
+    // JSON-RPC errors are objects; the server's own early answers (503, 405, ...) are {"error": "text"}.
+    const message = typeof data.error === 'string'
+      ? `${data.error} (HTTP ${response.status})`
+      : (data.error.message || 'JSON-RPC 错误');
+    const err = new Error(message);
     err.detail = data.error;
     throw err;
   }
@@ -144,6 +185,8 @@ async function loadHealth() {
 function renderStatus(health) {
   state.health = health;
   state.writeEnabled = Boolean(health.writeEnabled);
+  // The server's own list wins over the one injected into the page.
+  for (const name of health.writeTools || []) WRITE_TOOLS.add(name);
   const bar = $('#statbar');
   bar.textContent = '';
 
@@ -156,20 +199,54 @@ function renderStatus(health) {
 
   bar.append(chip('transport', health.transport || '—'));
   bar.append(chip('protocol path', health.protocolPath || '—'));
-  bar.append(chip('workspace', health.workspace || '—'));
-  bar.append(chip('seed', `${health.seedProject}${health.seeded ? ' ✓' : ''}`));
+  bar.append(chip('toolset', health.toolset || '—'));
+  bar.append(chip('tools', Array.isArray(health.tools) ? health.tools.length : '—'));
+  bar.append(chip('seed', health.seedProject || '—'));
   bar.append(chip('static site', health.staticSiteSource || '—'));
   bar.append(chip(
-    'write tools',
-    state.writeEnabled ? 'enabled' : 'disabled',
-    state.writeEnabled ? 'good' : 'warn'
+    'auth',
+    health.authRequired ? 'bearer token' : 'open',
+    health.authRequired ? 'good' : 'warn'
   ));
-  if (health.sessionManagerError) {
-    bar.append(chip('session manager', health.sessionManagerError, 'bad'));
+  const writeable = state.writeEnabled && WRITE_TOOLS.size > 0;
+  bar.append(chip(
+    'write tools',
+    WRITE_TOOLS.size === 0 ? 'none in this toolset' : (state.writeEnabled ? 'enabled' : 'disabled'),
+    writeable ? 'good' : 'warn'
+  ));
+  if (health.status && health.status !== 'ok') {
+    bar.append(chip('status', `${health.status} · session manager ${health.sessionManager || '?'}`, 'bad'));
   }
 
   $('#foot-meta').textContent =
-    `server ${health.server || 'gemarc-mcp'} · ${health.writeEnabled ? '写工具已开启' : '写工具默认关闭'}`;
+    `server ${health.server || 'gemarc-mcp'} ${health.version || ''} · ${health.writeEnabled ? '写工具已开启' : '写工具默认关闭'}`;
+}
+
+/* --------------------------------------------------------------------- auth */
+
+function setAuthMessage(text, cls) {
+  const msg = $('#token-msg');
+  msg.textContent = text || '';
+  msg.className = cls || 'muted';
+}
+
+function showAuthBar(message, cls) {
+  $('#authbar').hidden = false;
+  setAuthMessage(message, cls);
+}
+
+/**
+ * A 401 means the token that request carried is wrong or missing: forget it and ask again.
+ * A late 401 for an older token (a new one has been pasted since) is ignored and reported as not
+ * handled, so it can neither discard the newer token nor flip the status line.
+ */
+function handleUnauthorized(error) {
+  if ((error.tokenUsed || '') !== state.token) return false;
+  state.token = '';
+  storeToken('');
+  showAuthBar(error.message, 'bad');
+  $('#token-input').focus();
+  return true;
 }
 
 /* -------------------------------------------------------------- tool panel */
@@ -213,6 +290,13 @@ function renderToolList(filterText) {
 
 /* ---------------------------------------------------------------- the form */
 
+/** The call button follows the selected tool: locked for a write tool while writes are off. */
+function syncCallButton() {
+  const blocked = Boolean(state.selected) && WRITE_TOOLS.has(state.selected) && !state.writeEnabled;
+  $('#call-btn').disabled = blocked;
+  $('#call-btn').textContent = blocked ? '写工具已关闭' : '调用';
+}
+
 function selectTool(name) {
   state.selected = name;
   const tool = state.tools.find((t) => t.name === name);
@@ -225,9 +309,7 @@ function selectTool(name) {
   kind.textContent = WRITE_TOOLS.has(name) ? 'WRITE · 需要写权限' : 'READ · 只读';
   kind.className = 'chip ' + (WRITE_TOOLS.has(name) ? 'write' : 'read');
 
-  const blocked = WRITE_TOOLS.has(name) && !state.writeEnabled;
-  $('#call-btn').disabled = blocked;
-  $('#call-btn').textContent = blocked ? '写工具已关闭' : '调用';
+  syncCallButton();
 
   renderParams(tool);
   renderJson($('#schema'), tool.inputSchema || {});
@@ -351,8 +433,7 @@ async function callSelected() {
     args = collectParams();
   } catch (error) {
     showError(error.message, null);
-    button.disabled = false;
-    button.textContent = '调用';
+    syncCallButton();
     return;
   }
 
@@ -362,15 +443,16 @@ async function callSelected() {
     const elapsed = Math.round(performance.now() - started);
     const payload = unwrapToolResult(result);
     const isError = Boolean(result && result.isError);
-    showResult(payload, isError, `${name} · ${elapsed}ms`);
+    // The user may have selected another tool while this call was in flight.
+    if (state.selected === name) showResult(payload, isError, `${name} · ${elapsed}ms`);
     pushHistory({ name, ms: elapsed, ok: !isError });
   } catch (error) {
     const elapsed = Math.round(performance.now() - started);
-    showError(error.message, error.detail, `${name} · ${elapsed}ms`);
+    if (error.unauthorized) handleUnauthorized(error);
+    if (state.selected === name) showError(error.message, error.detail, `${name} · ${elapsed}ms`);
     pushHistory({ name, ms: elapsed, ok: false });
   } finally {
-    button.disabled = false;
-    button.textContent = '调用';
+    syncCallButton();
   }
 }
 
@@ -427,6 +509,7 @@ async function readResource(uri) {
     $('#result-meta').textContent = `resource ${uri}`;
     $('#copy-btn').hidden = false;
   } catch (error) {
+    if (error.unauthorized) handleUnauthorized(error);
     showError(error.message, error.detail, `resource ${uri}`);
   }
 }
@@ -445,6 +528,7 @@ async function getPrompt(name) {
     $('#result-meta').textContent = `prompt ${name} · project=demo`;
     $('#copy-btn').hidden = false;
   } catch (error) {
+    if (error.unauthorized) handleUnauthorized(error);
     showError(error.message, error.detail, `prompt ${name}`);
   }
 }
@@ -482,14 +566,32 @@ function renderSideLists() {
 async function boot() {
   const dot = $('#conn-dot');
   const text = $('#conn-text');
+  // A newer boot() (a token was pasted meanwhile) owns the status line; an older one must not touch it.
+  const generation = ++state.bootSeq;
+  const current = () => generation === state.bootSeq;
+  let healthShown = false;
   try {
-    const [health, toolResult, resourceResult, promptResult] = await Promise.all([
-      loadHealth(),
+    // Health first: it says whether a token is needed, so no MCP call is made
+    // (and none can 401) before the user has had a chance to supply one.
+    const health = await loadHealth();
+    if (!current()) return;
+    renderStatus(health);
+    healthShown = true;
+    if (health.authRequired) {
+      showAuthBar(state.token ? '已使用本标签页保存的令牌。' : '该服务器需要访问令牌,请粘贴后点「使用令牌」。',
+        state.token ? 'good' : 'warn');
+      if (!state.token) {
+        dot.className = 'dot off';
+        text.textContent = '需要访问令牌';
+        return;
+      }
+    }
+    const [toolResult, resourceResult, promptResult] = await Promise.all([
       rpc('tools/list', {}),
       rpc('resources/list', {}),
       rpc('prompts/list', {}),
     ]);
-    renderStatus(health);
+    if (!current()) return;
     state.tools = (toolResult && toolResult.tools) || [];
     state.resources = (resourceResult && resourceResult.resources) || [];
     state.prompts = (promptResult && promptResult.prompts) || [];
@@ -500,13 +602,51 @@ async function boot() {
     text.textContent = `已连接 · ${state.tools.length} tools / ${state.resources.length} resources / ${state.prompts.length} prompts`;
     if (state.tools.length) selectTool(state.tools[0].name);
   } catch (error) {
+    if (!current()) return;
     dot.className = 'dot off';
+    if (error.unauthorized) {
+      if (handleUnauthorized(error)) text.textContent = '需要访问令牌';
+      return;
+    }
     text.textContent = `连接失败: ${error.message}`;
-    $('#statbar').textContent = '';
-    $('#statbar').append(el('span', 'stat bad', error.message));
+    const bar = $('#statbar');
+    if (!healthShown) bar.textContent = '';  // keep the health chips (a degraded state included) once shown
+    bar.append(el('span', 'stat bad', error.message));
   }
 }
 
+function useToken() {
+  const input = $('#token-input');
+  const value = input.value.trim();
+  input.value = '';
+  if (!value) {
+    setAuthMessage('令牌为空。', 'bad');
+    return;
+  }
+  // A header value is Latin-1 without control characters. A zero-width space or a smart quote that came
+  // along with a copy would make every fetch throw before any request is sent, with the token still stored.
+  if (!/^[\x20-\x7e]+$/.test(value)) {
+    setAuthMessage('令牌里有不可见字符或非 ASCII 字符(常见于复制时带入的零宽空格、弯引号),请重新复制。', 'bad');
+    return;
+  }
+  state.token = value;
+  storeToken(value);
+  setAuthMessage('正在用该令牌连接…', 'muted');
+  boot();
+}
+
+function clearToken() {
+  state.token = '';
+  storeToken('');
+  $('#token-input').value = '';
+  setAuthMessage('已清除本标签页里的令牌。', 'muted');
+}
+
+$('#token-save').addEventListener('click', useToken);
+$('#token-clear').addEventListener('click', clearToken);
+$('#token-input').addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') useToken();
+});
 $('#call-btn').addEventListener('click', callSelected);
 $('#tool-filter').addEventListener('input', (event) => renderToolList(event.target.value));
 $('#copy-btn').addEventListener('click', async () => {

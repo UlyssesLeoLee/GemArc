@@ -6,3 +6,6 @@ example-workspace/
 *.egg-info/
 build/
 dist/
+.vercel/
+.vercel
+.env*

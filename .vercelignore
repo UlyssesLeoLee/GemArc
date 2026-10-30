@@ -1,0 +1,14 @@
+# Files Vercel does not need to upload. The function reads only src/gemarc_mcp/**
+# and examples/demo-site/** at run time (see api/index.py), so everything below is
+# documentation, tests or local tooling. Never ignore: api, src, examples/demo-site,
+# pyproject.toml, requirements.txt, vercel.json, .python-version.
+/docs
+/tests
+/skills
+/scripts
+/integration-examples
+/.claude-plugin
+*.egg-info
+*.xlsx
+.env*
+install.ps1

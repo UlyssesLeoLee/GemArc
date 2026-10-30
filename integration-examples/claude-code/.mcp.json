@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "gemarc": {
+      "type": "http",
+      "url": "${GEMARC_URL:-https://<project>.vercel.app/mcp}",
+      "headers": {
+        "Authorization": "Bearer ${GEMARC_MCP_TOKEN}"
+      }
+    },
+    "gemarc_local": {
+      "type": "stdio",
+      "command": "D:\\GemArc\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "gemarc_mcp"],
+      "env": {
+        "GEMARC_TOOLSET": "full",
+        "GEMARC_WORKSPACE_ROOT": "${GEMARC_WORKSPACE_ROOT:-<workspace>}",
+        "GEMARC_ALLOW_WRITE": "${GEMARC_ALLOW_WRITE:-0}",
+        "PYTHONUTF8": "1"
+      }
+    }
+  }
+}

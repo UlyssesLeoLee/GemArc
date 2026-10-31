@@ -256,7 +256,10 @@ class RealStageTests(WorkDir):
         cls.addClassCleanup(patcher.stop)
         root = Path(cls._tmp.name)
         ws = pj.get_workspace(root)
-        model = consistent(synth.generate("reference", 3))
+        # seed 5: the 5D tab draws only when the sealed comparisons contain one that shows a difference AND has something on its stage (and three
+        # draw calls need a stage with frames, nodes and edges), and the generator (debt-b4: no port-type mismatch edges, so a different graph for every
+        # seed) gives that for seed 5 (measured: seeds 1 and 3 have no 5D canvas, seed 2 has one with two draw calls)
+        model = consistent(synth.generate("reference", 5))
         assert tools.init(ws, "atlas", "Reference scale", "asis", ["en-US"], repos=model["meta"]["repos"])["status"] == "created"
         for name, text in slice_texts(model).items():
             assert tools.put(ws, "atlas", name, text)["status"] == "committed", name
@@ -382,8 +385,10 @@ class MixedProjectTests(OracleProject):
             self.assertEqual(self.put(name, text)["status"], "committed", name)
         expect_slice = next(name for name, text in slices.items() if "## expect:" in text and any(line.startswith(self.second + " |") for line in text.split("## expect:")[-1].splitlines()))
         self.simulate(case=self.second, detail="trace")                     # a reveal of the second case ...
-        terminal = list(model["cases"][1]["expectedTerminalState"])
-        row = f"{self.second} | {terminal[0]}=Failed," + ",".join(terminal[1:]) + " | by=author"
+        terminal = model["cases"][1]["expectedTerminalState"]
+        machines = {m["id"] for m in model["machines"]}
+        victim = next(n for n in terminal if n not in machines)             # a state machine has its own states: only a plain node can end Failed
+        row = f"{self.second} | " + ",".join(f"{n}={'Failed' if n == victim else s}" for n, s in terminal.items()) + " | by=author"
         self.assertEqual(self.put(expect_slice, f"#atlas 1\n## expect: case | nodes | opts\n{row}\n", mode="patch")["status"], "committed")   # ... then an edit: revised
         self.assertEqual(self.states()[f"case:{self.second}"], "revised")
         reply = tools.build(self.ws, self.name, docs=False)

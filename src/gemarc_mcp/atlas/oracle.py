@@ -52,6 +52,10 @@ from .rules import or_
 
 SCHEMA = "gemarc-atlas-oracle/1"
 LEDGER_MAX_BYTES = 1024 * 1024
+#: Deepest nesting a ledger may have: an authored cell is at most 56 levels deep (``format.rows.MAX_JSON_NESTING``) and the ledger wraps
+#: it in about ten, so a real ledger stays below this. A deeper file is not one the tool wrote (and may not survive ``json.dumps`` with an
+#: indent or ``copy.deepcopy``, which hit the recursion limit far below the decoder's).
+LEDGER_MAX_DEPTH = 96
 MAX_ITEMS = 2000
 LOG_KEEP = 16
 ISSUED_KEEP = 8
@@ -113,6 +117,20 @@ def _clip(value, limit: int = CLIP_CHARS) -> str:
     return text if len(text) <= limit else text[:limit] + "..."
 
 
+def _too_deep(value, limit: int = LEDGER_MAX_DEPTH) -> bool:
+    """True when ``value`` nests deeper than ``limit`` levels (iterative: a hostile file cannot make the check itself recurse)."""
+    stack = [(value, 1)]
+    while stack:
+        item, depth = stack.pop()
+        if depth > limit:
+            return True
+        if isinstance(item, dict):
+            stack.extend((v, depth + 1) for v in item.values())
+        elif isinstance(item, list):
+            stack.extend((v, depth + 1) for v in item)
+    return False
+
+
 def _anchor(paths: pj.Paths) -> "dict | None":
     """``.atlas/oracle-anchor.json`` (``{tick, chain}`` of the last ledger write): ``None`` when absent, ``{}`` when unreadable.
     A copy of an older ``oracle.json`` put back over the new one is older than this file, so it is a ``rolled-back`` ledger."""
@@ -120,16 +138,16 @@ def _anchor(paths: pj.Paths) -> "dict | None":
     if not target.is_file():
         return None
     try:
-        raw = json.loads(sl.read_bytes(target).decode("utf-8"))
-    except (ValueError, UnicodeDecodeError):
+        raw = json.loads(sl.read_limited(target, sl.COUNTER_MAX_BYTES).decode("utf-8"))
+    except (OSError, ValueError, UnicodeDecodeError, RecursionError):   # RecursionError: a file nested past the decoder's limit
         return {}
     return raw if isinstance(raw, dict) and isinstance(raw.get("tick"), int) and isinstance(raw.get("chain"), str) else {}
 
 
 def _puts(paths: pj.Paths) -> int:
     try:
-        value = json.loads(sl.read_bytes(paths.dot / "puts.json").decode("utf-8")).get("puts")
-    except (OSError, ValueError, AttributeError):
+        value = json.loads(sl.read_limited(paths.dot / "puts.json", sl.COUNTER_MAX_BYTES).decode("utf-8")).get("puts")
+    except (OSError, ValueError, AttributeError, RecursionError):
         return 0
     return value if isinstance(value, int) else 0
 
@@ -160,9 +178,9 @@ def read_ledger(paths: pj.Paths) -> Ledger:
         if path.stat().st_size > LEDGER_MAX_BYTES:
             return Ledger(_empty(), "unreadable")
         data = json.loads(sl.read_bytes(path).decode("utf-8"))
-    except (OSError, ValueError, UnicodeDecodeError):
+    except (OSError, ValueError, UnicodeDecodeError, RecursionError):   # RecursionError: nested past the decoder's limit
         return Ledger(_empty(), "unreadable")
-    if not isinstance(data, dict) or data.get("schema") != SCHEMA or not isinstance(data.get("items"), dict):
+    if not isinstance(data, dict) or data.get("schema") != SCHEMA or not isinstance(data.get("items"), dict) or _too_deep(data):
         return Ledger(_empty(), "unreadable")
     base = _empty()
     for key, default in base.items():
@@ -984,11 +1002,14 @@ def bite_run(ws: Workspace, project: str, *, budget: float = BITE_BUDGET_S, cap:
 # ---------------------------------------------------------------------------------------------------------------
 
 
-def sealed_runs(ws: Workspace, project: str, lang: str = "") -> dict:
+def sealed_runs(ws: Workspace, project: str, lang: str = "", expose: bool = True) -> dict:
     """Engine results for the SEALED or CONFIRMED items only, for build, the viewer and the documents (shape: oracle-provider.md).
 
     It is a write call: it seals what can be sealed first, and it records a ``build`` exposure on every item whose trace it returns
     (an edit of such an expectation afterwards makes it ``revised``). A ``revised`` or unregistered item is never included.
+
+    ``expose=False`` seals and returns the same reply but records no exposure: a caller that may still refuse to show the traces (a release
+    build that fails a gate) calls ``expose_build`` with the reply at the moment it does show them.
     """
     ws.writable()
     loaded = _load(ws, project, need_contract=True)
@@ -1011,7 +1032,8 @@ def sealed_runs(ws: Workspace, project: str, lang: str = "") -> dict:
                 continue
             run = simulate(model, case, None, {"index": ix})
             baselines[cid] = {"state": states[key][1], "run": run}
-            _reveal(data["items"][key], "build", tick)
+            if expose:
+                _reveal(data["items"][key], "build", tick)
         for iid, iv in ivs.items():
             ikey = f"{or_.INTERVENTION}:{iid}"
             if not _usable(states, ikey, sealed_only=True):
@@ -1026,7 +1048,8 @@ def sealed_runs(ws: Workspace, project: str, lang: str = "") -> dict:
                               "chain": causal_chain(model, result, iv, ix, locale)})
                 used = True
             if used:
-                _reveal(data["items"][ikey], "build", tick)
+                if expose:
+                    _reveal(data["items"][ikey], "build", tick)
             else:
                 withheld["interventions"].append(iid)       # sealed, but none of its cases has a sealed baseline: no pair to show
         provenance = {"ledger": "unverified" if (data.get("provenance") != "ok") else "ok", "reason": data.get("reason", "")}
@@ -1034,6 +1057,27 @@ def sealed_runs(ws: Workspace, project: str, lang: str = "") -> dict:
     units = diagrams.run_units(model, baselines, pairs, locale)
     return {"schema": "gemarc-atlas-sealed-runs/1", "modelSha8": loaded.sha8, "lang": locale, "baselines": baselines, "pairs": pairs,
             "diagrams": units["units"], "issues": units["issues"], "withheld": withheld, "provenance": provenance}
+
+
+def expose_build(ws: Workspace, project: str, sealed: Mapping) -> list:
+    """Record the ``build`` exposure of every item whose trace the reply ``sealed`` of ``sealed_runs(expose=False)`` embeds (the cases with a
+    baseline, the interventions with a pair). What ``sealed_runs`` does by itself for a plain build, done later: a release calls it once every
+    gate has passed and the page is about to be swapped into ``dist``, so a refused release exposes nothing. Returns the ledger keys recorded."""
+    ws.writable()
+    keys = [f"{or_.CASE}:{cid}" for cid in sorted(sealed.get("baselines") or ())]
+    keys += [f"{or_.INTERVENTION}:{iid}" for iid in sorted({p["interventionId"] for p in sealed.get("pairs") or ()})]
+    if not keys:
+        return []
+    loaded = _load(ws, project, need_contract=True)
+    recorded: list = []
+    with _writing(loaded.paths, loaded.model) as (data, _items, _report):
+        tick = data["tick"] + 1
+        for key in keys:
+            entry = data["items"].get(key)
+            if isinstance(entry, dict) and isinstance(entry.get("exposed"), dict):
+                _reveal(entry, "build", tick)
+                recorded.append(key)
+    return recorded
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -1045,7 +1089,7 @@ _TEXT = {
         "title": "# Oracle sheet: expectations waiting for the user",
         "how": ["Each line below is something the design is expected to do. Check it against what you want, not against the tool.",
                 f"To confirm lines: copy them into atlas/{CONFIRM_NAME}, change `[ ]` to `[x]` and keep the id and the hash.",
-                "To confirm everything listed: write the single line APPROVE-ALL <digest> (printed at the end) into that file.",
+                "To confirm everything listed: copy the last line of this sheet (APPROVE-ALL followed by 12 hex characters) into that file.",
                 "The tool never writes that file. A later edit of an expectation lapses its confirmation."],
         "counts": "sealed {sealed}, revised {revised}, confirmed {confirmed}; by=user claimed {claimed}, honoured {honoured}",
         "none": "Nothing waits for confirmation.",
@@ -1061,7 +1105,7 @@ _TEXT = {
         "title": "# 期望确认单：等待用户确认的期望",
         "how": ["下面每一行都是设计应当做到的事。请对照你想要的结果核对，不要对照工具的输出。",
                 f"确认其中几行：把它们复制进 atlas/{CONFIRM_NAME}，把 `[ ]` 改成 `[x]`，保留编号和哈希。",
-                "确认全部列出的内容：在该文件里写一行 APPROVE-ALL <摘要>（摘要印在末尾）。",
+                "确认全部列出的内容：把本表最后一行（APPROVE-ALL 加 12 位十六进制摘要）原样写进该文件。",
                 "工具从不写这个文件。之后再改某条期望，它的确认就作废。"],
         "counts": "已封存 {sealed}，已修订 {revised}，已确认 {confirmed}；声称 by=user {claimed}，被承认 {honoured}",
         "none": "没有等待确认的期望。",
@@ -1076,7 +1120,7 @@ _TEXT = {
         "title": "# 期待値確認シート：ユーザーの確認待ち",
         "how": ["以下の各行は、設計が満たすべきことです。ツールの返答ではなく、望む結果と照らして確認してください。",
                 f"行ごとに確認する：atlas/{CONFIRM_NAME} に行を書き写し、`[ ]` を `[x]` にして、ID と短い識別子はそのまま残します。",
-                "掲載分をすべて確認する：そのファイルに APPROVE-ALL <ダイジェスト> の1行（末尾に表示）を書きます。",
+                "掲載分をすべて確認する：この表の最後の行（APPROVE-ALL と 12 桁の16進ダイジェスト）をそのファイルにそのまま書きます。",
                 "ツールはこのファイルを書きません。期待値を後から変更すると、その確認は失効します。"],
         "counts": "封印 {sealed}、修正 {revised}、確認済み {confirmed}；by=user の申告 {claimed}、承認 {honoured}",
         "none": "確認待ちの期待値はありません。",
@@ -1230,7 +1274,7 @@ def release_gate(ws: Workspace, project: str) -> dict:
             continue
         if item.kind == or_.CASE:
             gap = or_.coverage_gap(cases.get(item.id, {}))
-            if gap is not None:                        # OR-003: the wave-2 rule is not in the default check, the gate enforces it
+            if gap is not None:                        # OR-003 (wave 2, also in the default full check): the gate enforces it on its own
                 blockers.append({"kind": "vacuous", "id": item.id, "rule": "OR-003", "message": or_.gap_text(gap)})
             # OR-004 needs a mutant run of THIS model: without one the gate cannot tell a vacuous assertion from a real one
             bite = entry.get("bite")

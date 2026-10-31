@@ -213,12 +213,15 @@ class BuildAndVerifyTests(Flow):
         self.assertNotIn("sheet", reply)
         self.assertFalse((self.paths.atlas / "dist").exists())
 
-    def test_release_without_the_gate_is_not_a_release_but_the_files_are_written(self):
+    def test_release_without_the_gate_is_refused_and_only_the_users_sheet_is_written(self):
+        # M8: a refused release writes no page (see tests/atlas/test_release_build.py), but the user still gets the sheet he needs to act on the oracle blockers
         self.authored()
         reply = tools.build_all(self.ws, self.name, release=True)
         self.assertEqual(reply["status"], "invalid")
         self.assertEqual(reply["code"], build.E_RELEASE)
         self.assertEqual(reply["sheet"], "atlas/dist/oracle-sheet.md")
+        self.assertNotIn("page", reply)
+        self.assertEqual(sorted(p.name for p in (self.paths.atlas / "dist").iterdir()), ["oracle-sheet.md"])
 
     def test_a_missing_browser_is_a_loud_skip_that_status_turns_into_a_stop_for_the_user(self):
         self.authored()

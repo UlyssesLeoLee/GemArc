@@ -58,6 +58,7 @@ from . import roots as _roots
 
 STAMP_SCHEMA = "gemarc-atlas-evidence-stamp/1"
 STAMP_RELATIVE_PATH = ".atlas/evidence-stamp.json"
+STAMP_MAX_BYTES = 8 * 1024 * 1024    # a stamp grows with the evidence rows (a few hundred bytes each); a larger file is not one the tool wrote
 USER_TEXT_DIR = "atlas/user"
 USER_ROOT_REV = "user-text"
 
@@ -483,6 +484,18 @@ def decode_text(data: bytes, *, max_bytes: int = MAX_FILE_BYTES) -> SourceText:
     return SourceText(text, _h16(data), bom=bom, crlf=crlf_count > 0, mixed_eol=crlf_count > 0 and bare_lf > 0)
 
 
+def read_text_file(path: "Path | str", *, max_bytes: int = MAX_FILE_BYTES) -> SourceText:
+    """``decode_text`` of a file, with the size known BEFORE the read: ``os.stat`` first (a file over ``max_bytes`` raises ``TextError``
+    and not one byte is read), then at most ``max_bytes + 1`` bytes are read (a file that became larger after the stat, or one whose size the
+    stat does not tell, is still cut and refused). ``OSError`` propagates to the caller, as ``Path.read_bytes`` did."""
+    size = os.stat(path).st_size
+    if size > max_bytes:
+        raise TextError(f"larger than {max_bytes} bytes")
+    with open(path, "rb") as handle:
+        data = handle.read(max_bytes + 1)
+    return decode_text(data, max_bytes=max_bytes)
+
+
 # --------------------------------------------------------------------------------------------------------
 # Options, stamp, claims
 # --------------------------------------------------------------------------------------------------------
@@ -514,8 +527,12 @@ def load_stamp(project_dir: Path | str) -> dict:
     if not path.is_file():
         return empty_stamp()
     try:
-        data = json.loads(path.read_bytes().decode("utf-8-sig"))
-    except (OSError, ValueError) as ex:
+        with open(path, "rb") as handle:
+            raw = handle.read(STAMP_MAX_BYTES + 1)         # never the whole of a file the tool did not write
+        if len(raw) > STAMP_MAX_BYTES:
+            raise ValueError(f"larger than {STAMP_MAX_BYTES} bytes")
+        data = json.loads(raw.decode("utf-8-sig"))
+    except (OSError, ValueError, RecursionError) as ex:   # RecursionError: nested past the decoder's limit
         raise EvidenceError("GEMARC_ATLAS_EV_070", f"{STAMP_RELATIVE_PATH} cannot be read: {ex}") from None
     if (not isinstance(data, dict) or data.get("schema") != STAMP_SCHEMA or not isinstance(data.get("entries"), dict)
             or any(not isinstance(v, dict) for v in data["entries"].values())):
@@ -671,10 +688,7 @@ class _Run:
         key = f"{alias}\0{resolved.rel}"
         if key not in self.files:
             try:
-                size = os.stat(resolved.path).st_size
-                if size > self.opts.max_bytes:
-                    raise TextError(f"larger than {self.opts.max_bytes} bytes")
-                self.files[key] = decode_text(resolved.path.read_bytes(), max_bytes=self.opts.max_bytes)
+                self.files[key] = read_text_file(resolved.path, max_bytes=self.opts.max_bytes)
                 self.files_read += 1
             except TextError as ex:
                 self.files[key] = ex
@@ -1111,7 +1125,7 @@ def _verify_user_row(row: Mapping, run: _Run, base: dict) -> dict:
             cache_key = str(resolved.path)
             if cache_key not in run.user_texts:
                 try:
-                    run.user_texts[cache_key] = decode_text(resolved.path.read_bytes(), max_bytes=run.opts.max_bytes)
+                    run.user_texts[cache_key] = read_text_file(resolved.path, max_bytes=run.opts.max_bytes)
                 except (TextError, OSError):
                     run.user_texts[cache_key] = None
             src = run.user_texts[cache_key]

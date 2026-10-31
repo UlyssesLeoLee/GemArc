@@ -301,7 +301,7 @@ window.__ATLAS__ = {
 | 占位符 | 填入内容 | 说明 |
 |---|---|---|
 | `<!--ATLAS_LANG-->` | `meta.primaryLanguage` | `html` 的 `lang` 初值，外壳启动后按界面语言改写 |
-| `<!--ATLAS_SELFTEST-->` | `gate/selftest.js` 包进一个 `script` 元素 | **必须位于 `head` 最前面**，先于任何其它脚本，错误捕获才能就位；与 `gate/smoke.py` 的 `SELFTEST_MARKER` 是同一个标记 |
+| `<!--ATLAS_SELFTEST-->` | `gate/selftest.js` 包进一个 `script` 元素 | **必须是 `head` 里的第一个脚本**，先于任何其它脚本，错误捕获才能就位（它前面只有三个 `meta`，第一个是 CSP，见 10.6）；与 `gate/smoke.py` 的 `SELFTEST_MARKER` 是同一个标记 |
 | `<!--ATLAS_TITLE-->` | 页面标题（转义后的 `meta.title`，空则用项目 id） | 外壳启动后也会写 `document.title` |
 | `<!--ATLAS_STYLE-->` | `atlas.css` 全文 | 无 `url(`，无外部资源 |
 | `<!--ATLAS_DATA-->` | 数据包的嵌入文字（构建实际填入 `JSON.parse('...')` 表达式，见 10.1；下面写的 `docbuild.embed_json` 是同一套转义的对象字面量写法） | 在模板里位于赋值语句 `window.__ATLAS__ = ...;` 之中，是一个合法的 JS 对象字面量；`embed_json` 已把 `<` `>` `&` U+2028 U+2029 写成转义，所以不会提前结束脚本，也不会出现 `</script` |
@@ -458,12 +458,24 @@ window.__ATLAS__ = {
 | BD-001 | 可移植：代码部分（模板、样式、门禁脚本、运行时）没有 `fetch(`、`import(`、`@import`、远程 `url(`、`XMLHttpRequest`、`sendBeacon`、`importScripts`、`WebSocket`、`EventSource`、`eval(`、`new Function`，以及不是裸调用的写法：`Function(`、`window.fetch`、`document.write`、`new Image`、字符串参数的 `setTimeout`/`setInterval`（**这是记号扫描，不是证明**：拼出来的名字、计算属性名扫不到，页面是否真的离线靠整页只有一个 `<script>` 的结构检查与门禁里的页面行为）；页面里除骨架元素外没有别的元素，没有任何 `src`、`href`、`action`。数据部分不按词扫描：证据锚点会引用代码，而数据是惰性的（BD-003） | ERROR |
 | BD-002 | 占位符：六个占位符各出现且只出现一次，填完后页面里没有 `<!--ATLAS_` | ERROR |
 | BD-003 | 数据：数据脚本恰好有第 2 节的十个键，解析回来等于输入包，且不含 `<` `>` `&` U+2028 U+2029 与控制字符 | ERROR |
-| BD-004 | 结构：恰好三个脚本（门禁脚本在 `head` 最前，数据，运行时，运行时以启动调用结束），内容与预期逐字相同；标题文字等于所给标题；`lang` 取自支持的语言 | ERROR |
+| BD-004 | 结构：恰好三个脚本（门禁脚本是 `head` 里的第一个脚本，数据，运行时，运行时以启动调用结束），内容与预期逐字相同；标题文字等于所给标题；`lang` 取自支持的语言；`head` 的第一个元素是唯一的 Content-Security-Policy `meta`，内容恰为 `htmlassemble.CSP_POLICY`（见 10.6），页面里没有别的 `http-equiv` 的 `meta` | ERROR |
 | BD-005 | 大小：超过 3 MiB 警告，超过 8 MiB 失败 | WARN / ERROR |
 | BD-006 | 编码：合法 UTF-8，只有 LF，没有 BOM 与 NUL | ERROR |
 | BD-007 | 可复现：同一输入填两次逐字节相同；代码部分没有本机路径（盘符、`/Users/`、`/home/`）与时间戳形文字 | ERROR |
 
 构建不含时间戳，页面只含模型哈希；`build-info.json` 也没有时间戳与路径，两次构建的 `dist/`（除 `.verify/` 与 `oracle-sheet.md`）逐字节相同。浏览器门禁的报告在 `dist/.verify/`。
+
+### 10.6 内容安全策略（CSP）
+
+模板 `atlas.template.html` 的 `head` 以一个 `meta http-equiv="Content-Security-Policy"` 开头（在 `charset`、`viewport` 与门禁脚本之前，所以它管到页面里的一切）：
+
+```
+default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; form-action 'none'; base-uri 'none'
+```
+
+页面自带的内联脚本与样式可以运行，`data:` 图片可以加载，被动加载与 `fetch` 一类的请求被挡：不能加载图片、脚本、框架、字体与媒体，不能用 `fetch`、XHR、`sendBeacon`、WebSocket 发请求，不能起 Worker；`form-action 'none'` 挡表单提交，`base-uri 'none'` 挡 `<base>`（这两条不回落到 `default-src`，所以单写）。**策略不挡页面跳转**（`location` 赋值、`meta refresh`、链接导航无法用 CSP 阻止），`script-src 'unsafe-inline'` 又让内联脚本照常运行，所以这条策略是纵深防御，不是 XSS 边界，也不能说页面「不能发请求」：页面被改过之后注入的标记仍能靠跳转把数据送出去，挡它靠 BD-001 至 BD-007 的逐字检查与构建后改页面被 `GEMARC_ATLAS_BUILD_032` 拒绝。`connect-src`、`font-src`、`worker-src`、`media-src` 不另写，它们回落到 `default-src 'none'`，因为页面用不到（运行时、样式与门禁脚本里没有 `Worker`、`createObjectURL`、`@font-face`、`blob:`、`<img`、`<link`、`fetch(`、`<form`、`<base`、`location.href` 一类的跳转；`tests/atlas/test_gate_csp.py` 逐项扫描）。`htmlassemble.CSP_POLICY` 是这段文字的唯一常量，BD-004 要求最终页面的第一个 `head` 元素就是它（逐字）、整页只有这一个 `http-equiv` 的 `meta`；缺失、挪位、重复、被放宽或另有一个 `refresh` 都是 ERROR。
+
+实测（Edge，`tests/atlas/test_gate_csp.py`）：合成的小预设与参考预设各一份已封存的页面，在 1024、1366、1600 宽度的门禁模式下，原始 stderr 里没有一行策略违规，门禁零发现，六个标签页都走到，3D、4D、5D 的 WebGL 画布都画了；反向对照（故意放一个被挡的图片和请求）能在同一份原始 stderr 里看到违规行。
 
 ## 11. 舞台：3D、4D、5D（viewer-B）
 

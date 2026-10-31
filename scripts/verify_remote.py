@@ -14,6 +14,11 @@ is only ever sent in the Authorization header and is never printed.
 skips the Vercel-specific advice. Start the server yourself, for example
 `uvicorn api.index:app --port 8000`.
 
+--atlas additionally checks a server that runs the `atlas_remote` tool set (GEMARC_TOOLSET=atlas_remote: the work order and the advisory
+slice lint, both read-only) and the atlas kit route `/kit/atlas.zip` (a LOCAL opt-in behind GEMARC_ATLAS_KIT=1; `--atlas-kit on|off|auto`
+says whether the route must serve the kit, must be absent, or may be either; only `auto` accepts the coded 503 of a server that has the flag but not the atlas). Without --atlas nothing below changes. The atlas is not deployed
+while its publication is pending: against such a server --atlas FAILS on purpose (the server runs the stateless tool set).
+
 If the URL is behind Vercel Deployment Protection the probe stops at the first
 response and says so: use the production alias, `vercel curl`, or pass the
 bypass header with --header.
@@ -22,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import os
 import re
@@ -29,6 +35,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import zipfile
 
 TOOL_NAME = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 STATELESS_TOOLS = (
@@ -144,10 +151,12 @@ class Response:
 
 
 class Probe:
-    def __init__(self, base: str, token: str, extra_headers: list[str], local: bool):
+    def __init__(self, base: str, token: str, extra_headers: list[str], local: bool, atlas: bool = False, atlas_kit: str = "auto"):
         self.base = base.rstrip("/")
         self.token = token
         self.local = local
+        self.atlas = atlas
+        self.atlas_kit = atlas_kit
         self.extra = {}
         for raw in extra_headers:
             name, _, value = raw.partition(":")
@@ -319,6 +328,8 @@ def run_checks(probe: Probe) -> None:
                 if names else describe(response))
     illegal = [n for n in names if not TOOL_NAME.match(n)]
     probe.check("every tool name matches ^[a-zA-Z0-9_-]{1,64}$", bool(names) and not illegal, f"illegal: {illegal}" if illegal else "")
+    if probe.atlas:
+        atlas_checks(probe, report, names)
     if not names or "gemarc_validate" not in names:
         return
 
@@ -376,6 +387,99 @@ def run_checks(probe: Probe) -> None:
                 f"sessionManager={after.get('sessionManager')} status={after.get('status')}")
 
 
+# --- the optional atlas checks (--atlas) -------------------------------------------------------------
+
+ATLAS_REMOTE_TOOLS = ("gemarc_atlas_brief", "gemarc_atlas_check")
+#: A small valid slice (grammar and references inside the slice); synthetic.
+ATLAS_PROBE_SLICE = (
+    "#atlas 1\n// a synthetic probe slice, not a real system\n## buildings: id | name | opts\nzone.lib | Library system | trust=internal\n"
+    "zone.ext | Outside | trust=external\n## floors: id | building | name | level\nlvl.core | zone.lib | Core services | 1\nlvl.out | zone.ext | Visitors | 0\n"
+    "## rooms: id | floor | name | opts\nrm.desk | lvl.core | Lending desk | tier=T2\nrm.vis | lvl.out | Members | tier=T1\n")
+ATLAS_KIT_PATH = "/kit/atlas.zip"
+ATLAS_KIT_MODES = ("auto", "on", "off")
+#: Shapes of a server filesystem location inside PROSE (the work order quotes ``\\|`` and the like, so a lone backslash is not a path here).
+_ATLAS_FS_SHAPES = (re.compile(r"[A-Za-z]:[\\/][A-Za-z0-9_.$-]"), re.compile(r"^\\\\[A-Za-z0-9_.$-]+\\"),
+                    re.compile(r"(^|\s)/(tmp|var|home|usr|opt|Users|private|workspace|vercel|task|root|mnt|etc)/"))
+
+
+def fs_path_values(value) -> list[str]:
+    """String values of a JSON document that look like a server filesystem location (drive paths, UNC paths, /tmp/ and friends)."""
+    found: list[str] = []
+    if isinstance(value, dict):
+        for item in value.values():
+            found += fs_path_values(item)
+    elif isinstance(value, list):
+        for item in value:
+            found += fs_path_values(item)
+    elif isinstance(value, str) and any(shape.search(value) for shape in _ATLAS_FS_SHAPES):
+        found.append(value[:80])
+    return found
+
+
+def atlas_checks(probe: Probe, report: dict, names: list) -> None:
+    """The extra checks of ``--atlas``: the ``atlas_remote`` tool set (two read-only tools) and the kit route."""
+    toolset = report.get("toolset")
+    if not probe.check("--atlas: the server runs the atlas_remote tool set", toolset == "atlas_remote",
+                       f"toolset={toolset!r} (GEMARC_TOOLSET=atlas_remote selects it; the atlas is not part of the stateless deployment)"):
+        atlas_kit_route(probe)
+        return
+    probe.check("--atlas: tools/list is exactly the two atlas tools", sorted(names) == sorted(ATLAS_REMOTE_TOOLS), f"tools={sorted(names)}")
+    probe.check("--atlas: /healthz lists no write tool", not report.get("writeTools"), f"writeTools={report.get('writeTools')}")
+    response, message = probe.rpc("tools/list", rid=21)
+    tools = ((message or {}).get("result") or {}).get("tools", [])
+    probe.check("--atlas: both tools are read-only (readOnlyHint)", bool(tools) and all((t.get("annotations") or {}).get("readOnlyHint") is True for t in tools),
+                f"annotations={[(t.get('name'), (t.get('annotations') or {}).get('readOnlyHint')) for t in tools]}")
+    response, brief, is_error = probe.call_tool("gemarc_atlas_brief", {"section": "format", "lang": "en-US"})
+    probe.check("--atlas: gemarc_atlas_brief returns the work order", bool(brief) and brief.get("status") == "ok" and len(str(brief.get("text", ""))) > 200 and not is_error,
+                f"status={(brief or {}).get('status')} bytes={len(json.dumps(brief or {}))}")
+    response, lint, is_error = probe.call_tool("gemarc_atlas_check", {"text": ATLAS_PROBE_SLICE})
+    probe.check("--atlas: gemarc_atlas_check lints a valid slice (advisory, grammar and intra-slice)",
+                bool(lint) and lint.get("status") == "ok" and lint.get("authority") == "advisory" and lint.get("scope") == "grammar+intra-slice"
+                and lint.get("clean") is True and not is_error, f"status={(lint or {}).get('status')} clean={(lint or {}).get('clean')} scope={(lint or {}).get('scope')}")
+    response, broken, is_error = probe.call_tool("gemarc_atlas_check", {"text": "#atlas 1\n## nodes: id | name | sub | opts\nonly-one-cell\n"})
+    probe.check("--atlas: gemarc_atlas_check reports a broken slice", bool(broken) and broken.get("status") == "ok" and broken.get("clean") is False,
+                f"status={(broken or {}).get('status')} clean={(broken or {}).get('clean')}")
+    response, huge, is_error = probe.call_tool("gemarc_atlas_check", {"text": "#atlas 1\n" + "x" * (33 * 1024)})
+    probe.check("--atlas: gemarc_atlas_check refuses a text above 32 KB with isError", bool(huge) and huge.get("status") == "invalid" and bool(is_error),
+                f"status={(huge or {}).get('status')} isError={is_error}")
+    leaks = fs_path_values([brief, lint, broken, huge])
+    probe.check("--atlas: no reply names a filesystem path", not leaks, f"path-like values: {leaks}" if leaks else "")
+    atlas_kit_route(probe)
+
+
+def atlas_kit_route(probe: Probe) -> None:
+    """``GET /kit/atlas.zip``: served as one attachment (the flag is on), or the plain 404 of an unknown kit (off), or the coded 503 (flag on, atlas absent)."""
+    wanted = probe.atlas_kit
+    response = probe.request("GET", ATLAS_KIT_PATH, token=False, timeout=60)
+    other = probe.request("GET", "/kit/no-such-kit-profile.zip", token=False)
+    if response.status == 200:
+        probe.check("--atlas: the kit route is allowed here", wanted in ("auto", "on"), f"--atlas-kit {wanted}: GET {ATLAS_KIT_PATH} answered 200")
+        digest = hashlib.sha256(response.body).hexdigest()
+        try:
+            names = zipfile.ZipFile(io.BytesIO(response.body)).namelist()
+        except zipfile.BadZipFile:
+            names = []
+        probe.check("--atlas: kit download is a zip with the launcher and the atlas package",
+                    "zip" in response.header("content-type").lower() and "attachment" in response.header("content-disposition")
+                    and "atlas-kit/atlas.py" in names and any(n.startswith("atlas-kit/gemarc_mcp/atlas/") for n in names)
+                    and not any("atlas_tools" in n or n.endswith(".pyc") for n in names),
+                    f"{describe(response)} {len(response.body)} bytes, {len(names)} files, type={response.header('content-type')!r}")
+        probe.check("--atlas: kit ETag is the sha256 of the archive and If-None-Match gives 304",
+                    response.header("etag").strip('"') == digest
+                    and probe.request("GET", ATLAS_KIT_PATH, token=False, headers={"If-None-Match": response.header("etag")}).status == 304,
+                    f"etag={response.header('etag')[:20]!r} sha256={digest[:16]}...")
+    elif response.status == 503:
+        body = response.json() or {}
+        # "on" means the route must SERVE the zip: a server that has the flag but not the atlas is not that, so only "auto" accepts the coded 503
+        probe.check("--atlas: the kit route is on but fails closed with a code (the atlas package is absent here)",
+                    wanted == "auto" and body.get("code") == "GEMARC_ATLAS_KIT_001" and not fs_path_values(body),
+                    f"{describe(response)} body={response.body[:120]!r} (--atlas-kit {wanted})")
+    else:
+        same = response.status == 404 and other.status == 404 and response.body == other.body
+        probe.check("--atlas: the kit route is off (the 404 of any unknown kit, naming nothing)", wanted in ("auto", "off") and same and b"atlas" not in response.body.lower(),
+                    f"{describe(response)} body={response.body[:100]!r} (--atlas-kit {wanted}); unknown kit answered {describe(other)}")
+
+
 def sdk_handshake(probe: Probe) -> None:
     try:
         import asyncio
@@ -419,12 +523,17 @@ def main(argv=None) -> int:
                         help="extra request header, repeatable (for example a Vercel protection-bypass header)")
     parser.add_argument("--local", action="store_true",
                         help="convenience: default the URL to http://127.0.0.1:8000 and skip Vercel advice (starts nothing)")
+    parser.add_argument("--atlas", action="store_true",
+                        help="also check the atlas_remote tool set (2 read-only tools) and the /kit/atlas.zip route; the server must run GEMARC_TOOLSET=atlas_remote")
+    parser.add_argument("--atlas-kit", choices=ATLAS_KIT_MODES, default="auto",
+                        help="with --atlas: on = the kit route must serve the zip (the coded 503 of a server without the atlas fails), off = it must be absent (404), "
+                             "auto = either, the coded 503 included (default)")
     args = parser.parse_args(argv)
     url = args.url or ("http://127.0.0.1:8000" if args.local else None)
     if not url:
         parser.error("give the deployment URL (or --local)")
     token = args.token if args.token is not None else os.environ.get("GEMARC_MCP_TOKEN", "")
-    probe = Probe(url, token.strip(), args.header, args.local)
+    probe = Probe(url, token.strip(), args.header, args.local, atlas=args.atlas, atlas_kit=args.atlas_kit)
     print(f"GemArc remote probe: {probe.base}  (token: {'given' if probe.token else 'none'}, "
           f"extra headers: {len(probe.extra)})")
     run_checks(probe)

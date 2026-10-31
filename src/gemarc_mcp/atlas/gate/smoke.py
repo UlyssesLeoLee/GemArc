@@ -35,6 +35,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.parse
 from dataclasses import dataclass, field
@@ -193,11 +194,28 @@ def _family_of(path: str) -> str:
     return "edge" if "edge" in name else "chrome"
 
 
-def _windows_roots(environ: Mapping[str, str]) -> list[str]:
+def _windows_roots(environ: Mapping[str, str], fallback: Mapping[str, str] | None = None) -> list[str]:
+    """The directories a Windows browser lives under: ``ProgramFiles(x86)``, ``ProgramFiles``, ``LOCALAPPDATA``.
+
+    A value comes from ``environ``; when that lacks it, from ``fallback`` (the process environment); when that lacks it too, the literal
+    default of a standard install. The MCP SDK hands a child process (Codex, Hermes) an environment that has ``LOCALAPPDATA`` but no
+    ``ProgramFiles*``: without the fallback Edge, which sits in ``ProgramFiles(x86)``, would not be found although it is installed."""
+    fallback = os.environ if fallback is None else fallback
+
+    def pick(key: str) -> str | None:
+        return environ.get(key) or fallback.get(key) or None
+
+    drive = pick("SystemDrive") or "C:"
+    home = pick("USERPROFILE") or os.path.expanduser("~")
+    defaults = {
+        "ProgramFiles(x86)": drive + "\\Program Files (x86)",
+        "ProgramFiles": drive + "\\Program Files",
+        "LOCALAPPDATA": os.path.join(home, "AppData", "Local"),
+    }
     roots = []
     for key in ("ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA"):
-        value = environ.get(key)
-        if value and value not in roots:
+        value = pick(key) or defaults[key]
+        if value not in roots:
             roots.append(value)
     return roots
 
@@ -206,8 +224,12 @@ def candidate_paths(
     environ: Mapping[str, str] | None = None,
     which: Callable[[str], str | None] = shutil.which,
     platform: str | None = None,
+    fallback_environ: Mapping[str, str] | None = None,
 ) -> list[str]:
-    """Ordered browser candidates: explicit override, PATH, default installs; Edge before Chrome."""
+    """Ordered browser candidates: explicit override, PATH, default installs; Edge before Chrome.
+
+    ``fallback_environ`` (default: the process environment) supplies the Windows install roots that ``environ`` lacks, and the literal
+    default directories come after it (see :func:`_windows_roots`)."""
     environ = os.environ if environ is None else environ
     platform = platform or sys.platform
     out: list[str] = []
@@ -220,14 +242,14 @@ def candidate_paths(
     for name in ("msedge", "microsoft-edge", "microsoft-edge-stable"):
         add(which(name))
     if platform.startswith("win"):
-        for root in _windows_roots(environ):
+        for root in _windows_roots(environ, fallback_environ):
             add(os.path.join(root, "Microsoft", "Edge", "Application", "msedge.exe"))
     elif platform == "darwin":
         add("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge")
     for name in ("chrome", "google-chrome", "google-chrome-stable", "chromium", "chromium-browser"):
         add(which(name))
     if platform.startswith("win"):
-        for root in _windows_roots(environ):
+        for root in _windows_roots(environ, fallback_environ):
             add(os.path.join(root, "Google", "Chrome", "Application", "chrome.exe"))
     elif platform == "darwin":
         add("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
@@ -252,6 +274,7 @@ def find_browser(
     which: Callable[[str], str | None] = shutil.which,
     isfile: Callable[[str], bool] = os.path.isfile,
     platform: str | None = None,
+    fallback_environ: Mapping[str, str] | None = None,
 ) -> Browser | None:
     """First usable browser. An explicit pin (env GEMARC_ATLAS_BROWSER) is never replaced by another
     browser: if the pinned path is not a file the result is None (a loud SKIP), because a gate that
@@ -262,18 +285,22 @@ def find_browser(
         if isfile(pinned):
             return Browser(path=pinned, family=_family_of(pinned), version=detect_version(pinned))
         return None
-    for path in candidate_paths(environ, which, platform):
+    for path in candidate_paths(environ, which, platform, fallback_environ):
         if isfile(path):
             return Browser(path=path, family=_family_of(path), version=detect_version(path))
     return None
 
 
-def no_browser_message(environ: Mapping[str, str] | None = None, pinned: str | None = None) -> str:
+def no_browser_message(environ: Mapping[str, str] | None = None, pinned: str | None = None, show_path: bool = False) -> str:
+    """The loud SKIP text. The pinned path is an environment value of the host and this text ends up in replies and in
+    ``dist/.verify/gate-report.json``, so it is NOT interpolated unless ``show_path`` is true (the command line asks for it: its
+    reader typed the path)."""
     environ = os.environ if environ is None else environ
     pinned = pinned if pinned is not None else (environ.get(BROWSER_ENV) or None)
     if pinned:
+        named = f" {pinned!r}" if show_path else ""
         what = (
-            f"the pinned browser {pinned!r} is not a file (the gate does not fall back to a browser "
+            f"the pinned browser{named} ({BROWSER_ENV}) is not a file (the gate does not fall back to a browser "
             "you did not choose)"
         )
     else:
@@ -808,6 +835,8 @@ class _Launch:
     seconds: float
     spawn_seconds: float = 0.0  # time spent inside Popen itself (process creation can stall under AV scanning)
     error: str | None = None  # the browser could not be started at all (missing file, not an executable)
+    overflow: str | None = None  # a pipe produced more than its cap (stdout or stderr was cut): never a verdict, always a process failure
+    read_error: str | None = None  # a pipe could not be read to its end (the dump or the log is incomplete): never a verdict either
 
 
 def _kill_tree(proc: subprocess.Popen) -> None:
@@ -846,7 +875,49 @@ def _browser_env(scratch: pathlib.Path) -> dict[str, str]:
     return env
 
 
-def _launch(args: list[str], timeout: float, env: Mapping[str, str] | None = None) -> _Launch:
+#: Caps of the two browser pipes, sized from measured launches of built reference-scale pages in gate mode (Edge 152): stdout, the DOM
+#: dump after the self-test removed its scripts, is 40 to 82 KB; a dump that still holds the page's scripts (no gate mode) is 2.1 MB; stderr
+#: is 2 to 121 KB. The stdout cap is twice the build's hard size limit for a page (htmlassemble ``FAIL_BYTES``, 8 MiB), so a dump larger
+#: than that cannot come from a page that passed the build; the stderr cap is about 35 times the largest log measured. Past a cap the
+#: rest of the pipe is still read (the child must never block on a full pipe) but thrown away, and the launch is a process failure.
+STDOUT_CAP_BYTES = 16 * 1024 * 1024
+STDERR_CAP_BYTES = 4 * 1024 * 1024
+_READ_CHUNK = 64 * 1024
+
+
+class _Pipe(threading.Thread):
+    """Reads one child pipe to EOF into a buffer of at most ``cap`` bytes; ``total`` counts every byte that went by. A read that fails
+    (``OSError``) is NOT an end of file: the error is kept in ``error`` and the launch is a process failure (an incomplete log could hide
+    the console errors after the cut)."""
+
+    def __init__(self, stream: Any, cap: int):
+        super().__init__(daemon=True)
+        self.stream, self.cap = stream, cap
+        self.data = bytearray()
+        self.total = 0
+        self.error: str | None = None
+
+    def run(self) -> None:
+        try:
+            while True:
+                chunk = self.stream.read1(_READ_CHUNK)
+                if not chunk:
+                    return
+                self.total += len(chunk)
+                room = self.cap - len(self.data)
+                if room > 0:
+                    self.data += chunk[:room]
+        except (OSError, ValueError) as exc:  # a read that failed: recorded, and judged by process_failure_reason (a timed-out launch is a failure anyway)
+            self.error = f"{type(exc).__name__}: {exc}"[:120]
+
+
+def _launch(
+    args: list[str],
+    timeout: float,
+    env: Mapping[str, str] | None = None,
+    stdout_cap: int = STDOUT_CAP_BYTES,
+    stderr_cap: int = STDERR_CAP_BYTES,
+) -> _Launch:
     kwargs: dict[str, Any] = {}
     if env is not None:
         kwargs["env"] = dict(env)
@@ -861,17 +932,44 @@ def _launch(args: list[str], timeout: float, env: Mapping[str, str] | None = Non
         elapsed = time.perf_counter() - started
         return _Launch(None, b"", b"", False, elapsed, elapsed, error=f"{type(exc).__name__}: {exc}")
     spawn = time.perf_counter() - started
+    readers = (_Pipe(proc.stdout, stdout_cap), _Pipe(proc.stderr, stderr_cap))
+    for reader in readers:
+        reader.start()
     timed_out = False
+    wait = max(1.0, timeout - spawn)  # `timeout` bounds the whole launch
+    limit = time.perf_counter() + wait
     try:
-        out, err = proc.communicate(timeout=max(1.0, timeout - spawn))  # `timeout` bounds the whole launch
+        proc.wait(timeout=wait)
+        for reader in readers:  # EOF on both pipes; a grandchild that keeps one open past the limit is a timeout, as before
+            reader.join(max(0.0, limit - time.perf_counter()))
+        timed_out = any(reader.is_alive() for reader in readers)
     except subprocess.TimeoutExpired:
         timed_out = True
+    if timed_out:
+        alive = proc.poll() is None   # was the browser itself still running at the limit?
         _kill_tree(proc)
         try:
-            out, err = proc.communicate(timeout=15)
+            proc.wait(timeout=15)
         except Exception:
-            out, err = b"", b""
-    return _Launch(proc.returncode, out or b"", err or b"", timed_out, time.perf_counter() - started, spawn)
+            pass
+        # A browser that had already exited while a descendant kept a pipe open cannot be reached by a kill of its (dead) pid on Windows, so
+        # waiting five seconds per pipe for an end of file that will not come only adds ten seconds to the limit.
+        patience = 5.0 if alive else 1.0
+        for reader in readers:
+            reader.join(patience)
+    for reader in readers:
+        if not reader.is_alive():  # a reader that is still blocked (it should not be) keeps its pipe: closing it under the read could hang
+            try:
+                reader.stream.close()
+            except OSError:
+                pass
+    out, err = readers
+    overflow = "; ".join(
+        f"{name} {pipe.total} bytes over the {pipe.cap} byte cap" for name, pipe in (("stdout", out), ("stderr", err)) if pipe.total > pipe.cap
+    ) or None
+    read_error = "; ".join(f"{name} {pipe.error}" for name, pipe in (("stdout", out), ("stderr", err)) if pipe.error) or None
+    return _Launch(proc.returncode, bytes(out.data), bytes(err.data), timed_out, time.perf_counter() - started, spawn, overflow=overflow,
+                   read_error=read_error)
 
 
 def _rmtree_retry(path: pathlib.Path, attempts: int = 25, delay: float = 0.2) -> bool:
@@ -892,6 +990,10 @@ def process_failure_reason(launch: _Launch) -> str | None:
         return f"could not start the browser: {launch.error}"
     if launch.timed_out:
         return f"timeout after {launch.seconds:.1f}s (process tree killed)"
+    if launch.overflow:
+        return f"browser output cut at its cap (truncated): {launch.overflow}"
+    if launch.read_error:
+        return f"browser output could not be read to its end (incomplete): {launch.read_error}"
     if launch.returncode != 0:
         return f"browser exited with code {launch.returncode}"
     if b"</html>" not in launch.stdout.lower():
@@ -920,6 +1022,7 @@ def run_gate(
     calibration: Mapping[str, Any] | None = None,
     scan_text: bool = True,
     retry_on_timeout: bool = True,
+    time_left: Callable[[], float] | None = None,
 ) -> GateResult:
     """Run the gate once at one target innerWidth. Never raises for page problems.
 
@@ -928,7 +1031,9 @@ def run_gate(
     fixtures only (the assembled copy lives in a temporary directory, relative assets would not be
     found there). Every launch attempt gets its own random nonce, so a retry can never accept the
     DOM of an earlier attempt. ``scan_text=False`` turns the undefined/NaN/[object scan off; ``retry_on_timeout=False`` makes a timed-out
-    launch final (a second launch on a loaded machine only repeats it)."""
+    launch final (a second launch on a loaded machine only repeats it). ``time_left`` (seconds, a callable) is the wall-clock budget of the
+    caller: a retry is not started with less than :data:`VERIFY_MIN_LAUNCH_SECONDS` left, and gets at most what is left (the first launch
+    is the caller's business: it passes its own ``timeout``)."""
     page = pathlib.Path(page)
     calibration = calibration if calibration is not None else load_calibration()
     limits = calibration.get("limits", {})
@@ -964,7 +1069,15 @@ def run_gate(
         launch: _Launch | None = None
         reason: str | None = None
         nonce = ""
+        attempt_timeout = timeout
+        no_retry_note = ""
         for attempt in range(retries + 1):
+            if attempt > 0 and time_left is not None:
+                left = time_left()
+                if left < VERIFY_MIN_LAUNCH_SECONDS:
+                    no_retry_note = f"; no retry: the wall-clock budget of the gate is spent ({max(0.0, left):.0f} s left)"
+                    break
+                attempt_timeout = min(timeout, left)
             nonce = secrets.token_hex(8)  # per attempt: the result must come from THIS launch
             url = page_url(target, with_nonce(query, nonce))
             profile = work / f"profile-{attempt}"
@@ -972,7 +1085,7 @@ def run_gate(
             try:
                 launch = _launch(
                     build_args(browser.path, str(profile), result.window, url, budget_ms),
-                    timeout,
+                    attempt_timeout,
                     env=_browser_env(work / f"browser-tmp-{attempt}"),
                 )
             finally:
@@ -991,7 +1104,7 @@ def run_gate(
             if launch.timed_out and not retry_on_timeout:
                 break
         if reason is not None or launch is None:
-            result.findings = [Finding("PROCESS", f"{len(result.process_failures)} launch(es) failed: {'; '.join(result.process_failures)}")]
+            result.findings = [Finding("PROCESS", f"{len(result.process_failures)} launch(es) failed: {'; '.join(result.process_failures)}{no_retry_note}")]
             result.message = str(result.findings[0])
             return result
 
@@ -1037,10 +1150,46 @@ DEFAULT_WIDTHS = (1024, 1366, 1600)
 #: worst with eight launches in parallel; a machine with as many busy processes as cores goes past 30 s (a cliff, measured). The page's own
 #: time is bounded by the virtual-time budget, so a larger wall limit costs nothing on a good page.
 VERIFY_TIMEOUT_SECONDS = 90.0
+#: Wall-clock budget of ALL widths together on the tool path (``build.run_gate`` passes it): three widths at 90 s would be 4.5 minutes
+#: and six widths 9 minutes in front of a client that gives up long before. About 150 s: a good run is 3 x 2 to 3 s, a busy machine is told so
+#: after the first width that times out and the rest is not launched (a loaded machine times out again, and more launches only add load).
+VERIFY_BUDGET_SECONDS = 150.0
+#: A launch is not started with less budget than this left (a good launch takes 2 to 3 s idle and up to about 23 s under heavy parallel load).
+VERIFY_MIN_LAUNCH_SECONDS = 10.0
+
+
+def _not_run_row(width: int, reason: str) -> dict[str, Any]:
+    """A width that was never launched: INCONCLUSIVE (not a pass, not a defect), with the reason in the message."""
+    return {"width": width, "status": "INCONCLUSIVE", "codes": ["NOT_RUN"], "findings": [], "innerWidth": None, "tabs": [], "steps": {"ok": 0, "total": 0},
+            "stepNames": [], "seconds": 0.0, "attempts": 0, "notRun": True, "message": f"NOT RUN: {reason}"}
+
+
+_FILE_URL = re.compile(r"file://[^\s'\"<>()\[\]{}|^`]*")
+_DRIVE_PATH = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]:[\\/][^\s'\"<>|*?]*")
+_POSIX_HOME = re.compile(r"(?<![\w:/.\-])/(?:home|Users|tmp|var|private|root|mnt|opt|usr)/[^\s'\"<>|*?]*")
+_LINE_COL = re.compile(r"^(.*?)((?::\d+){0,2})$", re.S)
+
+
+def _basename(match: "re.Match[str]") -> str:
+    body, position = _LINE_COL.match(match.group(0)).groups()
+    name = re.split(r"[\\/]+", body.rstrip("\\/"))[-1]
+    return (name or "file") + position
+
+
+def scrub_host_paths(text: str) -> str:
+    """``text`` without machine paths: a ``file://`` URL, a Windows drive path and a path under a well-known POSIX root each become their last
+    component (a ``:line:column`` suffix is kept). A page error of the real browser quotes the URL of the page and its scripts, which holds
+    the workspace location and the user name, and a verdict is written to ``gate-report.json`` and returned to the client."""
+    if not text:
+        return text
+    for pattern in (_FILE_URL, _DRIVE_PATH, _POSIX_HOME):
+        text = pattern.sub(_basename, text)
+    return text
 
 
 def summarize_result(result: GateResult) -> dict[str, Any]:
-    """One width of a verdict as plain data (what the build and verify tools report)."""
+    """One width of a verdict as plain data (what the build and verify tools report). Machine paths in finding details and in the
+    message are reduced to file names (:func:`scrub_host_paths`)."""
     raw = result.result or {}
     tabs = [str(t.get("tab")) for t in raw.get("tabs", []) if isinstance(t, dict)]
     steps = [s for s in raw.get("steps", []) if isinstance(s, dict)]
@@ -1049,11 +1198,13 @@ def summarize_result(result: GateResult) -> dict[str, Any]:
         status = "INCONCLUSIVE"
         message = (f"INCONCLUSIVE, not a pass and not a page defect: the browser did not finish within {result.total_seconds / max(1, result.attempts):.0f} s "
                    "(a loaded machine does this); run it again when the machine is idle; if it times out again on an idle machine, the page itself hangs. " + result.message)
+    findings = [dict(f.as_dict(), detail=scrub_host_paths(f.detail)) for f in result.findings]
+    message = scrub_host_paths(message)
     return {
         "width": result.width,
         "status": status,
         "codes": result.codes,
-        "findings": [f.as_dict() for f in result.findings],
+        "findings": findings,
         "innerWidth": raw.get("innerWidth"),
         "tabs": tabs,
         "steps": {"ok": sum(1 for s in steps if s.get("ok")), "total": len(steps)},
@@ -1076,6 +1227,9 @@ def verify_gate(
     widths: Sequence[int] = DEFAULT_WIDTHS,
     *,
     browser: Browser | None = None,
+    budget_seconds: float | None = None,
+    stop_after_inconclusive: bool = False,
+    clock: Callable[[], float] = time.monotonic,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """The gate of a built page at several widths (one launch per width), as one verdict. Fail-closed.
@@ -1085,7 +1239,15 @@ def verify_gate(
     ``INCONCLUSIVE`` (when nothing FAILED and no width was SKIPPED) means a launch timed out on a loaded machine: not a pass, not a page defect.
     The browser is looked up once. ``kwargs`` go to ``run_gate`` (``tmp_root``, ``retries``, ``require_header`` ...); the wall-clock limit per
     launch is :data:`VERIFY_TIMEOUT_SECONDS` unless ``timeout`` is given (virtual time, not wall time, bounds a good page), and a timeout is
-    not retried."""
+    not retried.
+
+    The tool path (``build.run_gate``) passes ``budget_seconds=VERIFY_BUDGET_SECONDS`` and ``stop_after_inconclusive=True``: every launch gets
+    at most the budget that is left (never less than :data:`VERIFY_MIN_LAUNCH_SECONDS`) and so does the retry of a launch that failed for a
+    reason other than a timeout (it is not started at all with less than that left), no width is launched once less than that is left, and
+    no width is launched after the first INCONCLUSIVE one (a loaded machine times out again, and more launches only add load). A width that
+    was not launched is an INCONCLUSIVE row with ``notRun`` and the reason, and ``message`` and ``lines`` say so. Without these two arguments
+    (the default, and what the command line and the other callers get) every width is launched whatever the others did. ``clock`` is the
+    time source (injected by tests)."""
     widths = tuple(int(w) for w in widths)
     if not widths:
         raise ValueError("verify_gate needs at least one width")
@@ -1099,12 +1261,27 @@ def verify_gate(
                  "innerWidth": None, "tabs": [], "steps": {"ok": 0, "total": 0}, "seconds": 0.0, "attempts": 0, "message": message} for w in widths]
         return {"status": "SKIP", "widths": rows, "lines": [f"SKIP {w}: no browser; the gate was NOT run (a skip is not a pass)" for w in widths],
                 "browser": None, "message": message}
+    begun = clock()
+    stopped: str | None = None   # why the remaining widths were not launched
     for w in widths:
+        launch_kwargs = dict(kwargs)
+        if stopped is None and budget_seconds is not None:
+            left = budget_seconds - (clock() - begun)
+            if rows and left < VERIFY_MIN_LAUNCH_SECONDS:
+                stopped = f"the {budget_seconds:.0f} s wall-clock budget of the gate is spent"
+            else:
+                launch_kwargs["timeout"] = min(float(kwargs["timeout"]), max(VERIFY_MIN_LAUNCH_SECONDS, left))
+                launch_kwargs["time_left"] = lambda: budget_seconds - (clock() - begun)   # a retry of this width is charged against the same budget
+        if stopped is not None:
+            rows.append(_not_run_row(w, stopped))
+            continue
         try:
-            rows.append(summarize_result(run_gate(page, w, browser=browser, **kwargs)))
+            rows.append(summarize_result(run_gate(page, w, browser=browser, **launch_kwargs)))
         except Exception as exc:  # fail closed: a crash of the runner is a failed gate, never a pass
             rows.append({"width": w, "status": "FAIL", "codes": ["PROCESS"], "findings": [Finding("PROCESS", f"runner error {type(exc).__name__}: {exc}"[:200]).as_dict()],
                          "innerWidth": None, "tabs": [], "steps": {"ok": 0, "total": 0}, "seconds": 0.0, "attempts": 0, "message": f"runner error {type(exc).__name__}"})
+        if stop_after_inconclusive and rows[-1]["status"] == "INCONCLUSIVE":
+            stopped = f"width {w} timed out (INCONCLUSIVE), so no further width is launched: a machine that is this busy times out again"
     if any(r["status"] == "SKIP" for r in rows):
         status = "SKIP"
     elif any(r["status"] == "FAIL" for r in rows):
@@ -1118,11 +1295,19 @@ def verify_gate(
         head = f"{r['status']} {r['width']}"
         if r["status"] == "PASS":
             lines.append(f"{head}: {len(r['tabs'])} tabs, {r['steps']['ok']}/{r['steps']['total']} steps, {r['seconds']} s")
+        elif r.get("notRun"):
+            lines.append(f"{head}: {r['message']}; NOT verified, no page defect found; run again when the machine is idle"[:200])
         elif r["status"] == "INCONCLUSIVE":
             lines.append(f"{head}: the browser timed out after {r['seconds']} s: NOT verified, no page defect found; run again when the machine is idle")
         else:
             lines.append(f"{head}: {', '.join(f['code'] + ' ' + f['name'] for f in r['findings'][:3]) or r['message']}"[:200])
-    return {"status": status, "widths": rows, "lines": lines, "browser": {"family": browser.family, "version": browser.version}, "message": ""}
+    verdict = {"status": status, "widths": rows, "lines": lines, "browser": {"family": browser.family, "version": browser.version}, "message": ""}
+    if budget_seconds is not None:
+        not_run = [r["width"] for r in rows if r.get("notRun")]
+        verdict["budget"] = {"seconds": budget_seconds, "usedSeconds": round(clock() - begun, 1), "notRun": not_run}
+        if not_run:
+            verdict["message"] = f"widths {', '.join(str(w) for w in not_run)} were NOT launched: {stopped}"
+    return verdict
 
 
 def calibrate(
@@ -1247,13 +1432,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     browser = None
     if args.browser:
         if not os.path.isfile(args.browser):
-            print(no_browser_message(pinned=args.browser), file=sys.stderr)
+            print(no_browser_message(pinned=args.browser, show_path=True), file=sys.stderr)
             return 3
         browser = Browser(path=args.browser, family=_family_of(args.browser), version=detect_version(args.browser))
     else:
         browser = find_browser()
     if browser is None:
-        print(no_browser_message(), file=sys.stderr)
+        print(no_browser_message(show_path=True), file=sys.stderr)
         return 3
     if args.calibrate:
         widths = args.width or [1024, 1256, 1366, 1576, 1600]

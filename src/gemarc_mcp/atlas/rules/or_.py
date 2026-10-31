@@ -271,13 +271,22 @@ def gap_text(gap: tuple) -> str:
     return f"assert at least {gap[1]} of the {gap[2]} participants (35%, minimum 2); Idle on an untouched node does not count"
 
 
+#: The event outcome every successful run has (the vocabulary's ``eventOutcomes`` has no other success value): asserting it says nothing
+#: abnormal (OR-002).
+UNREMARKABLE_OUTCOMES = ("OK",)
+
+
 def abnormal_all_completed(case: Mapping) -> bool:
-    """OR-002: an abnormal, recovery or combination case that asserts only ``Completed`` and no outcome."""
+    """OR-002: an abnormal, recovery or combination case whose effective assertions are only ``Completed`` states and ``OK`` outcomes.
+    Effective is the same notion as the coverage floor's: a participant, or a state other than
+    ``Idle`` (``Idle`` on a node the case never touches holds for every run, so adding one does not make a lazy case less lazy)."""
     if case.get("category") not in LAZY_CATEGORIES:
         return False
+    parts = mutate.participants(case)
     terminal = case.get("expectedTerminalState") or {}
-    outcomes = [o for o in case.get("expectedOutcomes") or [] if isinstance(o, Mapping)]
-    return bool(terminal) and not outcomes and all(v == "Completed" for v in terminal.values())
+    states = [state for node, state in terminal.items() if node in parts or state != "Idle"]
+    remarkable = [o for o in case.get("expectedOutcomes") or [] if isinstance(o, Mapping) and o.get("outcome") not in UNREMARKABLE_OUTCOMES]
+    return bool(states) and not remarkable and all(state == "Completed" for state in states)
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -293,8 +302,8 @@ register(Rule("OR-001", 2, E, "{detail}",
               modes=("full",)))
 register(Rule("CS-002", 2, E, "reported as OR-001", "terminal oracle: the asserted final states hold (reports as OR-001)", modes=("full",)))
 register(Rule("CS-003", 2, E, "reported as OR-001", "outcomes oracle: the asserted outcomes occur (reports as OR-001)", modes=("full",)))
-register(Rule("OR-002", 2, W, "an {category} case that asserts only Completed asserts nothing abnormal: add out= rows or the state that should differ",
-              "abnormal, recovery or combination case with only Completed asserted and no outcome"))
+register(Rule("OR-002", 2, W, "an {category} case that asserts only Completed states (and OK outcomes) asserts nothing abnormal: add an out= row or a state that differs",
+              "abnormal, recovery or combination case with only Completed states and OK outcomes asserted"))
 register(Rule("OR-003", 2, E, "{detail}",
               "coverage floor: asserted nodes >= max(2, ceil(0.35 x participants))", modes=("full",)))
 register(Rule("OR-004", 2, E, "{detail}", "kill rate of the mutants (zero killed = the assertions constrain nothing; low rate = WARN)", modes=("full",)))

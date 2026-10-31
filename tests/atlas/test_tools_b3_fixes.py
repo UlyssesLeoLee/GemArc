@@ -26,6 +26,7 @@ from gemarc_mcp.atlas import build
 from gemarc_mcp.atlas import project as pj
 from gemarc_mcp.atlas import status as st
 from gemarc_mcp.atlas import tools
+from gemarc_mcp.atlas.gate import smoke
 from gemarc_mcp.paths import GemArcError
 
 from .test_oracle_support import desk_files
@@ -347,22 +348,16 @@ class PinnedBrowserTests(Flow):
         stamp = (self.paths.atlas / "dist" / ".verify" / "gate-stamp.json").read_text(encoding="utf-8")
         self.assertEqual(json.loads(stamp)["status"], "SKIP")
 
-    @unittest.skipUnless(sys.platform.startswith("win"), "the default install directories are a Windows matter")
-    def test_the_program_files_directories_are_filled_in_when_the_sdk_environment_lacks_them(self):
-        keys = ("ProgramFiles", "ProgramFiles(x86)", "ProgramW6432")
-        with mock.patch.dict(os.environ):
-            for key in keys:
-                os.environ.pop(key, None)
-            tools.ensure_browser_env()
-            for key in keys:
-                folder = os.environ.get(key)
-                if folder is None:
-                    self.assertFalse(os.path.isdir((os.environ.get("SystemDrive") or "C:") + "\\" + ("Program Files (x86)" if "x86" in key else "Program Files")))
-                else:
-                    self.assertTrue(os.path.isdir(folder), folder)
-        with mock.patch.dict(os.environ, {"ProgramFiles": "Z:\\operator"}):
-            tools.ensure_browser_env()
-            self.assertEqual(os.environ["ProgramFiles"], "Z:\\operator", "a value the operator set is never replaced")
+    # debt-b4 item 35: ``tools.ensure_browser_env`` (it filled ProgramFiles* into os.environ) is gone: ``smoke.candidate_paths`` falls back to
+    # the process environment and the literal default install directories. Its tests are in tests/atlas/test_gate_tool_path.py
+    # (``DefaultInstallFallbackTests``, including a real discovery with a filtered environment and an empty PATH).
+    def test_the_gate_finds_a_browser_in_a_filtered_environment_without_the_tools_touching_os_environ(self):
+        before = dict(os.environ)
+        self.assertFalse(hasattr(tools, "ensure_browser_env"))
+        found = smoke.find_browser({"LOCALAPPDATA": "C:/LA"}, which=lambda n: None, isfile=lambda p: p.endswith("msedge.exe") and "Program Files (x86)" in p,
+                                   platform="win32", fallback_environ={})
+        self.assertEqual(found.family, "edge")
+        self.assertEqual(dict(os.environ), before)
 
 
 class EvidenceDriftTests(Flow):
@@ -425,6 +420,23 @@ class OracleSheetTests(Flow):
         self.assertIn("&lt;img onerror&gt;", sheet)
         self.assertRegex(sheet, r"(?m)^APPROVE-ALL [0-9a-f]{12}$")
         self.assertIn("CS-BORROW-OK", sheet)
+
+    def test_the_fixed_instruction_lines_show_no_html_entity_in_any_language(self):
+        """The sheet is read in a text editor: ``&lt;digest&gt;`` in the how-to lines was the escaping of the fixed text, not of model text."""
+        from gemarc_mcp.atlas import oracle
+
+        for lang in ("en-US", "zh-CN", "ja-JP"):
+            how = oracle._text(lang)["how"]                                 # noqa: SLF001
+            self.assertEqual([line for line in how if "<" in line or ">" in line], [], lang)
+            self.assertTrue(any("APPROVE-ALL" in line and "12" in line for line in how), f"{lang}: the how-to says the confirmation line is APPROVE-ALL plus 12 hex characters")
+        self.init()
+        files = desk_files()
+        files["30-policy"] = POLICY
+        self.load(files)
+        self.assertEqual(tools.oracle_sheet(self.ws, self.name)["status"], "ok")
+        sheet = (self.paths.atlas / "dist" / "oracle-sheet.md").read_text(encoding="utf-8")
+        self.assertNotIn("&lt;", sheet)
+        self.assertNotIn("&gt;", sheet)
 
 
 class InputValidationTests(Flow):

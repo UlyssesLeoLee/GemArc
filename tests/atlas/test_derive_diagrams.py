@@ -12,8 +12,10 @@ Run: PYTHONPATH=src python -m unittest discover -s tests/atlas -t tests -p "test
 """
 from __future__ import annotations
 
+import copy
 import json
 import re
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -383,6 +385,8 @@ class UnitTests(unittest.TestCase):
             self.assertLessEqual(set(unit["covers"]["nodeIds"]), node_ids, (label, unit["id"]))
             self.assertLessEqual(set(unit["covers"]["edgeIds"]), edge_ids, (label, unit["id"]))
             self.assertLessEqual(set(unit["covers"]["caseIds"]), case_ids, (label, unit["id"]))
+            for key in ("nodeIds", "edgeIds", "caseIds"):  # a covered id is listed once (the overview listed each edge once per building)
+                self.assertEqual(len(unit["covers"][key]), len(set(unit["covers"][key])), (label, unit["id"], key))
             self.assertEqual(mermaid_problems(unit["mermaid"]), [], (label, unit["id"], unit["mermaid"][:400]))
             self.assertEqual(junk(unit["mermaid"]), [], (label, unit["id"]))
             self.assertEqual(junk(json.dumps(unit, ensure_ascii=False)), [], (label, unit["id"]))
@@ -504,6 +508,131 @@ class UnitTests(unittest.TestCase):
         ids = [u["id"] for u in result["units"]]
         self.assertEqual(len(ids), len(set(ids)))
         self.assertTrue(any(re.match(r"component-.+-.+", i) for i in ids))
+
+
+def cross_building_edges(model) -> dict:
+    """``{(source building, target building): set of edge ids}`` of the logical-view relations between development-view
+    nodes in two different buildings, worked out from the raw model (the oracle of the overview tests)."""
+    ix = P.Index(model)
+    kinds = set(ix.profile.item("views", "development-view")["kinds"])
+    relations = {r["id"] for r in ix.profile.raw["relations"] if "logical-view" in r.get("views", [])}
+    building_of_floor = {f["id"]: f["buildingId"] for f in model["space"]["floors"]}
+    floor_of_room = {r["id"]: r["floorId"] for r in model["space"]["rooms"]}
+    where = {n["id"]: building_of_floor.get(floor_of_room.get(n.get("roomId"))) for n in model["nodes"] if n["kind"] in kinds}
+    found: dict = {}
+    for e in model["edges"]:
+        a, b = where.get(e["sourceId"]), where.get(e["targetId"])
+        if e["relation"] in relations and a and b and a != b:
+            found.setdefault((a, b), set()).add(e["id"])
+    return found
+
+
+class OverviewEdgeTests(unittest.TestCase):
+    """A cross-building edge is counted once: ``_component_units`` used to collect it once per building, so the overview
+    listed it N times (N buildings) and every Mermaid edge label was N times too large."""
+
+    def overview(self, model, lang="en-US"):
+        return [u for u in D.build_units(model, lang)["units"] if u["id"] == "component-overview"]
+
+    def test_the_overview_lists_each_edge_once_and_labels_count_distinct_edges(self):
+        seen = 0
+        for preset, seeds in (("small", (1, 2, 3, 4, 5)), ("reference", (1, 2, 3, 4, 5))):
+            for seed in seeds:
+                model = synth.generate(preset, seed)
+                expected = cross_building_edges(model)
+                units = self.overview(model)
+                if not expected:
+                    self.assertEqual(units, [], (preset, seed))
+                    continue
+                seen += 1
+                self.assertEqual(len(units), 1, (preset, seed))
+                unit = units[0]
+                ids = unit["covers"]["edgeIds"]
+                every = set().union(*expected.values())
+                self.assertEqual(len(ids), len(set(ids)), (preset, seed))
+                self.assertEqual(set(ids), every, (preset, seed))
+                drawn = {(e["from"], e["to"]): int(e["label"]) for e in unit["data"]["edges"]}
+                self.assertEqual(drawn, {pair: len(found) for pair, found in expected.items()}, (preset, seed))
+                self.assertEqual(sum(drawn.values()), len(ids), (preset, seed))
+                for pair, count in drawn.items():  # the label is in the Mermaid text, once per ordered pair
+                    self.assertIn('|"%d"|' % count, unit["mermaid"], (preset, seed, pair))
+                self.assertEqual(unit["mermaid"].count("-.->"), len(drawn), (preset, seed))
+        self.assertGreaterEqual(seen, 8)
+
+    def test_a_pinned_case_two_buildings_and_twenty_edges(self):
+        # pinned on the generator as it is since debt-b4 (no edge between a record port and a message port, so a different graph for every seed;
+        # the first pin of this test, 16 edges drawn "8" and "8", was measured on the earlier generator). The overview of small/3 has two
+        # buildings: 20 distinct cross-building edges, 10 in each direction. The pre-fix code collected them once per building, so it listed
+        # every edge twice and drew "20" on both arrows.
+        unit = self.overview(synth.generate("small", 3))[0]
+        self.assertEqual(len(unit["covers"]["edgeIds"]), 20)
+        self.assertEqual([e["label"] for e in unit["data"]["edges"]], ["10", "10"])
+        self.assertEqual(unit["mermaid"].count('|"10"|'), 2)
+        self.assertNotIn('|"20"|', unit["mermaid"])
+
+    def test_every_language_and_the_document_channel_agree(self):
+        from gemarc_mcp.atlas.derive import docbuild as B
+        model = synth.generate("small", 3)
+        expected = cross_building_edges(model)
+        every = set().union(*expected.values())
+        for lang in LANGS:
+            (unit,) = self.overview(model, lang)
+            self.assertEqual(len(unit["covers"]["edgeIds"]), len(every), lang)
+            bundle = B.get_bundle(model, lang, use_cache=False)
+            ids, label = B.resolve_unit(bundle, "component-overview")  # the outline selects by the covered ids
+            self.assertEqual(label, "component-overview")
+            self.assertEqual(len(ids), len(set(ids)), lang)
+            self.assertEqual(set(ids), every, lang)
+        with tempfile.TemporaryDirectory() as tmp:  # the written diagram file is the document channel's copy of the text
+            report = B.build_docs(model, tmp, ["en-US"])
+            text = (Path(tmp) / "diagrams" / "component-overview.mmd").read_bytes().decode("utf-8")
+            self.assertTrue(any(f["path"] == "diagrams/component-overview.mmd" for f in report["files"]))
+        self.assertEqual(text, self.overview(model)[0]["mermaid"])
+        self.assertEqual(text.count('|"10"|'), 2)
+        self.assertNotIn('|"20"|', text)
+
+    def test_an_edge_to_the_unplaced_group_is_not_covered_by_the_overview(self):
+        # debt-b4 fix: the unplaced group is no node of the overview, so its edges are neither drawn nor counted in a label
+        model = copy.deepcopy(synth.generate("small", 3))
+        before = cross_building_edges(model)
+        touching: dict = {}
+        for ids in before.values():
+            for edge in model["edges"]:
+                if edge["id"] in ids:
+                    for end in (edge["sourceId"], edge["targetId"]):
+                        touching[end] = touching.get(end, 0) + 1
+        victim = max(touching, key=lambda n: (touching[n], n))
+        next(n for n in model["nodes"] if n["id"] == victim)["roomId"] = None
+        expected = cross_building_edges(model)
+        self.assertNotEqual(expected, before, "the victim had cross-building edges, so the model changed")
+        (unit,) = self.overview(model)
+        ids = unit["covers"]["edgeIds"]
+        self.assertEqual(set(ids), set().union(*expected.values()))
+        self.assertFalse(any(e["id"] in set(ids) for e in model["edges"] if victim in (e["sourceId"], e["targetId"])))
+        drawn = {(e["from"], e["to"]): int(e["label"]) for e in unit["data"]["edges"]}
+        self.assertEqual(sum(drawn.values()), len(ids))
+
+    def test_no_overview_is_made_when_only_the_unplaced_group_has_cross_edges(self):
+        model = copy.deepcopy(synth.generate("small", 3))
+        cross = set().union(*cross_building_edges(model).values())
+        model["edges"] = [e for e in model["edges"] if e["id"] not in cross]
+        self.assertEqual(cross_building_edges(model), {})
+        ix = P.Index(model)
+        kinds = set(ix.profile.item("views", "development-view")["kinds"])
+        relations = {r["id"] for r in ix.profile.raw["relations"] if "logical-view" in r.get("views", [])}
+        drawn_kind = {n["id"] for n in model["nodes"] if n["kind"] in kinds}
+        linked = next(e["sourceId"] for e in model["edges"]
+                      if e["relation"] in relations and e["sourceId"] in drawn_kind and e["targetId"] in drawn_kind)
+        next(n for n in model["nodes"] if n["id"] == linked)["roomId"] = None
+        self.assertEqual(self.overview(model), [], "an overview with no drawn edge says nothing")
+
+    def test_no_unit_of_any_model_lists_an_id_twice(self):
+        models = [synth.generate(preset, seed) for preset in ("tiny", "small", "reference") for seed in (1, 7)]
+        models += [synth.edge_case(name, 2) for name in synth.EDGE_CASES]
+        for n, model in enumerate(models):
+            for unit in D.build_units(model, "en-US")["units"]:
+                for key, ids in unit["covers"].items():
+                    self.assertEqual(len(ids), len(set(ids)), (n, unit["id"], key))
 
 
 if __name__ == "__main__":

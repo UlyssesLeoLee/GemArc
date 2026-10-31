@@ -25,7 +25,7 @@ synthetic id families. `reference unit` is a generic module name, never an id or
 
 ## Files
 
-235 rows: 22 ported-semantic, 9 ported-structural, 14 clean-room, 190 new.
+236 rows: 22 ported-semantic, 9 ported-structural, 14 clean-room, 191 new.
 
 | path | origin | reference unit | treatment | deviations | lane |
 |---|---|---|---|---|---|
@@ -90,6 +90,7 @@ synthetic id families. `reference unit` is a generic module name, never an id or
 | `src/gemarc_mcp/atlas/gate/smoke.py` | new | - | authored from DESIGN.md 9.3 and 10-M0, then hardened after verification; stdlib subprocess runner; no reference code read or copied | calibration keyed per browser family (Edge 24 px, Chrome 16 px) instead of one +24; stderr console channel matches page-origin 'Uncaught'/WebGL error text because Edge logs console.error at INFO; per-attempt result nonce; canvases, renderer, GL errors and draw calls judged from the self-test's own reads; blank-canvas floor and renderer substring come from calibration.json; header, late errors and clientWidth overflow are fail-closed; pinned browser never replaced; start failures are coded findings; browser temp directory redirected into the work directory | gate |
 | `src/gemarc_mcp/atlas/htmlassemble.py` | new | - | authored from DESIGN.md 9.3; placeholder fill with a function replacer, script-safe data literal, build checks BD-001..BD-007, size accounting; no reference code read or copied | data are JSON.parse of a single-quoted literal instead of an object literal (a __proto__ key stays an own property); BD-003..BD-007 are defined by this file because the design names only BD-001 and BD-002 | build |
 | `src/gemarc_mcp/atlas/indexer.py` | new | - | The index scopes (nodes, room, req, case, ids) as compact lines over the expanded model and its provenance map, authored from design 4.1 | - | slices |
+| `src/gemarc_mcp/atlas/kit.py` | new | - | authored from DESIGN.md section 10 (M8) and section 4.1 (the kit is an HTTP route, not a tool): one deterministic zip of the stdlib-only atlas package with a launcher, a README and the specifications; no reference code read or copied | - | tools2 |
 | `src/gemarc_mcp/atlas/model.py` | ported-semantic | model validator and field contract | Python module written from the analysis of the reference model schema and validator: field names that engine and viewer code read are kept, the integrity checks follow the semantics of the reference validator, every derivation is a new single-source helper; no reference code copied | 32 listed differences in docs/atlas/spec/model-schema.md section 10: derived edge ids with hash fallback, ports <node>:in/out, ranks in GemArc order, one default-policy constant, tests registry, policies, tbdIds list | foundation |
 | `src/gemarc_mcp/atlas/oracle.py` | new | - | Oracle ledger (.atlas/oracle.json), sealing and the revised rule, blind verdicts and ledgered reveals, time-boxed mutant run, sealed-runs provider, oracle sheet and attestation badge, release gate; written from design section 7 and addendum A1 | - | oracle |
 | `src/gemarc_mcp/atlas/outline.py` | new | - | Authored for this repository from DESIGN.md 8.4: per-language entry finders (Python ast, regex on a comment-and-string-masked copy for C-like languages, Markdown, YAML, JSON, TOML, SQL, dotenv) and a shortest-unique anchor chooser; no reference counterpart | - | evidence |

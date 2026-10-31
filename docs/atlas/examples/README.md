@@ -10,7 +10,7 @@
 
 | 占位符 | 含义 |
 |---|---|
-| `<repo>` | 本仓库的目录（里面有 `.venv`）。Windows 示例：`D:\GemArc` |
+| `<repo>` | 本仓库的目录（里面有 `.venv`）。Windows 示例：`C:\src\GemArc` |
 | `<workspace>` | 一个已存在的空目录，Atlas 项目写在这里面。不要选在你要分析的仓库里面 |
 
 ## 2. 环境变量（四个客户端相同）
@@ -24,7 +24,7 @@
 | `GEMARC_ATLAS_BROWSER` | 可选：Edge 或 Chrome 可执行文件的完整路径，供浏览器门（`gemarc_atlas_verify`）用。指向的文件不存在时门是醒目的 SKIPPED，不会改用别的浏览器 |
 | `PYTHONUTF8` | 保持 `1`，中文才不会乱码 |
 
-客户端启动 stdio 服务器时只传过滤后的环境，所以服务器需要的每个变量都要写在配置里，不能指望继承你的 shell。浏览器门在 Windows 上靠 `ProgramFiles`、`ProgramFiles(x86)`、`LOCALAPPDATA` 找到 Edge；这几个变量不在被过滤的环境里时，服务器在 `build gate=smoke` 和 `verify` 里会按默认安装目录（`C:\Program Files (x86)`、`C:\Program Files`）补上缺的 `ProgramFiles*`；Edge 装在别处时，在配置里转发这些变量，或设置 `GEMARC_ATLAS_BROWSER`。找不到浏览器时 `gemarc_atlas_verify` 回复 SKIPPED（不算通过），`gemarc_atlas_status` 停在 `needs-user`，由用户装浏览器，或把理由写进 `<workspace>/<项目>/atlas/waive-browser.txt`（只有用户写这个文件）。
+客户端启动 stdio 服务器时只传过滤后的环境，所以服务器需要的每个变量都要写在配置里，不能指望继承你的 shell。浏览器门在 Windows 上靠 `ProgramFiles(x86)`、`ProgramFiles`、`LOCALAPPDATA` 找到 Edge；这几个变量不在被过滤的环境里时，门禁自己按标准安装目录（系统盘上的 `Program Files (x86)`、`Program Files`）找（`gate/smoke.py` 的 `candidate_paths`），不需要在配置里转发它们（转发无害）；Edge 装在别处时，设置 `GEMARC_ATLAS_BROWSER`。找不到浏览器时 `gemarc_atlas_verify` 回复 SKIPPED（不算通过），`gemarc_atlas_status` 停在 `needs-user`，由用户装浏览器，或把理由写进 `<workspace>/<项目>/atlas/waive-browser.txt`（只有用户写这个文件）。
 
 ## 3. Claude Code
 
@@ -39,6 +39,29 @@ claude mcp add gemarc_atlas -e GEMARC_TOOLSET=atlas -e GEMARC_WORKSPACE_ROOT=<wo
 ```
 
 接入后工具显示为 `mcp__gemarc_atlas__gemarc_atlas_put` 之类，入口提示是斜杠命令 `/mcp__gemarc_atlas__gemarc-atlas-create`。（这里的命令格式按 Claude Code 的文档写出；本目录的自动测试只验证 JSON 能解析、变量齐全，没有拉起 Claude Code，真实接入由最终验收阶段实测。）
+
+### 3.1 无头运行：`claude -p`（只给 atlas 工具加 Read、Grep、Glob）
+
+最终验收用的是无头模式：一句话进去，只允许 atlas 的 13 个工具和只读的 `Read`、`Grep`、`Glob`，工作区放在仓库之外，证据根指向被分析的仓库。三份文件配合使用：
+
+| 文件 | 作用 |
+|---|---|
+| `claude-headless.mcp.json` | 给 `--mcp-config` 的服务器配置（只有 `mcpServers`，和 `claude-code.mcp.json` 同一个条目，`GEMARC_ATLAS_ROOTS` 指向 `<repo>`） |
+| `claude-headless.settings.json` | 给 `--settings` 的权限：`allow` 恰好是 13 个 `mcp__gemarc_atlas__gemarc_atlas_*` 加 `Read`、`Grep`、`Glob`；`deny` 禁掉 `Bash`、`Edit`、`Write`、`NotebookEdit`、`WebFetch`、`WebSearch` |
+| `claude-headless-tobe.settings.json` | to-be（从需求短文设计新系统）用的 `--settings`：清单与上一份相同，另外只允许 `Write` 写 `<workspace>/*/atlas/user/**`（保存需求原文；`deny` 里没有整体的 `Write`，因为 `deny` 的优先级高于 `allow`，整体禁掉会让这条允许失效）。路径规则写成 `//` 加小写盘符再加路径，例如 `//c/work/atlas-ws/*/atlas/user/**`，按你的 Claude Code 版本核对写法；**这条路径规则没有在真实客户端上试过** |
+| 命令行里的 `--allowedTools` | 同一份清单，写在命令行上（`allowedTools` 不是 `--mcp-config` 文件里的键，所以单独列出） |
+
+在仓库根目录执行（先把两份 JSON 里的 `<repo>` 和 `<workspace>` 换成真实路径，`<workspace>` 在仓库之外）：
+
+```
+claude -p "为这个库创建5D设计" \
+  --mcp-config docs/atlas/examples/claude-headless.mcp.json --strict-mcp-config \
+  --settings docs/atlas/examples/claude-headless.settings.json \
+  --allowedTools "mcp__gemarc_atlas__gemarc_atlas_brief,mcp__gemarc_atlas__gemarc_atlas_init,mcp__gemarc_atlas__gemarc_atlas_put,mcp__gemarc_atlas__gemarc_atlas_check,mcp__gemarc_atlas__gemarc_atlas_status,mcp__gemarc_atlas__gemarc_atlas_index,mcp__gemarc_atlas__gemarc_atlas_simulate,mcp__gemarc_atlas__gemarc_atlas_doc,mcp__gemarc_atlas__gemarc_atlas_outline,mcp__gemarc_atlas__gemarc_atlas_evidence,mcp__gemarc_atlas__gemarc_atlas_build,mcp__gemarc_atlas__gemarc_atlas_verify,mcp__gemarc_atlas__gemarc_atlas_review,Read,Grep,Glob" \
+  --output-format stream-json --verbose
+```
+
+`--strict-mcp-config` 让这次运行只用上面这一份 MCP 配置。`claude-headless.settings.json` 没有 `Write`，模型不能自己把需求原文存进 `atlas/user/`（as-is 不强制）。**to-be 的无头运行**要么把 `--settings` 换成 `claude-headless-tobe.settings.json`，要么由你或操作者先把需求原文写进 `<工作区>/<项目名>/atlas/user/<名字>.txt`（`init` 先创建目录；工具集里没有保存用户文字的工具）。**这条命令没有在真实的 `claude` 上跑过**：自动测试只验证两份 JSON 能解析、清单与注册的工具逐个一致、服务器按这份配置能起来并列出 13 个工具；真实运行由最终验收阶段做。
 
 ## 4. Codex
 

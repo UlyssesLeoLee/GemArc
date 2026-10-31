@@ -17,8 +17,8 @@ GEMARC_WORKSPACE_ROOT = '<workspace>'
 GEMARC_ALLOW_WRITE = "1"
 # Where the cited source files live: alias=path, separated by ";". The model can only name the alias.
 GEMARC_ATLAS_ROOTS = 'main=<repo>'
-# Codex starts the server with a FILTERED environment: the browser gate (gemarc_atlas_verify) then cannot find Edge by itself.
-# Either forward ProgramFiles, ProgramFiles(x86) and LOCALAPPDATA here, or pin the browser (a missing browser is a loud SKIPPED, never a pass):
+# Codex starts the server with a FILTERED environment (no ProgramFiles variables): the browser gate (gemarc_atlas_verify) still finds Edge
+# in its standard install directories. Only when Edge is installed somewhere else, pin the browser (a missing browser is a loud SKIPPED, never a pass):
 # GEMARC_ATLAS_BROWSER = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 PYTHONUTF8 = "1"
 

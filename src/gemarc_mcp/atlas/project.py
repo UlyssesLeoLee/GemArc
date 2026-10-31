@@ -217,14 +217,43 @@ def create_layout(paths: Paths, config_text: str) -> None:
     (paths.atlas / ".gitignore").write_bytes(GITIGNORE.encode("utf-8"))
 
 
+#: ``FILE_ATTRIBUTE_REPARSE_POINT``: a symbolic link, a junction, or any other reparse point of Windows.
+_REPARSE_POINT = 0x400
+E_CONFINED = "GEMARC_AUTH_001"
+
+
+def is_link(path: "Path | str") -> bool:
+    """True for a symbolic link, a Windows junction or any other reparse point. ``Path.is_symlink`` misses a junction on Python 3.12, so the
+    three tests are made: ``is_symlink``, ``os.path.isjunction`` (3.12, Windows) and the reparse-point file attribute. A path that does not
+    exist, or cannot be examined, is not a link."""
+    try:
+        if Path(path).is_symlink():
+            return True
+        isjunction = getattr(os.path, "isjunction", None)
+        if isjunction is not None and isjunction(path):
+            return True
+        return bool(getattr(os.lstat(path), "st_file_attributes", 0) & _REPARSE_POINT)
+    except OSError:
+        return False
+
+
+def refuse_link(path: "Path | str", what: str = "") -> None:
+    """Raise ``GemArcError(GEMARC_AUTH_001)`` when ``path`` is a link, a junction or a reparse point: nothing is written, deleted or followed."""
+    if is_link(path):
+        raise GemArcError(E_CONFINED, f"{what or Path(path).name} is a link or junction: refusing to write or delete through it; nothing was written")
+
+
 def check_confined(ws: Workspace, paths: Paths) -> None:
-    """Refuse a write when a directory of the project resolves outside the workspace (a junction or a planted link inside the
-    project directory is followed by ``open``; ``Workspace.project`` only vets the project directory itself)."""
+    """Refuse a write when a directory of the project is a link, a junction or a reparse point, or resolves outside the workspace (a
+    junction or a planted link inside the project directory is followed by ``open``; ``Workspace.project`` only vets the project directory
+    itself). The directories are the ones the project writes to: ``atlas``, ``slices``, ``.atlas`` (with ``red`` and ``history``), ``user``,
+    ``out`` and ``dist`` (the build deletes and rewrites most of ``dist``; ``build.py`` checks what is inside it)."""
     root = ws.root
-    for directory in (paths.atlas, paths.slices, paths.dot, paths.red, paths.history, paths.user, paths.out):
+    for directory in (paths.atlas, paths.slices, paths.dot, paths.red, paths.history, paths.user, paths.out, paths.atlas / "dist"):
+        refuse_link(directory)
         try:
             resolved = directory.resolve(strict=False)
         except OSError:
-            raise GemArcError("GEMARC_AUTH_001", "a project directory cannot be resolved") from None
+            raise GemArcError(E_CONFINED, "a project directory cannot be resolved") from None
         if resolved != root and root not in resolved.parents:
-            raise GemArcError("GEMARC_AUTH_001", "a project directory points outside the workspace; nothing was written")
+            raise GemArcError(E_CONFINED, "a project directory points outside the workspace; nothing was written")

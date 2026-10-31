@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 from pathlib import Path
 from typing import Callable, Mapping, Sequence
 
@@ -177,14 +176,39 @@ def init(ws: Workspace, project: str, title: str = "", mode: str = "asis", langu
         if paths.atlas.exists():
             return invalid(pj.E_EXISTS, f"project {project} already has an atlas directory; init never overwrites it (continue with status view=next)",
                            path=str(paths.atlas), next=["resume: status view=next; saved texts go under <path>/user/"])
+        pj.refuse_link(paths.atlas)   # a dangling link or junction "does not exist" for exists() and would crash the mkdir below
         pj.create_layout(paths, pj.render_config(project, label, mode, langs, profile, aliases))
         first = "save the requirement text verbatim to atlas/user/<name>.txt (the directory exists), then " if mode == "tobe" else ""
-        return {"status": "created", "authority": AUTHORITY, "project": project, "path": str(paths.atlas), "mode": mode,
-                "created": ["atlas.toml", ".gitignore", "slices/", "user/", ".atlas/red/", ".atlas/history/"],
-                "next": [f"read the work order: brief (section=all, lang={langs[0]})",
-                         first + "put 00-space (buildings, floors, rooms), then 10-structure slices of about 11 nodes each",
-                         "after each put: read the next lines of its reply; status view=next after a red draft, on resume, and about every 5 puts"]}
+        reply = {"status": "created", "authority": AUTHORITY, "project": project, "path": str(paths.atlas), "mode": mode,
+                 "created": ["atlas.toml", ".gitignore", "slices/", "user/", ".atlas/red/", ".atlas/history/"],
+                 "next": [f"read the work order: brief (section=all, lang={langs[0]})",
+                          first + "put 00-space (buildings, floors, rooms), then 10-structure slices of about 11 nodes each",
+                          "after each put: read the next lines of its reply; status view=next after a red draft, on resume, and about every 5 puts"]}
+        inside = _workspace_inside_root(ws)
+        if inside:
+            reply["next"].insert(0, f"WARNING: the workspace is inside the evidence root '{inside}' (the repository being analysed): the atlas files would sit in the code they describe; "
+                                    "the operator should move GEMARC_WORKSPACE_ROOT outside it")
+        return reply
     return _guard(body)
+
+
+def _workspace_inside_root(ws: Workspace) -> str:
+    """The alias of an evidence root (``GEMARC_ATLAS_ROOTS``) that contains the workspace, or ``""``: nothing is refused, ``init`` only warns."""
+    from . import roots as roots_mod
+
+    try:
+        table = roots_mod.roots_from_env()
+    except roots_mod.RootsError:
+        return ""
+    here = ws.root
+    for alias, root in table.items():
+        try:
+            base = Path(root).resolve(strict=False)
+        except OSError:
+            continue
+        if here == base or base in here.parents:
+            return str(alias)
+    return ""
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -395,9 +419,9 @@ def check(ws: "Workspace | None" = None, project: str = "", text: str = "", slic
     ``mode="slice"`` checks the slice(s) against the committed rest (a forward reference is pending); ``mode="full"`` is the
     closed world of the whole project (every unresolved reference is an ERROR and every red draft is ST-009). With ``slice``
     set, the red draft of that slice is checked when there is one (that is the text a ``put`` rejected); ``offset`` pages
-    through the diagnostics the way ``put`` said (``more: offset=N``); ``rule`` keeps one rule id or family (``RF``); a family of
-    the wave-2 rules (``CS``, ``SM``, ``IV``, ``OR``, ``PT``) in full mode also runs them (they need the engine and read the oracle
-    ledger, read-only: ``check`` never seals, never runs a verdict and writes nothing).
+    through the diagnostics the way ``put`` said (``more: offset=N``); ``rule`` keeps one rule id or family (``RF``). A full check runs wave 1
+    and wave 2 (``status.FULL_WAVE_SET``): the wave-2 rules (``CS``, ``SM``, ``IV``, ``OR``, ``PT``) need the engine and read the oracle
+    ledger, read-only: ``check`` never seals, never runs a verdict and writes nothing.
     """
     def body() -> dict:
         if bool(project) == bool(text):
@@ -463,7 +487,8 @@ def _add_registration(result: "slicecheck.CheckResult", paths: pj.Paths, only: s
         result.diagnostics = sorted(list(result.diagnostics) + extra, key=dg.Diag.sort_key)
 
 
-#: ``check mode=full rule=<family>`` for one of these families also runs the wave-2 rules (the engine and oracle rules).
+#: ``check mode=full rule=<family>`` for one of these families names wave-2 rules (the engine and oracle rules); since the default full check
+#: runs wave 1 and wave 2 the set below only matters when ``status.FULL_WAVE_SET`` is set back to ``(1,)``.
 WAVE2_FAMILIES = ("CS", "SM", "IV", "OR", "PT")
 WAVE2_SET = (1, 2)
 
@@ -664,53 +689,21 @@ def _spread_blockers(blockers: "Sequence[Mapping]", limit: int) -> list:
     return (first + rest)[:limit]
 
 
-_DIST_PARTS = ("docs", "diagrams", "prompts", ".verify", "index.html", "build-info.json", "oracle-sheet.md")
-_REPARSE_POINT = 0x400                   # FILE_ATTRIBUTE_REPARSE_POINT: a symbolic link or a junction
-
-
-def is_link(path: Path) -> bool:
-    """A symbolic link or a Windows junction (``Path.is_symlink`` misses junctions on Python 3.12)."""
-    try:
-        if path.is_symlink():
-            return True
-        isjunction = getattr(os.path, "isjunction", None)
-        if isjunction is not None and isjunction(path):
-            return True
-        return bool(getattr(os.lstat(path), "st_file_attributes", 0) & _REPARSE_POINT)
-    except OSError:
-        return False
+is_link = pj.is_link   # the one definition lives in project.py (symbolic link, junction, reparse point); kept under this name for callers and tests
 
 
 def confine_dist(ws: Workspace, project: str) -> None:
     """Refuse build, verify and the oracle sheet when ``dist`` or anything the build owns inside it is a link or junction, or resolves
     outside the workspace: the build deletes and rewrites those directories, and a planted junction would send that outside.
-    ``project.check_confined`` (the guard of every other write) does not list ``dist`` or ``out``."""
+
+    Defence in depth since debt-b4: ``project.check_confined`` now lists ``dist`` and ``out`` and refuses links, and ``build.py`` runs the same
+    checks on every part of ``dist`` (``_check_dist_confined``) and again where it deletes (``_clear_owned``); this runs first so that the
+    refusal comes before anything else of the tool call."""
+    from . import build as build_mod
+
     ws.writable()
     paths = pj.project_paths(ws, project)
-    pj.check_confined(ws, paths)
-    root = ws.root
-    dist = paths.atlas / "dist"
-    for target in (paths.out, dist, *(dist / part for part in _DIST_PARTS), dist / ".verify" / "work"):
-        try:
-            resolved = target.resolve(strict=False)
-        except OSError:
-            raise GemArcError("GEMARC_AUTH_001", "a project directory cannot be resolved") from None
-        if is_link(target) or (resolved != root and root not in resolved.parents):
-            raise GemArcError("GEMARC_AUTH_001", f"{target.name} is a link or points outside the workspace; nothing was written")
-
-
-def ensure_browser_env() -> None:
-    """Edge lives in ``ProgramFiles(x86)`` on a standard Windows install, but the MCP SDK hands a child process an environment without
-    ``ProgramFiles*`` (Codex, Hermes): the gate would then find no browser although one is installed. Fill in the well-known
-    directories when they are missing (the proper fix, a default-install fallback in ``gate/smoke.py``, belongs to the gate lane)."""
-    if not sys.platform.startswith("win"):
-        return
-    drive = os.environ.get("SystemDrive") or "C:"
-    for key, folder in (("ProgramFiles", "Program Files"), ("ProgramFiles(x86)", "Program Files (x86)"), ("ProgramW6432", "Program Files")):
-        if not os.environ.get(key):
-            candidate = drive + "\\" + folder
-            if os.path.isdir(candidate):
-                os.environ[key] = candidate
+    build_mod._check_dist_confined(ws, paths)  # noqa: SLF001 - same package: one list of what the build owns
 
 
 def _scrub_strings(value, forms: Sequence[str]):
@@ -726,10 +719,11 @@ def _scrub_strings(value, forms: Sequence[str]):
     return value
 
 
-def scrub_verdict(dist: Path, verdict: Mapping) -> dict:
+def scrub_verdict(dist: Path, verdict: Mapping, write: bool = True) -> dict:
     """The verdict without the operator's pinned browser path (``GEMARC_ATLAS_BROWSER``): it is an environment value of the host, and the
     report in ``dist/`` is shared with the user. The gate's message quotes it (``repr``, with doubled backslashes); every string that holds
-    it is cleaned, and the report file is rewritten when anything changed."""
+    it is cleaned, and the report file is rewritten when anything changed (``write=False``: only the returned copy, for a refused release
+    whose gate report was never written to ``dist``)."""
     from . import build as build_mod
     from .gate import smoke
 
@@ -738,9 +732,47 @@ def scrub_verdict(dist: Path, verdict: Mapping) -> dict:
         return dict(verdict)
     forms = sorted({repr(pinned)[1:-1], pinned}, key=len, reverse=True)       # the quoted form first: it contains the plain one only when no backslash is doubled
     scrubbed = _scrub_strings(dict(verdict), forms)
-    if scrubbed != dict(verdict):
+    if write and scrubbed != dict(verdict):
         build_mod._write_report(dist, scrubbed)  # noqa: SLF001 - same package: keep gate-report.json in step with the reply
     return scrubbed
+
+
+#: What the AI does about each kind of release blocker (one line per kind that occurs; the first blocker of every kind is listed first).
+RELEASE_HOW = {
+    "unsealed": "oracle: write the expect rows with defined nodes only, then put (the release build seals them)",
+    "revised": "oracle: the user confirms the edited expectations on atlas/dist/oracle-sheet.md (atlas/oracle-confirm.txt); never write that file",
+    "provenance": "oracle: the ledger is unverified; only the user's confirmation of every item on atlas/dist/oracle-sheet.md clears it",
+    "mismatch": "oracle: a verdict fails: repair the case events first (never copy the engine's answer into the expectation)",
+    "no-verdict": "oracle: run gemarc_atlas_simulate, then release again",
+    "no-bite": "oracle: run gemarc_atlas_simulate, then release again (the release build runs the mutants)",
+    "vacuous": "oracle: an expectation constrains nothing: assert the states the case really decides (OR-003, OR-004)",
+    "evidence": "evidence: run gemarc_atlas_evidence (it re-stamps moved anchors); an edited block must be re-read and the row re-cited with a different anchor; then release again",
+    "docs": "docs: a release builds the documents, diagrams and prompts: call build release=true gate=smoke with docs=true",
+    "markers": "docs: author the NOT-AUTHORED slots (gemarc_atlas_doc shows where), then release again",
+    "gate": "browser gate: run build gate=smoke (not a release) to see the findings, repair, then release again",
+}
+
+
+def _release_refusal(result: Mapping, build_mod) -> dict:
+    """The reply of a release that was refused: no page or document of ``dist/`` was touched (``build_all`` refreshes ``oracle-sheet.md``), so the
+    reply names no page, only what blocked it."""
+    blockers, verdict = result["blockers"], result["verdict"]
+    if verdict is not None:
+        verdict = scrub_verdict(result["dist"], verdict, write=False)
+    counts = result["oracle"]
+    reply = {"status": "invalid", "authority": AUTHORITY, "code": build_mod.E_RELEASE,
+             "message": f"{len(blockers)} release blocker(s): the release was NOT built; no page or document of dist/ was changed (a previous build, if any, is still there; oracle-sheet.md is refreshed)",
+             "dist": str(result["dist"]), "modelSha8": result["modelSha8"], "oracle": {k: counts[k] for k in ("sealed", "revised", "confirmed", "pending")},
+             "gate": verdict["status"] if verdict else "NOT-RUN", "lines": _gate_lines(verdict),
+             "release": {"requested": True, "ok": False, "blockerCount": len(blockers)},
+             "blockers": [f"{b['rule']} {b['kind']} {b['id']}: {b['message']}"[:140] for b in _spread_blockers(blockers, BLOCKERS_SHOWN_IN_BUILD)],
+             "next": []}
+    seen: list = []
+    for b in blockers:
+        if b["kind"] not in seen:
+            seen.append(b["kind"])
+    reply["next"] = [RELEASE_HOW[k] for k in seen if k in RELEASE_HOW][:3]
+    return fit_result(reply, BUILD_CAP)
 
 
 def build(ws: Workspace, project: str, release: bool = False, docs: bool = True, gate: str = "none") -> dict:
@@ -748,15 +780,15 @@ def build(ws: Workspace, project: str, release: bool = False, docs: bool = True,
 
     Refuses a model with ERROR findings. Only sealed or confirmed expectations ever put a result into the page (ORACLE_FIRST);
     the others get the empty state. ``gate="smoke"`` runs the browser gate at 1024, 1366 and 1600 px; ``release`` also needs the oracle
-    gate, verified evidence (as-is), no NOT-AUTHORED slot and a passing gate, else the reply is ``invalid`` (the files are written).
+    gate, verified and not stale evidence (as-is), no NOT-AUTHORED slot and a passing gate. A release is built beside ``dist`` and swapped in only
+    when it passed: a refused release (``GEMARC_ATLAS_BUILD_020``, status ``invalid``) leaves every page and document of ``dist/`` exactly as it was
+    (``oracle-sheet.md`` is refreshed); a release needs ``docs=true`` and ``gate="smoke"``.
     The reply stays within 2 KB (paths, bytes, sha256, the per-part size breakdown, check results, oracle class counts, gate lines)."""
     def body() -> dict:
         from . import build as build_mod
         from . import htmlassemble
 
         confine_dist(ws, project)
-        if gate == "smoke":
-            ensure_browser_env()
         try:
             result = build_mod.build_project(ws, project, release, docs, gate)
         except build_mod.BuildRefused as ex:
@@ -765,6 +797,8 @@ def build(ws: Workspace, project: str, release: bool = False, docs: bool = True,
             return fit_result(invalid(ex.code, ex.message), BUILD_CAP)
         except oracle_mod.OracleError as ex:
             return fit_result(invalid(ex.code, ex.message, **ex.extra), BUILD_CAP)
+        if result["refused"]:
+            return _release_refusal(result, build_mod)
         info, verdict = result["info"], result["verdict"]
         if verdict is not None:                  # bind the browser verdict to THIS page: the status gate reads only a stamp of the current page
             verdict = scrub_verdict(result["dist"], verdict)
@@ -776,11 +810,7 @@ def build(ws: Workspace, project: str, release: bool = False, docs: bool = True,
                  "withheld": {k: len(v) for k, v in info["withheld"].items()}, "docs": info["docs"],
                  "gate": info["gate"]["status"], "lines": _gate_lines(verdict), "release": {"requested": release, "ok": info["release"]["ok"]},
                  "next": []}
-        if release and result["blockers"]:
-            reply.update(status="invalid", code=build_mod.E_RELEASE, message=f"{len(result['blockers'])} release blocker(s): the page is written but is not a release")
-            reply["blockers"] = [f"{b['rule']} {b['kind']} {b['id']}: {b['message']}"[:140] for b in _spread_blockers(result["blockers"], BLOCKERS_SHOWN_IN_BUILD)]
-            reply["release"]["blockerCount"] = len(result["blockers"])
-        elif verdict and verdict["status"] == "FAIL":
+        if verdict and verdict["status"] == "FAIL":
             reply.update(status="invalid", code=build_mod.E_GATE_FAIL, message="the browser gate FAILED: the page is written but is not verified")
         elif verdict and verdict["status"] == "SKIP":
             reply["next"].append("the browser gate was SKIPPED (no browser found): the page is NOT verified; install Edge or Chrome and run verify")
@@ -810,7 +840,6 @@ def verify(ws: Workspace, project: str, widths: "Sequence[int]" = (1024, 1366, 1
         if not wanted or any(w < 500 or w > 4000 for w in wanted) or len(wanted) > 6:
             raise GemArcError(E_ARG, "widths: one to six integers between 500 and 4000")
         confine_dist(ws, project)
-        ensure_browser_env()
         try:
             result = build_mod.verify_project(ws, project, wanted)
         except build_mod.BuildRefused as ex:
@@ -829,7 +858,8 @@ def verify(ws: Workspace, project: str, widths: "Sequence[int]" = (1024, 1366, 1
             reply.update(status="invalid", code=build_mod.E_GATE_SKIP, message="SKIPPED, NOT PASSED: " + str(verdict["message"])[:300])
         elif verdict["status"] == "INCONCLUSIVE":
             reply.update(status="invalid", code=build_mod.E_GATE_INCONCLUSIVE,
-                         message="INCONCLUSIVE, NOT PASSED: a browser launch timed out (the machine is busy); no defect was found in the page; run verify again when the machine is idle (if it times out again on an idle machine, the page itself hangs)")
+                         message="INCONCLUSIVE, NOT PASSED: a browser launch timed out (the machine is busy); no defect was found in the page; run verify again when the machine is idle (if it times out again on an idle machine, the page itself hangs)"
+                         + (" " + str(verdict["message"])[:200] if verdict.get("message") else ""))
         return fit_result(reply, VERIFY_CAP)
     return _guard(body)
 
@@ -1022,16 +1052,24 @@ def evidence(ws: Workspace, project: str, ids: "Sequence[str] | str" = ()) -> di
         reply = {"status": "ok", "authority": AUTHORITY, "rows": summary["total"], "pass": counts["PASS"], "warn": counts["WARN"], "fail": counts["FAIL"],
                  "skip": counts["SKIP"], "stamped": len(new.get("entries") or {}), "roots": sorted(table),
                  "lines": ev.compact_report(report, max_bytes=EVIDENCE_REPORT_BYTES).split("\n")[1:], "next": []}
-        if snap.mode == "asis":
+        if snap.mode == "asis" or total_claims:
             reply["claims"] = {"implemented": total_claims, "unverified": len(unverified)}
+        # a block edited since it was stamped (EV-005) is never re-stamped by this tool, and a release refuses it: say so instead of "all verified"
+        stale = [str(r.get("evidenceId")) for r in report.get("results", ())
+                 if r.get("status") in ("PASS", "WARN") and (r.get("stampable") is False or r.get("name") == "RANGE_CONTENT_CHANGED")]
+        if stale:
+            reply["stale"] = len(stale)
         if counts["SKIP"] and not table:
             reply["next"].append("no evidence root is configured: the operator sets GEMARC_ATLAS_ROOTS (alias=path) in the server environment; Implemented claims stay unverified")
         elif counts["SKIP"]:
             reply["next"].append(f"{counts['SKIP']} row(s) SKIPPED (alias without a root, or a missing root/file): they are not verified")
         if counts["FAIL"]:
             reply["next"].append("fix each FAIL row (put mode=patch with the corrected file/anchor; suggestions are never applied), then run evidence again")
-        if snap.mode == "asis" and unverified:
+        if unverified:
             reply["next"].append(f"{len(unverified)} Implemented claim(s) still lack a verified anchor (first: {unverified[0]}): verify them, or lower their verif=")
+        if stale:
+            reply["next"].append(f"{len(stale)} row(s) cite a block that was edited since it was stamped (EV-005, first: {stale[0]}): this tool does not re-stamp them and a release refuses them when an Implemented claim rests on them; "
+                                 "re-read the code, re-cite each row with a different anchor (put mode=patch), then run evidence again")
         if not reply["next"]:
             reply["next"].append("all evidence rows verified")
         return fit_result(reply, EVIDENCE_CAP, items_key="lines")
@@ -1041,8 +1079,10 @@ def evidence(ws: Workspace, project: str, ids: "Sequence[str] | str" = ()) -> di
 def build_all(ws: Workspace, project: str, release: bool = False, docs: bool = True, gate: str = "none") -> dict:
     """``build`` plus the oracle sheet hand-off (design 7.6): whenever the build wrote ``dist/``, ``atlas/dist/oracle-sheet.md`` is written
     too (one line per expectation the user has not confirmed, and ``APPROVE-ALL``). The MCP never writes the user's confirmation file."""
+    from . import build as build_mod
+
     reply = build(ws, project, release, docs, gate)
-    if "page" not in reply:
+    if "page" not in reply and reply.get("code") != build_mod.E_RELEASE:     # a refused release has no page, but the user still needs the sheet
         return reply
     sheet = oracle_sheet(ws, project)
     if sheet.get("status") == "ok":

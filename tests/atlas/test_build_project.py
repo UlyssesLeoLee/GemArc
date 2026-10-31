@@ -190,18 +190,18 @@ class DeskBuildTests(BuildProject):
         self.assertEqual(reply["status"], "invalid")
         self.assertEqual(reply["code"], build.E_ARG)
 
-    def test_release_without_the_browser_gate_is_not_a_release_but_the_page_is_written(self):
+    def test_release_without_the_browser_gate_is_refused_and_no_page_is_written(self):
+        # M8 changed this (it used to say "...is not a release but the page is written"): a release is built beside dist and swapped in only when it
+        # passed, so a refused release leaves dist exactly as it was (here: nothing); tests/atlas/test_release_build.py covers every refusal
         self.desk()
         reply = self.build(release=True)
         self.assertEqual(reply["status"], "invalid", reply)
         self.assertEqual(reply["code"], build.E_RELEASE)
-        self.assertTrue(any("browser gate was not run" in b for b in reply["blockers"]) or reply["release"]["ok"] is False)
-        self.assertTrue((self.dist / "index.html").is_file())
+        self.assertTrue(any("browser gate was not run" in b for b in reply["blockers"]), reply["blockers"])
+        self.assertFalse((self.dist / "index.html").exists())
+        self.assertFalse((self.dist / "build-info.json").exists())
         self.assertIn("bite", self.entry(CASE_KEY), "a release build runs the mutants the oracle gate needs")
-        info = json.loads((self.dist / "build-info.json").read_text(encoding="utf-8"))
-        self.assertTrue(info["release"]["requested"])
-        self.assertFalse(info["release"]["ok"])
-        self.assertTrue(any(b["kind"] == "gate" for b in info["release"]["blockers"]))
+        self.assertFalse(build.stage_dir(self.paths).exists(), "the stage directory never outlives the call")
 
     def test_verify_without_a_built_page_and_with_a_stale_page_is_refused_without_a_browser(self):
         self.desk()
@@ -300,8 +300,10 @@ class OracleFirstTests(BuildProject):
         expect_slice = next(name for name, text in slices.items() if any(line.startswith(second + " |") for line in text.split("## expect:")[-1].splitlines()) and "## expect:" in text)
         self.assertEqual(self.states()[f"case:{second}"], "sealed")
         self.simulate(case=second, detail="trace")                       # a reveal of the second case ...
-        terminal = list(model["cases"][1]["expectedTerminalState"])
-        row = f"{second} | {terminal[0]}=Failed," + ",".join(terminal[1:]) + " | by=author"
+        terminal = model["cases"][1]["expectedTerminalState"]
+        machines = {m["id"] for m in model["machines"]}
+        victim = next(n for n in terminal if n not in machines)          # a state machine has its own states: only a plain node can end Failed
+        row = f"{second} | " + ",".join(f"{n}={'Failed' if n == victim else s}" for n, s in terminal.items()) + " | by=author"
         reply = self.put(expect_slice, f"#atlas 1\n## expect: case | nodes | opts\n{row}\n", mode="patch")
         self.assertEqual(reply["status"], "committed", reply)             # ... then an edit: revised
         self.assertEqual(self.states()[f"case:{second}"], "revised")

@@ -133,7 +133,14 @@ def _component_units(ix: Index, lang: str) -> tuple:
     for bid in order:
         for n in members[bid]:
             node_building[sval(n.get("id"))] = bid
-    cross: dict = {}
+    cross: dict = {}  # (source building, target building) -> edge ids; collected once, not once per building
+    for e in ix.edges:
+        if sval(e.get("relation")) in relations:
+            a, b = node_building.get(sval(e.get("sourceId"))), node_building.get(sval(e.get("targetId")))
+            # only edges between two placed buildings: the unplaced group (key None) is no node of the overview, so an edge to or from it
+            # is neither drawn nor counted in a label, and the unit must not claim to cover it (a node of no listed kind has no key at all)
+            if a is not None and b is not None and a != b:
+                cross.setdefault((a, b), []).append(sval(e.get("id")))
     for bid in order:
         group_nodes = members[bid]
         bname = sval(ix.building[bid].get("name")) if bid in ix.building else ""
@@ -144,11 +151,6 @@ def _component_units(ix: Index, lang: str) -> tuple:
             title_name = T.tr(lang, "diagrams.unplaced")
         edge_rows = [e for e in ix.edges if sval(e.get("relation")) in relations
                      and node_building.get(sval(e.get("sourceId")), 0) == bid and node_building.get(sval(e.get("targetId")), 0) == bid]
-        for e in ix.edges:
-            if sval(e.get("relation")) in relations:
-                a, b = node_building.get(sval(e.get("sourceId")), 0), node_building.get(sval(e.get("targetId")), 0)
-                if a != 0 and b != 0 and a != b:
-                    cross.setdefault((a, b), []).append(sval(e.get("id")))
         pieces = [(bid, None, group_nodes, edge_rows)]
         data, text, bissues = _component_data(ix, lang, group_nodes, edge_rows)
         if len(text) > SPLIT_LIMIT:
@@ -197,8 +199,7 @@ def _component_data(ix: Index, lang: str, nodes: list, edges: list) -> tuple:
 
 def _overview_unit(ix: Index, lang: str, order: list, cross: dict, used: set) -> dict:
     nodes = [{"id": b, "label": sval(ix.building[b].get("name")), "shape": "box"} for b in order if b is not None and b in ix.building]
-    edges = [{"id": f"{a}>{b}", "from": a, "to": b, "label": str(len(ids)), "static": True} for (a, b), ids in cross.items()
-             if a is not None and b is not None]
+    edges = [{"id": f"{a}>{b}", "from": a, "to": b, "label": str(len(ids)), "static": True} for (a, b), ids in cross.items()]
     data = {"groups": [], "nodes": nodes, "edges": edges}
     text, issues = M.build("component", data)
     edge_ids = [e for ids in cross.values() for e in ids]

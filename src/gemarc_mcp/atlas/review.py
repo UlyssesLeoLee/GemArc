@@ -61,7 +61,6 @@ INFERRED_SHARE_LIMIT = 0.30
 NOTES_MAX_BYTES = 4096
 RECORD_FINDINGS_MAX = 60
 BLOCK_KEYS_MAX = 400
-TEXT_MAX_BYTES = 1024 * 1024
 DATA_KINDS = frozenset({"Storage", "Table", "Entity"})
 ACTIVE_RELATIONS = frozenset({"calls", "sends", "publishes", "triggers"})
 DATA_RELATIONS = frozenset({"writes", "reads", "owns", "implements"})
@@ -661,10 +660,9 @@ def _user_text(paths: pj.Paths) -> str:
     chunks = []
     for path in status_mod._user_texts(paths):  # noqa: SLF001 - the one definition of "saved requirement text"
         try:
-            data = sl.read_bytes(path)[:TEXT_MAX_BYTES]
+            chunks.append(status_mod.read_user_text(path))   # bounded: never the whole file first
         except OSError:
             continue
-        chunks.append(data.decode("utf-8-sig", errors="replace"))
     return _norm_quote("\n".join(chunks))
 
 
@@ -673,8 +671,8 @@ def _stamp_ids(paths: pj.Paths) -> "set | None":
     if not paths.stamp.is_file():
         return None
     try:
-        data = json.loads(sl.read_bytes(paths.stamp).decode("utf-8-sig"))
-    except (OSError, ValueError):
+        data = json.loads(sl.read_limited(paths.stamp, sl.RECORD_MAX_BYTES).decode("utf-8-sig"))
+    except (OSError, ValueError, RecursionError):
         return set()
     entries = data.get("entries") if isinstance(data, dict) else None
     return set(entries) if isinstance(entries, dict) else set()
@@ -698,6 +696,10 @@ def review_report(ws: Workspace, project: str) -> dict:
         report = build_report(context_of(snap))
         if snap.red:
             report.setdefault("warnings", []).append(f"{len(snap.red)} red draft(s): the report covers the committed slices only")
+        big = status_mod.oversize_user_texts(paths)
+        if big:
+            report.setdefault("warnings", []).append(
+                f"saved text larger than {status_mod.REVIEW_MAX_BYTES // 1024} KiB ({', '.join(big[:3])}): only its first part is read for quotations; split it")
         return core.fit_result(report, core.HARD_CAP)
     return core._guard(body)  # noqa: SLF001
 

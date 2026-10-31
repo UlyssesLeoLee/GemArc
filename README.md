@@ -236,6 +236,12 @@ python -m gemarc_mcp.cli build demo --legacy-dist E:\GemArcWork\legacy-build\dis
 > 自带的 Three.js 适配器已实现 3D 与 2D 之间的**跨维双向选择同步**（浏览器实测通过）；
 > 复用原仓库 Viewer 的路径仍然保留，作为「已有产物直接接入」的手段。
 
+## GemArc Atlas（仅本地，未部署）
+
+`src/gemarc_mcp/atlas/` 是 Atlas 工具集：AI 只写事实（紧凑的 `.atl` 切片），固定、经过测试的代码负责校验、推导和渲染，产出 5D 设计资料（查看器页面、三层文档、图、提示词、oracle 表）。它**只在本地使用**：`.vercelignore` 把它挡在 Vercel 上传之外，远程默认工具集仍是 `stateless`，默认工具集和远程端点的行为都没有改变。
+
+启用（本地 stdio）：命令仍是 `python -m gemarc_mcp`，在 MCP 配置的环境里设置 `GEMARC_TOOLSET=atlas`、`GEMARC_WORKSPACE_ROOT=<工作区>`、`GEMARC_ALLOW_WRITE=1`、`GEMARC_ATLAS_ROOTS=main=<被分析的仓库>`。Claude Code、Codex、Hermes 的配置示例、怎样说「创建5D设计」、输出目录和限制见 `docs/atlas/README.md`，工具契约见 `docs/atlas/ATLAS_TOOLS.md`。没有 MCP 接入的客户端可以用 `python tools/make_kit.py` 生成 `dist-kit/atlas-kit.zip`（纯标准库命令行工具包，不提交）。
+
 ## 代码模块
 
 - `src/gemarc_mcp/server.py`：MCP v2 工具、资源与提示词接口。

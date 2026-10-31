@@ -613,10 +613,13 @@ class DiscoveryTests(unittest.TestCase):
         found = smoke.find_browser(env, which=lambda n: "/usr/bin/msedge", isfile=lambda p: True, platform="win32")
         self.assertEqual((found.path, found.family), ("D:/mine/chrome.exe", "chrome"))
 
-    def test_the_skip_message_names_the_pinned_browser_and_the_generic_case(self):
+    def test_the_skip_message_says_the_pinned_browser_is_not_a_file_and_the_generic_case(self):
+        # debt-b4 item 36: the value of GEMARC_ATLAS_BROWSER is a host path and is no longer interpolated (the command line may show it:
+        # see test_cli_browser_flag_that_is_not_a_file_skips_with_exit_3 and tests/atlas/test_gate_tool_path.py)
         pinned = smoke.no_browser_message({smoke.BROWSER_ENV: "D:/nope.exe"})
-        for needle in ("SKIPPED, NOT PASSED", "UNVERIFIED", "D:/nope.exe", "does not fall back"):
+        for needle in ("SKIPPED, NOT PASSED", "UNVERIFIED", "the pinned browser", smoke.BROWSER_ENV, "is not a file", "does not fall back"):
             self.assertIn(needle, pinned)
+        self.assertNotIn("nope.exe", pinned)
         generic = smoke.no_browser_message({})
         self.assertIn("no Edge or Chrome found", generic)
         self.assertNotIn("pinned", generic)
@@ -626,7 +629,8 @@ class DiscoveryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {smoke.BROWSER_ENV: str(pathlib.Path(tmp) / "nope.exe")}):
             res = smoke.run_gate(FIXTURES / "ok-stub.html", 1366, inline_selftest=True, tmp_root=tmp)
         self.assertEqual((res.status, res.codes), ("SKIP", ["NO_BROWSER"]))
-        self.assertIn("nope.exe", res.message)
+        self.assertIn("the pinned browser", res.message)
+        self.assertNotIn("nope.exe", res.message, "debt-b4 item 36: the pinned path is not in the message")
 
     def test_cli_browser_flag_that_is_not_a_file_skips_with_exit_3(self):
         buf = io.StringIO()

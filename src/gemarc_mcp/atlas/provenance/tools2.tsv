@@ -1,1 +1,2 @@
 path	origin	reference_unit	treatment	deviations
+src/gemarc_mcp/atlas/kit.py	new	-	authored from DESIGN.md section 10 (M8) and section 4.1 (the kit is an HTTP route, not a tool): one deterministic zip of the stdlib-only atlas package with a launcher, a README and the specifications; no reference code read or copied	-

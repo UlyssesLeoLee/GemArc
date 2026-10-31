@@ -44,6 +44,7 @@ from . import diag as dg
 from . import expand as ex
 from . import model as am
 from . import slicecheck
+from . import slices as sl
 from .project import Config, Paths
 from .rules.completeness import Report, completeness_report
 from .slices import SliceFile, atomic_write, list_red, list_slices, read_bytes
@@ -52,12 +53,12 @@ MAX_NEXT = 10
 LINE_BYTES = 118
 NEEDS_LINE_BYTES = 150          # a question for the user is a whole sentence: clipped at a word boundary, never mid-sentence
 GATE_NAMES = ("oracle", "evidence", "docs", "build", "browser")
-#: Rule sets of a full check. Wave 2 (the engine and oracle rules: CS-001, CS-005, CS-008, PT-003, SM-004/006/007, IV-001/002,
-#: OR-001..005) is OFF by default because it adds findings (an ERROR for a synthetic intervention whose ``expect.status`` is not its
-#: compile status, INFO lines on every sealed project) that the existing sessions of the other lanes were written without; a caller
-#: asks for it with ``load_snapshot(..., wave_set=(1, 2))`` and ``check mode=full rule=<family>`` does. The wave-2 rules every full
-#: check adds are OR-000 (INFO: an expectation no write call has sealed yet), OR-003 (coverage floor) and CS-001 (event bound to an edge).
-FULL_WAVE_SET = (1,)
+#: Rule sets of a full check: wave 1 and wave 2. Wave 2 (the engine and oracle rules: CS-001, CS-005, CS-008, PT-003, SM-004/006/007, IV-001/002,
+#: OR-000..005) is part of the default full check (status completion contract, ``check mode=full``, MCP, CLI, build) since debt-b4: a valid
+#: synthetic atlas of every preset gives no ERROR and no WARN there (INFO only: CS-008, OR-000 ...). Before that the set was ``(1,)`` and a
+#: caller asked for wave 2 with ``load_snapshot(..., wave_set=(1, 2))``; ``(1,)`` is still a legal ``wave_set`` (the slice protocol checks
+#: wave 1 only), and ``_with_registration`` is what a full check adds when ``FULL_WAVE_SET`` is set back to ``(1,)``.
+FULL_WAVE_SET = (1, 2)
 DIMENSIONS = ("1D", "2D", "3D", "4D", "5D")
 ALWAYS_REQUIRED = ("1D", "2D", "3D")
 USER_TEXT_GLOB = "*.txt"
@@ -175,7 +176,7 @@ def _read_json(path) -> "dict | None":
         if not path.is_file() or path.stat().st_size > REVIEW_MAX_BYTES:
             return None
         data = json.loads(read_bytes(path).decode("utf-8-sig"))
-    except (OSError, ValueError):
+    except (OSError, ValueError, RecursionError):   # RecursionError: nested past the decoder's limit
         return None
     return data if isinstance(data, dict) else None
 
@@ -454,11 +455,10 @@ def claims_unverified(model: Mapping, entries: Mapping) -> tuple:
 
 
 def _gate_evidence(snap: "Snapshot") -> dict:
-    """As-is: every Implemented claim rests on a stamped source-code anchor. To-be has no such claim (the ceiling is Designed)."""
+    """Every Implemented claim rests on a stamped source-code anchor. The gate keys on the claims, not on the configured mode: a to-be model has
+    none (the ceiling is Designed, EV-010), so it costs a to-be project nothing, and a model that carries one is held to it whatever ``atlas.toml`` says."""
     from . import evidence as ev
 
-    if snap.mode != "asis":
-        return {"applicable": False, "ok": True, "detail": "to-be: no Implemented claim"}
     claims = [i for k in ("nodes", "edges") for i in snap.model.get(k, ()) if isinstance(i, dict) and i.get("verification") == "Implemented"]
     if not claims:
         return {"applicable": False, "ok": True, "detail": "no Implemented claim"}
@@ -533,8 +533,8 @@ def _page_state(snap: "Snapshot") -> tuple:
     if not page.is_file() or not info_path.is_file():
         return None, "", "no built page yet: run gemarc_atlas_build"
     try:
-        info = json.loads(read_bytes(info_path).decode("utf-8-sig"))
-    except (OSError, ValueError):
+        info = json.loads(sl.read_limited(info_path, sl.RECORD_MAX_BYTES).decode("utf-8-sig"))
+    except (OSError, ValueError, RecursionError):
         return None, "", "dist/build-info.json is unreadable: run gemarc_atlas_build"
     if not isinstance(info, dict):
         return None, "", "dist/build-info.json is unreadable: run gemarc_atlas_build"
@@ -753,12 +753,32 @@ def norm_text(text: str) -> str:
     return " ".join(str(text).casefold().split())
 
 
+def read_user_text(path) -> str:
+    """One saved text (``atlas/user/*.txt``) as a string: at most :data:`REVIEW_MAX_BYTES` are ever read (``open(...).read(limit + 1)``,
+    never the whole file first); the rest of a longer file is not looked at (:func:`oversize_user_texts` names such a file). Raises
+    ``OSError`` for a file that cannot be read."""
+    data, _cut = sl.read_prefix(path, REVIEW_MAX_BYTES)
+    return data.decode("utf-8-sig", errors="replace")
+
+
+def oversize_user_texts(paths: Paths) -> list:
+    """File names of the saved texts that are larger than :data:`REVIEW_MAX_BYTES` (only their first part is used for quotations)."""
+    out = []
+    for path in _user_texts(paths):
+        try:
+            if path.stat().st_size > REVIEW_MAX_BYTES:
+                out.append(path.name)
+        except OSError:
+            continue
+    return out
+
+
 def saved_text(paths: Paths) -> str:
     """The normalised text of every ``atlas/user/*.txt`` (what the user actually said); empty when nothing is saved."""
     chunks = []
     for path in _user_texts(paths):
         try:
-            chunks.append(read_bytes(path)[:REVIEW_MAX_BYTES].decode("utf-8-sig", errors="replace"))
+            chunks.append(read_user_text(path))
         except OSError:
             continue
     return norm_text("\n".join(chunks))
@@ -1129,7 +1149,9 @@ def evaluate(snap: Snapshot) -> State:
         applicable = [n for n in GATE_NAMES if gates[n]["applicable"]]
         waived = [n for n in applicable if gates[n].get("waived")]
         green = [n for n in applicable if n not in waived]
-        checked = f"check full is clean, {required[0]}-{required[-1]} ready" + (f", gates green: {', '.join(green)}" if green else "; no generate gate is available yet")
+        warns = len(snap.check.warnings)    # a WARN never blocks done (design D14), but a done line that says "clean" would hide it
+        checked = (f"check full has no ERROR{f' ({warns} WARN open: gemarc_atlas_check mode=full lists them)' if warns else ''}, {required[0]}-{required[-1]} ready"
+                   + (f", gates green: {', '.join(green)}" if green else "; no generate gate is available yet"))
         lines.append(f"done: {checked}; the review is recorded")
         for name in waived:       # a waiver is not a pass: the final report must say so
             lines.append(_clip(f"{name} gate WAIVED by the user, the page is UNVERIFIED: " + str(gates[name]["detail"]).partition(": ")[2]))

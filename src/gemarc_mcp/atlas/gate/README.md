@@ -202,9 +202,30 @@ PYTHONPATH=src python -m gemarc_mcp.atlas.gate.smoke --calibrate --browser "C:/P
 
 发现顺序:`GEMARC_ATLAS_BROWSER`、`PATH` 里的 Edge、默认安装路径的 Edge、`PATH` 里的 Chrome/Chromium、默认安装路径的 Chrome。
 
+「默认安装路径」的根目录是 `ProgramFiles(x86)`、`ProgramFiles`、`LOCALAPPDATA`:先取传入的环境,缺了取进程环境,再缺就用标准安装的字面目录(`<SystemDrive>/Program Files (x86)`、`<SystemDrive>/Program Files`、`<USERPROFILE>/AppData/Local`)。MCP SDK 交给子进程的环境(Codex、Hermes)只有 `LOCALAPPDATA`、没有 `ProgramFiles*`,以前这会让装在 `ProgramFiles(x86)` 里的 Edge 找不到、门禁说 SKIP;现在不需要在配置里转发这些变量(转发无害)。`candidate_paths` 与 `find_browser` 的 `fallback_environ` 参数(默认是进程环境)是测试用的接缝。
+
 **显式指定就不回退。** `GEMARC_ATLAS_BROWSER` 或 `--browser` 指向的不是文件时,结果是 SKIP(退出码 3,「the pinned browser ... is not a file」),**不会**悄悄改用 Edge:否则门禁跑在你没选的浏览器上,用的却是别的浏览器的校准。指向的是文件但不能执行(例如一个文本文件)时,`OSError` 被捕获成 `PROCESS` 判定(不重试),不再抛 traceback。
 
+SKIP 的文字(`no_browser_message`)**不写入**指定的路径,只说「the pinned browser (GEMARC_ATLAS_BROWSER) is not a file」:路径是主机的环境值,而这句话会进工具回复和 `dist/.verify/gate-report.json`。命令行(`smoke.main`)的使用者自己输入了路径,所以命令行带路径输出(`show_path=True`)。`tools.scrub_verdict` 仍然在回复和报告里再清一遍,作为第二道防线。
+
 CLI 输出对控制台编码做了容错(`errors="backslashreplace"`):页面路径里有 gbk 编码不了的字符时,仍然打印判定,不会在浏览器跑完之后因为 `UnicodeEncodeError` 退出。
+
+## 工具路径(`build gate=smoke` 与 `verify`):判定的第四种结果、挂钟预算、有上限的管道
+
+命令行(`smoke.main`)和 `run_gate` 的语义不变:每个宽度各启动一次,超时是 `FAIL` / `PROCESS`。工具路径(`build.run_gate` → `smoke.verify_gate`)在此之上多了下面几条,每条都有测试(`tests/atlas/test_gate_html_fixes.py`、`tests/atlas/test_gate_tool_path.py`)。
+
+- **INCONCLUSIVE。** 一个宽度的每次启动都超时(别无其它失败),这个宽度是 `INCONCLUSIVE`:页面没被评判,不是通过,也不是页面的缺陷。整个判定里 `FAIL` 高于 `INCONCLUSIVE` 高于 `PASS`;`SKIP`(没有浏览器)最高。工具回复 `GEMARC_ATLAS_BUILD_033`。每次启动的挂钟上限是 `VERIFY_TIMEOUT_SECONDS = 90`(好页面在空闲机器上 2 到 3 s,八个并行时最坏约 23 s;页面自己的时间由虚拟时间预算约束,所以更大的上限对好页面没有代价),超时不重试(`retry_on_timeout=False`:负载高的机器上第二次启动只会重复一次超时)。
+- **挂钟预算。** 各宽度合起来约 `VERIFY_BUDGET_SECONDS = 150`:每次启动的上限是 `min(90, 剩余)`、不低于 `VERIFY_MIN_LAUNCH_SECONDS = 10`;剩余不足 10 s 就不再启动;一个宽度里因超时以外的原因失败的启动(浏览器退出码非 0、输出被截断)的重试也计入预算(`run_gate(time_left=...)`:重试最多得到剩下的时间,剩下不足 10 s 就不重试,发现里写明 `no retry`)。启动结束时杀进程树、读管道的清理(最坏约 15 s 等进程加每路管道 5 s)不在预算内,所以总时间是「约 150 s 加最后一次启动的清理」,不是硬上限;**第一个 INCONCLUSIVE 之后不再启动后面的宽度**(机器忙到超时,再启动只会加重负载)。没启动的宽度是一行 `INCONCLUSIVE`,带 `notRun: true`、代码 `NOT_RUN`、原因(`message` 以 `NOT RUN:` 开头),判定的 `message`、`lines` 与 `budget`(`seconds`、`usedSeconds`、`notRun`)都写明哪些宽度没有启动。第一个宽度总会启动。预算参数(`budget_seconds`、`stop_after_inconclusive`、`clock`)默认关闭,所以命令行与直接调用 `verify_gate` 的测试不受影响。
+- **页面级发现里的路径。** 页面自己出错时(`PAGE_ERRORS`、`CONSOLE_STDERR`、被挡的资源)浏览器引用的是页面与脚本的网址(`file:///C:/Users/<用户>/AppData/...`);`summarize_result` 把发现的 `detail` 与 `message` 里的 `file://` 网址、盘符路径和常见 POSIX 根下的路径改成文件名(保留 `:行:列`),所以 `tools.verify` 的回复与 `dist/.verify/gate-report.json` 不含机器路径(命令行 `main` 直接打印的 `GateResult` 不经过这一步,那是读命令行输出的人自己的机器)。
+- **有上限的管道。** 浏览器的 stdout 与 stderr 各由读线程读进有上限的缓冲(`STDOUT_CAP_BYTES` 16 MiB、`STDERR_CAP_BYTES` 4 MiB),超出的部分继续读、丢弃(子进程不会因管道满而阻塞);任何一路超限都是 `PROCESS` 失败(「truncated ... cap」),不是判定;读管道时出错(`OSError`)不当作文件结束:读到一半的 stderr 会漏掉后面的控制台错误,所以它同样是 `PROCESS` 失败(「could not be read to its end」,超时的启动仍先按超时算)。浏览器自己已经退出、而它的子孙还握着管道时,杀死已退出的进程够不到它们:等管道的时间只加到每路 1 s(不是 5 s),启动仍按超时处理、绝不判为通过,子孙进程可能活到它自己结束(Windows 上没有用作业对象去追;真实的 Edge 没有观察到留下这样的子进程)。上限来自实测:Edge 152、构建出的参考规模页面、门禁模式,stdout 约 40 到 82 KB(没有门禁模式、脚本还在 DOM 里时 2.1 MB),stderr 2 到 121 KB;stdout 上限是构建对页面的硬上限(8 MiB)的两倍,所以通过构建的页面不会超限;stderr 上限约是最大实测的 35 倍。
+- **机器负载(门禁的 CPU 余量)。** 空闲时每次启动中位数 2.2 s;8 个忙进程 2.6 s;12 个忙进程 2.9 s;16 个忙进程(约等于逻辑核数)时 8 次启动里只有 2 次通过,其余在 30.8 到 33.0 s 超时;48 个忙进程时 8 次里 1 次;空闲机器上 8 个启动并行最长 23.2 s。数字来自验证者的 `load.py`(Edge 152,16 个逻辑核),本批没有重新测量。这是超时上限取 90 s、并设 INCONCLUSIVE 的依据:在 30 s 左右有一道悬崖。
+- **文字扫描。** `textAllow` 钩子(页面自己的数据里含 `undefined`、`NaN`、`[object` 的片段不算 `TEXT_BAD`;见 `bundle-contract.md` 9.6);运行器一侧的显式关闭项是 `run_gate(scan_text=False)` 与 `--no-text-scan`。扫描的缺口:`visibility:hidden` 的文字、画在 canvas 上的文字(都读不到)。
+- **步骤必须同步。** 页面脚本化步骤返回 thenable(Promise)算 `STEP_FAILED`:门禁只等同步的返回值,异步步骤会在结果写出之后才完成,等于没有被检查。
+- **嵌套的控件不算重叠。** 页眉里一个控件包着另一个控件(带关闭按钮的标签)时,两者的重叠是嵌套,不算 `HEADER_OVERLAP`(`selftest.js` 里 `contains` 判断);只比较互不包含的控件。
+
+## 页面本身的内容安全策略
+
+构建出的页面以 `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; form-action 'none'; base-uri 'none'">` 开头(`head` 的第一个元素,在自检脚本之前)。门禁因此在这条策略下跑真实页面:内联脚本与样式可以运行,被动加载(图片、脚本、框架、对象、字体、媒体)和 `fetch`、XHR、`sendBeacon`、WebSocket 这类请求被挡,`form-action 'none'` 挡表单提交,`base-uri 'none'` 挡 `<base>`;策略违规会作为浏览器控制台错误出现在 stderr 上。**这条策略不挡页面跳转**:`location` 赋值、`meta refresh`、链接导航都无法用 CSP 阻止(实测:真实 Edge 里脚本跳转到外部网址仍然到达)。又因为 `script-src 'unsafe-inline'` 允许内联脚本,它不是 XSS 边界,只是纵深防御;页面被改过之后再注入标记的防线是构建检查 BD-001 至 BD-007 与「构建后被改过的页面在门禁之前就被 `GEMARC_ATLAS_BUILD_032` 拒绝」,模型文字本身进不了标记(BD-003)。`tests/atlas/test_gate_csp.py` 在真实 Edge 里证明:合成的小预设与参考预设各一份已封存页面,三个宽度的门禁模式下原始 stderr 零行违规,门禁零发现,3D、4D、5D 的 WebGL 画布都画了;反向对照(故意放一个被挡的图片与请求)能在同一份原始 stderr 里看到违规行。构建检查 BD-004 要求这条 `meta` 逐字存在、是第一个元素、整页只有这一条 `http-equiv`;细节见 `bundle-contract.md` 10.6。
 
 ## 清理
 
@@ -323,7 +344,7 @@ ok-stub (non-ASCII path)      1366  PASS  -                                  20/
 ## 与构建的集成(M4)
 
 - `smoke.verify_gate(page, widths=(1024, 1366, 1600), **run_gate 的参数)`:同一个浏览器依次在每个宽度启动一次,返回一个裁决 `{status, widths[], lines[], browser, message}`。`PASS` 要求每个宽度都通过;找不到浏览器时每个宽度都是 `SKIP`,总裁决是 `SKIP`,`lines` 与 `message` 写明"没有运行,不算通过";任何宽度的断言失败、或运行器本身抛出异常,总裁决都是 `FAIL`(异常记为 `PROCESS`)。`summarize_result` 给出单个宽度的纯数据(状态、发现名、标签页、脚本步骤数、耗时)。
-- `tools.build(gate="smoke")` 与 `tools.verify` 调用它,报告写在 `<项目>/atlas/dist/.verify/gate-report.json`,浏览器的临时目录写在 `.verify/work` 下并在结束后删除。`build` 在没有浏览器时仍然成功,但回复里 `gate` 是 `SKIP` 并有一行"页面未验证";`verify` 在没有浏览器时回复 `invalid`(`GEMARC_ATLAS_BUILD_031`:SKIPPED, NOT PASSED);门禁失败是 `GEMARC_ATLAS_BUILD_030`。发布构建(`release`)要求门禁是 `PASS`。
+- `tools.build(gate="smoke")` 与 `tools.verify` 调用它,报告写在 `<项目>/atlas/dist/.verify/gate-report.json`,浏览器的临时目录写在 `.verify/work` 下并在结束后删除。`build` 在没有浏览器时仍然成功,但回复里 `gate` 是 `SKIP` 并有一行"页面未验证";`verify` 在没有浏览器时回复 `invalid`(`GEMARC_ATLAS_BUILD_031`:SKIPPED, NOT PASSED);门禁失败是 `GEMARC_ATLAS_BUILD_030`。发布构建(`release`)要求门禁是 `PASS`,而且门禁是在暂存目录里的页面上跑的(报告先写在暂存目录的 `.verify/`,发布通过后才和页面一起换入 `dist/.verify/`;被拒绝的发布不留下任何报告,`dist/` 不动)。
 - 页面里的门禁钩子由 `viewer/src/ui/shell.js` 的 `gateConfig()` 提供(六个标签页、四个脚本步骤 `doc-twin`、`levels`、`inspector`、`search`);`selftest.js` 在构建时由 `htmlassemble.py` 放进 `<head>` 最前面,本目录的行走器没有为此改动。`doc-twin` 在页面里重新组装 20 个规范选择并比较哈希,孪生实现漂移时把一条记录写进 `window.__ATLAS_ERRORS__`,所以运行器报 `PAGE_ERRORS` 与 `STEP_FAILED`。
 - 校准夹具的清单在 `tests/atlas/gate_fixtures/MATRIX.json`:`bad-header-overlap`(1256、1366 失败,1576 通过)、`frozen-scene`、`missing-result`(即 `no-result.html`)、`unknown-building`(测试时由合成模型生成,不存已构建的页面)、以及 viewer-B 的 `clipped-scene`(`FRAME_CLIPPED`)、`sparse-scene`(`SCENE_SPARSE`),它们在 `gate_fixtures/scene/`(不放在 `gate_fixtures/` 根目录:`test_gate_smoke` 会枚举根目录的 `*.html` 并要求每个都被它自己的源码用到)。
 - 在构建出的页面上做 N 次测量:`python tests/atlas/gate_html_matrix.py --runs 20 --fixtures`(退出码 0 GO、1 NO-GO、3 没有浏览器)。

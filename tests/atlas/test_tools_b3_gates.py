@@ -179,7 +179,8 @@ class EachConditionTests(Flow):
         self.assertEqual((gate["ok"], gate["kinds"]), (False, {"mismatch": 1}))
         self.assertIn("mismatch (CS-BORROW-OK)", gate["detail"])
         state = self.status()
-        self.assertEqual((state["done"], state["phase"], state["needsUser"]), (False, "build", []), "a failed verdict is the author's to look into")
+        # debt-b4: the mismatch is an OR-001 ERROR of the default full check (wave 2 is part of it), so the phase is repair (it was build)
+        self.assertEqual((state["done"], state["phase"], state["needsUser"]), (False, "repair", []), "a failed verdict is the author's to look into")
         # the author corrects the EXPECTATION after the mismatch was shown: that is exposure, the item is revised and the user decides
         self.put("20-scenarios", CORRECTED_EXPECT, mode="patch")
         self.assertEqual(self.states()["case:CS-BORROW-OK"], "revised")

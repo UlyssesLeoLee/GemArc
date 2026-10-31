@@ -24,7 +24,10 @@ BD-002   placeholders: none of the six placeholders is left, none was filled twi
 BD-003   data: the data script holds exactly the ten keys of the bundle contract, parses back to the embedded bundle, and
          contains no ``<``, ``>``, ``&``, U+2028, U+2029 or raw control character.
 BD-004   structure: exactly three scripts (self-test first in ``head``, data, runtime), equal to the expected text; the runtime
-         ends with the boot call; the title text equals the title; ``lang`` is one of the supported languages.
+         ends with the boot call; the title text equals the title; ``lang`` is one of the supported languages; the first element
+         of ``head`` is the one Content-Security-Policy ``meta`` with exactly :data:`CSP_POLICY` (no passive load and no fetch-type request:
+         only its own inline script and style, and ``data:`` images; no form submit, no ``<base>``; navigation is NOT blocked by a
+         policy), and no other ``http-equiv`` meta exists.
 BD-005   size: WARN above 3 MiB, ERROR above 8 MiB.
 BD-006   encoding: valid UTF-8, LF only, no BOM, no NUL.
 BD-007   reproducibility: two fills of the same inputs are byte-identical; no machine path (drive letter, ``/Users/``,
@@ -57,6 +60,12 @@ FAIL_BYTES = 8 * 1024 * 1024
 DATA_PREFIX = "window.__ATLAS__ = JSON.parse('"
 DATA_SUFFIX = "');"
 BOOT_TAIL = "__mod_ui_main.bootAtlas();\n})();"
+
+#: The Content-Security-Policy of every page (a ``meta`` that is the first element of ``head``, before the self-test script). Nothing is
+#: fetched, framed, embedded or sent: only the page's own inline script and style run, and ``data:`` images may load. connect-src,
+#: font-src, media-src and worker-src fall back to ``default-src 'none'`` because the page uses none of them (checked on built pages in
+#: headless Edge by ``tests/atlas/test_gate_csp.py``: zero violations, WebGL tabs included).
+CSP_POLICY = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; form-action 'none'; base-uri 'none'"
 
 E_VIEWER = "GEMARC_ATLAS_BUILD_010"
 
@@ -284,6 +293,23 @@ def _issue(rule: str, severity: str, message: str) -> dict:
     return {"rule": rule, "severity": severity, "message": message}
 
 
+def _csp_issues(skeleton: "_Skeleton") -> list:
+    """BD-004, the policy part: the first element of ``head`` is the one policy ``meta`` with exactly :data:`CSP_POLICY`, and no other
+    ``http-equiv`` meta (refresh, a second or a weaker policy) exists. Fail closed: a missing, moved, changed or doubled policy is an ERROR."""
+    tags = skeleton.tags
+    equiv = [attrs for tag, attrs in tags if tag == "meta" and any(key.lower() == "http-equiv" for key in attrs)]
+    head = next((i for i, (tag, _attrs) in enumerate(tags) if tag == "head"), None)
+    first = tags[head + 1] if head is not None and head + 1 < len(tags) else None
+    problems = []
+    if not (first and first[0] == "meta" and first[1].get("http-equiv", "").lower() == "content-security-policy"):
+        problems.append("the first element of head is not the Content-Security-Policy meta")
+    elif first[1].get("content") != CSP_POLICY or set(first[1]) != {"http-equiv", "content"}:
+        problems.append("the Content-Security-Policy meta is not exactly the pinned policy")
+    if len(equiv) != 1:
+        problems.append(f"the page has {len(equiv)} http-equiv meta elements, expected exactly the one policy")
+    return [_issue("BD-004", "ERROR", text) for text in problems]
+
+
 def code_parts(viewer: Viewer) -> dict:
     """The parts that are code, not data: what BD-001 and BD-007 scan."""
     return {"template": viewer.template, "style": viewer.css, "selftest": viewer.selftest, "runtime": viewer.runtime}
@@ -333,6 +359,7 @@ def check_page(page: "str | bytes", viewer: Viewer, bundle: "dict | None" = None
         if _URL_REMOTE.search(style_text) or re.search(r"@import", style_text, re.IGNORECASE):
             issues.append(_issue("BD-001", "ERROR", "the page style has a remote reference"))
     # BD-004 structure
+    issues.extend(_csp_issues(skeleton))
     expected_self = viewer.selftest + ("" if viewer.selftest.endswith("\n") else "\n")
     if len(skeleton.scripts) != 3:
         issues.append(_issue("BD-004", "ERROR", f"the page has {len(skeleton.scripts)} script elements, expected 3 (self-test, data, runtime)"))

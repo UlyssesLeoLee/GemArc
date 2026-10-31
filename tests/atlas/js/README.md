@@ -4,7 +4,7 @@
 
 ## 1. 怎么运行
 
-在仓库根目录 `D:/GemArc` 执行：
+在仓库根目录执行：
 
 ```
 node --test "tests/atlas/js/*.test.mjs"

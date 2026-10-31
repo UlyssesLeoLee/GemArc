@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__gemarc_atlas__gemarc_atlas_brief",
+      "mcp__gemarc_atlas__gemarc_atlas_init",
+      "mcp__gemarc_atlas__gemarc_atlas_put",
+      "mcp__gemarc_atlas__gemarc_atlas_check",
+      "mcp__gemarc_atlas__gemarc_atlas_status",
+      "mcp__gemarc_atlas__gemarc_atlas_index",
+      "mcp__gemarc_atlas__gemarc_atlas_simulate",
+      "mcp__gemarc_atlas__gemarc_atlas_doc",
+      "mcp__gemarc_atlas__gemarc_atlas_outline",
+      "mcp__gemarc_atlas__gemarc_atlas_evidence",
+      "mcp__gemarc_atlas__gemarc_atlas_build",
+      "mcp__gemarc_atlas__gemarc_atlas_verify",
+      "mcp__gemarc_atlas__gemarc_atlas_review",
+      "Read",
+      "Grep",
+      "Glob"
+    ],
+    "deny": ["Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch"]
+  }
+}

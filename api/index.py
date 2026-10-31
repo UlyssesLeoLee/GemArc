@@ -9,6 +9,7 @@ It serves, from one function:
   /              the MCP console (public static shell, no secrets)
   /site/*        the 5D architecture static site (public, built on first use)
   /kit/<p>.zip   the fixed part of a 5D site, one deterministic archive (public)
+  /kit/atlas.zip LOCAL OPT-IN only (GEMARC_ATLAS_KIT=1, off by default and unreachable on the Vercel upload): the atlas kit
 
 The default tool set of a remote deployment is ``stateless``: the model travels
 inside each tool call, so no durable filesystem and no caller identity are
@@ -123,6 +124,10 @@ HEALTH_PATH = "/healthz"
 SITE_PATH = "/site/"
 KIT_PROFILES = stateless.SITE_PROFILES
 _KIT_RE = re.compile(r"/kit/([A-Za-z0-9_-]+)\.zip")
+#: LOCAL OPT-IN, off in every deployed configuration: ``GET /kit/atlas.zip`` exists only while the operator's environment says
+#: ``GEMARC_ATLAS_KIT=1`` (exactly that value). The atlas is not part of the Vercel upload (``.vercelignore``), so even with the flag set the route
+#: answers 503 ``GEMARC_ATLAS_KIT_001`` there (the import is lazy and fails closed). Without the flag the path is an unknown kit profile: 404, as before.
+ATLAS_KIT_PATH = "/kit/atlas.zip"
 
 #: Paths under which a platform may hand the function the MCP request. The
 #: legacy ``builds`` + ``routes`` configuration rewrites everything to
@@ -667,6 +672,29 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
         headers["Content-Disposition"] = f"attachment; filename=gemarc-kit-{profile}.zip"
         await reply(Response(archive, media_type="application/zip", headers=headers), scope, receive, send)
 
+    async def atlas_kit_endpoint(scope, receive, send):
+        """The atlas kit zip (see ``ATLAS_KIT_PATH``); only reached with ``GEMARC_ATLAS_KIT=1``. Fails closed, with a code, when the atlas is absent."""
+        if not await read_only(scope, receive, send):
+            return
+        unavailable = {"Cache-Control": "no-store"}
+        try:
+            from gemarc_mcp.atlas import kit as atlas_kit  # lazy: the deployed function does not carry the atlas package
+        except ImportError:
+            await reply(_json(503, {"error": "atlas_kit_unavailable", "code": "GEMARC_ATLAS_KIT_001"}, unavailable), scope, receive, send)
+            return
+        try:
+            archive = await anyio.to_thread.run_sync(atlas_kit.build_zip)
+        except atlas_kit.KitError as ex:
+            await reply(_json(503, {"error": "atlas_kit_unavailable", "code": ex.code}, unavailable), scope, receive, send)
+            return
+        etag = '"%s"' % atlas_kit.sha256_hex(archive)
+        headers = {"ETag": etag, "Cache-Control": "no-cache"}
+        if _etag_matches(Headers(scope=scope).get("if-none-match"), etag):
+            await reply(Response(status_code=304, headers=headers), scope, receive, send)
+            return
+        headers["Content-Disposition"] = f"attachment; filename={atlas_kit.KIT_FILE}"
+        await reply(Response(archive, media_type="application/zip", headers=headers), scope, receive, send)
+
     async def site_endpoint(scope, receive, send, path: str):
         remainder = "/" + path[len(SITE_PATH):]
         rewritten = dict(scope)
@@ -683,6 +711,8 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
         path = scope.get("path", "/")
         if path == SITE_PATH or path.startswith(SITE_PATH):
             await site_endpoint(scope, receive, send, path)
+        elif path == ATLAS_KIT_PATH and os.environ.get("GEMARC_ATLAS_KIT") == "1":
+            await atlas_kit_endpoint(scope, receive, send)
         elif path.startswith("/kit/"):
             await kit_endpoint(scope, receive, send, path)
         elif path.startswith("/.well-known/"):

@@ -233,7 +233,10 @@ class StdioAuthoringSession(unittest.TestCase):
         self.assertTrue(full["clean"], full["diagnostics"])
         self.assertEqual((full["authority"], full["scope"]), ("authoritative", "project"))
         _, js = await call("gemarc_atlas_check", project="lending-desk", mode="full", format="json")
-        self.assertEqual(js["diagnostics"]["diagnostics"], [])
+        # debt-b4: wave 2 is part of the default full check, so the desk shows its INFO lines (events without a ruleId, a sealed expectation the user has
+        # not confirmed) and nothing above INFO; it used to show none
+        self.assertEqual([d for d in js["diagnostics"]["diagnostics"] if d["severity"] != "INFO"], [])
+        self.assertEqual({d["rule"] for d in js["diagnostics"]["diagnostics"]}, {"CS-008", "OR-005"})
         _, inline = await call("gemarc_atlas_check", text=DESK["20-scenarios"])
         self.assertEqual(inline["authority"], "advisory")
         result, both = await call("gemarc_atlas_check", project="lending-desk", text="x")

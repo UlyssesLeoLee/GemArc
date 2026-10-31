@@ -32,7 +32,7 @@ Atlas 是 v1 工具集旁边的另一套工具：AI 只写紧凑的、经校验�
 | 体积 | 每个工具有自己的上限（见各节），回复超出时由 `fit_result()` 明确截断：`truncated:true`，能分页的带 `more:"offset=N"`。服务器再用 20 KiB 的硬上限兜底，所以客户端 24 KiB 的限制永远不会被触到。体积按 UTF-8 字节数计 |
 | 写入 | 写工具需要用户在服务器配置里设置 `GEMARC_ALLOW_WRITE=1`，否则返回 `GEMARC_AUTH_002`（`isError`）。读工具（含 `gemarc_atlas_check`）不需要，也从不创建默认工作区目录；写工具在项目的某个目录指向工作区之外（目录联接、符号链接）时拒绝写入 |
 | 类型错误 | 参数类型不对（例如把数字传给字符串参数）由 MCP SDK 在进入工具之前拒绝，回复是纯文本的 pydantic 消息（仍然带 `isError=true`），不是紧凑 JSON；多余的未知参数被忽略。值域错误（未知的 `lang`、负的 `offset` 或 `page`）由工具自己拒绝：`GEMARC_ATLAS_TOOL_001`，不会悄悄当成别的值。atlas 专有的拒绝消息是英文，`GEMARC_AUTH_*` 沿用 v1 的中文消息 |
-| 路径 | 回复里除了 `init` 的 `path`（模型要用它保存需求原文，见该节）之外没有主机路径：`build` 的 `dist`、`verify` 的 `report` 是相对项目的（`atlas/dist`、`atlas/dist/.verify/gate-report.json`）；操作者的环境值（`GEMARC_ATLAS_BROWSER`）不进回复，也不进 `dist/.verify/gate-report.json`。命令行入口仍打印完整路径 |
+| 路径 | 回复里除了 `init` 的 `path`（模型要用它保存需求原文，见该节）之外没有主机路径：`build` 的 `dist`、`verify` 的 `report` 是相对项目的（`atlas/dist`、`atlas/dist/.verify/gate-report.json`）；操作者的环境值（`GEMARC_ATLAS_BROWSER`）不进回复，也不进 `dist/.verify/gate-report.json`；浏览器门的页面级发现（`PAGE_ERRORS`、`CONSOLE_STDERR`、被挡的资源等）里的 `file://` 网址与盘符路径在回复和报告里只留文件名与行列（`smoke.scrub_host_paths`）。直接调用 `tools.build`、`tools.verify` 的返回值和命令行入口仍带完整的 `dist`、`report` 路径（项目在本机的位置，含用户名）：只有 MCP 层把它们改成相对路径 |
 | 工作区 | `GEMARC_WORKSPACE_ROOT`（默认 `~/.gemarc/workspace`），在工具被调用时才解析，注册工具时不碰磁盘。项目在 `<工作区>/<项目>/atlas/` 下 |
 | 证据根 | 环境变量 `GEMARC_ATLAS_ROOTS`（`别名=路径;别名=路径`）由用户配置；工具参数里只能写别名，不能写路径（`outline` 的 `root` 参数就是别名） |
 | authority | 回复里的 `authority`：`local`（本地服务器的结论）或 `advisory`（远程或内联文本的参考性结论） |
@@ -65,7 +65,7 @@ Atlas 是 v1 工具集旁边的另一套工具：AI 只写紧凑的、经校验�
 | `profile` | `software` | 词表档案 |
 | `repos` | `[]` | 证据根别名（须在服务器的 `GEMARC_ATLAS_ROOTS` 里配置） |
 
-输出：`{status:"created", project, path, mode, created[], next[]}`；`path` 是绝对路径，这是有意的：模型要用自己的文件写入能力把需求原文保存到它下面的 `user/`（init 已建好这个目录；用户对 TBD 的回答也原话保存在这里），没有别的办法告诉它写到哪里。这是 MCP 回复里唯一的主机路径（`build`、`verify` 给相对路径），错误和诊断里没有。已有项目是 `invalid`（不覆盖，回复带 `path`，直接用 `gemarc_atlas_status` 继续）。参数过大（`repos` 超过 32 个、标题不是合法文本）在创建任何目录之前被拒绝。需要 `GEMARC_ALLOW_WRITE=1`。注解：写工具，非破坏性，非幂等。
+输出：`{status:"created", project, path, mode, created[], next[]}`；`path` 是绝对路径，这是有意的：模型要用自己的文件写入能力把需求原文保存到它下面的 `user/`（init 已建好这个目录；用户对 TBD 的回答也原话保存在这里），没有别的办法告诉它写到哪里。这是 MCP 回复里唯一的主机路径（`build`、`verify` 给相对路径），错误和诊断里没有。工作区在某个证据根（`GEMARC_ATLAS_ROOTS`，即被分析的仓库）里面时不拒绝，但 `next` 的第一行是 `WARNING`，请操作者把 `GEMARC_WORKSPACE_ROOT` 挪到外面。已有项目是 `invalid`（不覆盖，回复带 `path`，直接用 `gemarc_atlas_status` 继续）。参数过大（`repos` 超过 32 个、标题不是合法文本）在创建任何目录之前被拒绝。需要 `GEMARC_ALLOW_WRITE=1`。注解：写工具，非破坏性，非幂等。
 
 ### `gemarc_atlas_put`
 
@@ -99,7 +99,7 @@ Atlas 是 v1 工具集旁边的另一套工具：AI 只写紧凑的、经校验�
 | `project` | `""` | 校验项目；与 `text` 二选一 |
 | `text` | `""` | 校验一段内联文本（authority 为 advisory，只看得到自己）；最多 128 KiB |
 | `slice` | `""` | 只看这一个切片（有红稿时先看红稿，回复里 `source` 说明） |
-| `mode` | `slice` | `slice`：引用后面切片的 id 记为待定（INFO）；`full`：整个项目的封闭世界，引用到没有定义的 id 都是 ERROR，存在红稿时拒绝（ST-009） |
+| `mode` | `slice` | `slice`：引用后面切片的 id 记为待定（INFO）；`full`：整个项目的封闭世界，引用到没有定义的 id 都是 ERROR，存在红稿时拒绝（ST-009）。`full` 跑第一波与第二波规则（`status.FULL_WAVE_SET = (1, 2)`）：CS-001、CS-005、CS-008、PT-003、SM-004/006/007、IV-001/002、OR-000 至 OR-005 不用点名就会运行，所以 `status`（完成契约）、`build`、命令行与 MCP 看到同样的发现；预设的合成模型（`tiny`、`small`、`reference`）在这里没有 ERROR 与 WARN，只有 INFO（如 CS-008、OR-005）；边界模型 `record-crossings` 故意带 4 条 PT-003 WARN，并且恰好这 4 条。**真实的 atlas 通常会带 PT-003 WARN**：模块把消息发布进事件记录是合法的跨类型边，端口类型由节点种类推出，没有逐条接受的办法，所以保持原样，只有节点种类写错时才改；WARN 不挡 `done`（`status` 的 done 行会写 `(N WARN open: ...)`，不写「clean」）。切片检查（`mode=slice`，也是 `put` 的检查）只跑第一波 |
 | `rule` | `""` | 只保留一条规则或一个族（如 `RF`） |
 | `offset` | `0` | 诊断翻页，与 put 回复里的 `more: offset=N` 对应 |
 | `format` | `text` | `text` 或 `json` |
@@ -181,7 +181,7 @@ Atlas 是 v1 工具集旁边的另一套工具：AI 只写紧凑的、经校验�
 | `path` | 必填 | 相对于该根的文件路径；绝对路径、盘符、`..`、符号链接逃逸都是错误 |
 | `offset` | `0` | 从第几个条目继续（回复里的 `next`） |
 
-输出：`{status, authority, file, language, shown, total, text, next?, more?, warn?}`，`text` 每页不超过约 3.3 KB，整个回复 4,500 字节以内。文件大于 8 MiB 时在读取之前就拒绝（先 `stat`，`GEMARC_ATLAS_EV_006`），所以指向巨大文件的路径不会把它读进内存。`.env*` 只列键名，密钥类文件不给大纲，锚点经过凭据检查。只读。
+输出：`{status, authority, file, language, shown, total, text, next?, more?, warn?}`，`text` 每页不超过约 3.3 KB，整个回复 4,500 字节以内。文件大于 8 MiB 时在读取之前就拒绝（先 `stat`，`GEMARC_ATLAS_EV_006`；读取本身最多读 8 MiB 加一个字节），所以指向巨大文件的路径不会把它读进内存。`evidence` 对证据文件和项目 `user/` 下保存的需求文本用同一个读法（`evidence.read_text_file`）：过大的文件是 `NOT_TEXT`（`user:` 的引用是 `USER_TEXT_MISSING`），不读内容。`.env*` 只列键名，密钥类文件不给大纲，锚点经过凭据检查。只读。
 
 ### `gemarc_atlas_evidence`
 
@@ -192,7 +192,7 @@ Atlas 是 v1 工具集旁边的另一套工具：AI 只写紧凑的、经校验�
 | `project` | 必填 | 项目名 |
 | `ids` | `[]` | 只核验这些证据 id；空为全部 |
 
-输出：`{status, authority, rows, pass, warn, fail, skip, stamped, roots[], lines[], next[], claims?}`，上限 3,000 字节（`lines` 超出时截断并给 `more`）。每个不是绿色的行一行，带修复建议，建议**从不自动应用**；没有配置证据根的别名是 `SKIP`，绝不是通过。as-is 项目里 `claims` 给出 Implemented 声明的总数和仍未核验的个数：`status` 的 `evidence` 门要求每个 Implemented 声明的源码证据都有与当前文件、锚点相符的印记。注解：写工具，非破坏性，幂等。需要 `GEMARC_ALLOW_WRITE=1`。
+输出：`{status, authority, rows, pass, warn, fail, skip, stamped, roots[], lines[], next[], claims?, stale?}`，上限 3,000 字节（`lines` 超出时截断并给 `more`）。`stale` 是通过了但盖印的那一块在盖印之后被改过的行数（EV-005）：这个工具不给它们重新盖印，发布会拒绝它们（只要有 Implemented 声明靠着它们），`next` 说要重读代码并用另一个锚点重新引用。每个不是绿色的行一行，带修复建议，建议**从不自动应用**；没有配置证据根的别名是 `SKIP`，绝不是通过。`claims` 给出 Implemented 声明的总数和仍未核验的个数（as-is 项目总有；别的项目只在有这类声明时有）：`status` 的 `evidence` 门和发布的证据规则都按声明判断，不按 `atlas.toml` 的 `mode` 判断：每个 Implemented 声明的源码证据都要有与当前文件、锚点相符的印记。注解：写工具，非破坏性，幂等。需要 `GEMARC_ALLOW_WRITE=1`。
 
 ### `gemarc_atlas_build`
 
@@ -201,11 +201,11 @@ Atlas 是 v1 工具集旁边的另一套工具：AI 只写紧凑的、经校验�
 | 输入 | 默认 | 说明 |
 |---|---|---|
 | `project` | 必填 | 项目名 |
-| `release` | `false` | 同时要求发布门：oracle、证据、没有 NOT-AUTHORED 空位、浏览器门通过（需要 `gate=smoke`） |
+| `release` | `false` | 发布构建：oracle 门（先跑判定和变异体）、证据（对源码重新核验，没有过期的戳）、没有 NOT-AUTHORED 空位、浏览器门通过（需要 `gate=smoke`）；暂存后才换进 `dist/`，被拒绝时 `dist/` 原样不动 |
 | `docs` | `true` | `false` 不写 `docs/`、`diagrams/`、`prompts/`（这样 `status` 的构建门不会变绿） |
 | `gate` | `none` | `smoke` 在写完页面后，用无头浏览器以 1024、1366、1600 宽度跑浏览器门 |
 
-输出：`{status, authority, dist（`atlas/dist`）, page{bytes, sha256}, modelSha8, parts, data, checks, findings, oracle, withheld, docs, gate, lines, release, sheet?, next[]}`，上限 2,000 字节。模型有 ERROR 时拒绝（`GEMARC_ATLAS_BUILD_001`）；`dist`、`dist/.verify`、`dist/docs` 等是链接或目录联接（junction），或解析到工作区之外时在动任何文件之前拒绝（`GEMARC_AUTH_001`，构建会删除并重写这些目录）；浏览器门 FAIL 或发布门没过时回复 `invalid`，文件仍然写出：被拒绝的发布构建也会重写页面（页面的 sha 变了，所以之前的浏览器结论作废，要重新 `verify`）；没有浏览器时 `gate=smoke` 的门是 SKIPPED，回复仍是 `ok`（页面已经写出），`gate:"SKIP"` 和第一行 `next` 醒目地说页面**没有**被验证，`verify` 才给出判定。`sheet` 是写好的 oracle 表（相对项目的路径），MCP 从不写用户的确认文件 `atlas/oracle-confirm.txt`。会替换 `dist/` 里自己拥有的部分，所以注解为破坏性、幂等。需要 `GEMARC_ALLOW_WRITE=1`。
+输出：`{status, authority, dist（`atlas/dist`）, page{bytes, sha256}, modelSha8, parts, data, checks, findings, oracle, withheld, docs, gate, lines, release, sheet?, next[]}`，上限 2,000 字节。模型有 ERROR 时拒绝（`GEMARC_ATLAS_BUILD_001`，什么都不写）：这里的 ERROR 是默认完整检查（第一波加第二波）的，所以封存的期望被引擎否定（OR-001）、覆盖下限（OR-003）、干预声明与引擎不符（IV-001、IV-002）也算：判定失败的项目要先修好（`status` 的 phase 是 `repair`）再构建，不再是「写出页面、发布门再报 `mismatch`」；拒绝回复的 `message` 指向 `gemarc_atlas_check mode=full`，`diagnostics[].message` 在位置后带规则提示；`dist`、`out`、`dist/.verify`、`dist/docs` 等是符号链接、目录联接（junction）或其它重解析点（哪怕指向工作区之内），或解析到工作区之外时在动任何文件之前拒绝（`GEMARC_AUTH_001`，构建会删除并重写这些目录；`project.is_link` 用 `is_symlink`、`os.path.isjunction` 与重解析点属性三道判断，删除处再检查一次，绝不穿过链接删除）；不带 `release` 的构建遇到浏览器门 FAIL 时回复 `invalid`（`GEMARC_ATLAS_BUILD_030`），页面已经写出（页面的 sha 变了，所以之前的浏览器结论作废，要重新 `verify`）；**发布构建不是这样**：`release=true` 先在 `atlas/.atlas/release-stage/` 里组装整个 `dist/`，在那里依次过 oracle 门（先跑判定和变异体）、证据（对源码重新核验，见下）、文档里没有 NOT-AUTHORED、BD/RC/LB 构建检查和浏览器门，全部通过才把页面、`build-info.json`、`docs/`、`diagrams/`、`prompts/`、`.verify/` 逐项换进 `dist/`（`oracle-sheet.md` 不动）。发布还要求 `docs=true` 和 `gate=smoke`：`docs=false` 的发布会在换入时删掉此前的文档、图和提示词，所以和没有跑浏览器门一样，在暂存之前就被拒绝（阻挡项 `docs`）。任何一项挡住发布，回复 `invalid`（`GEMARC_ATLAS_BUILD_020`，不带 `page`，列出每一类阻挡项和一行行动提示），`dist/` 里此前的页面、文档、图、提示词、`build-info.json` 和 `.verify/` 一个字节也没变（暂存目录总会被删掉；唯一会写的是交给用户的 `oracle-sheet.md`，让用户有东西可以确认，所以回复写「no page or document of dist/ was changed」，而不是「dist/ 没变」；此前没有 `dist/` 时，被拒绝的发布会建出只含 `oracle-sheet.md` 的 `dist/`）。被拒绝的发布也不记「构建揭示」：期望的轨迹只在页面真的要换入 `dist/` 时才记入账本（所有门都过之后、换入之前），所以因为门没过而被拒绝的发布不会让之后对期望的诚实修改变成 `revised`（唯一的例外是换入本身失败：文件被锁时揭示已经记了，没有页面被看到，方向是保守的，之后改这些期望要你确认）；记完之后 oracle 门会对账本再判一次（同一指纹的期望是一个揭示单位，记录可能让兄弟项变成 `revised`），仍然关着就拒绝。换入时 Windows 上有程序把 `dist/` 里的文件开着（编辑器、预览、同步客户端）会让换入失败：`GEMARC_ATLAS_BUILD_021`（`invalid`，`message` 点名是哪一部分，叫你关掉后重新发布），已换入的部分全部回滚，`dist/` 原样。要看红色浏览器门的具体问题，用不带 `release` 的 `gate=smoke` 构建。发布构建的证据规则：每个 Implemented 声明的源码证据要有与当前行（仓库、文件、锚点）一致的戳（`EV-003`），而且戳对源码仍然成立（`EV-005`，发布时只读地重新核验，需要操作者配置的 `GEMARC_ATLAS_ROOTS`）：源码在盖戳之后移动了锚点，再跑一次 `gemarc_atlas_evidence` 重新盖戳；盖戳的那一块被改过，`evidence` 不会自己接受（它的回复有 `stale` 个数和一行 `next` 说明，不再写「all evidence rows verified」），要重读代码后把证据行用另一个锚点重新引用；锚点或文件没了、没有证据根，都拒绝。没有浏览器时 `gate=smoke` 的门是 SKIPPED，回复仍是 `ok`（页面已经写出），`gate:"SKIP"` 和第一行 `next` 醒目地说页面**没有**被验证，`verify` 才给出判定。`sheet` 是写好的 oracle 表（相对项目的路径），MCP 从不写用户的确认文件 `atlas/oracle-confirm.txt`。会替换 `dist/` 里自己拥有的部分，所以注解为破坏性、幂等。需要 `GEMARC_ALLOW_WRITE=1`。
 
 ### `gemarc_atlas_verify`
 
@@ -216,7 +216,7 @@ Atlas 是 v1 工具集旁边的另一套工具：AI 只写紧凑的、经校验�
 | `project` | 必填 | 项目名 |
 | `widths` | `[1024,1366,1600]` | 一到六个宽度（500 到 4000） |
 
-输出：`{status, authority, gate, widths[], lines[], modelSha8, report（`atlas/dist/.verify/gate-report.json`）, shots, browser}`，上限 3,000 字节。只有每个宽度都 PASS 才是 `ok`；操作者用 `GEMARC_ATLAS_BROWSER` 指定的路径不出现在回复和报告里（写作 `the pinned browser`）；`status` 的 browser 门要求印记里 1024、1366、1600 三个宽度都 PASS，只传一个宽度的 `verify` 不会让 `done`；FAIL、SKIPPED（没有找到浏览器：没通过）和 INCONCLUSIVE（浏览器启动超时，机器忙：没通过，也没发现缺陷）都是 `invalid`（`GEMARC_ATLAS_BUILD_030`、`_031`、`_033`）；没有页面或页面不是当前模型的页面是 `_032`，浏览器不会启动。浏览器由 `GEMARC_ATLAS_BROWSER`（可选，指向 Edge 或 Chrome 的可执行文件）或默认安装位置找到；服务器环境被过滤时（Codex、Hermes）要转发 `ProgramFiles`、`ProgramFiles(x86)`、`LOCALAPPDATA`，或设置 `GEMARC_ATLAS_BROWSER`。注解：写工具，非破坏性，幂等。需要 `GEMARC_ALLOW_WRITE=1`。
+输出：`{status, authority, gate, widths[], lines[], modelSha8, report（`atlas/dist/.verify/gate-report.json`）, shots, browser}`，上限 3,000 字节。只有每个宽度都 PASS 才是 `ok`；操作者用 `GEMARC_ATLAS_BROWSER` 指定的路径不出现在回复和报告里（写作 `the pinned browser`）；`status` 的 browser 门要求印记里 1024、1366、1600 三个宽度都 PASS，只传一个宽度的 `verify` 不会让 `done`；FAIL、SKIPPED（没有找到浏览器：没通过）和 INCONCLUSIVE（浏览器启动超时，机器忙：没通过，也没发现缺陷）都是 `invalid`（`GEMARC_ATLAS_BUILD_030`、`_031`、`_033`）；没有页面或页面不是当前模型的页面是 `_032`，浏览器不会启动。浏览器由 `GEMARC_ATLAS_BROWSER`（可选，指向 Edge 或 Chrome 的可执行文件）或默认安装位置找到：服务器环境被过滤、没有 `ProgramFiles*` 时（Codex、Hermes）也会按标准安装目录（`ProgramFiles(x86)`、`ProgramFiles`、`LOCALAPPDATA` 的默认值）找，不需要转发这些变量；Edge 装在别处时才需要设置 `GEMARC_ATLAS_BROWSER`。各宽度合起来约 150 秒（重试也计入这个预算：一个宽度的失败启动在剩余不足 10 秒时不再重试，重试最多得到剩下的时间；最后一次启动结束时杀进程树、读管道的清理另算，通常不到几秒，最坏十几秒）：第一个 INCONCLUSIVE 之后不再启动后面的宽度，没启动的宽度在 `widths[]` 里是 `INCONCLUSIVE`（`NOT_RUN`），回复的 `message` 与 `lines` 写明哪些宽度没有启动；浏览器输出有上限，超限是失败（`PROCESS`）而不是判定（见 `src/gemarc_mcp/atlas/gate/README.md`）。注解：写工具，非破坏性，幂等。需要 `GEMARC_ALLOW_WRITE=1`。
 
 ### `gemarc_atlas_review`
 
@@ -302,9 +302,9 @@ Atlas 是 v1 工具集旁边的另一套工具：AI 只写紧凑的、经校验�
 
 | 条件 | 含义 |
 |---|---|
-| 结构 | 没有红稿，完整检查没有 ERROR，没有 BLOCK 槽位，1D 到 5D 都就绪（只要有适用的 oracle 门，4D 和 5D 就是必需的：至少一个已封存的用例期望和一个已封存的干预期望） |
+| 结构 | 没有红稿，完整检查没有 ERROR（WARN 不挡；`next` 的 done 行写 `check full has no ERROR`，还有 WARN 时写 `(N WARN open: ...)`），没有 BLOCK 槽位，1D 到 5D 都就绪（只要有适用的 oracle 门，4D 和 5D 就是必需的：至少一个已封存的用例期望和一个已封存的干预期望） |
 | `oracle` 门 | 每条期望都是 sealed 或 confirmed，且针对**当前**模型有通过的判定（`simulate`），没有空转（覆盖下限）。sealed 但用户还没确认的期望不挡路：它们写在 `oracle-sheet.md` 上、写进最终报告。被改动的期望（`revised`）只有用户能处理：但在 `build` 写出 `oracle-sheet.md` 之前没有可批准的东西，所以那时 `phase` 仍是 `build`（`next` 叫你 simulate、build），表写出之后才是 `needs-user` |
-| `evidence` 门 | 只对 as-is：每个 Implemented 声明的源码证据都有印记，且印记对应的文件和锚点与当前证据行一致（`gemarc_atlas_evidence`；一行后来核验失败（FAIL）就失去印记，这道门随之变红）。to-be 的上限是 Designed，没有这道门。这些声明所在的别名没有任何可用的证据根时，AI 无事可做：`phase` 是 `needs-user`，`needsUser` 说明操作者要设置 `GEMARC_ATLAS_ROOTS 别名=<目录>`，或用户同意降低这些声明的 `verif=` |
+| `evidence` 门 | 按声明判断：每个 Implemented 声明的源码证据都有印记，且印记对应的文件和锚点与当前证据行一致（`gemarc_atlas_evidence`；一行后来核验失败（FAIL）就失去印记，这道门随之变红）。to-be 的上限是 Designed，不会有这类声明（EV-010），所以这道门对它是空的；判断看模型里的声明，不看 `atlas.toml` 的 `mode`。这些声明所在的别名没有任何可用的证据根时，AI 无事可做：`phase` 是 `needs-user`，`needsUser` 说明操作者要设置 `GEMARC_ATLAS_ROOTS 别名=<目录>`，或用户同意降低这些声明的 `verif=` |
 | `docs` 门 | 派生文档里没有 `[NOT-AUTHORED]` 空位（`gemarc_atlas_doc` 的 `markers` 为 0） |
 | `build` 门 | `dist/` 是当前模型的构建：页面没被改过，文档已写出（`gemarc_atlas_build`） |
 | `browser` 门 | 浏览器门在**这一页**上以 1024、1366、1600 三个宽度通过（`gemarc_atlas_verify`，印记绑定页面 sha256）。没有浏览器时是醒目的 SKIPPED，**不算通过**，也挡着 `done`，出路在用户手里：装浏览器，或由用户把理由写进 `atlas/waive-browser.txt`（任何工具都不写这个文件，和 `oracle-confirm.txt` 一样是声明，不是认证）。FAIL 永远不被豁免覆盖。被豁免的 `done` 在 `status` 里带 `waived:["browser"]`，不算验证 |
@@ -326,3 +326,8 @@ python scripts/atlas_mcp.py call gemarc_atlas_status '{"project":"demo"}'
 ```
 
 输出是紧凑 JSON，回复为 `isError` 时退出码非零。服务器环境不继承整个环境（SDK 只传过滤后的环境，与 Claude Code、Codex、Hermes 一致）：转发本 shell 里的 `GEMARC_*`，`GEMARC_TOOLSET` 默认 `atlas`。接入三个客户端的配置见 `docs/atlas/examples/README.md`。
+
+## 8. 工具包路由与远程检查
+
+- `tools/make_kit.py` 生成 `dist-kit/atlas-kit.zip`（纯标准库的 atlas 包、启动器 `atlas.py`、README、规格；确定性；不提交）。ASGI 应用里的 `GET /kit/atlas.zip` 是本地的可选项：只有环境变量恰好是 `GEMARC_ATLAS_KIT=1` 才存在，别的值（包括空、`true`、` 1`）都和任何未知的 kit 一样回 404，方法限制与默认行为不变；atlas 包不在时（Vercel 的上传里就是这样）回 503 和 `{"error":"atlas_kit_unavailable","code":"GEMARC_ATLAS_KIT_001"}`。它不是工具，不进任何工具集。
+- `python scripts/verify_remote.py <url> --atlas` 在一个运行 `GEMARC_TOOLSET=atlas_remote` 的服务器上多检查：两个只读工具、advisory 的切片检查（有效、损坏、超过 32 KB 三种输入）、回复里没有文件系统路径、kit 路由（`--atlas-kit on|off|auto`）。不带 `--atlas` 时脚本的行为不变；对 `stateless` 的部署带 `--atlas` 会失败，这是有意的（atlas 没有部署）。

@@ -621,7 +621,7 @@ def outline_file(roots: Mapping[str, Path | str], alias: str, rel: str, *, start
     if not resolved.exists or not _roots.is_regular_file(resolved.path):
         return {"ok": False, "code": _evidence._CODES["FILE_NOT_FOUND"][0], "message": f"no file {rel} under {alias}"}
     try:
-        src = _evidence.decode_text(resolved.path.read_bytes())
+        src = _evidence.read_text_file(resolved.path)   # os.stat first: an oversized file is refused without being read
     except (_evidence.TextError, OSError) as ex:
         return {"ok": False, "code": _evidence._CODES["NOT_TEXT"][0], "message": f"{resolved.rel}: {ex}"}
     result = outline(src, resolved.rel)

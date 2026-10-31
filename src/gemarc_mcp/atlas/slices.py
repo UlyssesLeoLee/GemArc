@@ -58,6 +58,8 @@ MODES = ("replace", "patch")
 MAX_SLICE_BYTES = rw.MAX_SLICE_BYTES            # 64 KiB: a larger slice is ST-008 (red draft)
 HARD_TEXT_BYTES = 2 * MAX_SLICE_BYTES           # a text above this is refused without being stored
 MAX_PROJECT_BYTES = 8 * 1024 * 1024
+COUNTER_MAX_BYTES = 64 * 1024                   # the tool's own small state files (put counters, the ledger anchor): a larger one was not written by the tool
+RECORD_MAX_BYTES = 8 * 1024 * 1024              # the tool's own records that grow with the project (evidence stamp, build info): a larger one is unreadable
 HISTORY_CAP = 10
 LOCK_STALE_S = 60.0
 LOCK_WAIT_S = 20.0
@@ -175,6 +177,35 @@ def read_bytes(path: Path, attempts: int = 40) -> bytes:
             time.sleep(delay)
             delay = min(delay * 1.6, 0.05)
     raise AssertionError("unreachable")
+
+
+class TooBig(ValueError):
+    """A file past its size limit (a ``ValueError`` so that every reader that treats a damaged file as unreadable treats this the same way)."""
+
+
+def read_prefix(path: Path, limit: int, attempts: int = 40) -> "tuple[bytes, bool]":
+    """``(first limit bytes, truncated)`` of a file, read through ``open(...).read(limit + 1)``: a file larger than ``limit`` (a sparse
+    file of a gigabyte included) is never loaded whole, and the caller decides what a cut file means. Waits out a replace in flight."""
+    delay = 0.002
+    for attempt in range(attempts):
+        try:
+            with open(path, "rb") as handle:
+                data = handle.read(limit + 1)
+            return data[:limit], len(data) > limit
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise _held_open() from None
+            time.sleep(delay)
+            delay = min(delay * 1.6, 0.05)
+    raise AssertionError("unreachable")
+
+
+def read_limited(path: Path, limit: int) -> bytes:
+    """The whole file, or ``TooBig`` when it is larger than ``limit`` bytes (nothing past ``limit + 1`` bytes is read)."""
+    data, truncated = read_prefix(path, limit)
+    if truncated:
+        raise TooBig(f"{path.name} is larger than {limit} bytes")
+    return data
 
 
 def _unlink(path: Path) -> None:
@@ -566,7 +597,7 @@ def _scan_jsonl(text: str, *, patch: bool) -> tuple:
         body = line[1:].lstrip() if delete else line
         try:
             obj = json.loads(body)
-        except ValueError:
+        except (ValueError, RecursionError):   # RecursionError: a line nested past the decoder's limit is "not an object"
             obj = None
         if not isinstance(obj, dict):
             units.append(_U("other", raw))
@@ -784,8 +815,10 @@ def _count_put(paths: Paths, name: str, red: bool) -> None:
     target = paths.dot / "puts.json"
     try:
         try:
-            data = json.loads(read_bytes(target).decode("utf-8")) if target.is_file() else {}
-        except (OSError, ValueError):
+            data = json.loads(read_limited(target, COUNTER_MAX_BYTES).decode("utf-8")) if target.is_file() else {}
+        except (OSError, ValueError, RecursionError):
+            data = {}
+        if not isinstance(data, dict):
             data = {}
         puts = data.get("puts") if isinstance(data.get("puts"), int) else 0
         reds = {k: v for k, v in (data.get("red") or {}).items() if isinstance(v, int)} if isinstance(data.get("red"), dict) else {}

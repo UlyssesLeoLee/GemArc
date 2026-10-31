@@ -55,8 +55,8 @@ def _read(arg_file: "str | None", arg_text: "str | None", stdin_flag: bool) -> s
     raise SystemExit("give the text with --file F, --text T or -")
 
 
-def _parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="python -m gemarc_mcp.atlas", description=__doc__.split("\n\n")[0])
+def _parser(prog: str = "python -m gemarc_mcp.atlas") -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(prog=prog, description=__doc__.split("\n\n")[0])
     p.set_defaults(root="", human=False)
     common = argparse.ArgumentParser(add_help=False)   # --root / --human are accepted before and after the command
     common.add_argument("--root", default=argparse.SUPPRESS, help="workspace root (default: GEMARC_WORKSPACE_ROOT)")
@@ -198,9 +198,10 @@ def _human(reply: dict) -> str:
     return "\n".join(lines) if lines else json.dumps(reply, ensure_ascii=False, indent=2)
 
 
-def run(argv: Sequence[str]) -> "tuple[dict, int]":
-    """Run one command; ``(reply, exit code)``. Never raises for a refused request."""
-    args = _parser().parse_args(list(argv))
+def run(argv: Sequence[str], prog: str = "python -m gemarc_mcp.atlas") -> "tuple[dict, int]":
+    """Run one command; ``(reply, exit code)``. Never raises for a refused request. ``prog`` is the program name that ``--help`` and usage errors
+    print (the kit launcher passes ``atlas.py``)."""
+    args = _parser(prog).parse_args(list(argv))
     writes = (args.cmd in ("init", "put") or (args.cmd == "check" and args.emit_model) or (args.cmd == "review" and args.action == "record")
               or (args.cmd == "simulate" and not args.gate) or args.cmd in ("build", "verify", "evidence"))
     try:
@@ -271,10 +272,10 @@ def _file_or_text(value: str) -> str:
         return value
 
 
-def main(argv: "Sequence[str] | None" = None) -> int:
+def main(argv: "Sequence[str] | None" = None, prog: str = "python -m gemarc_mcp.atlas") -> int:
     try:
         with status_mod.product_gates():          # the shell entry applies the same real completion gates as the MCP tools
-            reply, code = run(sys.argv[1:] if argv is None else argv)
+            reply, code = run(sys.argv[1:] if argv is None else argv, prog)
     except SystemExit as ex:
         if isinstance(ex.code, str):
             print(ex.code, file=sys.stderr)

@@ -5,8 +5,10 @@ for ``src/gemarc_mcp/atlas`` is NOT authorised yet. While ``src/gemarc_mcp/atlas
 ``PUBLICATION: PENDING`` this test asserts the three facts that keep it that way:
 
 1. ``.vercelignore`` excludes ``/src/gemarc_mcp/atlas`` (Vercel uploads ``src/**``; a deploy is a publication);
-2. ``api/index.py`` registers no atlas route (a ``/kit/atlas.zip`` route may only exist behind an explicit
-   ``GEMARC_ATLAS_KIT == "1"`` read; none exists yet);
+2. ``api/index.py`` registers no atlas route except the local opt-in ``/kit/atlas.zip``, which exists only behind an explicit
+   ``GEMARC_ATLAS_KIT == "1"`` read (milestone M8): off by default, off for every other value, the same 404 and 405 answers
+   as before, and a coded 503 where the atlas package is absent (``AtlasKitRouteTests``, including the upload set that
+   ``.vercelignore`` leaves);
 3. the default toolsets are unchanged: ``full`` locally, ``stateless`` (8 tools) on the hosted app;
 4. no module that the hosted function loads imports the atlas package, or the later ``atlas_tools`` glue module,
    unconditionally. ``.vercelignore`` keeps ``src/gemarc_mcp/atlas`` out of the upload, and ``atlas_tools.py`` sits
@@ -108,6 +110,15 @@ class VercelIgnoreTests(unittest.TestCase):
                 server.create_server("atlas_remote")
         self.assertEqual(caught.exception.code, "GEMARC_TOOLSET_001")
 
+    def test_the_kit_output_directory_and_the_tools_are_excluded_too(self):
+        """``tools/make_kit.py`` writes ``dist-kit/atlas-kit.zip`` (the whole atlas package in one archive) into the repository root: a later deploy must not upload it."""
+        if not pending():
+            self.skipTest("publication was granted by the user")
+        for line in ("/dist-kit", "/tools", "/docs"):
+            self.assertIn(line, ignore_lines(), f".vercelignore must list {line}")
+        text = read_text(REPO / "tools" / "make_kit.py")
+        self.assertIn('"dist-kit"', text, "the tool's default output directory is the one that is excluded")
+
     def test_no_negation_re_includes_the_atlas(self):
         if not pending():
             self.skipTest("publication was granted by the user")
@@ -146,8 +157,8 @@ class ApiRoutesTests(unittest.TestCase):
 
 
 @unittest.skipUnless(_sdk_available(), "MCP SDK / starlette is not installed")
-class LiveAppTests(unittest.TestCase):
-    """Build the hosted ASGI app in-process (no server, no lifespan) and ask it for atlas routes."""
+class LiveAppBase(unittest.TestCase):
+    """Build the hosted ASGI app in-process (no server, no lifespan) and ask it for atlas routes (the helpers; the tests are in the subclasses)."""
 
     ENV_KEYS = ("GEMARC_MCP_TOKEN", "GEMARC_TOOLSET", "GEMARC_ALLOW_WRITE", "GEMARC_WORKSPACE_ROOT", "GEMARC_ATLAS_KIT")
 
@@ -199,6 +210,7 @@ class LiveAppTests(unittest.TestCase):
         start = next(m for m in sent if m["type"] == "http.response.start")
         return start["status"], b"".join(m.get("body", b"") for m in sent if m["type"] == "http.response.body")
 
+class LiveAppTests(LiveAppBase):
     def test_hosted_default_is_the_stateless_toolset(self):
         health = self.build().state.gemarc_health()
         self.assertEqual(health["toolset"], "stateless")
@@ -219,6 +231,170 @@ class LiveAppTests(unittest.TestCase):
         status, body = self.get(self.build(), "/kit/not-a-profile.zip")
         self.assertEqual(status, 404)
         self.assertNotIn("atlas", json.loads(body).get("profiles", []))
+
+
+class AtlasKitRouteTests(LiveAppBase):
+    """``/kit/atlas.zip`` (milestone M8): a LOCAL opt-in, behind the exact flag ``GEMARC_ATLAS_KIT=1``, that cannot be switched on in the deployed
+    configuration (the atlas is not uploaded) and changes no answer of the default configuration."""
+
+    @staticmethod
+    def call(app, method, path, headers=()):
+        sent = []
+
+        async def receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        async def send(message):
+            sent.append(message)
+
+        scope = {"type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1", "method": method, "path": path,
+                 "raw_path": path.encode(), "query_string": b"", "root_path": "", "scheme": "http",
+                 "server": ("127.0.0.1", 80), "client": ("127.0.0.1", 1), "headers": [(b"host", b"gemarc.test"), *headers]}
+        asyncio.run(asyncio.wait_for(app(scope, receive, send), timeout=30))
+        start = next(m for m in sent if m["type"] == "http.response.start")
+        return start["status"], {k.decode().lower(): v.decode() for k, v in start["headers"]}, b"".join(m.get("body", b"") for m in sent if m["type"] == "http.response.body")
+
+    METHODS = ("GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS")
+    OFF_VALUES = ("0", "", "true", "True", "yes", "on", "2", "01", " 1", "1 ", "1\n", "enabled", "ON", "11")
+
+    def test_the_route_is_off_by_default_and_answers_exactly_like_any_unknown_kit(self):
+        app = self.build()
+        for method in self.METHODS:
+            status, headers, body = self.call(app, method, "/kit/atlas.zip")
+            reference = self.call(app, method, "/kit/no-such-profile.zip")
+            self.assertEqual((status, body), (reference[0], reference[2]), f"{method}: the 404 of an unknown kit, nothing more")
+            self.assertEqual(status, 404, method)
+            self.assertNotIn(b"atlas", body.lower(), method)
+            self.assertNotIn("content-disposition", headers)
+
+    def test_the_route_stays_off_for_every_value_but_exactly_1(self):
+        for value in self.OFF_VALUES:
+            app = self.build(GEMARC_ATLAS_KIT=value)
+            self.assertEqual(os.environ.get("GEMARC_ATLAS_KIT"), value)
+            for method in ("GET", "POST", "DELETE"):
+                status, _headers, body = self.call(app, method, "/kit/atlas.zip")
+                reference = self.call(app, method, "/kit/no-such-profile.zip")
+                self.assertEqual((status, body), (reference[0], reference[2]), f"flag {value!r}, {method}")
+                self.assertEqual(status, 404, f"flag {value!r}, {method}")
+
+    def test_with_the_flag_the_kit_is_served_as_one_deterministic_attachment(self):
+        import hashlib
+        import io
+        import zipfile
+
+        app = self.build(GEMARC_ATLAS_KIT="1")
+        status, headers, body = self.call(app, "GET", "/kit/atlas.zip")
+        self.assertEqual(status, 200, body[:200])
+        self.assertEqual(headers["content-type"], "application/zip")
+        self.assertIn("attachment", headers["content-disposition"])
+        self.assertEqual(headers["etag"], '"%s"' % hashlib.sha256(body).hexdigest())
+        names = zipfile.ZipFile(io.BytesIO(body)).namelist()
+        self.assertIn("atlas-kit/atlas.py", names)
+        self.assertEqual(self.call(app, "GET", "/kit/atlas.zip")[2], body, "the same bytes on every call")
+        self.assertEqual(self.call(app, "GET", "/kit/atlas.zip", [(b"if-none-match", headers["etag"].encode())])[0], 304)
+        self.assertEqual(self.call(app, "HEAD", "/kit/atlas.zip")[0], 200)
+        status, headers, _body = self.call(app, "POST", "/kit/atlas.zip")
+        self.assertEqual((status, headers["allow"]), (405, "GET, HEAD, OPTIONS"))
+        self.assertEqual(self.call(app, "OPTIONS", "/kit/atlas.zip")[0], 204)
+
+    def test_with_the_flag_the_other_kit_answers_are_unchanged(self):
+        plain = self.build()
+        flagged = self.build(GEMARC_ATLAS_KIT="1")
+        for path in ("/kit/no-such-profile.zip", "/kit/static.zip", "/kit/", "/kit/atlas", "/kit/atlas.zip.bak", "/kit/Atlas.zip", "/kit/../atlas.zip"):
+            self.assertEqual(self.call(plain, "GET", path)[::2], self.call(flagged, "GET", path)[::2], path)
+        status, _headers, body = self.call(flagged, "GET", "/kit/no-such-profile.zip")
+        self.assertEqual(status, 404)
+        self.assertNotIn("atlas", json.loads(body)["profiles"], "the kit listing never advertises the atlas profile")
+
+    def test_without_the_atlas_package_the_route_fails_closed_with_a_code(self):
+        import gemarc_mcp.atlas as atlas_package
+
+        app = self.build(GEMARC_ATLAS_KIT="1")
+        saved = atlas_package.__dict__.pop("kit", None)       # a package that was imported earlier keeps its submodule as an attribute
+        self.addCleanup(lambda: saved is not None and atlas_package.__dict__.__setitem__("kit", saved))
+        for missing in ({"gemarc_mcp.atlas.kit": None}, {"gemarc_mcp.atlas": None, "gemarc_mcp.atlas.kit": None}):
+            with mock.patch.dict(sys.modules, missing):
+                status, headers, body = self.call(app, "GET", "/kit/atlas.zip")
+            self.assertEqual(status, 503, missing)
+            self.assertEqual(json.loads(body), {"error": "atlas_kit_unavailable", "code": "GEMARC_ATLAS_KIT_001"})
+            self.assertEqual(headers["cache-control"], "no-store")
+            self.assertNotIn(b"/", body.replace(b'"', b""), "no path in the answer")
+
+    def test_a_tree_that_cannot_build_the_kit_fails_closed_with_the_kit_code(self):
+        from gemarc_mcp.atlas import kit
+
+        app = self.build(GEMARC_ATLAS_KIT="1")
+        with mock.patch.object(kit, "entries", side_effect=kit.KitError("docs are missing here")):
+            status, _headers, body = self.call(app, "GET", "/kit/atlas.zip")
+        self.assertEqual((status, json.loads(body)), (503, {"error": "atlas_kit_unavailable", "code": "GEMARC_ATLAS_KIT_001"}))
+
+    def test_the_flag_is_read_in_one_place_in_the_exact_form_and_the_atlas_import_is_lazy(self):
+        text = read_text(API_INDEX)
+        reads = re.findall(r"""os\.environ\.get\(\s*["']GEMARC_ATLAS_KIT["']\s*\)""", text)
+        self.assertEqual(len(reads), 1, "one read of the flag")
+        self.assertRegex(text, r'os\.environ\.get\("GEMARC_ATLAS_KIT"\) == "1"')
+        tree = ast.parse(text)
+        module_level = [n.lineno for n in tree.body if isinstance(n, (ast.Import, ast.ImportFrom)) and "atlas" in ast.dump(n)]
+        self.assertEqual(module_level, [], "no module-level import of the atlas in api/index.py")
+
+    def test_the_vercel_upload_set_cannot_serve_the_kit_even_with_the_flag(self):
+        """The upload as ``.vercelignore`` leaves it (the real file is applied): the flag is set and the route answers 503 ``GEMARC_ATLAS_KIT_001``;
+        the atlas package cannot be imported there; the default answers are the same as everywhere."""
+        import shutil
+        import subprocess
+        import tempfile
+
+        prefixes = [line.lstrip("/").rstrip("/") for line in ignore_lines() if line.startswith("/")]
+        self.assertIn("src/gemarc_mcp/atlas", prefixes)
+        with tempfile.TemporaryDirectory(prefix="gemarc-upload-") as tmp:
+            upload = Path(tmp)
+            for base in ("api", "src", "examples/demo-site"):
+                for path in sorted((REPO / base).rglob("*")):
+                    relative = path.relative_to(REPO).as_posix()
+                    if not path.is_file() or "__pycache__" in path.parts or any(relative == p or relative.startswith(p + "/") for p in prefixes):
+                        continue
+                    (upload / relative).parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(path, upload / relative)
+            for name in ("pyproject.toml", "requirements.txt", "vercel.json"):
+                shutil.copyfile(REPO / name, upload / name)
+            self.assertFalse((upload / "src" / "gemarc_mcp" / "atlas").exists())
+            self.assertFalse((upload / "src" / "gemarc_mcp" / "atlas_tools.py").exists())
+            script = (
+                "import asyncio, json, sys\n"
+                "sys.path.insert(0, 'api_dir')\n"
+                "from api.index import build_app\n"
+                "app = build_app(token='', workspace_root=sys.argv[1])\n"
+                "def call(method, path):\n"
+                "    sent = []\n"
+                "    async def receive(): return {'type': 'http.request', 'body': b'', 'more_body': False}\n"
+                "    async def send(m): sent.append(m)\n"
+                "    scope = {'type': 'http', 'asgi': {'version': '3.0'}, 'http_version': '1.1', 'method': method, 'path': path, 'raw_path': path.encode(),\n"
+                "             'query_string': b'', 'root_path': '', 'scheme': 'http', 'server': ('127.0.0.1', 80), 'client': ('127.0.0.1', 1),\n"
+                "             'headers': [(b'host', b'x')]}\n"
+                "    asyncio.run(app(scope, receive, send))\n"
+                "    return next(m for m in sent if m['type'] == 'http.response.start')['status'], b''.join(m.get('body', b'') for m in sent if m['type'] == 'http.response.body').decode()\n"
+                "try:\n"
+                "    import gemarc_mcp.atlas\n"
+                "    importable = True\n"
+                "except ImportError:\n"
+                "    importable = False\n"
+                "print(json.dumps({'importable': importable, 'kit': call('GET', '/kit/atlas.zip'), 'other': call('GET', '/kit/nope.zip')}))\n"
+            ).replace("api_dir", str(upload).replace("\\", "/"))
+            workspace = upload / "workspace"
+            workspace.mkdir()
+            for flag in ("1", "0"):
+                done = subprocess.run([sys.executable, "-I", "-c", script, str(workspace)], capture_output=True, text=True, timeout=120, cwd=str(upload),
+                                      env={**{k: v for k, v in os.environ.items() if not k.startswith("GEMARC_")}, "GEMARC_ATLAS_KIT": flag, "PYTHONPATH": ""})
+                self.assertEqual(done.returncode, 0, done.stderr[-800:])
+                result = json.loads(done.stdout.strip().splitlines()[-1])
+                self.assertFalse(result["importable"], "the upload does not contain the atlas package")
+                status, body = result["kit"]
+                if flag == "1":
+                    self.assertEqual((status, json.loads(body)), (503, {"error": "atlas_kit_unavailable", "code": "GEMARC_ATLAS_KIT_001"}))
+                else:
+                    self.assertEqual(status, 404)
+                    self.assertEqual(result["kit"], result["other"], "flag off: the same 404 as any unknown kit")
+                    self.assertNotIn("atlas", body.lower())
 
 
 class PackagingTests(unittest.TestCase):

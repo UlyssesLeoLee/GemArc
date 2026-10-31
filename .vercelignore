@@ -17,3 +17,5 @@ install.ps1
 /src/gemarc_mcp/atlas
 /src/gemarc_mcp/atlas_tools.py
 /tools
+# The atlas kit (tools/make_kit.py writes dist-kit/atlas-kit.zip, the whole atlas package in one archive) is a local artefact: never uploaded.
+/dist-kit

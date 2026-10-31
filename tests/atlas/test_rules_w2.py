@@ -208,10 +208,38 @@ class MutationTests(unittest.TestCase):
         for category in ("abnormal", "recovery", "combination"):
             self.assertEqual(ids(run((S, "CS-BORROW-OK | normal |", f"CS-BORROW-OK | {category} |"))), {"OR-002"}, category)
 
-    def test_OR_002_is_silent_when_an_outcome_or_a_different_state_is_asserted(self):
+    def test_OR_002_is_silent_when_a_remarkable_outcome_or_a_different_state_is_asserted(self):
         edit = (S, "CS-BORROW-OK | normal |", "CS-BORROW-OK | abnormal |")
         self.assertEqual(ids(run(edit, (S, CASE_ROW, CASE_ROW.replace("tbl.loan", "tbl.loan=Failed")))), set())
-        self.assertEqual(ids(run(edit, (S, CASE_ROW, CASE_ROW + ' outcomes=[{"ruleId":"R-CHECK","outcome":"OK"}]'))), set())
+        self.assertEqual(ids(run(edit, (S, CASE_ROW, CASE_ROW + ' outcomes=[{"ruleId":"R-CHECK","outcome":"Failed"}]'))), set())
+
+    def test_OR_002_is_not_evaded_by_an_outcome_that_every_run_has(self):
+        # debt-b4 fix: an OK outcome says nothing abnormal (it was enough to make the case silent before)
+        edit = (S, "CS-BORROW-OK | normal |", "CS-BORROW-OK | abnormal |")
+        row = CASE_ROW + ' outcomes=[{"ruleId":"R-CHECK","outcome":"OK"}]'
+        self.assertEqual(ids(run(edit, (S, CASE_ROW, row))), {"OR-002"})
+
+    def test_OR_002_is_not_evaded_by_Idle_on_a_node_the_case_never_touches(self):
+        # debt-b4 fix: the same notion of "effective" as the coverage floor (a participant, or a state other than Idle)
+        edit = (S, "CS-BORROW-OK | normal |", "CS-BORROW-OK | abnormal |")
+        idle = {"30-idle.atl": "#atlas 1" + chr(10) + "## nodes: id | name | sub | opts" + chr(10)
+                + "svc.idle | Idle service | Never called by the case. | room=rm.desk kind=Module ev=EVD-1" + chr(10)}
+        lazy = CASE_ROW.replace("tbl.loan", "tbl.loan,svc.idle=Idle")
+        self.assertIn("OR-002", ids(run(edit, (S, CASE_ROW, lazy), extra=idle)))
+        real = CASE_ROW.replace("tbl.loan", "tbl.loan,svc.idle=Blocked")
+        self.assertNotIn("OR-002", ids(run(edit, (S, CASE_ROW, real), extra=idle)), "a claim that differs on an untouched node is something")
+
+    def test_OR_002_pure_function_edges(self):
+        from gemarc_mcp.atlas.rules import or_
+
+        base = {"category": "abnormal", "events": [{"seq": 1, "from": "a", "to": "b"}], "expectedTerminalState": {"a": "Completed", "b": "Completed"}}
+        self.assertTrue(or_.abnormal_all_completed(base))
+        self.assertTrue(or_.abnormal_all_completed({**base, "expectedOutcomes": [{"ruleId": "R", "outcome": "OK"}, {"ruleId": "S", "outcome": "OK"}]}))
+        self.assertFalse(or_.abnormal_all_completed({**base, "expectedOutcomes": [{"ruleId": "R", "outcome": "OK"}, {"ruleId": "S", "outcome": "Timeout"}]}))
+        self.assertFalse(or_.abnormal_all_completed({**base, "category": "normal"}))
+        self.assertFalse(or_.abnormal_all_completed({**base, "expectedTerminalState": {"a": "Completed", "b": "Degraded"}}))
+        self.assertFalse(or_.abnormal_all_completed({**base, "expectedTerminalState": {"z": "Idle"}}), "nothing effective is asserted: OR-003 speaks, not OR-002")
+        self.assertFalse(or_.abnormal_all_completed({**base, "expectedTerminalState": {}}))
 
     def test_OR_003_floor_is_max_two_and_35_percent_of_the_participants(self):
         from gemarc_mcp.atlas.rules import or_
@@ -381,13 +409,21 @@ class SyntheticModelTests(unittest.TestCase):
             checked += 1
         self.assertEqual(checked, 5)
 
-    def test_the_random_status_of_the_generator_is_what_IV_001_finds_on_a_raw_model(self):
+    def test_a_raw_generated_model_has_no_IV_001_and_one_wrong_claim_is_found(self):
+        # debt-b4: this test pinned that the generator's random ``status`` (OK or DRAFT) was what IV-001 found on a raw model; the generator now
+        # writes a status only when it is true, so that count is zero and the old assertion (equal counts) would pass vacuously. Now: zero on raw
+        # models of five seeds, and exactly the one intervention whose claim is made wrong is named.
+        def run(model):
+            return slicecheck.check(encode.encode_atl(model, max_bytes=encode.ADVISORY_BYTES, state_hypothetical=True), encode.meta_of(model),
+                                    mode="full", wave_set=(1, 2))
+
+        for seed in (1, 2, 3, 4, 5):
+            self.assertEqual([d.rule for d in run(synth.generate("small", seed)).diagnostics if d.rule == "IV-001"], [], seed)
         raw = synth.generate("small", 3)
-        result = slicecheck.check(encode.encode_atl(raw, max_bytes=encode.ADVISORY_BYTES, state_hypothetical=True), encode.meta_of(raw),
-                                  mode="full", wave_set=(1, 2))
-        draft_ivs = [i["interventionId"] for i in raw["interventions"] if i["expect"].get("status") == "DRAFT"]
-        found = [d for d in result.diagnostics if d.rule == "IV-001"]
-        self.assertEqual(len(found), len(draft_ivs))
+        victim = next(i for i in raw["interventions"] if i["type"] == "insert_element")
+        victim["expect"]["status"] = "DRAFT"
+        found = [d for d in run(raw).diagnostics if d.rule == "IV-001"]
+        self.assertEqual([d.path for d in found], [f"interventions[{victim['interventionId']}].expect.status"])
 
 
 if __name__ == "__main__":

@@ -132,6 +132,23 @@ class InitTests(Workspace):
         self.assertEqual(again["code"], pj.E_EXISTS)
         self.assertLess(tools.reply_bytes(reply), 1024)
 
+    def test_init_warns_when_the_workspace_is_inside_an_evidence_root(self):
+        """Nothing is refused (the docs say 'not inside the analysed repository'), but the first ``next`` line says so."""
+        inner = self.root / "inner"
+        inner.mkdir()
+        with mock.patch.dict(os.environ, {"GEMARC_ATLAS_ROOTS": f"main={self.root}"}):
+            reply = tools.init(pj.get_workspace(inner), "desk", "T", "asis", ["en-US"], repos=["main"])
+            same = tools.init(pj.get_workspace(self.root), "same", "T", "asis", ["en-US"], repos=["main"])
+        self.assertEqual((reply["status"], same["status"]), ("created", "created"))
+        self.assertTrue(reply["next"][0].startswith("WARNING"), reply["next"])
+        self.assertIn("'main'", reply["next"][0])
+        self.assertTrue(same["next"][0].startswith("WARNING"), "a workspace that IS the root is inside it")
+        with tempfile.TemporaryDirectory() as elsewhere, mock.patch.dict(os.environ, {"GEMARC_ATLAS_ROOTS": f"main={elsewhere}"}):
+            other = tools.init(pj.get_workspace(inner), "desk2", "T", "asis", ["en-US"], repos=["main"])
+        self.assertTrue(other["next"][0].startswith("read the work order"), "a root elsewhere: no warning")
+        with mock.patch.dict(os.environ, {"GEMARC_ATLAS_ROOTS": "main=;;"}):
+            self.assertEqual(tools.init(pj.get_workspace(inner), "desk3", "T", "asis", ["en-US"])["status"], "created", "a broken roots value never breaks init")
+
     def test_atlas_toml_round_trips_through_tomllib_including_unicode_and_quotes(self):
         tools.init(self.ws, "uni", 'Title "with" quotes 中文 \\ back', "tobe", ["zh-CN", "en-US"], repos=["main", "web"])
         paths = pj.project_paths(self.ws, "uni")

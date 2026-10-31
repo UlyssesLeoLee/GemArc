@@ -399,6 +399,8 @@ class Scale:
     combined_rich: float = 0.0          # share of combined interventions that hold an insert_element and a change_guard part
     stamp_share: float = 0.0            # share of evidences that already carry a verifier ``lineRange``
     event_target_share: float = 0.0     # share of delay_message interventions that name one event (``<caseId>#<seq>``)
+    cross_edges: int = 0                # deliberate Message -> Record edges (each is one PT-003 WARN) with one event of a case along each; the
+                                        # clean preset models have none, the ``record-crossings`` edge case has a few (see ``edges_step``)
 
 
 PRESETS: dict[str, Scale] = {
@@ -463,6 +465,7 @@ KIND_WEIGHTS = (
     ("Interface", 5), ("Entity", 4), ("Table", 8), ("Storage", 4), ("Event", 8),
 )
 RUNTIME_FLOW = ("calls", "sends", "reads", "writes", "publishes", "subscribes", "triggers", "receives")
+CATEGORY_COVER_FROM = 6   # CS-005: from this many cases on, every case category must occur (``cs.MIN_CASES_FOR_COVER``)
 CASE_CATEGORY_WEIGHTS = (("normal", 9), ("abnormal", 6), ("boundary", 3), ("concurrency", 2), ("recovery", 2), ("combination", 1))
 INTERVENTION_CYCLE = (
     "disable_module", "disable_edge", "resource_failure", "change_timeout", "delay_message", "insert_element",
@@ -500,6 +503,7 @@ class _Generator:
         self.repos: list[str] = []
         self.rules: list[str] = []
         self.alias_edge_ids: list[str] = []
+        self.cross_edge_ids: list[str] = []   # the deliberate Message -> Record edges of ``Scale.cross_edges`` (empty in every other model)
 
     # ---- helpers --------------------------------------------------------------------------------------
 
@@ -689,7 +693,15 @@ class _Generator:
             return
         rng, t = self.rng("dedup"), self.text("dedup")
         candidates = [n for n in self.nodes if n["kind"] in ("Module", "Service", "Component", "API") and n["id"] not in self.machine_ids]
-        for node in rng.sample(candidates, min(s.dedup_nodes, len(candidates))):
+        # nodes that really receive events come first: the direct targets of a runtime edge out of an entry (Actor, API), where every case walk starts
+        entries = {n["id"] for n in self.nodes if n["kind"] in ("Actor", "API")}
+        near_ids = {e["targetId"] for e in self.edges if not e["static"] and e["relation"] != "owns" and e["sourceId"] in entries}
+        near = [n for n in candidates if n["id"] in near_ids]
+        far = [n for n in candidates if n["id"] not in near_ids]
+        wanted = min(s.dedup_nodes, len(candidates))
+        picked = rng.sample(near, min(wanted, len(near)))
+        picked += rng.sample(far, wanted - len(picked)) if wanted > len(picked) else []
+        for node in picked:
             dedup: dict = {"mode": rng.choice(("reject", "ignore")), "key": rng.choice(("request-id", "idempotency-key", "message-id"))}
             if dedup["mode"] == "reject":
                 dedup.update(errorCode="E_" + t.slug(1).upper().replace("-", "_"), httpStatus=409)
@@ -803,8 +815,15 @@ class _Generator:
         seen: set[tuple[str, str, str]] = set()
         authored: list[dict] = []
 
-        def add(source: dict, target: dict, relation: str, alias: str | None = None) -> bool:
+        record_kinds = self.profile.record_kinds
+
+        def same_port_type(a: dict, b: dict) -> bool:
+            return (a["kind"] in record_kinds) == (b["kind"] in record_kinds)
+
+        def add(source: dict, target: dict, relation: str, alias: str | None = None, crossing: bool = False) -> bool:
             if source["id"] == target["id"] and relation != "calls":
+                return False
+            if not crossing and not same_port_type(source, target):  # PT-003: a Message port never meets a Record port in a clean generated model
                 return False
             key = (source["id"], relation, target["id"])
             if key in seen and alias is None:
@@ -828,7 +847,10 @@ class _Generator:
         for index, node in enumerate(regular):
             if index == 0:
                 continue
-            earlier = [n for n in regular[:index] if n["id"] in source_ids] or regular[:index]
+            # a parent with the node's own port type: an Event node hangs below an earlier Event node (the first one starts its own chain)
+            earlier = [n for n in regular[:index] if n["id"] in source_ids and same_port_type(n, node)] or [n for n in regular[:index] if same_port_type(n, node)]
+            if not earlier:
+                continue
             parent = rng.choice(earlier)
             add(parent, node, self._relation(rng, parent, node))
         guard = 0
@@ -843,6 +865,20 @@ class _Generator:
             alias = self.claim(f"{self.fam['alias']}.{t.slug(1)}")
             add(self.node_by_id[base["sourceId"]], self.node_by_id[base["targetId"]], base["relation"], alias)
             self.alias_edge_ids.append(alias)
+        if s.cross_edges:
+            # deliberate Message -> Record edges (a module publishing into an event record: PT-003 by design, in a real model). Their own random
+            # fork, and nothing here runs when ``cross_edges`` is 0, so no other model moves.
+            cross = self.rng("cross-edges")
+            records = [n for n in regular if n["kind"] in record_kinds]
+            senders = [n for n in sources if n["kind"] not in record_kinds]
+            for _ in range(s.cross_edges * 40):
+                if len(self.cross_edge_ids) >= s.cross_edges or not records or not senders:
+                    break
+                source, target = cross.choice(senders), cross.choice(records)
+                if add(source, target, "publishes", crossing=True):
+                    self.cross_edge_ids.append(authored[-1]["id"])
+            if len(self.cross_edge_ids) < s.cross_edges:
+                raise AssertionError(f"the model has no room for {s.cross_edges} Message -> Record edges (record nodes: {len(records)})")
         # logical foreign keys between data nodes: the only edges that carry a cardinality
         links = self.rng("reference-edges")
         added = 0
@@ -927,11 +963,24 @@ class _Generator:
         per_case = (_spread_lengths(self.rng("case-lengths"), s.cases, s.events) if s.event_spread
                     else [s.events // s.cases + (1 if k < s.events % s.cases else 0) for k in range(s.cases)])
         categories = [rng.weighted(CASE_CATEGORY_WEIGHTS) for _ in range(s.cases)]
+        locked = 0
         if s.compensation_share >= 1.0:  # the coverage model must have cases that can end in Failure/Recovery and Compensation
             categories[:2] = ["abnormal", "recovery"][: len(categories)]
+            locked = 2
+        if len(categories) >= CATEGORY_COVER_FROM:
+            # CS-005 reports a category with no case once there are six cases or more: the cases that are the surplus of a category (counted
+            # from the end, never the locked ones) take the missing categories. No random draw: only a model that lacked a category changes.
+            for missing in [c for c in self.profile.ids("caseCategories") if c not in categories]:
+                spare = next((k for k in range(len(categories) - 1, locked - 1, -1) if categories.count(categories[k]) > 1), None)
+                if spare is None:
+                    break
+                categories[spare] = missing
         for k in range(s.cases):
             category = categories[k]
             events = self._events(rng, t, per_case[k], category, entries, out_edges, owners, self.rng(f"event-extras:{k}"))
+            if k < len(self.cross_edge_ids):  # one event of case k runs along deliberate edge k (inserted before the last event, which may be a Failure)
+                edge = next(e for e in self.edges if e["id"] == self.cross_edge_ids[k])
+                events.insert(max(0, len(events) - 1), ("Message", edge["sourceId"], edge["targetId"], {}))
             participants: list[str] = []
             for ev in events:
                 for node_id in (ev[1], ev[2]):
@@ -952,13 +1001,19 @@ class _Generator:
                 if ev[0] == "Transition" and ev[2] in self.machine_ids:
                     terminal[ev[2]] = ev[3]["params"]["target"]
             outcomes = None
-            if category in ("abnormal", "boundary", "recovery"):
+            if category in ("abnormal", "boundary", "recovery", "combination"):
+                # a combination case is as abnormal as the others (OR-002 flags one that asserts only Completed); its draws come from their own
+                # fork, so the stream of the other cases does not move
+                pick = rng if category != "combination" else self.rng(f"combination-outcome:{k}")
                 rule_ids = [ev[3]["ruleId"] for ev in events if ev[3].get("ruleId")]
                 if rule_ids:
-                    outcomes = [{"ruleId": rng.choice(rule_ids), "outcome": rng.choice(("Failed", "Timeout", "Rejected", "Denied", "Blocked"))}]
+                    outcomes = [{"ruleId": pick.choice(rule_ids), "outcome": pick.choice(("Failed", "Timeout", "Rejected", "Denied", "Blocked"))}]
                     victim = next((ev[2] for ev in events if ev[3].get("ruleId") == outcomes[0]["ruleId"]), None)
                     if victim in terminal and victim not in self.machine_ids:
-                        terminal[victim] = rng.choice(("Failed", "Blocked", "Degraded"))
+                        terminal[victim] = pick.choice(("Failed", "Blocked", "Degraded"))
+            if category in ("abnormal", "recovery", "combination") and not outcomes and terminal and all(v == "Completed" for v in terminal.values()):
+                # no event carries a ruleId, so no outcome can be named: the last participant is asserted to end Degraded (OR-002)
+                terminal[list(terminal)[-1]] = "Degraded"
             by = "user" if rng.chance(0.1) else "author"
             self.cases.append(am.build_case(
                 cid, category, t.trimmed(s.case_title_len), events, reqs, evidence_ids, partial, context,
@@ -1173,7 +1228,11 @@ class _Generator:
                     # alternate keep and disable so that a model with two inserted elements shows both dispositions
                     params["rewrite"].append(am.build_rewrite_entry(element_id, len(picked), extra.choice(spare), ("keep", "disable")[extra_rewrites % 2]))
                     extra_rewrites += 1
-                expect = {"outcomeClass": rng.choice(("CONVERGED", "DIVERGED", "NO_DIFFERENCE")), "status": rng.choice(("OK", "DRAFT"))}
+                expect = {"outcomeClass": rng.choice(("CONVERGED", "DIVERGED", "NO_DIFFERENCE"))}
+                if rng.choice(("OK", "DRAFT")) == "OK":
+                    # A generated element always compiles to OK, so ``status`` is written only when it says OK (a DRAFT here was a wrong claim, which
+                    # IV-001 rightly found). The draw is kept: the random stream, and so every other generated value, is unchanged.
+                    expect["status"] = "OK"
             elif kind == "combined_intervention":
                 second = {"type": "change_timeout", "timeoutMs": 500} if rng.chance(0.5) else {"type": "change_retry", "retryMax": 2}
                 params["parts"] = [{"type": "disable_module", "targetNodeId": target_node["id"]}, second]
@@ -1226,10 +1285,10 @@ class _Generator:
         self.space()
         self.evidence()
         self.nodes_step()
-        self.dedup_step()
         self.machines_step()
         self.links_step()
         self.edges_step()
+        self.dedup_step()
         self.requirements_step()
         self.cases_step()
         self.interventions_step()
@@ -1363,8 +1422,11 @@ def generate(preset: "str | Scale" = "small", seed: int = 0, family: "str | Fami
 
 EDGE_CASES = (
     "big400", "unknown-values", "no-cases", "no-interventions", "empty-strings", "cjk", "odd-ids", "machine",
-    "insert-element", "element-ports", "rich-fields",
+    "insert-element", "element-ports", "rich-fields", "record-crossings",
 )
+
+#: Deliberate Message -> Record edges of the ``record-crossings`` edge case: its default check carries exactly this many PT-003 WARNs.
+RECORD_CROSSINGS = 4
 
 
 def _scale(name: str, **changes) -> Scale:
@@ -1385,6 +1447,10 @@ def edge_case(name: str, seed: int = 0, family: "str | Family" = "random", mode:
                        machine_transitions=(3, 10), when_share=0.25, guard_share=0.12, code_share=0.1, compensation_share=1.0,
                        dedup_nodes=4, link_share=0.8, reference_edges=8, disposition_mix=1.0, combined_rich=1.0, event_target_share=1.0,
                        stamp_share=0.5)
+        return _finish(_Generator(scale, seed, fam, mode).assemble(), check)
+    if name == "record-crossings":
+        # a few edges from a message-typed module into an event record, as a real model has them (PT-003 is a WARN by design there)
+        scale = _scale(name, nodes=60, edges=130, cases=6, events=60, cross_edges=RECORD_CROSSINGS)
         return _finish(_Generator(scale, seed, fam, mode).assemble(), check)
     if name == "no-cases":
         scale = _scale(name, cases=0, events=0, interventions=0)
@@ -1421,7 +1487,8 @@ def _add_insert_element(model: dict, fam: Family, seed: int, many_ports: bool) -
     case_ids = [c["caseId"] for c in model["cases"][:2]]
     model["interventions"].append(am.build_intervention(
         f"{fam['intervention']}-ELEMENT", "insert_element", "Put an element in front of the called service", case_ids,
-        {"outcomeClass": "CONVERGED", "status": "OK"}, "", "the element answers locally", element=element,
+        # element-ports types the element Record on Message edges on purpose: the engine rejects that (port type mismatch), and that is what is declared
+        {"outcomeClass": "CONVERGED", "status": "OK"} if not many_ports else {"status": "REJECTED"}, "", "the element answers locally", element=element,
         rewrite=[am.build_rewrite_entry(element_id, n, edge, "replace") for n, edge in enumerate(picked)]))
     if many_ports:  # one keep and one disable entry exercise the empty-chain branch
         spare = [e for e in edges if e not in picked]

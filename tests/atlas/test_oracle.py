@@ -15,6 +15,7 @@ from pathlib import Path
 from unittest import mock
 
 from gemarc_mcp.atlas import cli, oracle, slicecheck, tools
+from gemarc_mcp.atlas import status as st
 from gemarc_mcp.atlas import project as pj
 from gemarc_mcp.atlas.derive import diagrams
 from gemarc_mcp.atlas.rules import or_
@@ -737,10 +738,16 @@ class ReadOnlyTests(OracleProject):
         self.assertIn("terminal 1 of 4 asserted nodes differ", reply["diagnostics"])
         self.assertNotIn("Failed", reply["diagnostics"])
 
-    def test_the_default_full_check_is_wave_one_plus_OR_000_only(self):
+    def test_the_default_full_check_is_wave_one_plus_wave_two(self):
+        # debt-b4 (this test said "wave one plus OR-000 only"): status.FULL_WAVE_SET is (1, 2). The desk (sealed by put, not yet confirmed by the
+        # user) gets exactly one finding more than wave one gives: the INFO line OR-005. Wave one alone is still available.
         self.desk()
-        rules = slicecheck.check(desk_files(), self.cfg().meta(), mode="full", wave_set=(1,)).rule_ids()
-        self.assertEqual(set(self.snap().check.rule_ids()) - rules, set())
+        default, wave_one, both = self.snap().check, self.snap(wave_set=(1,)).check, self.snap(wave_set=(1, 2)).check
+        self.assertEqual(st.FULL_WAVE_SET, (1, 2))
+        self.assertEqual(wave_one.rule_ids(), set())
+        self.assertEqual(default.rule_ids(), both.rule_ids())
+        self.assertEqual(default.rule_ids(), {"OR-005"})
+        self.assertEqual({d.severity for d in default.diagnostics}, {"INFO"})
 
 
 class CliTests(OracleProject):

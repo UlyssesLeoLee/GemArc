@@ -177,7 +177,7 @@ def evidence(project: str, ids: list[str] = []) -> dict:
 
 @atlas_tool("gemarc_atlas_build", "Build the atlas", write=True, destructive=True, idempotent=True)
 def build(project: str, release: bool = False, docs: bool = True, gate: str = "none") -> dict:
-    """Write dist/ (viewer page, documents, diagrams, prompts) and oracle-sheet.md for the user. Only sealed or confirmed expectations show results. `gate=smoke` runs the browser gate; `release=true` needs the full gate, and a refusal leaves the page unverified. Needs GEMARC_ALLOW_WRITE=1."""
+    """Write dist/ (viewer page, documents, diagrams, prompts) and oracle-sheet.md for the user. Only sealed or confirmed expectations show results. `gate=smoke` runs the browser gate; `release=true` needs every gate, docs=true and gate=smoke, and is built beside dist/: a refusal changes no page or document there (oracle-sheet.md is refreshed). Needs GEMARC_ALLOW_WRITE=1."""
     return _no_host_paths(core.build_all(_ws(), project, bool(release), bool(docs), gate))
 
 

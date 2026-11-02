@@ -117,7 +117,10 @@ class Migrate(DbCase):
         [t.start() for t in threads]
         [t.join() for t in threads]
         self.assertEqual(errors, [])
-        self.assertEqual(sorted(results), [()] * 5 + [("0001_init", "0002_admin")])
+        # Every migration is applied exactly once, but not necessarily by the same runner: the lock is
+        # taken per migration, so two runners can split 0001 and 0002. Assert the outcome, not the split.
+        applied = sorted(version for result in results for version in result)
+        self.assertEqual(applied, ["0001_init", "0002_admin"])
         self.assertEqual(self.count("schema_migrations"), 2)
 
 

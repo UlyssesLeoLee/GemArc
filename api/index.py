@@ -353,24 +353,29 @@ ACCOUNT_ADMIN_PATH = "/account/admin"
 def _toolset_override(account_config) -> str:
     """The tool set the operator area selected, or "" when there is none (or it cannot be read).
 
-    Best effort and bounded: the worker is a daemon thread, so a hanging database can neither delay
-    the cold start beyond the timeout nor keep the process alive at exit. A deployment that cannot
-    reach the database keeps the environment's tool set.
+    Only a Postgres deployment is probed, and only once per cold start. Two reasons:
+
+    * building an application must never create a database as a side effect. A SQLite target is
+      the dev/test one, and opening it would create the file (a relative path would land in the
+      working directory). The tool set of a dev/test deployment stays the environment's.
+    * the probe is one query inside one transaction, on a daemon thread with a timeout, so a slow
+      or unreachable database delays the cold start by at most the timeout and never keeps the
+      process alive.
+
+    A deployment that cannot reach the database keeps the environment's tool set.
     """
-    if account_config is None:
+    if account_config is None or account_config.db.kind != "postgres":
         return ""
 
     def read() -> str:
         try:
             from gemarc_mcp.accounts import admin as admin_mod
-            from gemarc_mcp.accounts import schema as accounts_schema
-            from gemarc_mcp.accounts.crypto import Crypto
             from gemarc_mcp.accounts.db import Database
-            db = Database.from_target(account_config.db, enforce_role=account_config.db.kind == "postgres",
+            db = Database.from_target(account_config.db, enforce_role=True,
                                       role_relaxed=account_config.db_role_relaxed)
-            accounts_schema.require_current(db)
-            service = admin_mod.AdminService(db, Crypto(account_config.keyring), account_config.admin_emails)
-            value = service.settings().get(admin_mod.TOOLSET, "")
+            with db.transaction() as tx:
+                row = tx.fetchone("SELECT value FROM operator_settings WHERE key = ?", (admin_mod.TOOLSET,))
+            value = (row or {}).get("value", "")
             return value if value in admin_mod.TOOLSETS else ""
         except Exception:
             return ""

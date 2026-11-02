@@ -173,6 +173,27 @@ class AdminArea(ServerCase):
         self.assertEqual(resp.status, 303)
         self.assertEqual(self.srv.runtime().tokens.effective_policy().max_days, 45)
 
+    def test_the_administrator_can_ask_for_the_site_to_be_rebuilt(self):
+        self.login_as("owner@gmail.com")
+        page = self.browser.get("/account/admin")
+        self.assertIn("5D 站", page.text)
+        resp = self.browser.post("/account/admin/site", {"csrf": self.browser.csrf(page.text)})
+        self.assertEqual(resp.status, 303)
+
+    def test_the_account_page_links_to_the_console_and_to_the_area_for_an_administrator(self):
+        self.login_as("owner@gmail.com")
+        page = self.browser.get("/account")
+        self.assertEqual(page.status, 200)
+        self.assertIn('href="/"', page.text)
+        self.assertIn('href="/account/admin"', page.text)
+
+    def test_the_account_page_of_an_ordinary_user_has_no_link_to_the_area(self):
+        self.login_as("someone@gmail.com")
+        page = self.browser.get("/account")
+        self.assertEqual(page.status, 200)
+        self.assertIn('href="/"', page.text)
+        self.assertNotIn('href="/account/admin"', page.text)
+
     def test_an_out_of_range_setting_is_refused_and_changes_nothing(self):
         self.login_as("owner@gmail.com")
         page = self.browser.get("/account/admin")

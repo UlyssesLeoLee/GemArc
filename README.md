@@ -213,6 +213,9 @@ npx vercel@65.8.0 deploy --prod
 不设置则端点对知道 URL 的人开放（claude.ai 自定义 connector 需要这种形态）。`/healthz`、控制台、`/site/`、`/kit/` 始终公开且不含密钥或路径。
 完整说明、已实测/待验证清单见 `docs/09_部署/01_Vercel部署.md`。
 **账号（可选，默认关闭）**：Google 登录、个人访问令牌（PAT）与数据库存储的设计、运营手册见 `docs/09_部署/02_账号与安全.md`。
+开启后本部署变成「登录才能用」：控制台 `/` 需要登录会话；`POST /mcp` 同时认个人访问令牌与登录会话（会话通道要求同源）；
+`/account/admin` 是**仅管理员**的设置区（用户管理、审计日志、站点与工具集、令牌策略）。管理员 = 环境变量
+`GEMARC_ACCOUNTS_ADMIN_EMAILS` 白名单**或**数据库表 `admin_users` 里的运行时授予（两者取并集，收权要两边都做）。
 
 ## 复用现有 GemArc Three.js Viewer
 

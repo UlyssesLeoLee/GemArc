@@ -206,16 +206,22 @@ def snippets(view: View, token: str) -> str:
 
 def account_page(view: View, nonce: str, *, email: str, csrf: str, tokens: Sequence, now: int, recent: bool,
                  created: Optional[dict] = None, message: Optional[str] = None,
-                 default_days: Optional[int] = None, max_days: Optional[int] = None) -> str:
+                 default_days: Optional[int] = None, max_days: Optional[int] = None,
+                 is_admin: bool = False) -> str:
     """The signed-in page. ``tokens`` are TokenMeta-like objects; ``created`` is ``{"token": ..., "id": ...}``.
 
     ``default_days`` and ``max_days`` are the token policy in force; without them the deployment
-    defaults from the environment are used.
+    defaults from the environment are used. ``is_admin`` shows the link to the operator area.
     """
     days_default = int(view.default_days if default_days is None else default_days)
     days_max = int(view.max_days if max_days is None else max_days)
     parts = ["<h1>GemArc 账号</h1>"]
     parts.append(f"<p>已登录：<strong>{esc(email)}</strong></p>")
+    links = "<p><a class=\"btn\" href=\"/\">打开 MCP 控制台</a>"
+    if is_admin:
+        links += " <a class=\"btn\" href=\"/account/admin\">管理员设置</a>"
+    links += "</p>"
+    parts.append(links)
     if message:
         parts.append(f"<p class=\"ok\">{esc(message)}</p>")
     if not recent:
@@ -343,6 +349,19 @@ def admin_page(view: View, nonce: str, *, email: str, csrf: str, now: int, users
         "</table></div>")
 
     parts.append("<h2>用户管理</h2>" + _admin_user_rows(users, csrf))
+
+    site = deployment.get("site")
+    if site:
+        parts.append(
+            "<h2>5D 站</h2><div class=\"card\"><table>"
+            f"<tr><th>可用</th><td>{'是' if site.get('available') else '否'}</td></tr>"
+            f"<tr><th>已构建</th><td>{'是' if site.get('built') else '否'}</td></tr>"
+            f"<tr><th>来源</th><td>{esc(str(site.get('source', '')) or '—')}</td></tr>"
+            "</table>"
+            "<form method=\"post\" action=\"/account/admin/site\">" + _csrf(csrf) +
+            "<button type=\"submit\">重建站点</button></form>"
+            "<p class=\"mute\">重建只清掉本实例已物化的站点，下一次访问站点路径时重新生成；别的实例不受影响。</p>"
+            "</div>")
 
     def number_row(key: str, label: str, low: int, high: int) -> str:
         current = settings.get(key, "")

@@ -266,6 +266,32 @@ class LazySite:
             return self._available
         return SEED_MODEL.is_file() or (LEGACY_STATIC_DIR / "index.html").is_file()
 
+    def status(self) -> dict:
+        """What the operator area shows about the site. No path, no secret."""
+        return {"available": self.available, "built": self._done, "source": self._source}
+
+    def reset(self) -> None:
+        """Forget the materialised site so the next request builds it again.
+
+        The build is deferred and idempotent: the next ``/site/*`` request re-runs
+        :meth:`ensure`, which rebuilds from the package sources and falls back to the
+        committed preview when that fails.
+        """
+        with self._lock:
+            self._done = False
+            self._app = None
+            self._available = None
+            self._source = self.NOT_BUILT
+
+    def rebuild(self) -> str:
+        """Drop the materialised site and build it again right away. Returns the source of the result.
+
+        Blocking; the caller runs it in a worker thread.
+        """
+        self.reset()
+        self.ensure()
+        return self._source
+
     def ensure(self) -> None:
         """Blocking; run it in a worker thread. Safe to call concurrently."""
         if self._done:
@@ -478,7 +504,8 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
                          if k in ("idp", "clock", "db", "opener", "limit_overrides", "prefilter")}
                 account_runtime.append(account_routes.AccountsRuntime(
                     account_config, environ=env_source, registered_tools=registered,
-                    write_tools=write_tools, allow_write=allow_write, **extra))
+                    write_tools=write_tools, allow_write=allow_write,
+                    site_status=site.status, site_rebuild=site.rebuild, **extra))
             return account_runtime[0]
 
     def get_account_mcp_auth():

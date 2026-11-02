@@ -131,7 +131,8 @@ class AccountsRuntime:
                  limit_overrides: Optional["dict[str, tuple[int, int]]"] = None,
                  prefilter: "tuple[int, int]" = (PREFILTER_LIMIT, PREFILTER_LIMIT_NO_IP),
                  registered_tools: "tuple[str, ...]" = (), write_tools: "tuple[str, ...]" = (),
-                 allow_write: bool = False) -> None:
+                 allow_write: bool = False, site_status: Optional[Callable[[], dict]] = None,
+                 site_rebuild: Optional[Callable[[], str]] = None) -> None:
         self.config = config
         self.clock = clock or time.time
         self.environ = environ if environ is not None else {}
@@ -163,6 +164,10 @@ class AccountsRuntime:
         self.write_tools = tuple(write_tools)
         #: A write-scope token can be created only when the toolset has write tools AND the operator allows writes.
         self.write_scope = bool(write_tools) and allow_write
+        #: The application owns the static site; the operator area may ask it for a rebuild. Both
+        #: callables are optional: without them the area shows no site section.
+        self.site_status = site_status
+        self.site_rebuild = site_rebuild
         self.view = View(config.base_url, config.privacy_url, self.write_scope, config.pat_default_days,
                          config.pat_max_days, config.secure_cookies)
         self.sid_cookie = "__Host-gemarc_sid" if config.secure_cookies else "gemarc_sid"
@@ -560,9 +565,11 @@ class AccountsRuntime:
         # The policy in force, not the environment defaults: the operator area can change it while
         # the deployment runs, and the form must not offer a longer lifetime than the store allows.
         policy = await self.run_db(self.tokens.effective_policy)
+        is_admin = await self.run_db(self.admin.is_admin, info.user_id, email)
         return self._html(status, lambda n: pages.account_page(self.view, n, email=email or "", csrf=csrf, tokens=tokens,
                                                                now=now, recent=recent, created=created, message=message,
-                                                               default_days=policy.default_days, max_days=policy.max_days),
+                                                               default_days=policy.default_days, max_days=policy.max_days,
+                                                               is_admin=is_admin),
                           cookies=cookies)
 
     async def _account(self, req: Req):
@@ -743,6 +750,11 @@ class AccountsRuntime:
             "openRegistration": self.config.open_registration,
             "mcpMode": self.config.mcp_mode or "",
         }
+        if self.site_status is not None:
+            try:
+                deployment["site"] = self.site_status()
+            except Exception:
+                deployment["site"] = {"available": False, "built": False, "source": ""}
         return {"users": users, "audit": audit, "settings": settings, "deployment": deployment}
 
     async def _require_admin(self, a: Authed) -> bool:
@@ -833,6 +845,12 @@ class AccountsRuntime:
     async def _do_admin_site(self, req: Req, a: Authed):
         if not await self._require_admin(a):
             return self.error(403, "GEMARC_ACCT_060")
+        if self.site_rebuild is None:
+            return self.error(400, "GEMARC_ACCT_061", relogin=False)
+        try:
+            message = await self.run_db(self.site_rebuild)
+        except Exception:
+            return self.error(503, "GEMARC_ACCT_002")
         await self.audit_async("admin_site_rebuild", user_id=a.info.user_id)
         return pages.redirect(ADMIN_PATH, 303, hsts=self.hsts)
 

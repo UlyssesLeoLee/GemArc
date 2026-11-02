@@ -527,9 +527,7 @@ class OutlineSecretTests(unittest.TestCase):
         self.assertEqual(ol.choose_anchor(src, "a.py", 4), (None, "sensitive-line"))
         self.assertTrue(ol.choose_anchor(src, "a.py", 7)[0].startswith("after"))
 
-    # def test_json_keys_that_look_like_tokens_are_withheld(self):
-    #     result = ol.outline_text("a.json", '{"ordinary": 1,\n"test": 2}\n')
-    #     self.assertNotIn("4eC39", json.dumps(result))
+
 
 
 class PageTests(unittest.TestCase):

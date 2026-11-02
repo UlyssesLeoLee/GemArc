@@ -14,15 +14,18 @@ What is pinned here:
 """
 from __future__ import annotations
 
+import io
 import unittest
 
 from gemarc_mcp.accounts import admin as admin_mod
+from gemarc_mcp.accounts import __main__ as cli
 from gemarc_mcp.accounts.admin import AdminService
+from gemarc_mcp.accounts.crypto import b64u
 from gemarc_mcp.accounts.db import Database
 from gemarc_mcp.accounts.users import UserAccounts
 
 from .fake_idp import Browser, ServerCase
-from .support import DbCase, T0
+from .support import DbCase, KEY1, T0
 
 INIT = {"jsonrpc": "2.0", "id": 1, "method": "initialize",
         "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "t", "version": "0"}}}
@@ -259,6 +262,48 @@ class McpSessionLane(ServerCase):
                                              "Origin": "https://evil.example"},
                                     data=b'{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}')
         self.assertEqual(resp.status, 401)
+
+
+class AdminCli(DbCase):
+    """The operator CLI: list, grant and revoke the administrator role."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.users = UserAccounts(self.db, self.crypto)
+        self.target = self.users.login("sub-cli", "cli@gmail.com", False, T0).user_id
+
+    def env(self) -> dict:
+        return {
+            "GEMARC_MIGRATE_DATABASE_URL": "sqlite:///" + self.path.replace("\\", "/"),
+            "GEMARC_ACCOUNTS_ALLOW_SQLITE": "1",
+            "GEMARC_ACCOUNTS_KEYS": "k1:" + b64u(KEY1),
+            "GEMARC_ACCOUNTS_ADMIN_EMAILS": "owner@gmail.com",
+        }
+
+    def cli_run(self, argv):
+        out, err = io.StringIO(), io.StringIO()
+        code = cli.main(argv, self.env(), out, err, lambda: T0)
+        return code, out.getvalue(), err.getvalue()
+
+    def test_list_shows_the_allow_list_and_the_runtime_grants(self):
+        code, out, _ = self.cli_run(["admin", "list"])
+        self.assertEqual(code, 0)
+        self.assertIn("environment allow-list: 1 address(es)", out)
+        self.assertIn("runtime grants: 0", out)
+
+    def test_grant_and_revoke_move_the_runtime_grant(self):
+        code, out, _ = self.cli_run(["admin", "grant", "--email", "cli@gmail.com"])
+        self.assertEqual(code, 0)
+        self.assertIn(self.target, out)
+        self.assertTrue(AdminService(self.db, self.crypto).granted(self.target))
+        code, out, _ = self.cli_run(["admin", "revoke", "--email", "cli@gmail.com"])
+        self.assertEqual(code, 0)
+        self.assertFalse(AdminService(self.db, self.crypto).granted(self.target))
+
+    def test_granting_an_unknown_address_fails_without_a_leak(self):
+        code, _, err = self.cli_run(["admin", "grant", "--email", "nobody@gmail.com"])
+        self.assertEqual(code, 1)
+        self.assertNotIn("nobody@gmail.com", err)
 
 
 if __name__ == "__main__":

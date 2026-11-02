@@ -9,7 +9,7 @@ for ``src/gemarc_mcp/atlas`` is NOT authorised yet. While ``src/gemarc_mcp/atlas
    ``GEMARC_ATLAS_KIT == "1"`` read (milestone M8): off by default, off for every other value, the same 404 and 405 answers
    as before, and a coded 503 where the atlas package is absent (``AtlasKitRouteTests``, including the upload set that
    ``.vercelignore`` leaves);
-3. the default toolsets are unchanged: ``full`` locally, ``stateless`` (8 tools) on the hosted app;
+3. the default toolsets are unchanged: ``full`` locally, ``stateless`` (9 tools) on the hosted app;
 4. no module that the hosted function loads imports the atlas package, or the later ``atlas_tools`` glue module,
    unconditionally. ``.vercelignore`` keeps ``src/gemarc_mcp/atlas`` out of the upload, and ``atlas_tools.py`` sits
    outside that directory, so an unguarded ``import`` in ``server.py``, ``service.py`` or ``api/index.py`` would
@@ -44,8 +44,8 @@ MARKER_RE = re.compile(
     re.MULTILINE,
 )
 STATELESS_TOOLS = (
-    "gemarc_brief", "gemarc_contracts", "gemarc_assets", "gemarc_new_model", "gemarc_validate", "gemarc_simulate",
-    "gemarc_diff", "gemarc_render",
+    "gemarc_5d_guide", "gemarc_brief", "gemarc_contracts", "gemarc_assets", "gemarc_new_model", "gemarc_validate",
+    "gemarc_simulate", "gemarc_diff", "gemarc_render",
 )
 
 

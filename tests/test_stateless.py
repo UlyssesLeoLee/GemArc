@@ -102,8 +102,9 @@ class ToolContractTests(unittest.TestCase):
     def test_stateless_toolset_has_no_workspace_or_write_tool(self):
         _, tools = self._tools("stateless")
         names = [t.name for t in tools]
-        self.assertEqual(names, ["gemarc_brief", "gemarc_contracts", "gemarc_assets", "gemarc_new_model",
-                                 "gemarc_validate", "gemarc_simulate", "gemarc_diff", "gemarc_render"])
+        self.assertEqual(names, ["gemarc_5d_guide", "gemarc_brief", "gemarc_contracts", "gemarc_assets",
+                                 "gemarc_new_model", "gemarc_validate", "gemarc_simulate", "gemarc_diff",
+                                 "gemarc_render"])
         self.assertEqual(server.WRITE_TOOLS, set())
 
     def test_failures_are_flagged_as_errors_and_keep_the_payload(self):

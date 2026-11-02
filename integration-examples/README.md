@@ -19,14 +19,14 @@
 | claude.ai / API connector | 不适用 | UNVERIFIED（静态 header 仅 beta，DOCS） | 无认证 DOCS；API connector 仅 tools、token 须为 OAuth（DOCS） | UNVERIFIED | UNVERIFIED（API connector 不支持，DOCS） | UNVERIFIED（API connector 不支持，DOCS） | UNVERIFIED |
 | OpenAI Codex | 配置被 `--strict-config` 接受、`codex mcp add/list/get/remove` **RAN**；启动服务器 UNVERIFIED | SOURCE（`bearer_token_env_var`）；配置解析 **RAN** | SOURCE | SOURCE | SOURCE（仅内置 list/read 工具） | SOURCE（被忽略） | UNVERIFIED |
 | Hermes Agent | SOURCE | SOURCE | SOURCE | SOURCE | SOURCE | SOURCE | SOURCE（目录）；发现 UNVERIFIED |
-| 官方 `mcp` 客户端库（协议层基线） | **RAN**：`scripts/verify_stdio.py`，16 个工具 / 2 个资源 / 1 个提示词全部通过 | 未测 | 未测 | **RAN** | **RAN** | **RAN** | 不适用 |
+| 官方 `mcp` 客户端库（协议层基线） | **RAN**：`scripts/verify_stdio.py`，17 个工具 / 4 个资源 / 1 个提示词全部通过 | 未测 | 未测 | **RAN** | **RAN** | **RAN** | 不适用 |
 
 “协议层基线”那一行说明服务器本身符合协议、字段合法；它**不能**替代各客户端自己的行为（审批、名字改写、输出截断）。
 
 ## 我该用哪种模式
 
-1. **在自己的机器上、仓库就在磁盘上、需要把模型写进工作区** → 本地 stdio，`full` 工具集（16 个）。Claude Code / Codex / Hermes 都行。写工具默认关，`GEMARC_ALLOW_WRITE=1` 才开。
-2. **不想在每台机器装环境、只做「读仓库 → 填模型 → 校验 → 模拟 → 取回站点数据」** → 远程 `stateless` 工具集（8 个，全只读，没有工作区）。Claude Code / Codex / Hermes 用 Bearer token；claude.ai / Desktop 需要部署**不设** token（见 `claude-desktop/README.md` 的取舍）。
+1. **在自己的机器上、仓库就在磁盘上、需要把模型写进工作区** → 本地 stdio，`full` 工具集（17 个）。Claude Code / Codex / Hermes 都行。写工具默认关，`GEMARC_ALLOW_WRITE=1` 才开。
+2. **不想在每台机器装环境、只做「读仓库 → 填模型 → 校验 → 模拟 → 取回站点数据」** → 远程 `stateless` 工具集（9 个，全只读，没有工作区）。Claude Code / Codex / Hermes 用 Bearer token；claude.ai / Desktop 需要部署**不设** token（见 `claude-desktop/README.md` 的取舍）。
 3. **模型很大**（`gemarc_render` 派生文件合计超过约 24 KiB，或单次输出超过客户端上限）→ 走本地：`gemarc_build`，或命令行 `gemarc build <project> --profile static`。
 4. **只想试一下** → 本地 stdio，`GEMARC_ALLOW_WRITE=0`，只用只读工具。
 

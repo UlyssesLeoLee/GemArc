@@ -1,4 +1,4 @@
-# GemArc MCP, local stdio, full toolset (16 tools).
+# GemArc MCP, local stdio, full toolset (17 tools).
 # Merge into ~/.hermes/config.yaml  (Windows native: %LOCALAPPDATA%\hermes\config.yaml; HERMES_HOME overrides the folder).
 # Replace <workspace> with an EXISTING directory; it must contain the repositories gemarc_inspect should scan.
 # Use ONE of config.stdio.yaml / config.remote.yaml: both define the server name "gemarc".

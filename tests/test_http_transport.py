@@ -8,7 +8,7 @@ drives it with the official MCP client and with plain HTTP, so a broken
 transport, a missing session manager or a wrong configuration fails here
 instead of in production.
 
-The remote default is the ``stateless`` tool set (8 tools, model passed inline).
+The remote default is the ``stateless`` tool set (9 tools, model passed inline).
 ``FullToolsetTests`` covers the operator opt-in ``GEMARC_TOOLSET=full``.
 
 Skipped when the MCP SDK is not installed, so the suite still runs offline.
@@ -39,7 +39,7 @@ for candidate in (str(REPO_ROOT / "src"), str(REPO_ROOT)):
 
 FUNCTION_NAME = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 STATELESS_TOOLS = {
-    "gemarc_brief", "gemarc_contracts", "gemarc_assets", "gemarc_new_model",
+    "gemarc_5d_guide", "gemarc_brief", "gemarc_contracts", "gemarc_assets", "gemarc_new_model",
     "gemarc_validate", "gemarc_simulate", "gemarc_diff", "gemarc_render",
 }
 WRITE_TOOLS = {"gemarc_build", "gemarc_export", "gemarc_init", "gemarc_model", "gemarc_scaffold"}
@@ -288,10 +288,12 @@ class RemoteDefaultTests(unittest.TestCase):
         out = drive(self.mcp())
         self.assertEqual(out["server"], "GemArc MCP")
         self.assertEqual(set(out["tools"]), STATELESS_TOOLS)
-        self.assertEqual(len(out["tools"]), 8)
+        self.assertEqual(len(out["tools"]), 9)
         for name in out["tools"]:
             self.assertRegex(name, FUNCTION_NAME)
-        self.assertEqual(out["resources"], ["gemarc://registry", "gemarc://schema/model"])
+        self.assertEqual(out["resources"], ["gemarc://registry", "gemarc://schema/model",
+                                            "gemarc://skill/gemarc-5d-design",
+                                            "gemarc://skill/gemarc-5d-design/references/assemble-site.md"])
         self.assertEqual(out["prompts"], ["gemarc-design"])
 
     def test_write_and_workspace_tools_are_absent(self):
@@ -707,13 +709,15 @@ class FullToolsetTests(unittest.TestCase):
     def test_handshake_exposes_the_full_tool_surface(self):
         out = drive(self.live.url("/mcp"))
         self.assertEqual(out["server"], "GemArc MCP")
-        self.assertEqual(len(out["tools"]), 16)
-        self.assertEqual(len(set(out["tools"])), 16)
+        self.assertEqual(len(out["tools"]), 17)
+        self.assertEqual(len(set(out["tools"])), 17)
         for name in out["tools"]:
             self.assertRegex(name, FUNCTION_NAME)
         for name in ("gemarc_scaffold", "gemarc_contracts", "gemarc_brief", "gemarc_render", "gemarc_new_model"):
             self.assertIn(name, out["tools"])
-        self.assertEqual(out["resources"], ["gemarc://registry", "gemarc://schema/model"])
+        self.assertEqual(out["resources"], ["gemarc://registry", "gemarc://schema/model",
+                                            "gemarc://skill/gemarc-5d-design",
+                                            "gemarc://skill/gemarc-5d-design/references/assemble-site.md"])
         self.assertEqual(out["prompts"], ["gemarc-design"])
 
     def test_read_tools_work_against_the_seeded_project(self):
@@ -747,7 +751,7 @@ class FullToolsetTests(unittest.TestCase):
         self.assertEqual(report["toolset"], "full")
         self.assertEqual(set(report["writeTools"]), WRITE_TOOLS)
         self.assertFalse(report["writeEnabled"])
-        self.assertEqual(len(report["tools"]), 16)
+        self.assertEqual(len(report["tools"]), 17)
         self.assertEqual(leaked_paths(report), [])
         body = http(self.live.url("/"))[2].decode("utf-8", "replace")
         self.assertIn('"gemarc_scaffold"', body)

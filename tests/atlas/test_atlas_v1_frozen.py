@@ -2,7 +2,7 @@
 
 Pins, with literals written in this file AND read from the code at test time:
 
-* the 16-name ``full`` toolset and the 8-name ``stateless`` toolset of ``gemarc_mcp.server``
+* the 17-name ``full`` toolset and the 9-name ``stateless`` toolset of ``gemarc_mcp.server``
   (registered order, write-tool set, ``stateless`` is a subset of ``full``);
 * sha256 of the simulation golden file ``scaffold/cases/simulation-golden.json``;
 * the per-file sha256 and two digests of ``scaffold/vocab/*.json``.
@@ -33,17 +33,19 @@ GOLDEN = REPO / "src" / "gemarc_mcp" / "scaffold" / "cases" / "simulation-golden
 VOCAB_DIR = REPO / "src" / "gemarc_mcp" / "scaffold" / "vocab"
 
 # --------------------------------------------------------------------------------------------------------
-# Pinned values (computed at commit dad6f73 plus the strict-evidence fix, which touches neither artifact)
+# Pinned values (computed at commit dad6f73 plus the strict-evidence fix, which touches neither artifact).
+# The tool lists moved on when v1 deliberately added gemarc_5d_guide (ADR-012): the server now ships the
+# 5D design workflow itself. The vocabulary and the golden file did not move with them.
 # --------------------------------------------------------------------------------------------------------
 
 FULL_TOOLS = (
-    "gemarc_brief", "gemarc_contracts", "gemarc_assets", "gemarc_new_model", "gemarc_validate", "gemarc_simulate",
-    "gemarc_diff", "gemarc_render", "gemarc_inspect", "gemarc_plan", "gemarc_scaffold", "gemarc_init", "gemarc_model",
-    "gemarc_build", "gemarc_verify", "gemarc_export",
+    "gemarc_5d_guide", "gemarc_brief", "gemarc_contracts", "gemarc_assets", "gemarc_new_model", "gemarc_validate",
+    "gemarc_simulate", "gemarc_diff", "gemarc_render", "gemarc_inspect", "gemarc_plan", "gemarc_scaffold", "gemarc_init",
+    "gemarc_model", "gemarc_build", "gemarc_verify", "gemarc_export",
 )
 STATELESS_TOOLS = (
-    "gemarc_brief", "gemarc_contracts", "gemarc_assets", "gemarc_new_model", "gemarc_validate", "gemarc_simulate",
-    "gemarc_diff", "gemarc_render",
+    "gemarc_5d_guide", "gemarc_brief", "gemarc_contracts", "gemarc_assets", "gemarc_new_model", "gemarc_validate",
+    "gemarc_simulate", "gemarc_diff", "gemarc_render",
 )
 WRITE_TOOLS = ("gemarc_build", "gemarc_export", "gemarc_init", "gemarc_model", "gemarc_scaffold")
 
@@ -150,18 +152,18 @@ class StaticToolsetTests(unittest.TestCase):
     """Read the registrations from the source text: needs no SDK, so it always runs."""
 
     def test_literal_lists_have_the_pinned_sizes(self):
-        self.assertEqual((len(FULL_TOOLS), len(STATELESS_TOOLS), len(WRITE_TOOLS)), (16, 8, 5))
-        self.assertEqual(len(set(FULL_TOOLS)), 16)
+        self.assertEqual((len(FULL_TOOLS), len(STATELESS_TOOLS), len(WRITE_TOOLS)), (17, 9, 5))
+        self.assertEqual(len(set(FULL_TOOLS)), 17)
         self.assertTrue(set(STATELESS_TOOLS) <= set(FULL_TOOLS))
         self.assertTrue(set(WRITE_TOOLS) <= set(FULL_TOOLS) - set(STATELESS_TOOLS))
 
     def test_server_source_registers_exactly_the_pinned_full_toolset(self):
         names, _, _ = static_registrations()
-        self.assertEqual(tuple(names), FULL_TOOLS, "the 16 v1 tools (names and order) are frozen" + UPDATE_HINT)
+        self.assertEqual(tuple(names), FULL_TOOLS, "the 17 v1 tools (names and order) are frozen" + UPDATE_HINT)
 
     def test_server_source_marks_exactly_the_pinned_stateless_tools(self):
         _, stateless, _ = static_registrations()
-        self.assertEqual(tuple(stateless), STATELESS_TOOLS, "the 8 stateless tools are frozen" + UPDATE_HINT)
+        self.assertEqual(tuple(stateless), STATELESS_TOOLS, "the 9 stateless tools are frozen" + UPDATE_HINT)
 
     def test_server_source_marks_exactly_the_pinned_write_tools(self):
         _, _, write = static_registrations()

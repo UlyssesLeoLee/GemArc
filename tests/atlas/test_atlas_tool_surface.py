@@ -231,12 +231,12 @@ class ToolListTests(Base):
 
 class V1UntouchedTests(Base):
     def test_v1_tool_sets_do_not_contain_atlas_tools_and_keep_their_prompt_and_resources(self):
-        for toolset, count in (("full", 16), ("stateless", 8)):
+        for toolset, count in (("full", 17), ("stateless", 9)):
             app, tools, registered, _ = self.live(toolset)
             self.assertEqual(len(tools), count)
             self.assertFalse([n for n in registered if "atlas" in n])
             self.assertEqual([p.name for p in asyncio.run(app.list_prompts())], ["gemarc-design"])
-            self.assertEqual(len(asyncio.run(app.list_resources())), 2)
+            self.assertEqual(len(asyncio.run(app.list_resources())), 4)
 
     def test_atlas_sets_expose_no_v1_tool_resource_or_prompt(self):
         for toolset in TOOLSETS:
@@ -250,7 +250,7 @@ class V1UntouchedTests(Base):
         full = self.live("full")[2]
         stateless = self.live("stateless")[2]
         self.assertEqual(stateless, [n for n in full if n in stateless])
-        self.assertEqual((len(full), len(stateless)), (16, 8))
+        self.assertEqual((len(full), len(stateless)), (17, 9))
 
 
 class DocumentTests(Base):

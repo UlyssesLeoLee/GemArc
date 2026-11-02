@@ -6,7 +6,7 @@
 
 | 能力 | 状态 | 说明 |
 |---|---|---|
-| 16 个 MCP 工具（两个工具集） | 实现 | 基于 MCP Python SDK v2 的 `MCPServer`。`full` 16 个（本地 stdio，含工作区工具）；`stateless` 8 个（远程，模型随调用传入）。工具名只含 `[a-z0-9_]`，每个带 `title` 与安全 `annotations`，失败置 `isError`。**已用官方客户端完成真实 stdio 与公网 Streamable HTTP 握手核验** |
+| 17 个 MCP 工具（两个工具集） | 实现 | 基于 MCP Python SDK v2 的 `MCPServer`。`full` 17 个（本地 stdio，含工作区工具）；`stateless` 9 个（远程，模型随调用传入）。工具名只含 `[a-z0-9_]`，每个带 `title` 与安全 `annotations`，失败置 `isError`。**已用官方客户端完成真实 stdio 与公网 Streamable HTTP 握手核验** |
 | 2 个 MCP Resources + 1 Prompt | 实现 | Registry、简化 Schema 和标准设计策略 |
 | 统一模型和安全验证 | 实现 | 稳定 ID、证据等级、Node–Edge、View、Case 约束 |
 | 组件注册中心 | MVP | JSON 检索；无独立 UI 与组件包签名 |
@@ -73,7 +73,7 @@ Claude Code、Codex、Hermes 的配置容器键名各不相同，下一节与 `i
 
 ## 接入 Claude / Codex / Hermes
 
-本地 stdio（16 个工具，写工具默认关）或远程 `/mcp`（8 个无状态工具）。完整说明、兼容矩阵和每项的验证状态见
+本地 stdio（17 个工具，写工具默认关）或远程 `/mcp`（9 个无状态工具）。完整说明、兼容矩阵和每项的验证状态见
 `integration-examples/README.md`；先运行 `python scripts/verify_stdio.py` 自检本地服务器，
 运行 `python scripts/verify_remote.py https://<project>.vercel.app` 自检远程端点。
 
@@ -81,7 +81,8 @@ Claude Code、Codex、Hermes 的配置容器键名各不相同，下一节与 `i
 - Codex：`codex mcp add gemarc --url 'https://<project>.vercel.app/mcp' --bearer-token-env-var GEMARC_MCP_TOKEN`。
 - Hermes：`hermes mcp add gemarc --url https://<project>.vercel.app/mcp`。
 - claude.ai / Claude Desktop 的远程 connector 只支持 OAuth 或无认证（本仓库未实现 OAuth）：要用就得让部署不设 `GEMARC_MCP_TOKEN`，代价是端点对知道 URL 的人开放。
-- `skills/gemarc-5d-design/` 是配套的技能（SKILL.md），教模型按 brief → new_model → 填写 → validate → simulate → render 的顺序使用这些工具。
+- **连上 MCP 就已经具备「制作 5D 设计」的能力**：5D 设计工作流随服务器发布，工具 `gemarc_5d_guide`（或资源 `gemarc://skill/gemarc-5d-design`）就是它，模型按 brief → new_model → 填写 → validate → simulate → render 的顺序执行即可，**不必再单独装 skill**（ADR-012）。
+- `skills/gemarc-5d-design/` 是同一份工作流的独立副本（SKILL.md），用于离线查阅或给不读 MCP 资源的客户端；它与服务器发的那份由 `tests/test_skill_pack.py` 断言不会漂移。
 
 > 上述客户端命令中，只有 Claude Code 加载 `.mcp.json` 并调用本地工具、Codex 的 `mcp add/list/get` 与 `--strict-config`
 > 被实际运行过；Codex 真正调用工具、Hermes、Claude Desktop 未验证（见 `integration-examples/README.md` 矩阵）。

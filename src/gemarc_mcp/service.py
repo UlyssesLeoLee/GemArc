@@ -125,6 +125,36 @@ def assets(query: str = "") -> dict:
     return data
 
 
+def guide(topic: str = "") -> dict:
+    """The 5D design workflow the server ships, as a tool result.
+
+    The server carries the workflow inside the package, so a client that can
+    only call tools - which is every client - already has the whole procedure
+    and does not have to install a separate skill.
+    """
+    from .scaffold import skillpack
+
+    section_id, title, relative = skillpack.resolve(topic)
+    if section_id == "workflow":
+        # The front matter only matters to a skill installer; the model wants the procedure.
+        text = skillpack.workflow_body()
+    else:
+        text = skillpack.read_text(relative)
+    raw = text.encode("utf-8")
+    return {
+        "status": "ok",
+        "topic": section_id,
+        "title": title,
+        "content": text,
+        "bytes": len(raw),
+        "sha256": skillpack.digest(raw),
+        "source": "gemarc://skill/gemarc-5d-design",
+        "sections": skillpack.manifest(),
+        "notice": "本工作流随服务器发布：客户端连上 MCP 即已具备制作 5D 设计的能力，无需另外安装 skill；"
+                  "文中出现的工具名以本服务器注册的工具为准。",
+    }
+
+
 def brief(project: str = "", section: str = "", stateless: bool = False) -> dict:
     """The compact work order handed to a language model.
 
@@ -147,6 +177,7 @@ def brief(project: str = "", section: str = "", stateless: bool = False) -> dict
             "不要重新发明引擎、字段名或算法；只填事实，并把缺失如实标注为缺失。"
         ),
         "procedure": [
+            "0. gemarc_5d_guide 取得服务器自带的完整 5D 设计工作流（首次做 5D 设计时先读它）。",
             "1. 读 scaffold-manifest.json 与 FILL-IN.md，确认槽位清单。",
             "2. 读 contracts/*.schema.json 确定每个对象该长什么样；读 vocab/*.json 确认允许哪些词。",
             "3. 填写 model/architecture.json 的槽位。证据必须能指回真实来源；指不回去就标 Unknown。",
@@ -197,12 +228,14 @@ def brief(project: str = "", section: str = "", stateless: bool = False) -> dict
             "vocabularies": sorted(p.name for p in builder.VOCAB_DIR.glob("*.json")),
             "runtime": "图引擎 / Focus 退避 / 3D 空间 / 4D-5D 仿真 / 跨视图状态 / 工作流语义 / 互操作适配器",
             "site": "两套交付 profile 共用一份应用源码：static 零构建、vite 为 npm 工程",
+            "workflow": "5D 设计完整工作流随服务器发布：gemarc_5d_guide / gemarc://skill/gemarc-5d-design",
         },
     }
     if stateless:
         # A remote deployment has no workspace: the work order must only name
         # tools that exist there, and must not tell the model to run local CLIs.
         payload["procedure"] = [
+            "0. gemarc_5d_guide 取得服务器自带的完整 5D 设计工作流（首次做 5D 设计时先读它）。",
             "1. gemarc_brief 取得规则与词表；需要完整契约时用 gemarc_contracts。",
             "2. gemarc_new_model 取得空骨架；用你自己对用户仓库的访问能力读取事实并填写槽位。",
             "3. 证据必须能指回真实来源；指不回去就标 Unknown，不要编造。",

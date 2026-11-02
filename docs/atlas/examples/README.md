@@ -2,7 +2,7 @@
 
 本目录的配置把 GemArc 的 `atlas` 工具集（本地 stdio，13 个工具加一个入口提示：写事实、校验、盲测判定、证据核验、构建、浏览器门、自审）接到 Claude Code、Codex 和 Hermes。工具和提示的契约见 `../ATLAS_TOOLS.md`，使用流程见 `skills/gemarc-atlas/SKILL.md`。
 
-这些示例故意放在 `docs/atlas/examples/`，不放在 `integration-examples/`：后者是 v1 工具集的示例，由 v1 的测试按 16 个工具逐一核对。
+这些示例故意放在 `docs/atlas/examples/`，不放在 `integration-examples/`：后者是 v1 工具集的示例，由 v1 的测试按 17 个工具逐一核对。
 
 ## 1. 占位符
 

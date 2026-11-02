@@ -32,9 +32,9 @@ class MCPRegistrationTests(unittest.TestCase):
 
     def test_register_all_tools(self):
         app=self._register('full')
-        self.assertEqual(len(app.tools),16)
-        self.assertEqual(len(set(app.tools)),16)
-        self.assertEqual(len(app.resources),2)
+        self.assertEqual(len(app.tools),17)
+        self.assertEqual(len(set(app.tools)),17)
+        self.assertEqual(len(app.resources),4)
         self.assertEqual(len(app.prompts),1)
         # subscriptions/listen would answer a POST with a never-ending SSE stream (pins a serverless invocation)
         self.assertIs(app.kwargs.get('subscriptions'),False)
@@ -43,7 +43,7 @@ class MCPRegistrationTests(unittest.TestCase):
 
     def test_stateless_toolset_registers_only_model_in_tools(self):
         app=self._register('stateless')
-        self.assertEqual(len(app.tools),8)
+        self.assertEqual(len(app.tools),9)
         self.assertNotIn('gemarc_build', app.tools)
         self.assertEqual(server.WRITE_TOOLS,set())
 

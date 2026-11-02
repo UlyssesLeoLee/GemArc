@@ -8,4 +8,5 @@ tests/accounts/** text=auto eol=lf
 docs/atlas/** text=auto eol=lf
 tools/** text=auto eol=lf
 skills/gemarc-atlas/** text=auto eol=lf
+src/gemarc_mcp/scaffold/skills/** text=auto eol=lf
 scripts/atlas_mcp.py text=auto eol=lf

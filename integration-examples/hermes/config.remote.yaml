@@ -1,4 +1,4 @@
-# GemArc MCP, remote Streamable HTTP, stateless toolset (8 tools, all read-only).
+# GemArc MCP, remote Streamable HTTP, stateless toolset (9 tools, all read-only).
 # Merge into ~/.hermes/config.yaml  (Windows native: %LOCALAPPDATA%\hermes\config.yaml; HERMES_HOME overrides the folder).
 # Replace <project> with your Vercel project subdomain. Use the exact /mcp URL, not the site root.
 # Use ONE of config.stdio.yaml / config.remote.yaml: both define the server name "gemarc".

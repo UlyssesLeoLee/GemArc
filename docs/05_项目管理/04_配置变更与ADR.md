@@ -1,8 +1,8 @@
 # 变更控制、配置管理与 ADR
 
-> 文档编号：PM-003 ｜版本：1.1 ｜日期：2026-10-30 ｜状态：设计基线（待评审）  
+> 文档编号：PM-003 ｜版本：1.2 ｜日期：2026-11-02 ｜状态：设计基线（待评审）  
 > 产品：GemArc MCP — 5D Design Scaffolding & Architecture Compiler  
-> 说明：ADR-001～007 为目标设计，不代表目标功能已实现或已测试；ADR-008～011 记录已经实现的接口决策，仍待评审批准。
+> 说明：ADR-001～007 为目标设计，不代表目标功能已实现或已测试；ADR-008～012 记录已经实现的接口决策，仍待评审批准。
 
 ## 版本控制原则
 
@@ -20,9 +20,10 @@
 | ADR-006 | 现有 Python/JS 资产渐进迁移 | 建议采纳 | 降低对仓库的回归风险 |
 | ADR-007 | MCP 2026 版本优先，适配旧版 | 待验证 | Host 支持矩阵因产品版本不同 |
 | ADR-008 | 工具名使用 `gemarc_` + `[a-z0-9_]`（由点号形式改名，不保留别名） | 建议采纳（已实现） | Claude API / OpenAI 函数名字符集；Codex、Hermes 改写点号，Hermes 对重名工具两个都丢弃 |
-| ADR-009 | 远程部署使用无状态工具集（8 个只读工具，模型内联传入） | 建议采纳（已实现） | Vercel 无持久文件系统、无调用者身份 |
+| ADR-009 | 远程部署使用无状态工具集（9 个只读工具，模型内联传入） | 建议采纳（已实现） | Vercel 无持久文件系统、无调用者身份 |
 | ADR-010 | 远程端点：可选 Bearer token，未设置则无认证；GET `/mcp` 返回 405 | 建议采纳（实现见 `api/index.py`，本文未随该文件验证） | claude.ai / Desktop 无法携带静态 Bearer；Codex 把 404 当作会话过期 |
 | ADR-011 | 工具结果不返回 `structuredContent`，不声明 `outputSchema` | 建议采纳（已实现） | Codex 用 `structuredContent` 替换 `content`；Hermes 去重并忽略 `outputSchema` |
+| ADR-012 | 5D 设计工作流随服务器发布（工具 `gemarc_5d_guide` + 2 个资源），连上 MCP 即具备该能力 | 建议采纳（已实现） | 「导入 MCP」就该能用，不该再要求单独装 skill；工具是所有客户端都会交给模型的那条通道 |
 
 ### ADR-008 工具名：`gemarc_` 前缀 + `[a-z0-9_]`
 
@@ -32,7 +33,7 @@
 
 ### ADR-009 远程使用无状态工具集
 
-- **决策**：`server.create_server(toolset)` 提供 `full`（16 个，本地默认）与 `stateless`（8 个，远程默认，由 `GEMARC_TOOLSET` 选择）。`stateless` 只含不依赖工作区的工具，模型作为参数内联传入，新增 `gemarc_new_model` 与 `gemarc_render`。站点的固定件（约 620 KB）不进工具结果，由 `/kit/<profile>.zip` 提供；`gemarc_render` 只返回随模型变化的 `data/*.json`，合计不超过 24 KiB 时内联。
+- **决策**：`server.create_server(toolset)` 提供 `full`（17 个，本地默认）与 `stateless`（9 个，远程默认，由 `GEMARC_TOOLSET` 选择）。`stateless` 只含不依赖工作区的工具，模型作为参数内联传入，新增 `gemarc_new_model` 与 `gemarc_render`。站点的固定件（约 620 KB）不进工具结果，由 `/kit/<profile>.zip` 提供；`gemarc_render` 只返回随模型变化的 `data/*.json`，合计不超过 24 KiB 时内联。（工具数原为 16/8，ADR-012 之后为 17/9。）
 - **原因**：Vercel 没有持久文件系统，也没有调用者身份；把工作区放进 `/tmp` 既不跨实例共享，也无法把项目归属到调用者。把完整站点放进工具结果没有任何客户端接受得了（Claude Code 在 10k token 告警，Codex 约 10k token 截断）。
 - **后果**：服务端不保存任何项目，没有写工具，因此不需要写授权；填写事实靠调用方 agent 用自己的文件访问能力读用户的仓库；模型大于内联上限时改走本地工具集。
 
@@ -40,13 +41,19 @@
 
 - **决策**：环境变量 `GEMARC_MCP_TOKEN` 已设置（可逗号分隔以便轮换）时，`POST /mcp` 要求 `Authorization: Bearer <token>`；**未设置时端点无认证**。GET `/mcp` 一律返回 405（带 `Allow: POST`）。`/healthz` 与首页公开。
 - **原因**：claude.ai 与 Claude Desktop 的远程 connector 只支持 OAuth、无认证（或部分组织的 beta 静态 header），不能带静态 Bearer；Claude Code、Codex、Hermes 都能带 Bearer。要让所有客户端都能连，必须有「无认证」这一档，OAuth 未实现。GET 返回 405 是因为 MCP 允许服务器拒绝可选的 GET 流，而 Codex 把 404 映射成「会话过期」。
-- **后果**：无认证档位下，知道 URL 的任何人都能调用 8 个纯计算工具（没有工作区、不存储任何数据，但消耗部署者的额度）；使用 claude.ai / Desktop 的部署者必须自己接受这个取舍。这些客户端行为来自对文档与源码的调研，未真机验证。
+- **后果**：无认证档位下，知道 URL 的任何人都能调用 9 个纯计算工具（没有工作区、不存储任何数据，但消耗部署者的额度）；使用 claude.ai / Desktop 的部署者必须自己接受这个取舍。这些客户端行为来自对文档与源码的调研，未真机验证。
 
 ### ADR-011 不返回 `structuredContent`
 
 - **决策**：每个工具只返回一个 JSON `TextContent`；`status` 为 `invalid` 或 `error` 时设置 `isError=true`，正文不变；不返回 `structuredContent`，也不声明 `outputSchema`。
 - **原因**：Codex 一旦看到 `structuredContent` 就用它**替换** `content` 给模型；Hermes 对内容相同的 `content` 与 `structuredContent` 去重并忽略 `outputSchema`。只给 `content` 在三者上表现一致，同一份 JSON 无需发两份。
 - **后果**：没有机器可校验的输出 schema，输出形状由 `docs/03_详细设计/02_MCP工具详细契约.md` 与测试约束；将来若引入 `structuredContent`，必须先在 Codex 上验证模型看到的内容。
+
+### ADR-012 5D 设计工作流由服务器随包发布
+
+- **决策**：工作流的正本仍是仓库里的 `skills/gemarc-5d-design/`，但它会**生成一份副本**进包内 `src/gemarc_mcp/scaffold/skills/gemarc-5d-design/`（`python -m gemarc_mcp.scaffold.skillpack`，`tests/test_skill_pack.py` 断言两者不会漂移、且 package-data 覆盖每个打包文件）。服务器以三条通道把它发出：工具 `gemarc_5d_guide`（`full` 与 `stateless` 都有）、资源 `gemarc://skill/gemarc-5d-design` 与 `gemarc://skill/gemarc-5d-design/references/assemble-site.md`；服务器 instructions 与提示词 `gemarc-design` 都指向它，`gemarc_brief` 的 procedure 第 0 步也是它。
+- **原因**：客户端在「连上 MCP」这一步就该拿到模型需要的一切，不该再要求用户去装一个 skill。而**工具**是唯一所有客户端都会交给模型的通道：Codex 忽略 prompt，Claude API 的 MCP connector 只支持 tools，部分客户端（例如 MCode）根本不暴露 resources——只放资源的话，这些客户端读不到那份工作流。
+- **后果**：v1 工具面从 16/8 变成 17/9，`tests/atlas/test_atlas_v1_frozen.py` 的 pin 按该文件自述的「v1 刻意变更」通道在同一提交内更新（ADR 与 pin 同提交）。文档、集成示例与用户侧白名单（Claude 的 `permissions.allow`、Codex 的 `enabled_tools`）同步更新。`.vercelignore` 仍排除 `/skills`，但打包副本在 `src/` 下面，随部署上传。工作流文本以服务器那份为准；单独安装的 skill 只是同一份文本的离线拷贝。
 
 ## 变更流程
 

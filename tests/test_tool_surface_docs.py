@@ -31,7 +31,7 @@ SKILL_DIR = REPO_ROOT / "skills" / "gemarc-5d-design"
 LEGACY_NAME = re.compile(
     r"gemarc\.(?:inspect|plan|assets|contracts|brief|scaffold|init|model|validate|build|"
     r"simulate|verify|diff|export)\b(?!\.[A-Za-z])")
-TOOL_TOKEN = re.compile(r"(?<![A-Za-z0-9])gemarc_[a-z][a-z0-9_]*")
+TOOL_TOKEN = re.compile(r"(?<![A-Za-z0-9])gemarc_[a-z0-9][a-z0-9_]*")
 #: ``gemarc_`` words that are not tool names, each with the reason it is legitimate.
 NOT_TOOLS = {
     "gemarc_mcp": "the Python package / module (python -m gemarc_mcp)",
@@ -85,7 +85,7 @@ def _without_adr_008(text: str) -> str:
 class RegisteredToolsAreDocumentedTests(unittest.TestCase):
     def test_every_registered_tool_is_in_the_contract_document(self):
         names, _ = _registered("full")
-        self.assertEqual(len(names), 16)
+        self.assertEqual(len(names), 17)
         text = _text(CONTRACT_DOC)
         missing = [name for name in names if f"`{name}`" not in text]
         self.assertEqual(missing, [], f"not documented in {CONTRACT_DOC.name}")
@@ -116,7 +116,7 @@ class RegisteredToolsAreDocumentedTests(unittest.TestCase):
 
     def test_stateless_column_matches_the_stateless_toolset(self):
         stateless_names, _ = _registered("stateless")
-        self.assertEqual(len(stateless_names), 8)
+        self.assertEqual(len(stateless_names), 9)
         text = _text(CONTRACT_DOC)
         for name in stateless_names:
             self.assertRegex(text, re.compile(rf"^\| `{name}` \| S \|", re.M),

@@ -27,8 +27,8 @@
 | `/.well-known/*` | 任意 | 一律返回 404 JSON（OAuth 发现探测得到干净的否定答案，而不是控制台 HTML） | 公开 |
 | 其他路径 | 任意 | 404 JSON（**不再**把站点挂在根路径下） | — |
 
-**远程默认工具集是 `stateless`**（8 个工具，模型随调用内联传入，不需要工作区）。
-运营者仍可设 `GEMARC_TOOLSET=full` 得到全部 16 个工具，但那是**每个实例各自一份临时工作区**，
+**远程默认工具集是 `stateless`**（9 个工具，模型随调用内联传入，不需要工作区）。
+运营者仍可设 `GEMARC_TOOLSET=full` 得到全部 17 个工具，但那是**每个实例各自一份临时工作区**，
 见第 5、6 节。
 
 **主页是控制台，不是设计图**。主页列出服务器上**真实注册**的工具，让人在浏览器里改参数、
@@ -83,7 +83,7 @@ POST 一次拿一个 JSON 响应，不需要 session id，控制台与 `/mcp` �
   `scaffold/vocab/*.json`、`scaffold/runtime/**` 共 48 个文件）。`package-data` 不需要改。
 - **本地实测**：在一个全新的临时 venv 里安装该轮子（解析出 `mcp 2.3.0`），再用 `python -I`
   从仓库**之外**的目录运行：`gemarc_mcp` 来自 `site-packages`，`stateless.site_kit("static")`
-  得到 52 个文件，`create_server("stateless")` 注册 8 个工具，`builder.build_site` 正常。
+  得到 52 个文件，`create_server("stateless")` 注册 9 个工具，`builder.build_site` 正常。
   这证明「已安装的包」本身是完整的，而不是靠 `api/index.py` 往 `sys.path` 里塞了仓库的 `src`。
 - 本机没有 `uv`（`uv --version` 不存在），所以**没有提交 `uv.lock`**。建议首次部署前在装有
   `uv` 的机器上执行 `uv lock` 并提交；Vercel 是否使用它 **UNVERIFIED**。
@@ -172,7 +172,7 @@ manager 的循环不是当前循环（已关闭、已关停或启动失败）时
 
 catch-all 路由下函数收到的路径可能是 `/mcp`，也可能是重写产生的 `/api/index`。
 入口把 `/mcp`、`/mcp/`、`/api/index`、`/api/index.py`、`/index.py` 都归一化为 MCP 端点
-（**本地实测**：五条路径都返回同一组 8 个工具）。
+（**本地实测**：五条路径都返回同一组 9 个工具）。
 
 ### 3.5 静态站：首次访问 `/site/*` 才物化
 
@@ -331,10 +331,11 @@ python -m gemarc_mcp.accounts admin revoke --email x@y.com # 撤销运行时授�
 
 ## 5. 工具可用性
 
-### 5.1 远程默认：`stateless` 工具集（8 个）
+### 5.1 远程默认：`stateless` 工具集（9 个）
 
 | 工具 | 说明 |
 |---|---|
+| `gemarc_5d_guide` | 服务器随包发布的**完整 5D 设计工作流**（ADR-012）：客户端连上即具备「制作 5D 设计」的能力，不必另装 skill |
 | `gemarc_brief` `gemarc_contracts` `gemarc_assets` | 工作指令、契约/词表、组件注册表，读取包内文件，不依赖工作区 |
 | `gemarc_new_model` | 返回空骨架模型与槽位清单 |
 | `gemarc_validate` `gemarc_simulate` `gemarc_diff` | 模型通过 `model` 参数**内联**传入；也接受 `project="demo"`（冷启动时植入的示例项目），让第一次试用的人不必先准备模型 |
@@ -346,7 +347,7 @@ python -m gemarc_mcp.accounts admin revoke --email x@y.com # 撤销运行时授�
 示例模型来自 `examples/demo-site/data/architecture.json`，是**已发布的示例数据**
 （`evidenceState: illustrative`），不含真实工程事实。
 
-### 5.2 `GEMARC_TOOLSET=full`（运营者主动选择，16 个）
+### 5.2 `GEMARC_TOOLSET=full`（运营者主动选择，17 个）
 
 额外含 `gemarc_inspect/plan/scaffold/init/model/build/verify/export`。它们读写**工作区**，
 而函数实例的文件系统是临时的（第 6 节），写工具默认关闭（`GEMARC_ALLOW_WRITE`）。
@@ -395,7 +396,7 @@ python scripts/verify_remote.py https://<project>.vercel.app --token <T>   # 4. 
 | 变量 | 必需 | 默认 | 说明 |
 |---|---|---|---|
 | `GEMARC_MCP_TOKEN` | 否 | 空（authless） | Bearer 令牌，可逗号分隔多个；**不要**用 `ANTHROPIC_` 开头的名字 |
-| `GEMARC_TOOLSET` | 否 | `stateless` | `full` 才开放 16 个工具 |
+| `GEMARC_TOOLSET` | 否 | `stateless` | `full` 才开放 17 个工具 |
 | `GEMARC_ALLOW_WRITE` | 否 | `0` | 置 `1` 才开放写工具；公开部署不建议 |
 | `GEMARC_WORKSPACE_ROOT` | 否 | 系统临时目录下的 `gemarc-workspace`（Vercel 上即 `/tmp`） | 工作区根，建议保持默认 |
 | `GEMARC_PUBLIC_URL` | 否 | 空 | 让 `gemarc_render` 返回绝对的 `kit.url`；未设时回退到 Vercel 的 `VERCEL_PROJECT_PRODUCTION_URL`（系统变量，第 12 节实测默认暴露）；它在预览部署里也是生产域名，所以仅当 `VERCEL_ENV` 为 `production`（或未设）时才使用；暂存生产部署（`--skip-domain`）在 promote 之前，这个域名仍指向上一个部署的 kit，用 `archiveSha256` 核对。都没有则 `kit.url` 为 `null`，调用方用 `kit.path` 拼接 |
@@ -420,7 +421,7 @@ python scripts/verify_remote.py --local                                         
 2. `GET /mcp` 在 5 秒内返回 405（`Allow: POST`），`HEAD`/`DELETE` 也是 405；
    `/.well-known/oauth-protected-resource` 是 404 JSON；
 3. 无令牌 `POST /mcp`：要求令牌时 401（并检查错误令牌也是 401），否则 200；
-4. `initialize` 回报服务器名与协议版本；`tools/list` 与 `/healthz.tools` 一致（stateless 时恰好是那 8 个名字），
+4. `initialize` 回报服务器名与协议版本；`tools/list` 与 `/healthz.tools` 一致（stateless 时恰好是那 9 个名字），
    每个名字都匹配 `^[a-zA-Z0-9_-]{1,64}$`；
 5. `gemarc_new_model` → `gemarc_validate`（空骨架、内联探测模型、`project="demo"`）→ `gemarc_simulate`
    → `gemarc_render`；
@@ -494,8 +495,8 @@ curl.exe -I https://<domain>/kit/static.zip              # 期望：200，ETag�
 ### 本地实测（本机真实运行；Windows，Python 3.12.10，MCP SDK 2.3.0）
 
 - 全部 Python 测试 **192 个通过**，Node 测试 **125 个通过**（基线是 109 + 125，其中 1 个 HTTP 用例因工具改名而红，已按新现实重写）。
-- Streamable HTTP 全链路：官方客户端握手，stateless 8 个工具 / 2 个 resource / 1 个 prompt；
-  `full` 工具集 16 个；工具名全部匹配 `^[a-zA-Z0-9_-]{1,64}$`。
+- Streamable HTTP 全链路：官方客户端握手，stateless 9 个工具 / 4 个 resource / 1 个 prompt；
+  `full` 工具集 17 个；工具名全部匹配 `^[a-zA-Z0-9_-]{1,64}$`。
 - `gemarc_validate(project="demo")`、内联模型调用、`gemarc_new_model → validate → render` 往返。
 - GET/HEAD/DELETE `/mcp` → 405；OPTIONS → 204；鉴权全部规则（§4）；`/.well-known/*` → 404 JSON。
 - session manager 的 lifespan / lazy / 每次调用新事件循环 / 失败各条路径（§3.3）。
@@ -528,6 +529,11 @@ curl.exe -I https://<domain>/kit/static.zip              # 期望：200，ETag�
    `initialize`、8 个工具名合法、`new_model → validate → simulate → render` 往返、`kit` 下载 177630 字节且 SHA-256 与清单一致、
    `If-None-Match` → 304、`kit.url` 可达且相同（因此 **`VERCEL_PROJECT_PRODUCTION_URL` 默认暴露**，`kit.url` 为 `https://gem-arc.vercel.app/kit/static.zip`）、
    官方 MCP 客户端握手（协议 `2025-11-25`，8 个工具）、流量后 session manager 仍在运行。
+
+> **时间注记**：上面这段是 **2026-10-30** 那次部署的实测记录，数字按当时的工具面写（8 个工具、2 个资源）。
+> 之后 v1 在 ADR-012 里刻意新增了 `gemarc_5d_guide`（服务器随包发布 5D 设计工作流），当前工具面是
+> stateless 9 个工具 / 4 个资源（`gemarc://skill/gemarc-5d-design` 与
+> `gemarc://skill/gemarc-5d-design/references/assemble-site.md`）。这段记录不改写，新部署请以当前工具面为准。
 
 副作用（须知）：`vercel curl` 首次运行时**自动在项目里创建了 "Protection Bypass for Automation" 密钥**；不需要时可在项目
 Settings → Deployment Protection 撤销。`vercel link` 会生成含 `VERCEL_OIDC_TOKEN` 的 `.env.local`（已被 `.gitignore` 与 `.vercelignore` 排除，用完应删除）。

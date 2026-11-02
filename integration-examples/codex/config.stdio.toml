@@ -1,4 +1,4 @@
-# GemArc MCP, local stdio, full toolset (16 tools).
+# GemArc MCP, local stdio, full toolset (17 tools).
 # Append to ~/.codex/config.toml (or to .codex/config.toml of a trusted project).
 # Replace <workspace> with an EXISTING directory; it must contain the repositories gemarc_inspect should scan.
 # Use ONE of config.stdio.toml / config.remote.toml: both define the server name "gemarc".
@@ -10,10 +10,11 @@ args = ["-m", "gemarc_mcp"]
 startup_timeout_sec = 30
 tool_timeout_sec = 120
 
-# Raw tool names (underscores), exactly as the server registers them. Only the 11 read-only tools are
+# Raw tool names (underscores), exactly as the server registers them. Only the 12 read-only tools are
 # exposed; add gemarc_scaffold, gemarc_init, gemarc_model, gemarc_build, gemarc_export together with
 # GEMARC_ALLOW_WRITE = "1" below when you want the model to write into <workspace>.
 enabled_tools = [
+  "gemarc_5d_guide",
   "gemarc_brief", "gemarc_contracts", "gemarc_assets", "gemarc_new_model",
   "gemarc_validate", "gemarc_simulate", "gemarc_diff", "gemarc_render",
   "gemarc_inspect", "gemarc_plan", "gemarc_verify",

@@ -1,7 +1,7 @@
 ---
 name: gemarc-5d-design
-description: Use when the user wants to turn the facts of a software system (their repository, design documents, ADRs) into a reviewable 0D-5D architecture model and a static site through the GemArc MCP server (tools named gemarc_*), or asks to validate, simulate, diff or render such a model. Covers the remote stateless workflow (gemarc_brief, gemarc_new_model, gemarc_validate, gemarc_simulate, gemarc_render, then assemble the downloaded site kit) and the local full workflow (gemarc_inspect, gemarc_scaffold, gemarc_build, gemarc_verify, gemarc_export). Not for drawing diagrams by hand or for the Three.js generator that does not go through this MCP server (see ipa-architecture-3d).
-compatibility: Needs the GemArc MCP server connected, either remote over Streamable HTTP (stateless toolset, 8 tools) or local over stdio (full toolset, 16 tools). Assembling a site needs curl or PowerShell plus Python 3 (static profile) or Node 20+ (vite profile).
+description: Use when the user wants to turn the facts of a software system (their repository, design documents, ADRs) into a reviewable 0D-5D architecture model and a static site through the GemArc MCP server (tools named gemarc_*), or asks to validate, simulate, diff or render such a model. Chinese triggers: 制作5D设计、创建5D设计、生成5D架构站点、做5D设计、5D架构模型、架构模型校验。 The MCP server ships this workflow itself (tool gemarc_5d_guide, resource gemarc://skill/gemarc-5d-design), so a client that only imports the MCP already has it; this skill is the standalone copy for offline reading. Covers the remote stateless workflow (gemarc_5d_guide, gemarc_brief, gemarc_new_model, gemarc_validate, gemarc_simulate, gemarc_render, then assemble the downloaded site kit) and the local full workflow (gemarc_inspect, gemarc_scaffold, gemarc_build, gemarc_verify, gemarc_export). Not for drawing diagrams by hand or for the Three.js generator that does not go through this MCP server (see ipa-architecture-3d).
+compatibility: Needs the GemArc MCP server connected, either remote over Streamable HTTP (stateless toolset, 9 tools) or local over stdio (full toolset, 17 tools). Assembling a site needs curl or PowerShell plus Python 3 (static profile) or Node 20+ (vite profile).
 metadata:
   version: "1.0.0"
   default_language: "zh-CN"
@@ -14,14 +14,20 @@ GemArc 把「可被写死的东西」（字段名、词表、校验规则、模�
 
 下文用裸工具名。客户端可能显示为 `mcp__gemarc__gemarc_validate`（Claude Code、Hermes）或命名空间 `mcp__gemarc` 下的 `gemarc_validate`（Codex）；按客户端显示的名字调用即可。
 
+## 何时用这份工作流
+
+用户说「制作5D设计」「创建5D设计」「做5D设计」「生成5D架构站点」「5D架构模型」，或者要校验、模拟、对比、渲染一个架构模型时，按本文执行。
+
+**这份工作流由服务器自己发出。** MCP 服务器随包发布同一份文本：客户端连上之后调 `gemarc_5d_guide` 就能取到（也可读资源 `gemarc://skill/gemarc-5d-design`），所以「导入 MCP」这一步就已经具备制作 5D 设计的能力，不必再单独安装本 skill。服务器返回的文本与本文一致；两者不一致时以 `gemarc_5d_guide` 返回的为准（服务器那份才是与工具面同步的那份）。
+
 ## 先判断模式
 
 看你**实际拿到**的工具列表，不要靠猜：
 
 | 看到 | 模式 | 特点 |
 |---|---|---|
-| 只有 8 个工具：`gemarc_brief` `gemarc_contracts` `gemarc_assets` `gemarc_new_model` `gemarc_validate` `gemarc_simulate` `gemarc_diff` `gemarc_render` | **远程 / 无状态**（流程 A） | 没有工作区，服务端不保存任何东西；模型每次随调用以 `model` 参数内联传入；服务端看不到用户的仓库 |
-| 16 个工具（另有 `gemarc_inspect` `gemarc_plan` `gemarc_scaffold` `gemarc_init` `gemarc_model` `gemarc_build` `gemarc_verify` `gemarc_export`） | **本地 / 完整**（流程 B） | 项目存在工作区目录里；写工具需要用户开启 `GEMARC_ALLOW_WRITE=1` |
+| 只有 9 个工具：`gemarc_5d_guide` `gemarc_brief` `gemarc_contracts` `gemarc_assets` `gemarc_new_model` `gemarc_validate` `gemarc_simulate` `gemarc_diff` `gemarc_render` | **远程 / 无状态**（流程 A） | 没有工作区，服务端不保存任何东西；模型每次随调用以 `model` 参数内联传入；服务端看不到用户的仓库 |
+| 17 个工具（另有 `gemarc_inspect` `gemarc_plan` `gemarc_scaffold` `gemarc_init` `gemarc_model` `gemarc_build` `gemarc_verify` `gemarc_export`） | **本地 / 完整**（流程 B） | 项目存在工作区目录里；写工具需要用户开启 `GEMARC_ALLOW_WRITE=1` |
 
 ## 硬规则（两种模式都适用）
 
@@ -32,17 +38,19 @@ GemArc 把「可被写死的东西」（字段名、词表、校验规则、模�
 5. **不夸大验证范围。** `gemarc_verify` 只检查生成站点的文件完整性和 schema；浏览器、WebGL、性能行为没有测过，必须在最终说明里写出来。
 6. **不改固定件。** 站点外壳与共用运行时（kit 或 `scaffold/` 下的固定文件）不要手改；定制放进模型的槽位里。
 7. **一个模型是唯一事实源。** 所有视图、模拟、站点数据都从同一个模型派生，不要在站点文件里另写一份事实。
+8. **工作流以服务端那份为准。** `gemarc_5d_guide`（或资源 `gemarc://skill/gemarc-5d-design`）返回的文本与本文相同；两者不一致时用服务器那份，字段名与词表仍按硬规则 2 取自 `gemarc_brief`。
 
 ## 流程 A：远程（无状态）
 
-1. `gemarc_brief()`：取得工作指令、槽位清单和词表（必要时只取 `section="slots"` / `"vocabulary"`）。
-2. `gemarc_new_model(system="<系统名>")`：返回空模型 `model` 和槽位说明 `slots`。系统名 ≤ 80 字符。
-3. **用你自己的文件访问能力**读用户的仓库、文档、ADR，按槽位逐项填写。每个事实记下出处；缺的写 `Unknown`。服务端读不到仓库，也不会替你读。
-4. 校验循环：`gemarc_validate(model=<对象>, strict=false)` → 按 `errors[].id` 与 `entityId` 逐条修 → 再校验，直到 0 个 error。需要宣称「已确认」时再用 `strict=true`。strict 要求节点和边有「已实现或已观测」的证据：一个全是 `Hypothetical` 的模型在 strict 下必然失败，正确的做法是补真实证据，**不是改标签**。同一批 id 连续三轮改不掉，就停下来问用户，不要硬凑。
-5. 4D/5D：`gemarc_simulate(model=…, scenario_id="…")`；要做对比用 `compare_baseline=true` 加 `disabled_nodes=["<节点 id>", …]`。场景只用真实事件或明确标注的假设。
-6. `gemarc_render(model=…, profile="static")`（或 `"vite"`）：校验通过后返回随模型变化的 `data/*.json`（`files[]`）和固定件 `kit` 的下载信息。
-7. 组装站点：下载 `kit`、核对 `kit.archiveSha256`、解压、把 `files[]` 逐个写进同一目录、核对每个文件的 `sha256`，再用 `kit.run` 的命令本地预览。逐步命令（bash 与 PowerShell）见 [references/assemble-site.md](references/assemble-site.md)。
-8. 汇报：站点位置、校验结果（含 warnings）、哪些事实是 `Unknown`/`Hypothetical`、哪些浏览器能力没测过。
+1. `gemarc_5d_guide()`：取服务端自带的完整工作流（本文就是它的一份拷贝；已经读过就跳过）。
+2. `gemarc_brief()`：取得工作指令、槽位清单和词表（必要时只取 `section="slots"` / `"vocabulary"`）。
+3. `gemarc_new_model(system="<系统名>")`：返回空模型 `model` 和槽位说明 `slots`。系统名 ≤ 80 字符。
+4. **用你自己的文件访问能力**读用户的仓库、文档、ADR，按槽位逐项填写。每个事实记下出处；缺的写 `Unknown`。服务端读不到仓库，也不会替你读。
+5. 校验循环：`gemarc_validate(model=<对象>, strict=false)` → 按 `errors[].id` 与 `entityId` 逐条修 → 再校验，直到 0 个 error。需要宣称「已确认」时再用 `strict=true`。strict 要求节点和边有「已实现或已观测」的证据：一个全是 `Hypothetical` 的模型在 strict 下必然失败，正确的做法是补真实证据，**不是改标签**。同一批 id 连续三轮改不掉，就停下来问用户，不要硬凑。
+6. 4D/5D：`gemarc_simulate(model=…, scenario_id="…")`；要做对比用 `compare_baseline=true` 加 `disabled_nodes=["<节点 id>", …]`。场景只用真实事件或明确标注的假设。
+7. `gemarc_render(model=…, profile="static")`（或 `"vite"`）：校验通过后返回随模型变化的 `data/*.json`（`files[]`）和固定件 `kit` 的下载信息。
+8. 组装站点：下载 `kit`、核对 `kit.archiveSha256`、解压、把 `files[]` 逐个写进同一目录、核对每个文件的 `sha256`，再用 `kit.run` 的命令本地预览。逐步命令（bash 与 PowerShell）见 [references/assemble-site.md](references/assemble-site.md)。
+9. 汇报：站点位置、校验结果（含 warnings）、哪些事实是 `Unknown`/`Hypothetical`、哪些浏览器能力没测过。
 
 `gemarc_diff(base_model=…, target_model=…)` 比较两个版本的模型（新增、删除、修改的节点与边，以及相邻节点）。
 
@@ -50,7 +58,7 @@ GemArc 把「可被写死的东西」（字段名、词表、校验规则、模�
 
 `GEMARC_WORKSPACE_ROOT` 必须**包含**要扫描的仓库，生成物也写在这个目录里。
 
-1. `gemarc_brief()`，必要时 `gemarc_contracts()`、`gemarc_assets(query="…")`。
+1. `gemarc_5d_guide()`（已读过本文就跳过），然后 `gemarc_brief()`，必要时 `gemarc_contracts()`、`gemarc_assets(query="…")`。
 2. `gemarc_inspect(path="<工作区内的仓库路径>")`：只读扫描。返回的候选模块**都未确认**，必须对照源码核实后才能当事实。
 3. `gemarc_plan(project="…")`：看哪些维度（1D–5D）现有证据撑得住、缺什么。
 4. `gemarc_scaffold(project="…", profile="static")`：落下固定件和空模型 `<project>/model/architecture.json`。已有的脚手架不会被覆盖。（只想看一个带示例数据的项目用 `gemarc_init`；示例不是真实事实。）
@@ -67,7 +75,7 @@ GemArc 把「可被写死的东西」（字段名、词表、校验规则、模�
 - `status` 为 `invalid` 或 `error` 时，MCP 结果的 `isError` 为 true，正文 JSON 不变。**读正文**，不要只看 `isError`：
   - 校验失败：`errors[]` 和 `warnings[]`，每项有 `id`、`severity`、`message`、`entityId`；`summary` 给出数量。
   - 工具拒绝（越权、参数不合法、未知分段等）：`diagnostics[]`，每项同样有 `id`、`message`。
-- 常见 id：`GEMARC_INPUT_003`（`project`/`model` 必须二选一）、`GEMARC_AUTH_001`（越出工作区）、`GEMARC_AUTH_002`（写操作关闭）、`GEMARC_MODEL_002`（模型超过 4 MiB）、`GEMARC_EVIDENCE_00x`（证据不足）。完整含义看 `gemarc_contracts()` 与仓库的 `docs/03_详细设计/02_MCP工具详细契约.md`。
+- 常见 id：`GEMARC_INPUT_003`（`project`/`model` 必须二选一）、`GEMARC_AUTH_001`（越出工作区）、`GEMARC_AUTH_002`（写操作关闭）、`GEMARC_MODEL_002`（模型超过 4 MiB）、`GEMARC_EVIDENCE_00x`（证据不足）、`GEMARC_GUIDE_001`（`gemarc_5d_guide` 的分段名未知）。完整含义看 `gemarc_contracts()` 与仓库的 `docs/03_详细设计/02_MCP工具详细契约.md`。
 - `status: "error"` 与 `GEMARC_INTERNAL_001` 表示服务端异常，原样报告给用户，不要重试 5 次。
 
 ## 大小与限额

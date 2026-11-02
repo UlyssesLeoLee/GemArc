@@ -1,6 +1,7 @@
 {
   "permissions": {
     "allow": [
+      "mcp__gemarc__gemarc_5d_guide",
       "mcp__gemarc__gemarc_brief",
       "mcp__gemarc__gemarc_contracts",
       "mcp__gemarc__gemarc_assets",
@@ -9,6 +10,7 @@
       "mcp__gemarc__gemarc_simulate",
       "mcp__gemarc__gemarc_diff",
       "mcp__gemarc__gemarc_render",
+      "mcp__gemarc_local__gemarc_5d_guide",
       "mcp__gemarc_local__gemarc_brief",
       "mcp__gemarc_local__gemarc_contracts",
       "mcp__gemarc_local__gemarc_assets",

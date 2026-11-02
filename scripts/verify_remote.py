@@ -39,9 +39,10 @@ import zipfile
 
 TOOL_NAME = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 STATELESS_TOOLS = (
-    "gemarc_brief", "gemarc_contracts", "gemarc_assets", "gemarc_new_model",
+    "gemarc_5d_guide", "gemarc_brief", "gemarc_contracts", "gemarc_assets", "gemarc_new_model",
     "gemarc_validate", "gemarc_simulate", "gemarc_diff", "gemarc_render",
 )
+WORKFLOW_URI = "gemarc://skill/gemarc-5d-design"
 PROTOCOL_VERSION = "2025-06-18"
 GET_MCP_BUDGET_S = 5.0
 PROTECTION_HINT = ("Deployment Protection is on for this URL - use the production alias "
@@ -328,6 +329,21 @@ def run_checks(probe: Probe) -> None:
                 if names else describe(response))
     illegal = [n for n in names if not TOOL_NAME.match(n)]
     probe.check("every tool name matches ^[a-zA-Z0-9_-]{1,64}$", bool(names) and not illegal, f"illegal: {illegal}" if illegal else "")
+    if "gemarc_5d_guide" in names:
+        # The server ships the 5D design workflow itself: a client that only imports the MCP
+        # already has the capability (ADR-012).
+        _, payload, is_error = probe.call_tool("gemarc_5d_guide", {})
+        content = (payload or {}).get("content") or ""
+        probe.check("gemarc_5d_guide returns the 5D design workflow",
+                    bool(payload) and payload.get("status") == "ok" and not is_error and len(content) > 3000
+                    and "制作5D设计" in content,
+                    f"status={(payload or {}).get('status')} bytes={(payload or {}).get('bytes')}")
+        response, message = probe.rpc("resources/read", {"uri": WORKFLOW_URI}, rid=3)
+        contents = ((message or {}).get("result") or {}).get("contents") or []
+        text = next((item.get("text") for item in contents if isinstance(item, dict)), "") or ""
+        probe.check(f"resources/read {WORKFLOW_URI} serves the same workflow",
+                    bool(text) and "制作5D设计" in text,
+                    f"{len(text)} chars")
     if probe.atlas:
         atlas_checks(probe, report, names)
     if not names or "gemarc_validate" not in names:

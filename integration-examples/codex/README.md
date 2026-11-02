@@ -4,8 +4,8 @@
 
 | 文件 | 用途 |
 |---|---|
-| `config.stdio.toml` | 本地 stdio（16 个工具），追加到 `~/.codex/config.toml` |
-| `config.remote.toml` | 远程 Streamable HTTP（8 个只读工具），追加到 `~/.codex/config.toml` |
+| `config.stdio.toml` | 本地 stdio（17 个工具），追加到 `~/.codex/config.toml` |
+| `config.remote.toml` | 远程 Streamable HTTP（9 个只读工具），追加到 `~/.codex/config.toml` |
 
 两个文件都用服务器名 `gemarc`，**只启用一个**。占位符：`<workspace>`（已存在的目录）、`<project>`（Vercel 子域名）。token 放在环境变量 `GEMARC_MCP_TOKEN`，不写进文件。也可以放项目里的 `.codex/config.toml`，但只有项目被信任时才生效 **[SOURCE]**。
 

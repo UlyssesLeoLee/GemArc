@@ -35,6 +35,10 @@ REGISTERED_TOOLS: list[str] = []
 
 INSTRUCTIONS = (
     "GemArc turns facts about a software system into a reviewable 0D-5D architecture site. "
+    "This server ships the whole workflow: when the user asks to make a 5D design "
+    "(制作5D设计、创建5D设计、做5D架构站点、5D架构模型) or to validate, simulate, diff or render "
+    "such a model, call gemarc_5d_guide first and follow it; the same text is the resource "
+    "gemarc://skill/gemarc-5d-design. No separate skill has to be installed. "
     "Start with gemarc_brief: it is the complete work order (slots, rules, allowed vocabulary). "
     "Never invent facts: every node and edge must point at evidence, otherwise mark it Unknown. "
     "Simulation output is only as strong as the evidence class of its scenario. "
@@ -152,6 +156,11 @@ def create_server(toolset: str | None = None):
         return deco
 
     # ---- tools that work in every deployment ---------------------------------------
+
+    @tool("gemarc_5d_guide", "5D design workflow", stateless_ok=True)
+    def guide(topic: str = ""):
+        """The complete 5D design workflow, served by this server. Call it first when the user asks to make a 5D design (制作5D设计、创建5D设计、做5D架构站点、5D架构模型) or to validate, simulate, diff or render such a model: it states the procedure, the hard rules and the tool sequence to use. `topic` is "" or "workflow" for the full workflow, "assemble" for the step-by-step commands that put the downloaded site together. The same text is the MCP resource gemarc://skill/gemarc-5d-design; no separate skill has to be installed."""
+        return run(lambda: service.guide(topic))
 
     @tool("gemarc_brief", "Work order for the model", stateless_ok=True)
     def brief(project: str = "", section: str = ""):
@@ -274,18 +283,32 @@ def create_server(toolset: str | None = None):
         path = builder.CONTRACTS_DIR / "canonical-model.schema.json"
         return path.read_text(encoding="utf-8")
 
+    @app.resource("gemarc://skill/gemarc-5d-design")
+    def skill_workflow() -> str:
+        """The complete 5D design workflow shipped with this server: the same text as the gemarc_5d_guide tool, so a client that can read resources needs no separate skill."""
+        from .scaffold import skillpack
+        return skillpack.read_text("SKILL.md")
+
+    @app.resource("gemarc://skill/gemarc-5d-design/references/assemble-site.md")
+    def skill_assemble() -> str:
+        """Step-by-step commands that put the downloaded site kit together into a working site."""
+        from .scaffold import skillpack
+        return skillpack.read_text("references/assemble-site.md")
+
     @app.prompt(name="gemarc-design")
     def design_prompt(project: str = "") -> str:
         """Generate verified 5D architecture data while reusing the fixed scaffold."""
         target = f"针对 {project}：" if project else ""
+        lead = ("先调用 gemarc_5d_guide 取得服务器自带的完整 5D 设计工作流"
+                "（也可读资源 gemarc://skill/gemarc-5d-design），按它执行；")
         if remote:
-            return (f"{target}先调用 gemarc_brief 取得工作指令、槽位清单与词表，不要自行发明字段名、证据等级说法或引擎。"
+            return (f"{target}{lead}再调用 gemarc_brief 取得工作指令、槽位清单与词表，不要自行发明字段名、证据等级说法或引擎。"
                     "用 gemarc_new_model 取得空骨架，再用你自己对用户仓库的访问能力读取真实证据来填写；"
                     "未确定的事实标为 Unknown。反复调用 gemarc_validate(model=…) 直到 0 个 error；"
                     "只有要宣称“已确认”时才加 strict=true（strict 下 Unknown/Hypothetical 必然不过，不要为此改证据等级）。"
                     "4D 仅使用真实事件或显式假设场景；5D 只能根据确认的规则做计算（gemarc_simulate）。"
                     "最后调用 gemarc_render 取得 data/*.json 与固定件下载地址，并说明哪些浏览器能力未经测试。")
-        return (f"{target}先调用 gemarc_brief 取得精简工作指令、槽位清单与词表，"
+        return (f"{target}{lead}再调用 gemarc_brief 取得精简工作指令、槽位清单与词表，"
                 "不要自行发明字段名、证据等级说法或引擎。"
                 "然后调用 gemarc_inspect 与 gemarc_assets，读取原始设计证据，"
                 "建立一个统一 Architecture Model，未确定事实标为 unknown/assumed；调用 gemarc_validate。"

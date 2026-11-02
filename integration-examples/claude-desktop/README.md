@@ -7,7 +7,7 @@
 | | 本地 stdio | 远程 connector |
 |---|---|---|
 | 在哪里配置 | `claude_desktop_config.json` | **Settings > Connectors**（不是 `claude_desktop_config.json`）**[DOCS]** |
-| 工具集 | 16 个（`GEMARC_TOOLSET=full`） | 8 个无状态工具（部署默认） |
+| 工具集 | 17 个（`GEMARC_TOOLSET=full`） | 9 个无状态工具（部署默认） |
 | 认证 | 无（本机进程） | OAuth、无认证，或静态 header（beta，部分组织才有）**[DOCS]** |
 | 本仓库支持 | 是 | 仅「无认证」；**OAuth 没有实现** |
 
@@ -30,7 +30,7 @@ claude.ai 和 Desktop 的远程 connector 只支持三种认证 **[DOCS]**：OAu
 
 所以要在 claude.ai / Desktop 里用远程端点，就必须让部署跑在无认证模式（Vercel 项目里不要设 `GEMARC_MCP_TOKEN`）。这是一个真实的取舍，请你自己决定：
 
-- 代价：知道 URL 的任何人都能调用这 8 个工具。它们是纯计算（`stateless` 工具集：没有工作区、不读写文件、服务端不保存任何东西），没有数据可泄露，但会消耗你的 Vercel 函数额度，可能被滥用或刷量。URL 隐蔽不算访问控制。
+- 代价：知道 URL 的任何人都能调用这 9 个工具。它们是纯计算（`stateless` 工具集：没有工作区、不读写文件、服务端不保存任何东西），没有数据可泄露，但会消耗你的 Vercel 函数额度，可能被滥用或刷量。URL 隐蔽不算访问控制。
 - 缓解（都没有在本仓库验证）：给 Vercel 项目加用量告警；如果只给自己的 Claude Code / Codex / Hermes 用，就设 token，不要给 claude.ai 用。
 - 彻底的办法是在服务端实现 OAuth，**本仓库没有做**，也没有计划内的实现。
 
@@ -38,5 +38,5 @@ claude.ai 和 Desktop 的远程 connector 只支持三种认证 **[DOCS]**：OAu
 
 ## prompt、资源与 skill
 
-- 提示词 `gemarc-design`、资源 `gemarc://registry`、`gemarc://schema/model` 在 Desktop 里的呈现方式没有验证 **[UNVERIFIED]**。让模型先调用 `gemarc_brief` 是不依赖它们的做法。
-- `skills/gemarc-5d-design` 在 Desktop / claude.ai 里的安装方式没有验证 **[UNVERIFIED]**。
+- 提示词 `gemarc-design`、资源 `gemarc://registry`、`gemarc://schema/model`、`gemarc://skill/gemarc-5d-design` 在 Desktop 里的呈现方式没有验证 **[UNVERIFIED]**。让模型先调用 `gemarc_5d_guide`（工具，Desktop 一定会给模型）或 `gemarc_brief` 是不依赖 prompt 与资源的做法。
+- `skills/gemarc-5d-design` 在 Desktop / claude.ai 里的安装方式没有验证 **[UNVERIFIED]**；不过工作流本身已经由服务器随包发布，**不装这个 skill 也已经具备制作 5D 设计的能力**（工具 `gemarc_5d_guide`）。

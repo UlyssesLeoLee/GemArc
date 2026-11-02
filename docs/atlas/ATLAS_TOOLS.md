@@ -2,7 +2,7 @@
 
 本文是 Atlas 工具集的接口契约：每个工具的输入、输出、体积上限和安全注解。实现在 `src/gemarc_mcp/atlas_tools.py`（绑定）和 `src/gemarc_mcp/atlas/tools.py`（纯函数）。`tests/atlas/test_atlas_tool_surface.py` 逐项核对本文与真实的 `tools/list`：工具缺章节、注解对不上、引用了不存在的工具名，测试都会失败。
 
-Atlas 是 v1 工具集旁边的另一套工具：AI 只写紧凑的、经校验的事实文本（切片），固定且经过测试的代码推导并检查其余一切。v1 的 16 个工具和 8 个无状态工具一个字节都没有变（`tests/atlas/test_atlas_v1_frozen.py` 钉住）。
+Atlas 是 v1 工具集旁边的另一套工具：AI 只写紧凑的、经校验的事实文本（切片），固定且经过测试的代码推导并检查其余一切。atlas 的工作没有改动 v1 的工具面（`tests/atlas/test_atlas_v1_frozen.py` 钉住）；v1 自身后来在 ADR-012 里刻意新增了 `gemarc_5d_guide`（让服务器自己发出 5D 工作流），那是 v1 的决定，与 atlas 无关。
 
 ## 1. 两个工具集
 

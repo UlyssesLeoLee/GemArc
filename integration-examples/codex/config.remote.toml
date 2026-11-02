@@ -1,4 +1,4 @@
-# GemArc MCP, remote Streamable HTTP, stateless toolset (8 tools, all read-only).
+# GemArc MCP, remote Streamable HTTP, stateless toolset (9 tools, all read-only).
 # Append to ~/.codex/config.toml (or to .codex/config.toml of a trusted project).
 # Replace <project> with your Vercel project subdomain.
 # Use ONE of config.stdio.toml / config.remote.toml: both define the server name "gemarc".

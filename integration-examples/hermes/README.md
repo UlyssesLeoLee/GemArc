@@ -4,8 +4,8 @@
 
 | 文件 | 用途 |
 |---|---|
-| `config.stdio.yaml` | 本地 stdio（16 个工具；默认隐藏 5 个写工具），合并进 `~/.hermes/config.yaml` |
-| `config.remote.yaml` | 远程 Streamable HTTP（8 个只读工具） |
+| `config.stdio.yaml` | 本地 stdio（17 个工具；默认隐藏 5 个写工具），合并进 `~/.hermes/config.yaml` |
+| `config.remote.yaml` | 远程 Streamable HTTP（9 个只读工具） |
 | `env.example` | 放 token 的 `.env` 片段 |
 
 两个 YAML 都用服务器名 `gemarc`，**只启用一个**。占位符：`<workspace>`（已存在的目录）、`<project>`（Vercel 子域名）、`<token>`。
@@ -54,7 +54,9 @@ hermes mcp remove gemarc
 - Hermes 会对可空 `anyOf` 做清理 **[SOURCE]**；本服务器的输入 schema 没有 `null` 分支（`verify_stdio.py` 检查 **[RAN]**）。
 - `hermes-agent[mcp]` 固定 `mcp==2.3.0` **[SOURCE]**，与本仓库的 SDK 版本一致（`.venv` 里是 2.3.0 **[RAN]**）。
 
-## 安装 Skill
+## 安装 Skill（可选）
+
+**连上本服务器就已经具备制作 5D 设计的能力**：工作流随服务器发布，工具 `gemarc_5d_guide`（或资源 `gemarc://skill/gemarc-5d-design`）就是它。装 skill 只是为了离线查阅同一份文本。
 
 `skills/gemarc-5d-design/` 符合 agentskills.io 规则（`name` 与目录名一致、`description` ≤ 1024 字符、`SKILL.md` < 500 行；`tests/test_tool_surface_docs.py` 检查 **[RAN]**）。Hermes 的 skill 目录是 `$HERMES_HOME/skills/<name>/SKILL.md` **[SOURCE]**：
 

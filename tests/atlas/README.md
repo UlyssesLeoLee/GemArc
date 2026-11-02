@@ -92,7 +92,7 @@ atlas 的新测试都是新增文件，不改任何已有测试文件：`git dif
 
 ## 6. v1 冻结测试
 
-`test_atlas_v1_frozen.py` 固定：16 个完整工具集名称与顺序、8 个无状态工具、5 个写工具、`scaffold/cases/simulation-golden.json` 的哈希、`scaffold/vocab/*.json` 的逐文件哈希和两个摘要。哈希按 LF 归一化后计算（去 BOM，CRLF 转 LF），所以 Windows 与 Linux 检出一致。
+`test_atlas_v1_frozen.py` 固定：17 个完整工具集名称与顺序、9 个无状态工具、5 个写工具、`scaffold/cases/simulation-golden.json` 的哈希、`scaffold/vocab/*.json` 的逐文件哈希和两个摘要。哈希按 LF 归一化后计算（去 BOM，CRLF 转 LF），所以 Windows 与 Linux 检出一致。
 
 只有 v1 维护者有意改动 v1 时才更新：运行 `PYTHONPATH=src ./.venv/Scripts/python.exe tests/atlas/test_atlas_v1_frozen.py --print`，把打印出的常量粘进测试文件，与 v1 改动同一次提交。atlas 的工作不得导致这个测试变红。
 

@@ -17,21 +17,22 @@
 
 | 工具集 | 工具数 | 默认用于 | 特点 |
 |---|---|---|---|
-| `full` | 16 | 本地 stdio | 项目工具读写工作区；写工具需 `GEMARC_ALLOW_WRITE=1` |
-| `stateless` | 8 | 远程（Vercel） | 模型随调用内联传入，服务端不保存任何东西，没有写工具（ADR-009） |
+| `full` | 17 | 本地 stdio | 项目工具读写工作区；写工具需 `GEMARC_ALLOW_WRITE=1` |
+| `stateless` | 9 | 远程（Vercel） | 模型随调用内联传入，服务端不保存任何东西，没有写工具（ADR-009） |
 
-`stateless` 的 8 个工具是 `gemarc_brief`、`gemarc_contracts`、`gemarc_assets`、`gemarc_new_model`、`gemarc_validate`、`gemarc_simulate`、`gemarc_diff`、`gemarc_render`；其余 8 个只在 `full` 中注册。`gemarc_brief` 在 `stateless` 下返回的 `procedure` 与 `commands` 只会提到该工具集里存在的工具。
+`stateless` 的 9 个工具是 `gemarc_5d_guide`、`gemarc_brief`、`gemarc_contracts`、`gemarc_assets`、`gemarc_new_model`、`gemarc_validate`、`gemarc_simulate`、`gemarc_diff`、`gemarc_render`；其余 8 个只在 `full` 中注册。`gemarc_brief` 在 `stateless` 下返回的 `procedure` 与 `commands` 只会提到该工具集里存在的工具。
 
 ## `project` 与 `model` 二选一
 
 `gemarc_validate`、`gemarc_simulate` 接受 `project`（工作区内的项目名）**或** `model`（内联的架构模型 JSON 对象）；`gemarc_diff` 对「基准」与「目标」各自二选一：`base_project` / `base_model`、`target_project` / `target_model`。两个都给、或都不给、或 `model` 为空对象，一律返回 `GEMARC_INPUT_003`（`isError` 为 true）。`stateless` 工具集里 `project` 参数仍然出现在 schema 中，但远程部署只有一个预置的示例项目 `demo`（服务启动时从包内复制进临时工作区），其它项目名得到 `GEMARC_IO_001`；真正的用法是只传 `model`。内联模型受 4 MiB 上限约束（`GEMARC_MODEL_002`）。
 
-## 16 个工具详细契约
+## 17 个工具详细契约
 
 参数名与默认值取自服务器注册的函数签名；`*` 表示必填，其余都有默认值。「集」列：S = `stateless` 与 `full` 都有，F = 只在 `full`。
 
 | Tool | 集 | 参数 | 主要输出字段 | 执行约束 |
 |---|---|---|---|---|
+| `gemarc_5d_guide` | S | `topic=""` | topic, title, content, bytes, sha256, source, sections[], notice | 只读；`topic` 为 `""`/`workflow`（完整工作流）或 `assemble`（组装站点的逐步命令），其它值 `GEMARC_GUIDE_001`；返回随包发布的工作流文本，客户端无需另装 skill |
 | `gemarc_brief` | S | `project=""`, `section=""` | purpose, procedure, rules, slots, vocabulary, commands, alreadyDone, vocabDigest；带 `section` 时为 `{status, section, content, vocabDigest}` | 只读；`section` 取上述任一键，未知值 `GEMARC_BRIEF_001`；`stateless` 下 procedure/commands 只含该工具集里的工具 |
 | `gemarc_contracts` | S | `query=""` | contracts[], vocabularies[], profiles[], slots[]；带 `query`（文件名）时多一个 `document` | 只读；`query` 只能是 `contracts[]` / `vocabularies[]` 里出现的文件名，路径、`..` 与不在列表里的名字一律 `GEMARC_CONTRACT_001` |
 | `gemarc_assets` | S | `query=""` | name, licensePolicy, components[] | 只读；`planned` 状态的组件尚未实现 |
@@ -60,6 +61,7 @@
 
 | Tool | title | readOnlyHint | destructiveHint | idempotentHint | openWorldHint | `stateless` |
 |---|---|---|---|---|---|---|
+| `gemarc_5d_guide` | 5D design workflow | true | — | — | false | 是 |
 | `gemarc_brief` | Work order for the model | true | — | — | false | 是 |
 | `gemarc_contracts` | Contracts and vocabularies | true | — | — | false | 是 |
 | `gemarc_assets` | Reusable components | true | — | — | false | 是 |
@@ -77,7 +79,7 @@
 | `gemarc_verify` | Verify the built site | true | — | — | false | 否 |
 | `gemarc_export` | Export the site as a ZIP | false | false | true | false | 否 |
 
-注解直接驱动客户端的审批：Codex 在默认的 `auto` 模式下，只有 `readOnlyHint=true`，或 `destructiveHint=false` 且 `openWorldHint=false` 的工具不提示，所以 `gemarc_scaffold`、`gemarc_init`、`gemarc_export` 会**不经确认**执行（开启 `GEMARC_ALLOW_WRITE=1` 之后），只有 `gemarc_model`、`gemarc_build` 会提示。这一规则来自对 Codex 源码的调研，未在真机上运行验证；需要逐次确认的用户在客户端侧为这些工具配置 `approval_mode`（见 `integration-examples/codex/README.md`）。11 个只读工具带 `readOnlyHint`，Claude Code 允许并行调用它们。
+注解直接驱动客户端的审批：Codex 在默认的 `auto` 模式下，只有 `readOnlyHint=true`，或 `destructiveHint=false` 且 `openWorldHint=false` 的工具不提示，所以 `gemarc_scaffold`、`gemarc_init`、`gemarc_export` 会**不经确认**执行（开启 `GEMARC_ALLOW_WRITE=1` 之后），只有 `gemarc_model`、`gemarc_build` 会提示。这一规则来自对 Codex 源码的调研，未在真机上运行验证；需要逐次确认的用户在客户端侧为这些工具配置 `approval_mode`（见 `integration-examples/codex/README.md`）。12 个只读工具带 `readOnlyHint`，Claude Code 允许并行调用它们。
 
 ## 结果结构与 `isError`
 
@@ -120,6 +122,7 @@
 | `GEMARC_IO_001` / `GEMARC_IO_002` | 文件不存在或超过 4 MiB / 项目目录已存在，拒绝覆盖 |
 | `GEMARC_MODEL_001` / `GEMARC_MODEL_002` / `GEMARC_MODEL_020` | JSON 读取失败或模型不是对象 / 模型超过 4 MiB / 模型校验失败，不可模拟 |
 | `GEMARC_BRIEF_001`、`GEMARC_CONTRACT_001` | 未知分段、未找到契约文件 |
+| `GEMARC_GUIDE_001` / `GEMARC_GUIDE_002` | `gemarc_5d_guide` 的分段名未知 / 工作流文件缺失 |
 | `GEMARC_SCAFFOLD_001` / `GEMARC_SCAFFOLD_002` | 未知 profile / 脚手架已存在 |
 | `GEMARC_CONFLICT_001` | `expected_sha256` 与当前模型不一致 |
 | `GEMARC_BUILD_001`–`005` | `legacy_dist` 不合法 / 超 50 MiB / 目标目录非 GemArc 生成 / 含符号链接 / 未知 profile |
@@ -137,14 +140,18 @@
 
 ## Resources / Prompts
 
-当前注册了 2 个只读资源和 1 个提示词（两个工具集相同）：
+当前注册了 4 个只读资源和 1 个提示词（两个工具集相同）：
 
 | 类型 | 名称 | 内容 |
 |---|---|---|
 | Resource | `gemarc://registry` | 可复用组件注册表（同 `gemarc_assets()`） |
 | Resource | `gemarc://schema/model` | 规范架构模型的 JSON Schema（语义规则另由 `gemarc_validate` 检查） |
-| Prompt | `gemarc-design`（参数 `project=""`） | 设计任务引导；`full` 下引导 inspect → validate → build → verify，`stateless` 下引导 new_model → validate → simulate → render；两个版本都只引用该工具集里存在的工具名 |
+| Resource | `gemarc://skill/gemarc-5d-design` | 随包发布的完整 5D 设计工作流（与 `gemarc_5d_guide` 同一份文本） |
+| Resource | `gemarc://skill/gemarc-5d-design/references/assemble-site.md` | 组装站点的逐步命令（bash 与 PowerShell） |
+| Prompt | `gemarc-design`（参数 `project=""`） | 设计任务引导；`full` 下引导 inspect → validate → build → verify，`stateless` 下引导 new_model → validate → simulate → render；两个版本都只引用该工具集里存在的工具名，并以 `gemarc_5d_guide` 开头 |
 
-提示词是引导，不隐式写文件，操作仍经工具授权。不是每个客户端都用得上 resources 与 prompts（以下是对客户端文档与源码的调研结论，未真机验证）：Codex 忽略 prompt，只能通过内置的 list/read resource 工具读资源；Claude API 的 MCP connector 只支持 tools。因此**核心流程不依赖它们**，由 `gemarc_brief` 提供完整工作指令。资源读取不允许任意文件访问，只返回上表的固定内容。
+提示词是引导，不隐式写文件，操作仍经工具授权。不是每个客户端都用得上 resources 与 prompts（以下是对客户端文档与源码的调研结论，未真机验证）：Codex 忽略 prompt，只能通过内置的 list/read resource 工具读资源；Claude API 的 MCP connector 只支持 tools。因此**核心流程不依赖它们**：工作流本身由工具 `gemarc_5d_guide` 提供（工具是所有客户端都会交给模型的那条通道），`gemarc_brief` 再给出槽位、规则与词表。资源读取不允许任意文件访问，只返回上表的固定内容。
+
+工作流文本的来源是仓库里的 `skills/gemarc-5d-design/`，随包复制到 `src/gemarc_mcp/scaffold/skills/`（ADR-012）；`tests/test_skill_pack.py` 断言两者不会漂移，且 package-data 声明覆盖每一个打包文件。
 
 [工具调用序列图](../06_图表/03_mcp_operation_sequence.mmd)

@@ -13,8 +13,8 @@
 
 ## 选哪个
 
-- **远程**（`gemarc`）：8 个无状态工具，模型内联传入；没有工作区，不能写盘。部署见 `docs/09_部署/01_Vercel部署.md`。
-- **本地**（`gemarc_local`）：16 个工具，项目存在 `<workspace>` 里；写工具默认关闭，`GEMARC_ALLOW_WRITE=1` 才开。
+- **远程**（`gemarc`）：9 个无状态工具，模型内联传入；没有工作区，不能写盘。部署见 `docs/09_部署/01_Vercel部署.md`。
+- **本地**（`gemarc_local`）：17 个工具，项目存在 `<workspace>` 里；写工具默认关闭，`GEMARC_ALLOW_WRITE=1` 才开。
 - 两个同时启用会看到两套同名工具（前缀不同），容易混淆，建议只留一个。
 
 ## 环境变量
@@ -63,7 +63,7 @@ claude mcp add gemarc --scope user --transport stdio -e GEMARC_WORKSPACE_ROOT='<
 
 - 项目里的 `.mcp.json` 服务器第一次要用户批准：`claude mcp list` 显示 `Pending approval (run claude to approve)` **[RAN]**。
 - 工具名是 `mcp__<服务器名>__<工具名>` **[DOCS]**。服务器名用 `gemarc`（没有点、连字符、`__`），工具名即 `mcp__gemarc__gemarc_validate`。
-- `settings.example.json` 只放行**只读**工具，按 `.mcp.json` 里的两个服务器名分开写：远程 `gemarc`（`mcp__gemarc__` 下 8 个无状态工具，全是只读）和本地 `gemarc_local`（`mcp__gemarc_local__` 下 11 个只读工具）。如果你只用其中一个，删掉另一组；如果用 `claude mcp add` 把本地服务器也命名成 `gemarc`，就只保留 `mcp__gemarc__` 下的 11 个只读名。**不要**写 `mcp__gemarc__*` 或 `mcp__gemarc_local__*`，那会把 `gemarc_scaffold/init/model/build/export` 也一并放行。
+- `settings.example.json` 只放行**只读**工具，按 `.mcp.json` 里的两个服务器名分开写：远程 `gemarc`（`mcp__gemarc__` 下 9 个无状态工具，全是只读）和本地 `gemarc_local`（`mcp__gemarc_local__` 下 12 个只读工具）。如果你只用其中一个，删掉另一组；如果用 `claude mcp add` 把本地服务器也命名成 `gemarc`，就只保留 `mcp__gemarc__` 下的 12 个只读名。**不要**写 `mcp__gemarc__*` 或 `mcp__gemarc_local__*`，那会把 `gemarc_scaffold/init/model/build/export` 也一并放行。
 - 权限规则的写法：**[RAN]** 用 `claude -p ... --allowedTools mcp__gemarc_local__gemarc_new_model` 调用该工具，没有权限拒绝（`permission_denials` 为空）；这证明了命令行 `--allowedTools` 的精确名形式。写进 `settings.json` 的 `permissions.allow` 后的匹配 **[UNVERIFIED]**，我没跑。
 - 本地工作区目录不存在（或 `<workspace>` 占位符没改）时，所有项目类工具返回 `GEMARC_AUTH_001`（「GEMARC_WORKSPACE_ROOT 必须是现有目录」），先创建目录。
 - 这些工具都声明了 `readOnlyHint`，只读工具允许并行调用 **[DOCS]**。

@@ -17,6 +17,11 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 
+# PS 5.1 defaults to the OEM code page; force UTF-8 so Chinese messages are
+# readable rather than mojibake exactly when something has failed.
+try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catch { }
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+
 # `powershell -File ... -Agents codex,hermes` arrives as ONE comma-joined string,
 # while an in-session call arrives as a real array. Accept both.
 $knownAgents = @('claude','codex','hermes','minimax')

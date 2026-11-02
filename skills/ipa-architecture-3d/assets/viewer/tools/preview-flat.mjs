@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {plan2d} from '../src/flat.js';
 import {crossingReport} from '../src/layout.js';
+import {model} from './load-model.mjs';
 
 class N{
  constructor(name){this.tag=name;this.attrs={};this.children=[];this.text=null;this.listeners={};}
@@ -25,7 +26,6 @@ class N{
 globalThis.document={createElementNS:(_ns,name)=>new N(name)};
 const {drawFlat}=await import('../src/flat-view.js');
 
-const model=JSON.parse(fs.readFileSync(new URL('../../examples/illustrative-architecture.json',import.meta.url),'utf8'));
 const {getTranslation}=await import('../src/i18n.js');
 const tr=getTranslation('zh-CN');
 const text=k=>tr[k]||k;

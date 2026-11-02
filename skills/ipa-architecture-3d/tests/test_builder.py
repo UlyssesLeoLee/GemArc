@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -9,6 +10,7 @@ import sys
 sys.path.insert(0,str(ROOT/'scripts'))
 from build import run,localize_model
 from validate import validate
+from sync_version import sync
 MODEL=ROOT/'assets/examples/illustrative-architecture.json'
 
 class ArchitectureTests(unittest.TestCase):
@@ -43,5 +45,38 @@ class ArchitectureTests(unittest.TestCase):
   self.assertTrue(validate(self.model,False,'fr-FR')[0])
   with tempfile.TemporaryDirectory() as temp:
    self.assertEqual(run([str(MODEL),'--out',str(Path(temp)/'fr'),'--lang','fr-FR']),1)
+
+ def test_every_manifest_agrees_on_the_version(self):
+  # The version used to be hand-written in five places, so the plugin could ship a
+  # manifest that lied about its own contents. One file is authoritative now.
+  self.assertEqual(sync(check_only=True),[])
+
+ def test_viewer_config_only_declares_what_the_viewer_reads(self):
+  # build.py writes renderer/flatRenderer/isSample that nothing consumes. Shipping
+  # config nobody reads invites the next person to trust a flag that does nothing.
+  line=(ROOT/'scripts'/'build.py').read_text(encoding='utf8').split('viewer-config.json')[1].split('\n')[0]
+  main=(ROOT/'assets'/'viewer'/'src'/'main.js').read_text(encoding='utf8')
+  for key in re.findall(r"'([A-Za-z]+)':",line):
+   with self.subTest(key=key):
+    self.assertIn(f'config.{key}',main,
+      f'viewer-config declares {key} but main.js never reads it')
+
+ def test_every_manifest_declares_the_same_license(self):
+  # A distributed artifact whose manifests disagree about licensing is a legal
+  # problem, not a cosmetic one. LICENSE and the NOTICE file must agree with them.
+  license_text=(ROOT.parents[1]/'LICENSE').read_text(encoding='utf8')
+  self.assertIn('MIT License',license_text)
+  notice=(ROOT.parents[1]/'THIRD_PARTY_NOTICES.md').read_text(encoding='utf8')
+  for dep in ('three','vite'):
+   self.assertIn(dep,notice,f'{dep} missing from THIRD_PARTY_NOTICES.md')
+  for manifest in (ROOT.parents[1]/'plugin.json',
+                   ROOT.parents[1]/'.claude-plugin'/'plugin.json',
+                   ROOT.parents[1]/'.claude-plugin'/'marketplace.json',
+                   ROOT/'assets'/'viewer'/'package.json'):
+   with self.subTest(manifest=manifest.name):
+    doc=json.loads(manifest.read_text(encoding='utf8'))
+    nodes=[doc] if 'license' in doc else doc.get('plugins',[doc])
+    for node in nodes:
+     self.assertEqual(node.get('license'),'MIT',f'{manifest.name}: license must be MIT')
 
 if __name__=='__main__':unittest.main()

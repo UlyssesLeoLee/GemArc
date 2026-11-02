@@ -3,6 +3,12 @@ export const DIM_FIELDS=['boundary','layer','repo','runtime','environment','data
 export const AXIS_COLORS={x:0x56c8dd,y:0xffcc7e,z:0xbca6fc};
 export const NO_VALUE='—';
 function value(node, field){const v=node[field]; return v===undefined||v===null||String(v).trim()===''?NO_VALUE:String(v)}
+/** A missing attribute is an absence of fact, not a category of its own.
+ *  It is drawn as a placeholder band so the reader sees the gap, but it must never
+ *  count as a distinct class when measuring how much an axis discriminates --
+ *  otherwise "everyone is prod, one record just forgot" would look like a real
+ *  second Z group and the viewer would claim depth it does not have. */
+function discriminates(node, field){const v=node[field]; return !(v===undefined||v===null||String(v).trim()==='')}
 export function dimensionPlan(model,view,requested){
  const dimensions=requested||view.dimensions;
  if(!dimensions||!['x','y','z'].every(a=>DIM_FIELDS.includes(dimensions[a]?.field)))throw new Error('DIMENSIONS_INVALID');
@@ -23,7 +29,8 @@ export function dimensionPlan(model,view,requested){
   axes[axis]={field,values:distinct,size:distinct.length,complete:values.filter(s=>s!==NO_VALUE).length,total:values.length};
  }
  // Independent information gain: an axis is useful only if it further partitions entities.
- const splitCount=(fields)=>new Set(nodes.map(n=>fields.map(f=>value(n,f)).join('\u0001'))).size;
+ // Placeholder (`—`) rows are excluded here; see `discriminates`.
+ const splitCount=(fields)=>new Set(nodes.map(n=>fields.map(f=>discriminates(n,f)?value(n,f):'').join('\u0001'))).size;
  const s1=splitCount([axes.x.field]),s2=splitCount([axes.x.field,axes.y.field]),s3=splitCount([axes.x.field,axes.y.field,axes.z.field]);
  const incremental={x:Math.max(0,s1-1),y:s2-s1,z:s3-s2};
  const effective={x:incremental.x>0,y:incremental.y>0,z:incremental.z>0};

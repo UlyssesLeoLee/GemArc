@@ -6,20 +6,25 @@ import {DIM_FIELDS,AXIS_COLORS,dimensionPlan,crossingReport,NO_VALUE} from './la
 import {plan2d} from './flat.js';
 import {drawFlat} from './flat-view.js';
 import {getTranslation} from './i18n.js';
+import {RIGS,RIG_IDS,QUESTION_TEXT,rigAssessment,cameraPlacement,rigMatrix} from './rigs.js';
+import {blastRadius,shortestPath,trustChain} from './graph.js';
+import {AxisGizmo} from './gizmo.js';
 import './style.css';
 
 const lang=config.language||'zh-CN';
 const tr=getTranslation(lang);
 const $=id=>document.getElementById(id);
 const text=(k)=>tr[k]||k;
+const qtext=k=>(QUESTION_TEXT[k]||{})[lang]||k;
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const nodeMap=new Map(model.nodes.map(n=>[n.id,n]));
-const state={view:0,axes:null,selected:null,showEdges:true,showLayers:true,projection:'3d',mode:'3d',search:'',filters:{x:null,y:null,z:null},renderReady:false,animationStart:0,animateMs:860};
+const state={view:0,axes:null,selected:null,showEdges:true,showLayers:true,projection:'iso',mode:'3d',search:'',filters:{x:null,y:null,z:null},renderReady:false,animationStart:0,animateMs:860,impact:null};
 const classColors={actor:0xf2c17e,external:0xf2c17e,system:0x76cfe3,gateway:0x76cfe3,service:0x76cfe3,module:0x76cfe3,process:0x9baff4,runtime:0x9baff4,plugin:0x9baff4,database:0x70dbb9,storage:0x70dbb9,data:0x70dbb9,security:0xf2c17e,operations:0x70dbb9};
 const sceneContainer=$('scene');
 let renderer,scene,perspCamera,orthoCamera,activeCamera,controls,raycaster,canvasEl;
 let nodesGroup,edgesGroup,axesGroup,layerGroup;
 let layout,report,animation=0,flatPlan=null;
+let gizmo=null;
 const nodeObjs=new Map(),edgeObjs=new Map();
 const disposables=[];
 function uiInit(){
@@ -28,6 +33,15 @@ function uiInit(){
  $('language-pill').textContent=({'zh-CN':'简体中文','ja-JP':'日本語','en-US':'English'})[lang]||lang;
  $('system-title').textContent=model.meta.system;
  $('model-tag').textContent=text(model.meta.evidenceState);
+ $('model-tag').dataset.state=model.meta.evidenceState||'';
+ // Design intent lives in the model but has no place in space; IPA review needs it
+ // stated, so it gets its own surface rather than being left in unused JSON fields.
+ const list=v=>Array.isArray(v)?v.filter(Boolean).join(' · '):(v||text('unknown'));
+ $('intent-scope').textContent=model.meta.scope||text('unknown');
+ $('intent-constraints').textContent=list(model.meta.constraints);
+ $('intent-decisions').textContent=list(model.meta.decisions);
+ $('intent-quality').textContent=list(model.meta.qualityAttributes);
+ $('intent-sources').textContent=list(model.meta.sources);
  $('search').placeholder=text('search');
  $('view-count').textContent=`${model.views.length} Views`;
  const nav=$('view-nav');
@@ -35,8 +49,7 @@ function uiInit(){
   const b=document.createElement('button');b.type='button';b.className='nav-btn';b.dataset.view=String(i);
   const num=document.createElement('span');num.className='nav-no';num.textContent=String(i+1).padStart(2,'0');
   const name=document.createElement('span');name.className='nav-label';name.textContent=view.title;
-  const arrow=document.createElement('span');arrow.className='nav-mark';arrow.textContent='›';
-  b.append(num,name,arrow);b.onclick=()=>setView(i);nav.append(b);
+  b.append(num,name);b.onclick=()=>setView(i);nav.append(b);
  });
  for(const axis of ['x','y','z']){
   const el=$(`axis-${axis}`);
@@ -52,10 +65,16 @@ function uiInit(){
  $('layers-toggle').onclick=()=>{state.showLayers=!state.showLayers;syncToggles();layerGroup.visible=state.showLayers};
  $('fit').onclick=()=>fitCamera();
  $('search').oninput=e=>{state.search=e.target.value;renderList()};
+ // The inspector's markup is re-rendered on selection, so delegate its actions.
+ $('detail').addEventListener('click',e=>{
+  const btn=e.target.closest('[data-impact]');
+  if(!btn)return;
+  if(state.impact){clearImpact();return;}
+  focusImpact(btn.dataset.impact);
+ });
  for(const axis of ['x','y','z'])$(`axis-${axis}-filter`).onchange=e=>{state.filters[axis]=e.target.value||null;applyFocus()};
- document.querySelectorAll('[data-camera]').forEach(btn=>btn.onclick=()=>setProjection(btn.dataset.camera));
  document.querySelectorAll('[data-mode]').forEach(btn=>btn.onclick=()=>setMode(btn.dataset.mode));
- syncToggles();
+ syncToggles();syncCameraButtons();
 }
 function syncToggles(){
  for(const [id,enabled,key] of [['edge-toggle',state.showEdges,'edges'],['layers-toggle',state.showLayers,'layers']]){
@@ -97,8 +116,32 @@ function buildScene(){
  renderer.domElement.addEventListener('pointerdown',e=>{renderer.domElement.dataset.pointer=`${e.clientX},${e.clientY}`});
  renderer.domElement.addEventListener('pointerup',onPick);
  window.addEventListener('resize',resize);
+ // The gizmo lives in its own scene with its own camera, so it never clips against the
+ // main scene's near/far planes and keeps a constant on-screen size at any zoom.
+ gizmo=new AxisGizmo({host:$('gizmo-host'),size:112,lang,
+  onPick:(axis,positive)=>alignCameraToAxis(axis,positive)});
  state.renderReady=true;requestAnimationFrame(frame);
 }
+/** Clicking an axis ball swings the view onto that axis -- the gizmo is a navigation
+ *  control, not decoration. It lands on a DECLARED rig whose viewing ray is that axis,
+ *  so the reader never ends up in an unnamed angle. If no rig hides this axis, the
+ *  oblique camera is aimed straight down it instead. */
+function alignCameraToAxis(axis,positive){
+ const match=RIG_IDS.map(id=>RIGS[id]).find(r=>r.roles&&r.roles.hidden===axis);
+ if(match){setProjection(match.id);return;}
+ const sign=positive?1:-1;
+ const oblique={id:'axis-align',kind:'iso',orthographic:false,dir:[.9,.9,.9],up:[0,1,0]};
+ oblique.dir[axisAxisIndex(axis)]=sign*1.6;
+ const aspect=sceneContainer.clientWidth/Math.max(1,sceneContainer.clientHeight);
+ const place=cameraPlacement(oblique,layout,layout.bounds,aspect);
+ state.projection=oblique.id;
+ activeCamera=perspCamera;controls.object=perspCamera;
+ perspCamera.position.set(...place.position);perspCamera.up.set(...place.up);
+ perspCamera.lookAt(...place.center);
+ perspCamera.near=.1;perspCamera.far=Math.max(1500,place.distance*4);perspCamera.updateProjectionMatrix();
+ controls.target.set(...place.center);controls.update();
+}
+function axisAxisIndex(axis){return axis==='x'?0:axis==='y'?1:2}
 function makeNode(node){
  const tint=classColors[node.kind]||0xa1bdde;
  const group=new THREE.Group();
@@ -159,7 +202,11 @@ function rebuildScaffold(){
  layerGroup.visible=state.showLayers;
 }
 function setView(index){
+ // A blast radius belongs to ONE view's graph; carrying it across would dim nodes the
+ // new view never had.
+ state.impact=null;
  state.view=index;state.axes=structuredClone(model.views[index].dimensions);state.filters={x:null,y:null,z:null};
+ for(const o of nodeObjs.values())o.inImpact=true;
  document.querySelectorAll('.nav-btn').forEach(btn=>btn.classList.toggle('active',Number(btn.dataset.view)===index));
  activateLayout(true);
 }
@@ -195,13 +242,73 @@ function activateLayout(resetCamera){
  }
  for(const e of edgeObjs.values())e.active=report.edges.some(r=>r.id===e.edge.id);
  if(state.renderReady){rebuildScaffold();if(resetCamera)fitCamera();}
+ syncCameraButtons();renderRigNote();
  // The 2D map is planned from the same axes, so it can never claim different fields.
  flatPlan=plan2d(model,view,state.axes);
  applyFocus();renderDetail();
 }
+/** Tell the reader what the CURRENT angle is for, and which axis it cannot speak about.
+ *  This is the difference between four "camera angles" and four review viewpoints. */
+function renderRigNote(){
+ const el=$('rig-note');if(!el||!layout)return;
+ const rig=RIGS[state.projection];
+ if(!rig){el.hidden=true;return;}
+ // NOTE: `rig.hint` is developer-facing English and deliberately NOT shown to the reader;
+ // printing it would mix languages in the UI, which this Skill treats as a P0 defect.
+ // The reader-facing explanation is the localized question label plus rigHides/rigCells.
+ const parts=[qtext(rig.question)];
+ if(rig.roles){
+  const h=rig.roles.hidden;
+  parts.push(text('rigHides').replace('{axis}',`${h.toUpperCase()}=${tr.fieldLabel[layout.axes[h].field]||layout.axes[h].field}`));
+  const mtx=rigMatrix(rig,layout);
+  if(mtx&&mtx.cells)parts.push(`${mtx.columns.size}×${mtx.rows.size} ${text('rigCells')}`);
+ }
+ el.textContent=parts.join(' · ');el.hidden=false;
+}
 function resize(){if(!renderer)return;const w=Math.max(1,sceneContainer.clientWidth),h=Math.max(1,sceneContainer.clientHeight);
  renderer.setSize(w,h);perspCamera.aspect=w/h;perspCamera.updateProjectionMatrix();orthoCamera.left=-16*w/h;orthoCamera.right=16*w/h;orthoCamera.top=16;orthoCamera.bottom=-16;orthoCamera.updateProjectionMatrix();fitCamera();}
-function setProjection(mode){state.projection=mode;document.querySelectorAll('[data-camera]').forEach(b=>b.classList.toggle('selected',b.dataset.camera===mode));activeCamera=mode==='3d'?perspCamera:orthoCamera;controls.object=activeCamera;fitCamera();}
+function setProjection(id){
+ // Refuse an angle that cannot answer anything for THIS layout, and say why, instead
+ // of drawing a confident-looking picture that encodes nothing.
+ const rig=RIGS[id];if(!rig||!layout)return;
+ const verdict=rigAssessment(rig,layout);
+ if(!verdict.valid){
+  const r=verdict.reasons;
+  const why=r.hiddenAxisIsOnlyUseful
+   ? text('rigHidesOnlyAxis').replace('{axis}',r.hiddenAxisField||'')
+   : text('rigFlatAxis').replace('{axis}',(r.flatScreenAxes||[]).map(f=>f.axis.toUpperCase()).join('/'));
+  showRigNotice(why);return;
+ }
+ showRigNotice('');
+ state.projection=id;
+ document.querySelectorAll('[data-camera]').forEach(b=>b.classList.toggle('selected',b.dataset.camera===id));
+ controls.object=RIGS[id].orthographic?orthoCamera:perspCamera;
+ fitCamera();
+ renderRigNote();
+}
+function showRigNotice(message){
+ const el=$('rig-note');if(!el)return;
+ el.textContent=message||'';el.hidden=!message;
+}
+/** Rewrite the camera buttons from the rig table, so a new review angle is added in
+ *  one place (rigs.js) and automatically gets a label, a question and an honest
+ *  disabled state for the current layout. */
+function syncCameraButtons(){
+ const host=$('camera-tabs');if(!host)return;
+ host.replaceChildren();
+ for(const id of RIG_IDS){
+  const rig=RIGS[id];
+  const b=document.createElement('button');
+  b.type='button';b.dataset.camera=id;b.className='ctl ctl-rig'+(id===state.projection?' selected':'');
+  b.textContent=qtext(rig.question);
+  // The dot colour tells the reader, before clicking, WHICH axis this angle drops.
+  if(rig.roles)b.dataset.hiddenAxis=rig.roles.hidden;
+  b.title=`${rig.hint} — ${text('rigHides').replace('{axis}',rig.roles?tr.fieldLabel[rig.roles.hidden]||rig.roles.hidden:'')}`;
+  if(layout&&!rigAssessment(rig,layout).valid)b.disabled=true;
+  b.onclick=()=>setProjection(id);
+  host.append(b);
+ }
+}
 /** Reader-facing choice between the real 3D scene and the real 2D map.
  * 2D is an explicit selection, never a silent downgrade of a WebGL failure. */
 function setMode(mode){
@@ -229,22 +336,29 @@ function renderFlat(){
  $('flat-note').textContent=`${text('flatNote')}：${sentence}`;
 }
 function fitCamera(){if(!layout||!state.renderReady)return;
- const b=layout.bounds;const center=new THREE.Vector3((b.minX+b.maxX)/2,(b.minY+b.maxY)/2,(b.minZ+b.maxZ)/2);
- const dx=Math.max(7,b.maxX-b.minX+10),dy=Math.max(6,b.maxY-b.minY+9),dz=Math.max(8,b.maxZ-b.minZ+12);
- if(state.projection==='3d'){
-  const radius=Math.sqrt(dx*dx+dy*dy+dz*dz)/2;
-  const distance=radius/Math.sin(THREE.MathUtils.degToRad(20))*1.05;
-  perspCamera.position.copy(center).add(new THREE.Vector3(1,.76,1.12).normalize().multiplyScalar(distance));
-  perspCamera.near=.1;perspCamera.far=Math.max(1500,distance*4);perspCamera.updateProjectionMatrix();
+ // The rig owns the framing: it decides direction, and guarantees that every
+ // orthographic angle frames the SAME box so switching angles changes only what is
+ // occluded, never the scale.
+ const rig=RIGS[state.projection]||RIGS.iso;
+ const aspect=sceneContainer.clientWidth/Math.max(1,sceneContainer.clientHeight);
+ const place=cameraPlacement(rig,layout,layout.bounds,aspect);
+ const center=new THREE.Vector3(...place.center);
+ if(rig.orthographic){
+  activeCamera=orthoCamera;
+  orthoCamera.position.set(...place.position);
+  orthoCamera.up.set(...place.up);
+  orthoCamera.lookAt(center);
+  orthoCamera.left=-place.halfWidth;orthoCamera.right=place.halfWidth;
+  orthoCamera.top=place.halfHeight;orthoCamera.bottom=-place.halfHeight;
+  orthoCamera.near=.1;orthoCamera.far=Math.max(1500,place.distance*4);
+  orthoCamera.updateProjectionMatrix();
  }else{
-  const distance=Math.max(dx,dy,dz)*4;
-  if(state.projection==='top'){orthoCamera.position.copy(center).add(new THREE.Vector3(0,distance,0));orthoCamera.up.set(0,0,-1)}
-  if(state.projection==='front'){orthoCamera.position.copy(center).add(new THREE.Vector3(0,0,distance));orthoCamera.up.set(0,1,0)}
-  if(state.projection==='side'){orthoCamera.position.copy(center).add(new THREE.Vector3(distance,0,0));orthoCamera.up.set(0,1,0)}
-  let horizontal=dx,vertical=dy;
-  if(state.projection==='top'){horizontal=dx;vertical=dz}else if(state.projection==='side'){horizontal=dz;vertical=dy}
-  const aspect=sceneContainer.clientWidth/Math.max(1,sceneContainer.clientHeight);
-  orthoCamera.zoom=Math.max(.12,Math.min(4.5,32*aspect/(horizontal*1.25),32/(vertical*1.32)));orthoCamera.updateProjectionMatrix();
+  activeCamera=perspCamera;
+  perspCamera.position.set(...place.position);
+  perspCamera.up.set(...place.up);
+  perspCamera.lookAt(center);
+  perspCamera.near=.1;perspCamera.far=Math.max(1500,place.distance*4);
+  perspCamera.updateProjectionMatrix();
  }
  controls.target.copy(center);controls.update();
 }
@@ -259,6 +373,7 @@ function onPick(event){if(!layout||!renderer)return;
 function selectNode(id){state.selected=id;renderDetail();renderList();renderFlat();}
 function matchesFocus(id){
  const p=layout?.positions[id];if(!p)return false;
+ if(state.impact&&!state.impact.levels.has(id))return false;
  return ['x','y','z'].every(a=>!state.filters[a]||p.category[a]===state.filters[a]);
 }
 function applyFocus(){
@@ -286,7 +401,61 @@ function renderDetail(){
   const other=nodeMap.get(e.source===n.id?e.target:e.source);return `${e.source===n.id?'→':'←'} ${other?.name||'?'} [${e.kind}]`;
  });
  rows.push([text('links'),links.join(' / ')||text('noLinks')]);
- el.innerHTML=`<h3>${escape(n.name)}</h3><p class="detail-description">${escape(n.description)}</p>${active?'':`<p class="detail-description">${escape(text('notInView'))}</p>`}${rows.map(([a,b])=>`<div class="kv"><b>${escape(a)}</b><span>${escape(b)}</span></div>`).join('')}`;
+ el.innerHTML=`<h3>${escape(n.name)}</h3><p class="detail-description">${escape(n.description)}</p>${active?'':`<p class="detail-description">${escape(text('notInView'))}</p>`}${rows.map(([a,b])=>`<div class="kv"><b>${escape(a)}</b><span>${escape(b)}</span></div>`).join('')}${renderImpact(n,active)}`;
+ renderImpactBar();
+}
+/** Blast radius + trust chain for the selected node, computed over the SAME filtered
+ *  graph the renderer draws, so "what breaks if this changes?" can never cite a link
+ *  the reader cannot see. */
+function renderImpact(n,active){
+ if(!active)return '';
+ const view=model.views[state.view];
+ const impact=blastRadius(model,view,n.id,{maxDepth:3});
+ const others=impact.levels.size-1;
+ // Where does this node sit relative to the nearest trust boundary?
+ let chain=null;
+ for(const e of report.edges){
+  if(e.source!==n.id&&e.target!==n.id)continue;
+  const far=e.source===n.id?e.target:e.source;
+  const c=trustChain(model,view,n.id,far);
+  if(c&&c.crossesTrust){chain=c;break;}
+ }
+ const blocks=[];
+ blocks.push(`<div class="impact"><div class="impact-head"><span>${escape(text('impact'))}</span>
+   <button type="button" class="ctl" data-impact="${escape(n.id)}">${escape(text('impactFocus'))}</button></div>
+   <div class="impact-body">${others?`${others} ${escape(text('impactReached'))}`
+     :escape(text('impactIsolated'))}</div>`);
+ if(chain){
+  const zone=`${chain.crossings[0].from} → ${chain.crossings[0].to}`;
+  blocks.push(`<div class="impact"><div class="impact-head"><span>${escape(text('trustChain'))}</span>
+    <span class="impact-flag ${chain.allVerified?'ok':'warn'}">${escape(chain.allVerified?text('controlsVerified'):text('controlsPending'))}</span></div>
+    <div class="impact-body">${escape(zone)} · ${chain.depth} ${escape(text('hops'))}</div></div>`);
+ }
+ blocks.push('</div>');
+ return blocks.join('');
+}
+function renderImpactBar(){
+ const el=$('impact-bar');if(!el)return;
+ const impact=state.impact;
+ if(!impact){el.hidden=true;el.textContent='';return;}
+ const view=model.views[state.view];
+ el.hidden=false;
+ el.textContent=`${text('impactShowing')} ${impact.levels.size}/${view.nodeIds.length} ${text('elements')}`;
+}
+function clearImpact(){
+ if(!state.impact)return;
+ state.impact=null;
+ for(const o of nodeObjs.values())o.inImpact=true;
+ applyFocus();renderDetail();renderImpactBar();
+}
+/** Dim everything outside the selected node's blast radius. This is a READING aid,
+ *  not an edit: the model, the view definition and the evidence are untouched. */
+function focusImpact(id){
+ const view=model.views[state.view];
+ if(!view.nodeIds.includes(id))return;
+ state.impact=blastRadius(model,view,id,{maxDepth:3});
+ for(const [nodeId,o] of nodeObjs)o.inImpact=state.impact.levels.has(nodeId);
+ applyFocus();renderDetail();renderImpactBar();
 }
 function frame(now){requestAnimationFrame(frame);
  // While the reader is on the 2D map the WebGL scene is parked; SVG redraws on state change.
@@ -318,6 +487,11 @@ function frame(now){requestAnimationFrame(frame);
   cone.position.copy(tail);cone.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),unit);
  }
  controls.update();renderer.render(scene,activeCamera);
+ // The gizmo mirrors the live camera orientation, so it is only meaningful in 3D.
+ if(gizmo){
+  gizmo.syncFrom(activeCamera);gizmo.render();
+  gizmo.renderer.domElement.style.visibility=state.mode==='2d'?'hidden':'visible';
+ }
 }
 function errorScene(error){
  state.renderReady=false;

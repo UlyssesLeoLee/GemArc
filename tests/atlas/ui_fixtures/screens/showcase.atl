@@ -1,0 +1,99 @@
+#atlas-ui 1
+// Showcase of every layout feature of the screen renderer: synthetic example, not a real system.
+## screens: id | title | purpose | opts
+SCR-DASH | 总览 | 汇总各项数字，并列出最近的记录。 | kind=page frame=desktop route=/dash start=true group=main req=RQ-1
+SCR-FORMX | 登记表 | 平板上居中的登记表单，含各种输入。 | kind=page frame=tablet route=/form group=main
+SCR-PHONE | Phone view | A narrow screen where texts and buttons must wrap. | kind=page frame=phone route=/phone group=main
+SCR-ALIGN | 对齐 | 屏幕的 align 选项把根下的控件靠右。 | kind=page frame=desktop route=/align group=extra align=end
+## variants: screen | name | note | opts
+SCR-DASH | loading | 读取数字和记录。 | kind=loading
+SCR-DASH | empty | 还没有任何记录。 | kind=empty text=没有记录
+SCR-DASH | error | 读取失败，请稍后再试。 | kind=error
+SCR-FORMX | error | 有两项没有填写。 | kind=error
+SCR-PHONE | loading | Waiting for the server. | kind=loading
+SCR-PHONE | empty | Nothing to show yet. | kind=empty
+## widgets: local | label | opts
+@set screen=SCR-DASH
+bar | 页头 | kind=header
+logo | 总览 | kind=heading parent=bar
+home | 首页 | kind=link parent=bar
+help | 帮助 | kind=link parent=bar
+menu | 侧栏 | kind=sidebar
+m1 | 记录 | kind=menu parent=menu
+m2 | 设置 | kind=menu parent=menu
+title | 今日概况 | kind=heading
+cards | 数字卡片 | kind=row
+c1 | 订单 | kind=card parent=cards
+c1h | 订单 128 | kind=heading parent=c1
+c1t | 比昨天多 12 单 | kind=text parent=c1
+c2 | 库存 | kind=card parent=cards
+c2h | 库存 3,420 | kind=heading parent=c2
+c2t | 有 4 个品种低于安全库存线 | kind=text parent=c2
+c3 | 提醒 | kind=card parent=cards
+c3h | 提醒 7 | kind=heading parent=c3
+c3b | 查看 | kind=button parent=c3 emph=secondary
+tags | 标签 | kind=grid cols=3
+g1 | 新 | kind=badge parent=tags
+g2 | 待处理 | kind=badge parent=tags
+g3 | 已完成 | kind=badge parent=tags
+g4 | 暂停 | kind=badge parent=tags emph=muted
+tools | 工具栏 | kind=toolbar
+t1 | 筛选 | kind=button parent=tools
+t2 | 导出 | kind=button parent=tools emph=primary
+t3 | 删除 | kind=button parent=tools emph=danger
+sw | 只看今天 | kind=switch parent=tools
+recent | 最近的记录 | kind=table w=fill data={"cols":["编号","客户","金额","状态"],"rows":[["A-1001","张三","120.00","已付"],["A-1002","李四","88.50","待付"],["A-1003","王五","45.00","已付"],["A-1004","赵六","300.00","待付"],["A-1005","钱七","18.20","已付"],["A-1006","孙八","77.70","已付"],["A-1007","周九","9.90","待付"]]}
+open | 打开选中的记录 | kind=button emph=primary
+stats | 统计表 | kind=table w=fill
+pager | 第 1 页 | kind=pagination
+chart | 近 7 天走势 | kind=chart w=fill
+pic | 示意图 | kind=image
+blank | 自定义区块 | kind=custom
+line | 分隔 | kind=divider
+foot | 页脚 | kind=footer
+fnote | 版权所有 | kind=text parent=foot
+@set screen=SCR-FORMX
+form | 登记表单 | kind=form
+hd | 登记新客户 | kind=heading parent=form
+nm | 姓名 | kind=input parent=form bind=name
+ct | 联系方式 | kind=select parent=form bind=contact
+ad | 地址 | kind=textarea parent=form bind=address
+ag | 我已阅读并同意以上条款，并愿意接收相关的通知和提醒信息 | kind=checkbox parent=form bind=agree
+r1 | 个人 | kind=radio parent=form bind=type
+r2 | 公司 | kind=radio parent=form bind=type
+err | 还有两项没有填写 | kind=text parent=form in=error emph=danger
+acts | 操作 | kind=row parent=form
+ok | 提交 | kind=button parent=acts emph=primary
+no | 取消 | kind=link parent=acts
+side | 说明 | kind=card w=fill
+st | 提交后会在两个工作日内审核，请保持电话畅通。 | kind=text parent=side
+@set screen=SCR-PHONE
+bar | Top bar | kind=header
+back | Back | kind=link parent=bar
+hd | A rather long heading that has to wrap onto several lines | kind=heading
+body | This paragraph is long enough to need several lines on a narrow phone screen, so the renderer wraps it. | kind=text
+nm | Your name | kind=input bind=name
+go | Continue with the registration of a new customer | kind=button emph=primary
+btns | Actions | kind=row
+b1 | One | kind=button parent=btns
+b2 | Two | kind=button parent=btns
+b3 | Three | kind=button parent=btns
+b4 | Four | kind=button parent=btns
+list | Items | kind=list
+li1 | First item | kind=text parent=list
+li2 | Second item | kind=text parent=list
+@set screen=SCR-ALIGN
+note | 靠右的说明文字 | kind=text
+act | 靠右的按钮 | kind=button emph=primary
+mid | 居中的说明文字 | kind=text align=center
+## nav: from | to | label | opts
+SCR-DASH.home | SCR-DASH | 刷新首页 | on=tap
+SCR-DASH.m1 | SCR-FORMX | 去登记 | on=tap
+SCR-DASH.open | SCR-FORMX | 打开记录 | on=tap guard=已选中一条记录 req=RQ-1
+SCR-DASH.recent | SCR-PHONE | 看手机版 | on=tap
+SCR-FORMX.ok | SCR-DASH | 提交成功 | on=submit
+SCR-FORMX.ok | SCR-FORMX#error | 提交失败 | on=submit alias=nav-form-fail
+SCR-FORMX.no | SCR-DASH | 取消登记 | on=tap
+SCR-PHONE.back | SCR-DASH | 返回 | on=back
+SCR-PHONE.go | SCR-PHONE#empty | 继续 | on=tap
+SCR-ALIGN.act | SCR-DASH | 回到总览 | on=tap

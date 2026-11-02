@@ -2,7 +2,8 @@
 
 * ``build_docs(model, out_dir, langs)`` writes ``docs/<lang>/{REQ,BD,DD}.md``, ``diagrams/<unit id>.mmd`` and
   ``prompts/<prompt id>.md`` (diagrams and prompts in the primary language) under ``out_dir``, deterministically: no
-  timestamps, UTF-8, LF, sorted order, so two builds of one model are byte-identical.
+  timestamps, UTF-8, LF, sorted order, so two builds of one model are byte-identical. A diagram file is the ``%%`` header of
+  ``diagram_header`` and then the unit text byte for byte.
 * ``doc_outline(model, unit, level, lang, chapter, page)`` is the pure core of the ``gemarc_atlas_doc`` tool. The default
   reply is a compact outline plus lint counts (at most 1 KiB of JSON); a chapter page (at most 20 KiB of Markdown) is
   returned on request. It never raises: a bad argument gives ``{"ok": false, "code": "GEMARC_ATLAS_DOC_00N", ...}``.
@@ -21,6 +22,7 @@ from pathlib import Path
 
 from .. import model as am
 from . import assemble as A
+from . import diagram_header as DH
 from . import diagrams as D
 from . import fragments as F
 from . import i18n as T
@@ -31,6 +33,9 @@ from . import prompts as R
 LEVELS = A.LEVELS
 REPLY_LIMIT = 1024
 PAGE_LIMIT = 20 * 1024
+#: The one name of the page size of a document chapter (design F2): an alias of ``PAGE_LIMIT``, same value. ``tools.DOC_PAGE_BYTES`` (15 KiB, the
+#: tool reply) is a second constant for the same thing; the integration lane points it here and picks the one value. Nothing reads this name yet.
+DOC_PAGE_BYTES = PAGE_LIMIT
 CACHE_SIZE = 8
 E_UNIT, E_LEVEL, E_CHAPTER, E_INTERNAL = (f"GEMARC_ATLAS_DOC_{n:03d}" for n in (1, 2, 3, 99))
 ALL_UNITS = ("all", "*")
@@ -92,6 +97,14 @@ def lint_text(bundle: Bundle, level: str, text: str) -> list:
 
 # --------------------------------------------------------------------------------------------- build
 
+def _model_stamp(model) -> str:
+    """The ``m=`` stamp of the model (8 hex digits), or ``""`` when the model cannot be hashed (the header then has no stamp)."""
+    try:
+        return am.model_sha8(T.sanitize(dict(model)))
+    except Exception:
+        return ""
+
+
 def _file_name(text: str, used: set) -> str:
     base = T.dg_id(text)
     name, n = base, 1
@@ -132,8 +145,10 @@ def build_docs(model, out_dir, langs=None, *, per_requirement: bool = False) -> 
         report["issues"].extend(ds["issues"])
         report["langs"][lang] = entry
     pbundle = get_bundle(model, primary)
+    units_by_name = {f"{u['id']}.mmd": u for u in pbundle.units}
+    header_ctx = DH.HeaderContext.from_model(model, primary, _model_stamp(model))
     for name, text in D.diagram_files(pbundle.units).items():
-        files[f"diagrams/{name}"] = text
+        files[f"diagrams/{name}"] = DH.apply(units_by_name[name], header_ctx)       # the header of design 2.12 in front of the unit text, byte for byte
     for name, text in R.prompt_files(model, None, primary, units=pbundle.units).items():
         files[f"prompts/{name}"] = text
     for rel in sorted(files):

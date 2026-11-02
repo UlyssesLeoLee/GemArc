@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">
+<title>登录 · 画面卡</title>
+<meta name="atlas-page" content="CARD-SCR-LOGIN">
+<meta name="atlas-stamp" content="u=9da9bdd5">
+<meta name="atlas-class" content="page">
+<meta name="atlas-lang" content="zh-CN">
+<meta name="atlas-schema" content="gemarc-atlas-read/1">
+<link rel="alternate" type="text/markdown" href="../../screens/SCR-LOGIN.card.md">
+<style>
+body{font:14px/1.5 'Microsoft YaHei','PingFang SC',sans-serif;margin:16px;color:#1f2328}
+header,footer{color:#57606a;font-size:12px}
+table{border-collapse:collapse;margin:8px 0}
+th,td{border:1px solid #d0d7de;padding:2px 8px;text-align:left;vertical-align:top}
+figure{margin:12px 0;overflow:auto}
+figcaption{font-size:12px;color:#57606a}
+code{font-family:Consolas,monospace}
+aside{background:#f6f8fa;padding:4px 12px;margin:8px 0}
+</style>
+</head>
+<body>
+<header>
+<p>页 §CARD-SCR-LOGIN · 登录 · 1/1 · 含 11 个块、8 张表 · 页类 page</p>
+<p>项目 demo · zh-CN · u=9da9bdd5 · 原型界面 · 核对是否过期: gemarc_atlas_index scope="stamp"</p>
+</header>
+<main>
+<h1>登录</h1>
+<aside>
+<p>含: 控件 5 个、状态 3 个、出向导航 1 条、核对点 25 个</p>
+<p>不含: 像素级几何、叠层、动画、响应式断点（几何只是示意）</p>
+<p>读法: 规范性内容: 种类、文字、字段、状态、跳转、父子与顺序；示意性内容: 位置与尺寸。圆标 = 控件序号 = 表里的 #。PNG 有效当且仅当其状态条里的 ui 值等于本卡的 u=。kind 与 DOM 的对照见 ui-schema.md</p>
+</aside>
+<p>屏幕 <code>SCR-LOGIN</code> · 页面 · 桌面 1280x800</p>
+<p>用途: 会员用邮箱和密码进入借阅台。</p>
+<p>属性: frame=desktop · route=/login · kind=page · start=true · actor=usr.member · req=RQ-1</p>
+<p>核对点 checkpoints=25（控件表每个非空单元格一个，id 是控件 id 加 @ 加列名；另有 @order、@route 和 #状态@state）</p>
+<p>判定戳 sha=36523f9f（<code>ui-verdict-*</code> 的 conform 行抄它；本屏的核对点变了它才变）</p>
+<figure id="st-default">
+<figcaption>状态 default</figcaption>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 828" width="1280" height="828" role="group" aria-label="SCR-LOGIN 登录（状态: default）" data-schema="gemarc-atlas-screen/1" data-screen="SCR-LOGIN" data-variant="default" data-frame="desktop" data-layout="1" data-ui-sha8="9da9bdd5">
+<title>SCR-LOGIN 登录（状态: default）</title>
+<desc>包含: 5 个控件（button×1, form×1, input×2, text×1）；本状态显示 4 / 共 5，未显示: SCR-LOGIN.err（仅在其它状态显示）。 不含: 叠层、绝对定位、动画、响应式断点、主题；一切不在原型模型里的内容。 几何为示意（布局 L1.1），规范性内容 = 种类、文字、字段、状态、跳转、父子与顺序。</desc>
+<style>
+.p{fill:#f6f7f9}.b{fill:#fff;stroke:#8a8f98}.f{fill:#e9ebee;stroke:#8a8f98}.n{fill:none;stroke:#c3c7cd;stroke-dasharray:3 3}.z{fill:transparent}.k{fill:#1f2328}.s{fill:#fff;stroke:#1f2328;stroke-width:2}.d{fill:#fff;stroke:#c0392b;stroke-width:2}.q{fill:#e5e7eb}.m{fill:#6b7280}.ln{stroke:#8a8f98;fill:none}
+.t,.h,.s2,.mk{font-family:'Microsoft YaHei','PingFang SC','Noto Sans CJK SC',sans-serif;font-size:14px;fill:#1f2328}.h{font-size:20px;font-weight:bold}.s2{font-size:12px}
+.mk{font-size:12px;fill:#fff;text-anchor:middle}.bd{font-weight:bold}.g{fill:#6b7280}.w{fill:#fff}.r{fill:#c0392b}.u{fill:#1a5fb4;text-decoration:underline}.i{font-style:italic}
+</style>
+<g id="SCR-LOGIN.state" data-kind="state-label" data-box="0 0 1280 28">
+<rect x="0" y="0" width="1280" height="28" class="f"/>
+<text x="8" y="18" class="s2 g">SCR-LOGIN · default · desktop 1280x800 · layout 1 · ui 9da9bdd5 · 示意线框 · 显示 4/5</text>
+</g>
+<g id="SCR-LOGIN.root" data-kind="screen" data-box="0 0 1280 800" data-req="RQ-1" transform="translate(0 28)">
+<rect x="0" y="0" width="1280" height="800" class="p"/>
+<g id="SCR-LOGIN.form" data-kind="form" data-box="320 24 640 172" data-n="1" data-parent="SCR-LOGIN.root" aria-label="登录表单">
+<rect x="320" y="24" width="640" height="172" rx="4" class="b"/>
+</g>
+<g id="SCR-LOGIN.email" data-kind="input" data-box="340 40 480 40" data-n="2" data-parent="SCR-LOGIN.form" aria-label="邮箱" data-bind="email">
+<rect x="340" y="40" width="480" height="40" rx="4" class="b"/>
+<text x="352" y="65" class="t g">邮箱</text>
+<circle cx="330" cy="50" r="9" class="m"/>
+<text x="330" y="54" class="mk" data-mark="2">2</text>
+</g>
+<g id="SCR-LOGIN.pwd" data-kind="input" data-box="340 92 480 40" data-n="3" data-parent="SCR-LOGIN.form" aria-label="密码" data-bind="password">
+<rect x="340" y="92" width="480" height="40" rx="4" class="b"/>
+<text x="352" y="117" class="t g">密码</text>
+<circle cx="330" cy="102" r="9" class="m"/>
+<text x="330" y="106" class="mk" data-mark="3">3</text>
+</g>
+<a href="SCR-HOME.html">
+<g id="SCR-LOGIN.submit" data-kind="button" data-box="340 144 88 36" data-n="5" data-parent="SCR-LOGIN.form" aria-label="登录" data-emph="primary" data-api="svc.loan" data-case="CS-BORROW-OK" data-rule="R-BORROW" data-goto="SCR-HOME" data-nav="SCR-LOGIN.submit:go:SCR-HOME" data-on="submit">
+<rect x="340" y="144" width="88" height="36" rx="4" class="k"/>
+<text x="384" y="167" text-anchor="middle" class="t w">登录</text>
+<circle cx="330" cy="154" r="9" class="m"/>
+<text x="330" y="158" class="mk" data-mark="5">5</text>
+</g>
+</a>
+</g>
+</svg>
+</figure>
+<figure id="st-loading">
+<figcaption>状态 loading · 提交后等待服务器响应。</figcaption>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 844" width="1280" height="844" role="group" aria-label="SCR-LOGIN 登录（状态: loading）" data-schema="gemarc-atlas-screen/1" data-screen="SCR-LOGIN" data-variant="loading" data-frame="desktop" data-layout="1" data-ui-sha8="9da9bdd5">
+<title>SCR-LOGIN 登录（状态: loading）</title>
+<desc>包含: 5 个控件（button×1, form×1, input×2, text×1）；本状态显示 4 / 共 5，未显示: SCR-LOGIN.err（仅在其它状态显示）。 不含: 叠层、绝对定位、动画、响应式断点、主题；一切不在原型模型里的内容。 提交后等待服务器响应。 几何为示意（布局 L1.1），规范性内容 = 种类、文字、字段、状态、跳转、父子与顺序。</desc>
+<style>
+.p{fill:#f6f7f9}.b{fill:#fff;stroke:#8a8f98}.f{fill:#e9ebee;stroke:#8a8f98}.n{fill:none;stroke:#c3c7cd;stroke-dasharray:3 3}.z{fill:transparent}.k{fill:#1f2328}.s{fill:#fff;stroke:#1f2328;stroke-width:2}.d{fill:#fff;stroke:#c0392b;stroke-width:2}.q{fill:#e5e7eb}.m{fill:#6b7280}.ln{stroke:#8a8f98;fill:none}
+.t,.h,.s2,.mk{font-family:'Microsoft YaHei','PingFang SC','Noto Sans CJK SC',sans-serif;font-size:14px;fill:#1f2328}.h{font-size:20px;font-weight:bold}.s2{font-size:12px}
+.mk{font-size:12px;fill:#fff;text-anchor:middle}.bd{font-weight:bold}.g{fill:#6b7280}.w{fill:#fff}.r{fill:#c0392b}.u{fill:#1a5fb4;text-decoration:underline}.i{font-style:italic}
+</style>
+<g id="SCR-LOGIN.state" data-kind="state-label" data-box="0 0 1280 44">
+<rect x="0" y="0" width="1280" height="44" class="f"/>
+<text x="8" y="18" class="s2 g">SCR-LOGIN · loading · desktop 1280x800 · layout 1 · ui 9da9bdd5 · 示意线框 · 显示 4/5</text>
+<text x="8" y="34" class="s2 g">提交后等待服务器响应。</text>
+</g>
+<g id="SCR-LOGIN.root" data-kind="screen" data-box="0 0 1280 800" data-req="RQ-1" transform="translate(0 44)">
+<rect x="0" y="0" width="1280" height="800" class="p"/>
+<g id="SCR-LOGIN.form" data-kind="form" data-box="320 24 640 172" data-n="1" data-parent="SCR-LOGIN.root" aria-label="登录表单">
+<rect x="320" y="24" width="640" height="172" rx="4" class="b"/>
+</g>
+<g id="SCR-LOGIN.email" data-kind="input" data-box="340 40 480 40" data-n="2" data-parent="SCR-LOGIN.form" aria-label="邮箱" data-bind="email">
+<rect x="340" y="40" width="480" height="40" rx="4" class="b"/>
+<text x="352" y="65" class="t g">邮箱</text>
+<circle cx="330" cy="50" r="9" class="m"/>
+<text x="330" y="54" class="mk" data-mark="2">2</text>
+</g>
+<g id="SCR-LOGIN.pwd" data-kind="input" data-box="340 92 480 40" data-n="3" data-parent="SCR-LOGIN.form" aria-label="密码" data-bind="password">
+<rect x="340" y="92" width="480" height="40" rx="4" class="b"/>
+<text x="352" y="117" class="t g">密码</text>
+<circle cx="330" cy="102" r="9" class="m"/>
+<text x="330" y="106" class="mk" data-mark="3">3</text>
+</g>
+<a href="SCR-HOME.html">
+<g id="SCR-LOGIN.submit" data-kind="button" data-box="340 144 88 36" data-n="5" data-parent="SCR-LOGIN.form" aria-label="登录" data-emph="primary" data-api="svc.loan" data-case="CS-BORROW-OK" data-rule="R-BORROW" data-goto="SCR-HOME" data-nav="SCR-LOGIN.submit:go:SCR-HOME" data-on="submit">
+<rect x="340" y="144" width="88" height="36" rx="4" class="k"/>
+<text x="384" y="167" text-anchor="middle" class="t w">登录</text>
+<circle cx="330" cy="154" r="9" class="m"/>
+<text x="330" y="158" class="mk" data-mark="5">5</text>
+</g>
+</a>
+</g>
+</svg>
+</figure>
+<figure id="st-error">
+<figcaption>状态 error · 邮箱或密码不正确。</figcaption>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 844" width="1280" height="844" role="group" aria-label="SCR-LOGIN 登录（状态: error）" data-schema="gemarc-atlas-screen/1" data-screen="SCR-LOGIN" data-variant="error" data-frame="desktop" data-layout="1" data-ui-sha8="9da9bdd5">
+<title>SCR-LOGIN 登录（状态: error）</title>
+<desc>包含: 5 个控件（button×1, form×1, input×2, text×1）；本状态显示 5 / 共 5。 不含: 叠层、绝对定位、动画、响应式断点、主题；一切不在原型模型里的内容。 邮箱或密码不正确。 几何为示意（布局 L1.1），规范性内容 = 种类、文字、字段、状态、跳转、父子与顺序。</desc>
+<style>
+.p{fill:#f6f7f9}.b{fill:#fff;stroke:#8a8f98}.f{fill:#e9ebee;stroke:#8a8f98}.n{fill:none;stroke:#c3c7cd;stroke-dasharray:3 3}.z{fill:transparent}.k{fill:#1f2328}.s{fill:#fff;stroke:#1f2328;stroke-width:2}.d{fill:#fff;stroke:#c0392b;stroke-width:2}.q{fill:#e5e7eb}.m{fill:#6b7280}.ln{stroke:#8a8f98;fill:none}
+.t,.h,.s2,.mk{font-family:'Microsoft YaHei','PingFang SC','Noto Sans CJK SC',sans-serif;font-size:14px;fill:#1f2328}.h{font-size:20px;font-weight:bold}.s2{font-size:12px}
+.mk{font-size:12px;fill:#fff;text-anchor:middle}.bd{font-weight:bold}.g{fill:#6b7280}.w{fill:#fff}.r{fill:#c0392b}.u{fill:#1a5fb4;text-decoration:underline}.i{font-style:italic}
+</style>
+<g id="SCR-LOGIN.state" data-kind="state-label" data-box="0 0 1280 44">
+<rect x="0" y="0" width="1280" height="44" class="f"/>
+<text x="8" y="18" class="s2 g">SCR-LOGIN · error · desktop 1280x800 · layout 1 · ui 9da9bdd5 · 示意线框 · 显示 5/5</text>
+<text x="8" y="34" class="s2 g">邮箱或密码不正确。</text>
+</g>
+<g id="SCR-LOGIN.root" data-kind="screen" data-box="0 0 1280 800" data-req="RQ-1" transform="translate(0 44)">
+<rect x="0" y="0" width="1280" height="800" class="p"/>
+<g id="SCR-LOGIN.form" data-kind="form" data-box="320 24 640 206" data-n="1" data-parent="SCR-LOGIN.root" aria-label="登录表单">
+<rect x="320" y="24" width="640" height="206" rx="4" class="b"/>
+</g>
+<g id="SCR-LOGIN.email" data-kind="input" data-box="340 40 480 40" data-n="2" data-parent="SCR-LOGIN.form" aria-label="邮箱" data-bind="email">
+<rect x="340" y="40" width="480" height="40" rx="4" class="b"/>
+<text x="352" y="65" class="t g">邮箱</text>
+<circle cx="330" cy="50" r="9" class="m"/>
+<text x="330" y="54" class="mk" data-mark="2">2</text>
+</g>
+<g id="SCR-LOGIN.pwd" data-kind="input" data-box="340 92 480 40" data-n="3" data-parent="SCR-LOGIN.form" aria-label="密码" data-bind="password">
+<rect x="340" y="92" width="480" height="40" rx="4" class="b"/>
+<text x="352" y="117" class="t g">密码</text>
+<circle cx="330" cy="102" r="9" class="m"/>
+<text x="330" y="106" class="mk" data-mark="3">3</text>
+</g>
+<g id="SCR-LOGIN.err" data-kind="text" data-box="340 144 124 22" data-n="4" data-parent="SCR-LOGIN.form" aria-label="邮箱或密码不正确" data-emph="danger" data-in="error">
+<rect x="340" y="144" width="124" height="22" class="z"/>
+<text x="340" y="160" class="t r">邮箱或密码不正确</text>
+<circle cx="330" cy="154" r="9" class="m"/>
+<text x="330" y="158" class="mk" data-mark="4">4</text>
+</g>
+<a href="SCR-HOME.html">
+<g id="SCR-LOGIN.submit" data-kind="button" data-box="340 178 88 36" data-n="5" data-parent="SCR-LOGIN.form" aria-label="登录" data-emph="primary" data-api="svc.loan" data-case="CS-BORROW-OK" data-rule="R-BORROW" data-goto="SCR-HOME" data-nav="SCR-LOGIN.submit:go:SCR-HOME" data-on="submit">
+<rect x="340" y="178" width="88" height="36" rx="4" class="k"/>
+<text x="384" y="201" text-anchor="middle" class="t w">登录</text>
+<circle cx="330" cy="188" r="9" class="m"/>
+<text x="330" y="192" class="mk" data-mark="5">5</text>
+</g>
+</a>
+</g>
+</svg>
+</figure>
+<table>
+<caption>控件（5）</caption>
+<tr><th>#</th><th>id</th><th>kind</th><th>label</th><th>parent</th><th>in</th><th>bind</th><th>api</th><th>emph</th><th>goto</th><th>属性</th></tr>
+<tr id="r-SCR-LOGIN.form"><td>1</td><td><code>SCR-LOGIN.form</code></td><td>form</td><td>登录表单</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr id="r-SCR-LOGIN.email"><td>2</td><td><code>SCR-LOGIN.email</code></td><td>input</td><td>邮箱</td><td>form</td><td></td><td>email</td><td></td><td></td><td></td><td></td></tr>
+<tr id="r-SCR-LOGIN.pwd"><td>3</td><td><code>SCR-LOGIN.pwd</code></td><td>input</td><td>密码</td><td>form</td><td></td><td>password</td><td></td><td></td><td></td><td></td></tr>
+<tr id="r-SCR-LOGIN.err"><td>4</td><td><code>SCR-LOGIN.err</code></td><td>text</td><td>邮箱或密码不正确</td><td>form</td><td>error</td><td></td><td></td><td>danger</td><td></td><td></td></tr>
+<tr id="r-SCR-LOGIN.submit"><td>5</td><td><code>SCR-LOGIN.submit</code></td><td>button</td><td>登录</td><td>form</td><td></td><td></td><td>svc.loan</td><td>primary</td><td>SCR-HOME</td><td>case=CS-BORROW-OK rule=R-BORROW</td></tr>
+</table>
+<table>
+<caption>顺序（1）</caption>
+<tr><th>容器</th><th>子控件的顺序</th></tr>
+<tr><td><code>SCR-LOGIN.form</code></td><td>email,pwd,err,submit</td></tr>
+</table>
+<table>
+<caption>状态（3）</caption>
+<tr><th>状态</th><th>kind</th><th>说明</th><th>界面文案</th><th>文件</th><th>显示控件数</th><th>未显示</th></tr>
+<tr id="r-SCR-LOGIN~default"><td><code>SCR-LOGIN#default</code></td><td></td><td></td><td></td><td><code>SCR-LOGIN.svg</code></td><td>4/5</td><td>SCR-LOGIN.err</td></tr>
+<tr id="r-SCR-LOGIN~loading"><td><code>SCR-LOGIN#loading</code></td><td>loading</td><td>提交后等待服务器响应。</td><td></td><td><code>SCR-LOGIN~loading.svg</code></td><td>4/5</td><td>SCR-LOGIN.err</td></tr>
+<tr id="r-SCR-LOGIN~error"><td><code>SCR-LOGIN#error</code></td><td>error</td><td>邮箱或密码不正确。</td><td></td><td><code>SCR-LOGIN~error.svg</code></td><td>5/5</td><td></td></tr>
+</table>
+<table>
+<caption>出向导航（1）</caption>
+<tr><th>起点</th><th>终点</th><th>文字</th><th>条件</th><th>触发</th><th>链接</th></tr>
+<tr><td><code>SCR-LOGIN.submit</code></td><td><code>SCR-HOME</code></td><td>凭证正确,进入首页</td><td>凭证正确</td><td>submit</td><td>case=CS-BORROW-OK rule=R-BORROW</td></tr>
+</table>
+<table>
+<caption>入向导航（1）</caption>
+<tr><th>起点</th><th>终点</th><th>文字</th><th>触发</th></tr>
+<tr><td><code>SCR-HOME.logout</code></td><td><code>SCR-LOGIN</code></td><td>退出登录</td><td>tap</td></tr>
+</table>
+<table>
+<caption>渲染器推导，非作者声明（0）</caption>
+<tr><th>推导物</th><th>控件</th><th>界面文案</th><th>状态</th></tr>
+</table>
+<table>
+<caption>全部可见文字（9）</caption>
+<tr><th>文字</th><th>状态</th><th>来源</th></tr>
+<tr><td>邮箱</td><td>全部</td><td>SCR-LOGIN.email</td></tr>
+<tr><td>密码</td><td>全部</td><td>SCR-LOGIN.pwd</td></tr>
+<tr><td>登录</td><td>全部</td><td>SCR-LOGIN.submit</td></tr>
+<tr><td>SCR-LOGIN · default · desktop 1280x800 · layout 1 · ui 9da9bdd5 · 示意线框 · 显示 4/5</td><td>default</td><td>状态条</td></tr>
+<tr><td>SCR-LOGIN · loading · desktop 1280x800 · layout 1 · ui 9da9bdd5 · 示意线框 · 显示 4/5</td><td>loading</td><td>状态条</td></tr>
+<tr><td>提交后等待服务器响应。</td><td>loading</td><td>状态说明</td></tr>
+<tr><td>邮箱或密码不正确</td><td>error</td><td>SCR-LOGIN.err</td></tr>
+<tr><td>SCR-LOGIN · error · desktop 1280x800 · layout 1 · ui 9da9bdd5 · 示意线框 · 显示 5/5</td><td>error</td><td>状态条</td></tr>
+<tr><td>邮箱或密码不正确。</td><td>error</td><td>状态说明</td></tr>
+</table>
+<table>
+<caption>示例数据（0）</caption>
+<tr><th>控件</th><th>列</th><th>行数</th><th>画出行数</th><th>说明</th></tr>
+</table>
+</main>
+<footer>
+<nav>
+<a href="../../screens/SCR-LOGIN.card.md">画面卡（Markdown）</a> · <a href="INDEX.html">索引</a> · <a href="NAV.html">导航</a> · <a href="../START.html">入口</a>
+</nav>
+<p>页尾 §CARD-SCR-LOGIN · 含 11 个块、8 张表 · sha8 cd6d86f4 · 以上为全部内容</p>
+</footer>
+</body>
+</html>

@@ -2,7 +2,8 @@
 
 The prose lives in ``atlas/brief/<section>.<lang>.md`` (data, zh-CN and en-US). A few placeholders keep the text from drifting
 away from the code that enforces it: ``{{headers}}`` (the section headers of the format, from ``format.rows.SECTIONS``),
-``{{derived}}`` (the keys the format refuses, from ``rows.DERIVED``) and ``{{ids:<group>}}`` (vocabulary ids of the profile).
+``{{derived}}`` (the keys the format refuses, from ``rows.DERIVED``) and ``{{ids:<group>}}`` (vocabulary ids of the profile). The ``ui`` section
+adds ``{{uiheaders}}``, ``{{uiderived}}`` and ``{{uiids:<group>}}``, the same three taken from the interface family (``protoui``).
 ``all`` is a compact work order of at most 9,000 bytes; every other section is at most 3,000 bytes (UTF-8 bytes of the
 rendered text; the tests enforce both for both languages). Standard library only.
 """
@@ -13,9 +14,11 @@ from pathlib import Path
 
 from . import vocab
 from .format import rows as rw
+from .protoui import rows as ui_rows
+from .protoui import vocab as ui_vocab
 
 BRIEF_DIR = Path(__file__).resolve().parent / "brief"
-SECTIONS = ("format", "vocab", "derived", "slices", "oracle", "docs", "economics")
+SECTIONS = ("format", "vocab", "derived", "slices", "oracle", "docs", "economics", "ui")
 LANGUAGES = ("zh-CN", "en-US")
 ALL_CAP = 9000
 SECTION_CAP = 3000
@@ -38,6 +41,18 @@ def _derived() -> str:
     return "\n".join(f"- {name}: {' '.join(sorted(keys))}" for name, keys in rw.DERIVED.items() if keys)
 
 
+def _ui_headers() -> str:
+    lines = []
+    for spec in ui_rows.SECTIONS.values():
+        options = " ".join(spec.option_names)
+        lines.append(f"{spec.header}" + (f"   opts: {options}" if options else ""))
+    return "\n".join(lines)
+
+
+def _ui_derived() -> str:
+    return "\n".join(f"- {name}: {' '.join(sorted(keys))}" for name, keys in ui_rows.DERIVED.items() if keys)
+
+
 def _fill(match: "re.Match") -> str:
     name, argument = match.group(1), match.group(2)
     if name == "headers":
@@ -46,6 +61,12 @@ def _fill(match: "re.Match") -> str:
         return _derived()
     if name == "ids" and argument:
         return " ".join(vocab.default_profile().ids(argument))
+    if name == "uiheaders":
+        return _ui_headers()
+    if name == "uiderived":
+        return _ui_derived()
+    if name == "uiids" and argument and argument in ui_vocab.ENUMS:
+        return " ".join(ui_vocab.ENUMS[argument])
     raise BriefError(f"unknown placeholder {match.group(0)}")
 
 

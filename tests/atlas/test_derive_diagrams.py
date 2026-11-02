@@ -20,6 +20,7 @@ import unittest
 from pathlib import Path
 
 from gemarc_mcp.atlas import model as am
+from gemarc_mcp.atlas.derive import diagram_header as DH
 from gemarc_mcp.atlas.derive import diagrams as D
 from gemarc_mcp.atlas.derive import i18n as T
 from gemarc_mcp.atlas.derive import mermaid as M
@@ -162,7 +163,7 @@ class TableTests(unittest.TestCase):
                 self.assertEqual({T.chapter_title(lang, lv, n) for lv in T.LEVELS}.__len__(), 1)
 
     def test_every_table_header_set_exists_and_has_the_documented_width(self):
-        widths = {"evidence": 4, "requirement": 4, "coverage": 6, "node_req": 5, "node_bd": 7, "edge_min": 5, "edge_bd": 6, "edge_dd": 10,
+        widths = {"evidence": 4, "requirement": 4, "coverage": 6, "node_req": 5, "node_bd": 7, "edge_min": 5, "edge_bd": 6, "edge_dd": 11, "evidence_ref": 6,
                   "case": 5, "event": 6, "entity": 5, "column": 4, "port": 4, "transition": 5, "tbd": 4, "policy": 3, "exception": 4,
                   "testplan": 2, "crossmap": 4, "signoff": 4}
         for lang in LANGS:
@@ -587,7 +588,8 @@ class OverviewEdgeTests(unittest.TestCase):
             report = B.build_docs(model, tmp, ["en-US"])
             text = (Path(tmp) / "diagrams" / "component-overview.mmd").read_bytes().decode("utf-8")
             self.assertTrue(any(f["path"] == "diagrams/component-overview.mmd" for f in report["files"]))
-        self.assertEqual(text, self.overview(model)[0]["mermaid"])
+        self.assertTrue(text.startswith(DH.VERSION_LINE + "\n"), "a written diagram file starts with its header (design 2.12, R3)")
+        self.assertEqual(DH.body_of(text), self.overview(model)[0]["mermaid"], "what follows the header is the unit text, byte for byte")
         self.assertEqual(text.count('|"10"|'), 2)
         self.assertNotIn('|"20"|', text)
 

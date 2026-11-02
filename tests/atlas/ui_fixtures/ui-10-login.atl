@@ -1,0 +1,23 @@
+#atlas-ui 1
+// 借阅台原型界面:合成示例,不是真实系统。
+## screens: id | title | purpose | opts
+SCR-LOGIN | 登录 | 会员用邮箱和密码进入借阅台。 | kind=page frame=desktop route=/login start=true actor=usr.member req=RQ-1
+SCR-HOME | 我的借阅 | 列出会员当前借出的书。 | kind=page frame=desktop route=/home req=RQ-1
+## variants: screen | name | note | opts
+SCR-LOGIN | loading | 提交后等待服务器响应。 | kind=loading
+SCR-LOGIN | error | 邮箱或密码不正确。 | kind=error
+SCR-HOME | empty | 没有任何借出的书。 | kind=empty
+## widgets: local | label | opts
+@set screen=SCR-LOGIN
+form | 登录表单 | kind=form
+email | 邮箱 | kind=input parent=form bind=email
+pwd | 密码 | kind=input parent=form bind=password
+err | 邮箱或密码不正确 | kind=text parent=form in=error emph=danger
+submit | 登录 | kind=button parent=form emph=primary api=svc.loan
+@set screen=SCR-HOME
+bar | 借阅台 | kind=header
+logout | 退出 | kind=link parent=bar
+loans | 借出的书 | kind=table w=fill
+## nav: from | to | label | opts
+SCR-LOGIN.submit | SCR-HOME | 凭证正确,进入首页 | on=submit guard=凭证正确 case=CS-BORROW-OK rule=R-BORROW
+SCR-HOME.logout | SCR-LOGIN | 退出登录 | on=tap

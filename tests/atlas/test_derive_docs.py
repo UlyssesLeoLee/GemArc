@@ -533,5 +533,87 @@ class ColumnConsistencyTests(unittest.TestCase):
             self.assertEqual(sorted(unreached.get("evidences", [])), sorted(set(b.ix.evidence) - cited))
 
 
+class RepairedFragmentTests(unittest.TestCase):
+    """The three fragment changes of the reading surface (design A3 F4, F12, N0): the label column of the DD edge table, the evidence
+    columns, the fact note. Each is also what the reading planner relies on, so each is pinned here."""
+
+    FORBIDDEN = {"zh-CN": ("已验证", "已核实", "已确认"), "en-US": ("verified", "validated", "confirmed"), "ja-JP": ()}
+
+    def test_the_dd_edge_row_prints_the_label_the_shallow_rows_print(self):
+        for lang in LANGS:
+            b = built("reference")
+            items = b.langs[lang][0]["fragments"]["items"]
+            by_key = {}
+            for item in items:
+                if item["grp"] in ("e.BD", "e.DD", "ifc"):
+                    by_key.setdefault((item["grp"], item["md"].split("`")[1]), item["md"])
+            header = T.tr_list(lang, "skeleton.th.edge_dd")
+            self.assertEqual(len(header), 11, lang)
+            label_at = header.index(T.tr_list(lang, "skeleton.th.edge_bd")[4])  # the column the BD row calls the label
+            checked = 0
+            for (grp, eid), md in sorted(by_key.items()):
+                if grp != "e.DD":
+                    continue
+                dd_cells = [c.strip() for c in md.strip().strip("|").split(" | ")]
+                self.assertEqual(len(dd_cells), 11, (lang, eid))
+                for other in ("e.BD", "ifc"):
+                    shallow = by_key.get((other, eid))
+                    if shallow is None:
+                        continue
+                    cells = [c.strip() for c in shallow.strip().strip("|").split(" | ")]
+                    label = cells[4]  # BD: id from to relation label grade; ifc: id from to relation label
+                    self.assertEqual(dd_cells[label_at], label, (lang, eid, other))
+                    checked += 1
+            self.assertGreater(checked, 50, lang)
+
+    def test_every_interface_row_is_rebuildable_from_the_dd_edge_row(self):
+        b = built("reference")
+        items = b.langs["en-US"][0]["fragments"]["items"]
+        dd = {i["md"].split("`")[1]: [c.strip() for c in i["md"].strip().strip("|").split(" | ")] for i in items if i["grp"] == "e.DD"}
+        ifc = [i for i in items if i["grp"] == "ifc"]
+        self.assertGreater(len(ifc), 10)
+        for item in ifc:
+            cells = [c.strip() for c in item["md"].strip().strip("|").split(" | ")]
+            self.assertTrue(set(cells) <= set(dd[item["md"].split("`")[1]]), cells)
+
+    def test_the_evidence_row_has_alias_and_line_range_columns(self):
+        model = copy.deepcopy(fixture_model())
+        evs = model["evidences"]
+        self.assertGreaterEqual(len(evs), 3)
+        evs[0].update({"repository": "", "lineRange": None, "anchor": "a" * 130})
+        evs[1].update({"repository": "synth-repo", "lineRange": [12, 18], "anchor": "short anchor"})
+        for lang in LANGS:
+            rows = {}
+            ds = F.build_docset(model, lang)
+            for item in ds["fragments"]["items"]:
+                if item["grp"] == "ev":
+                    rows[item["md"].split("`")[1]] = [c.strip() for c in item["md"].strip().strip("|").split(" | ")]
+            self.assertEqual(len(T.tr_list(lang, "skeleton.th.evidence_ref")), 6)
+            for cells in rows.values():
+                self.assertEqual(len(cells), 6, (lang, cells))
+            first, second = rows.get(evs[0]["evidenceId"]), rows.get(evs[1]["evidenceId"])
+            if first is None or second is None:
+                self.skipTest("the fixture does not cite its first two evidences")
+            self.assertEqual(first[1], T.tr(lang, "skeleton.evidence_cell.no_repo"))
+            self.assertEqual(first[3], T.tr(lang, "skeleton.evidence_cell.unstamped"))
+            self.assertIn("a" * 117 + "...", first[2])      # the anchor is cut at 120 characters, not at 50
+            self.assertNotIn("a" * 118, first[2])
+            self.assertEqual(second[1], "`synth-repo`")
+            self.assertEqual(second[3], "12-18")
+            self.assertIn("short anchor", second[2])
+            self.assertNotIn(T.NA, second[1:4])
+
+    def test_the_fact_note_claims_a_structure_check_and_nothing_stronger(self):
+        for lang in LANGS:
+            note = " ".join(T.tr_list(lang, "skeleton.facts_note"))
+            self.assertEqual(len(T.tr_list(lang, "skeleton.facts_note")), 3, lang)
+            for word in self.FORBIDDEN[lang]:
+                self.assertNotIn(word, note.lower() if lang == "en-US" else note, (lang, word))
+        self.assertIn("已通过结构检查", T.tr_list("zh-CN", "skeleton.facts_note")[0])
+        self.assertIn("structure checks", T.tr_list("en-US", "skeleton.facts_note")[0])
+        built_doc = built("fixture").text("zh-CN", "DD")
+        self.assertNotIn("已验证", built_doc)
+
+
 if __name__ == "__main__":
     unittest.main()

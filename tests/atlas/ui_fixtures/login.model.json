@@ -1,0 +1,240 @@
+{
+ "meta": {
+  "languages": [
+   "zh-CN"
+  ],
+  "profile": "ui",
+  "projectId": "project",
+  "title": ""
+ },
+ "nav": [
+  {
+   "caseId": "CS-BORROW-OK",
+   "fromId": "SCR-LOGIN.submit",
+   "fromScreenId": "SCR-LOGIN",
+   "guard": "凭证正确",
+   "id": "SCR-LOGIN.submit:go:SCR-HOME",
+   "label": "凭证正确,进入首页",
+   "on": "submit",
+   "reqIds": [],
+   "ruleId": "R-BORROW",
+   "toId": "SCR-HOME",
+   "toScreenId": "SCR-HOME"
+  },
+  {
+   "fromId": "SCR-HOME.logout",
+   "fromScreenId": "SCR-HOME",
+   "id": "SCR-HOME.logout:go:SCR-LOGIN",
+   "label": "退出登录",
+   "on": "tap",
+   "reqIds": [],
+   "toId": "SCR-LOGIN",
+   "toScreenId": "SCR-LOGIN"
+  }
+ ],
+ "schema": "gemarc-atlas-ui/1",
+ "screens": [
+  {
+   "actorId": "usr.member",
+   "frame": "desktop",
+   "id": "SCR-LOGIN",
+   "kind": "page",
+   "navInIds": [
+    "SCR-HOME.logout:go:SCR-LOGIN"
+   ],
+   "navOutIds": [
+    "SCR-LOGIN.submit:go:SCR-HOME"
+   ],
+   "purpose": "会员用邮箱和密码进入借阅台。",
+   "reqIds": [
+    "RQ-1"
+   ],
+   "route": "/login",
+   "start": true,
+   "title": "登录",
+   "variantNames": [
+    "default",
+    "loading",
+    "error"
+   ],
+   "widgetIds": [
+    "SCR-LOGIN.form",
+    "SCR-LOGIN.email",
+    "SCR-LOGIN.pwd",
+    "SCR-LOGIN.err",
+    "SCR-LOGIN.submit"
+   ]
+  },
+  {
+   "frame": "desktop",
+   "id": "SCR-HOME",
+   "kind": "page",
+   "navInIds": [
+    "SCR-LOGIN.submit:go:SCR-HOME"
+   ],
+   "navOutIds": [
+    "SCR-HOME.logout:go:SCR-LOGIN"
+   ],
+   "purpose": "列出会员当前借出的书。",
+   "reqIds": [
+    "RQ-1"
+   ],
+   "route": "/home",
+   "start": false,
+   "title": "我的借阅",
+   "variantNames": [
+    "default",
+    "empty"
+   ],
+   "widgetIds": [
+    "SCR-HOME.bar",
+    "SCR-HOME.logout",
+    "SCR-HOME.loans"
+   ]
+  }
+ ],
+ "variants": [
+  {
+   "id": "SCR-LOGIN#loading",
+   "kind": "loading",
+   "name": "loading",
+   "note": "提交后等待服务器响应。",
+   "screenId": "SCR-LOGIN"
+  },
+  {
+   "id": "SCR-LOGIN#error",
+   "kind": "error",
+   "name": "error",
+   "note": "邮箱或密码不正确。",
+   "screenId": "SCR-LOGIN"
+  },
+  {
+   "id": "SCR-HOME#empty",
+   "kind": "empty",
+   "name": "empty",
+   "note": "没有任何借出的书。",
+   "screenId": "SCR-HOME"
+  }
+ ],
+ "widgets": [
+  {
+   "childIds": [
+    "SCR-LOGIN.email",
+    "SCR-LOGIN.pwd",
+    "SCR-LOGIN.err",
+    "SCR-LOGIN.submit"
+   ],
+   "depth": 0,
+   "id": "SCR-LOGIN.form",
+   "inVariants": null,
+   "kind": "form",
+   "label": "登录表单",
+   "local": "form",
+   "order": 0,
+   "parentId": null,
+   "reqIds": [],
+   "screenId": "SCR-LOGIN"
+  },
+  {
+   "bind": "email",
+   "childIds": [],
+   "depth": 1,
+   "id": "SCR-LOGIN.email",
+   "inVariants": null,
+   "kind": "input",
+   "label": "邮箱",
+   "local": "email",
+   "order": 0,
+   "parentId": "SCR-LOGIN.form",
+   "reqIds": [],
+   "screenId": "SCR-LOGIN"
+  },
+  {
+   "bind": "password",
+   "childIds": [],
+   "depth": 1,
+   "id": "SCR-LOGIN.pwd",
+   "inVariants": null,
+   "kind": "input",
+   "label": "密码",
+   "local": "pwd",
+   "order": 1,
+   "parentId": "SCR-LOGIN.form",
+   "reqIds": [],
+   "screenId": "SCR-LOGIN"
+  },
+  {
+   "childIds": [],
+   "depth": 1,
+   "emph": "danger",
+   "id": "SCR-LOGIN.err",
+   "inVariants": [
+    "error"
+   ],
+   "kind": "text",
+   "label": "邮箱或密码不正确",
+   "local": "err",
+   "order": 2,
+   "parentId": "SCR-LOGIN.form",
+   "reqIds": [],
+   "screenId": "SCR-LOGIN"
+  },
+  {
+   "apiId": "svc.loan",
+   "childIds": [],
+   "depth": 1,
+   "emph": "primary",
+   "id": "SCR-LOGIN.submit",
+   "inVariants": null,
+   "kind": "button",
+   "label": "登录",
+   "local": "submit",
+   "order": 3,
+   "parentId": "SCR-LOGIN.form",
+   "reqIds": [],
+   "screenId": "SCR-LOGIN"
+  },
+  {
+   "childIds": [
+    "SCR-HOME.logout"
+   ],
+   "depth": 0,
+   "id": "SCR-HOME.bar",
+   "inVariants": null,
+   "kind": "header",
+   "label": "借阅台",
+   "local": "bar",
+   "order": 0,
+   "parentId": null,
+   "reqIds": [],
+   "screenId": "SCR-HOME"
+  },
+  {
+   "childIds": [],
+   "depth": 1,
+   "id": "SCR-HOME.logout",
+   "inVariants": null,
+   "kind": "link",
+   "label": "退出",
+   "local": "logout",
+   "order": 0,
+   "parentId": "SCR-HOME.bar",
+   "reqIds": [],
+   "screenId": "SCR-HOME"
+  },
+  {
+   "childIds": [],
+   "depth": 0,
+   "id": "SCR-HOME.loans",
+   "inVariants": null,
+   "kind": "table",
+   "label": "借出的书",
+   "local": "loans",
+   "order": 1,
+   "parentId": null,
+   "reqIds": [],
+   "screenId": "SCR-HOME",
+   "w": "fill"
+  }
+ ]
+}

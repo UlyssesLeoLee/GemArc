@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 844" width="1280" height="844" role="group" aria-label="SCR-HOME 我的借阅（状态: empty）" data-schema="gemarc-atlas-screen/1" data-screen="SCR-HOME" data-variant="empty" data-frame="desktop" data-layout="1" data-ui-sha8="9da9bdd5">
+<title>SCR-HOME 我的借阅（状态: empty）</title>
+<desc>包含: 3 个控件（header×1, link×1, table×1）；本状态显示 3 / 共 3。 不含: 叠层、绝对定位、动画、响应式断点、主题；一切不在原型模型里的内容。 没有任何借出的书。 几何为示意（布局 L1.1），规范性内容 = 种类、文字、字段、状态、跳转、父子与顺序。</desc>
+<style>
+.p{fill:#f6f7f9}.b{fill:#fff;stroke:#8a8f98}.f{fill:#e9ebee;stroke:#8a8f98}.n{fill:none;stroke:#c3c7cd;stroke-dasharray:3 3}.z{fill:transparent}.k{fill:#1f2328}.s{fill:#fff;stroke:#1f2328;stroke-width:2}.d{fill:#fff;stroke:#c0392b;stroke-width:2}.q{fill:#e5e7eb}.m{fill:#6b7280}.ln{stroke:#8a8f98;fill:none}
+.t,.h,.s2,.mk{font-family:'Microsoft YaHei','PingFang SC','Noto Sans CJK SC',sans-serif;font-size:14px;fill:#1f2328}.h{font-size:20px;font-weight:bold}.s2{font-size:12px}
+.mk{font-size:12px;fill:#fff;text-anchor:middle}.bd{font-weight:bold}.g{fill:#6b7280}.w{fill:#fff}.r{fill:#c0392b}.u{fill:#1a5fb4;text-decoration:underline}.i{font-style:italic}
+</style>
+<g id="SCR-HOME.state" data-kind="state-label" data-box="0 0 1280 44">
+<rect x="0" y="0" width="1280" height="44" class="f"/>
+<text x="8" y="18" class="s2 g">SCR-HOME · empty · desktop 1280x800 · layout 1 · ui 9da9bdd5 · 示意线框 · 显示 3/3</text>
+<text x="8" y="34" class="s2 g">没有任何借出的书。</text>
+</g>
+<g id="SCR-HOME.root" data-kind="screen" data-box="0 0 1280 800" data-req="RQ-1" transform="translate(0 44)">
+<rect x="0" y="0" width="1280" height="800" class="p"/>
+<g id="SCR-HOME.bar" data-kind="header" data-box="0 0 1280 56" data-n="1" data-parent="SCR-HOME.root" aria-label="借阅台">
+<rect x="0" y="0" width="1280" height="56" class="f"/>
+</g>
+<g id="SCR-HOME.logout" data-kind="link" data-box="20 12 34 32" data-n="2" data-parent="SCR-HOME.bar" aria-label="退出" data-goto="SCR-LOGIN" data-nav="SCR-HOME.logout:go:SCR-LOGIN" data-on="tap">
+<rect x="20" y="12" width="34" height="32" class="z"/>
+<text x="20" y="33" class="t u">退出</text>
+<circle cx="10" cy="22" r="9" class="m"/>
+<text x="10" y="26" class="mk" data-mark="2">2</text>
+</g>
+<g id="SCR-HOME.loans" data-kind="table" data-box="24 80 1232 92" data-n="3" data-parent="SCR-HOME.root" aria-label="借出的书">
+<rect x="24" y="80" width="1232" height="92" class="b"/>
+<rect x="24" y="80" width="1232" height="36" class="f"/>
+<text x="36" y="103" class="t bd">借出的书</text>
+<text x="640" y="149" text-anchor="middle" class="t g i" data-derived="true">（空）</text>
+<circle cx="14" cy="90" r="9" class="m"/>
+<text x="14" y="94" class="mk" data-mark="3">3</text>
+</g>
+</g>
+</svg>

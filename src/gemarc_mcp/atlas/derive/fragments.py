@@ -74,7 +74,7 @@ _STATIC_GROUPS = [
     (11, "acc", 1, 3, "\n"),
     (12, "sign", 1, 3, "\n\n"),
 ]
-_HEAD_KEY = {"req": "requirement", "cov": "coverage", "ev": "evidence", "xmap": "crossmap", "chmap": "crossmap", "n.REQ": "node_req", "e.REQ": "edge_min",
+_HEAD_KEY = {"req": "requirement", "cov": "coverage", "ev": "evidence_ref", "xmap": "crossmap", "chmap": "crossmap", "n.REQ": "node_req", "e.REQ": "edge_min",
              "n.BD": "node_bd", "e.BD": "edge_bd", "e.DD": "edge_dd", "case": "case", "ent": "entity", "ifc": "edge_min", "ports": "port",
              "nfr": "policy", "con": "policy", "tbd": "tbd"}
 # the chapter-level empty sentence (``skeleton.empty.<key>``) of the chapters that can be empty

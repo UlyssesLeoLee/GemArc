@@ -1,0 +1,56 @@
+#atlas-ui 1
+## screens: id | title | purpose | opts
+SCR-RETURN | 还书 | 馆员扫码登记还书。 | kind=page frame=tablet route=/return start=true
+SCR-FINES | 罚款 | 显示会员的逾期罚款并支持缴纳。 | kind=page frame=desktop route=/fines
+SCR-PROFILE | 个人资料 | 会员查看并修改自己的联系方式。 | kind=page frame=phone route=/profile actor=usr.member
+SCR-NOTICE | 通知 | 到期提醒和预约到馆通知。 | kind=page frame=phone route=/notice
+## variants: screen | name | note | opts
+SCR-RETURN | success | 已登记归还。 | kind=success
+SCR-RETURN | error | 找不到这本书的借阅记录。 | kind=error
+SCR-FINES | loading | 读取罚款。 | kind=loading
+SCR-FINES | empty | 没有罚款。 | kind=empty
+SCR-PROFILE | error | 保存失败,请检查输入。 | kind=error
+SCR-PROFILE | success | 已保存。 | kind=success
+SCR-NOTICE | loading | 读取通知。 | kind=loading
+SCR-NOTICE | empty | 没有未读消息。 | kind=empty
+## widgets: local | label | opts
+@set screen=SCR-RETURN
+form | 还书表单 | kind=form
+scan | 扫描条码 | kind=input parent=form bind=barcode
+copy | 册号 | kind=select parent=form bind=copy
+submit | 登记归还 | kind=button parent=form emph=primary api=svc.loan
+result | 已归还 | kind=text in=success
+home | 回到首页 | kind=link
+@set screen=SCR-FINES
+bar | 借阅台 | kind=header
+home | 我的借阅 | kind=link parent=bar
+total | 合计 12.00 元 | kind=heading
+fines | 罚款明细 | kind=table w=fill
+pay | 缴纳 | kind=button emph=primary
+pager | 分页 | kind=pagination
+@set screen=SCR-PROFILE
+form | 资料表单 | kind=form
+avatar | 头像 | kind=image parent=form
+name | 姓名 | kind=input parent=form bind=name
+phone | 电话 | kind=input parent=form bind=phone
+addr | 地址 | kind=textarea parent=form bind=address
+save | 保存 | kind=button parent=form emph=primary
+cancel | 取消 | kind=link parent=form
+tip | 电话用于到期提醒 | kind=text parent=form emph=muted
+@set screen=SCR-NOTICE
+bar | 通知 | kind=header
+home | 返回 | kind=link parent=bar
+tabs | 分组 | kind=tabs
+unread | 未读 | kind=tab parent=tabs
+all | 全部 | kind=tab parent=tabs
+items | 通知列表 | kind=list w=fill
+mark | 全部标为已读 | kind=button emph=secondary api=svc.loan
+## nav: from | to | label | opts
+SCR-RETURN.submit | SCR-RETURN#success | 归还成功 | on=submit
+SCR-RETURN.home | SCR-HOME | 回到首页 | on=tap
+SCR-FINES.home | SCR-HOME | 回到我的借阅 | on=tap
+SCR-FINES.pay | SCR-HOME | 缴纳完成 | on=submit
+SCR-PROFILE.save | SCR-PROFILE#success | 保存成功 | on=submit
+SCR-PROFILE.cancel | SCR-HOME | 放弃修改 | on=tap
+SCR-NOTICE.home | SCR-HOME | 返回首页 | on=back
+SCR-NOTICE.items | SCR-BOOK | 点通知看相关的书 | on=tap

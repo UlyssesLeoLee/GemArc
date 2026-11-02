@@ -288,22 +288,32 @@ def sign_block(c: Ctx) -> str:
 
 # --------------------------------------------------------------------------------------------- evidence, requirements
 
+ANCHOR_LIMIT = 120
+
+
 def evidence_row(c: Ctx, eid: str) -> str:
+    """One evidence row: id, repository alias, location (file and anchor, anchor cut at ``ANCHOR_LIMIT`` characters), line range, topic, grade.
+
+    An empty alias prints the fixed ``evidence_cell.no_repo`` text and a line range the verifier has not stamped (``null``) prints
+    ``evidence_cell.unstamped``: both are authored states, not missing facts, so neither is a NOT-AUTHORED marker."""
     rec = c.ix.evidence.get(eid)
     if rec is None:
         # an id used but never defined: keep the row, say what is missing (spec: never drop a row silently)
-        return row([T.code(eid), T.not_authored(slot("evidence.file", eid)), T.not_authored(slot("evidence.topic", eid)),
+        return row([T.code(eid), T.na(), T.not_authored(slot("evidence.file", eid)), T.na(), T.not_authored(slot("evidence.topic", eid)),
                     T.not_authored(slot("evidence.verification", eid))])
+    repo = sval(rec.get("repository"))
     path = sval(rec.get("filePath"))
     where = T.code(path) if path else T.not_authored(slot("evidence.file", eid))
-    span = rec.get("lineRange")
-    if isinstance(span, list) and len(span) == 2 and all(isinstance(x, int) and not isinstance(x, bool) for x in span):
-        where += f":{span[0]}-{span[1]}"
     anchor = sval(rec.get("anchor"))
     if anchor:
-        where += " " + T.md_text(T.clip(anchor, 50))
-    return row([T.code(eid), where, T.md_cell(rec.get("topic"), slot("evidence.topic", eid)),
-                T.md_cell(rec.get("verification"), slot("evidence.verification", eid))])
+        where += " " + T.md_text(T.clip(anchor, ANCHOR_LIMIT))
+    span = rec.get("lineRange")
+    if isinstance(span, list) and len(span) == 2 and all(isinstance(x, int) and not isinstance(x, bool) for x in span):
+        lines = f"{span[0]}-{span[1]}"
+    else:
+        lines = T.tr(c.lang, "skeleton.evidence_cell.unstamped")
+    return row([T.code(eid), T.code(repo) if repo else T.tr(c.lang, "skeleton.evidence_cell.no_repo"), where, lines,
+                T.md_cell(rec.get("topic"), slot("evidence.topic", eid)), T.md_cell(rec.get("verification"), slot("evidence.verification", eid))])
 
 
 def requirement_row(c: Ctx, req: Mapping) -> str:
@@ -416,7 +426,8 @@ def edge_row_dd(c: Ctx, edge: Mapping) -> str:
     guard = edge.get("guardId")
     return row([T.code(eid), code_or_na(edge.get("sourceId")), code_or_na(edge.get("sourcePortId")), code_or_na(edge.get("targetId")),
                 code_or_na(edge.get("targetPortId")), _relation(c, edge, False),
-                T.md_text(sval(edge.get("cardinality"))) or T.na(), code_or_na(guard), ids_cell(str_list(edge.get("evidenceIds")), 4),
+                T.md_text(sval(edge.get("cardinality"))) or T.na(), T.md_cell(edge.get("label"), slot("edge.label", eid)), code_or_na(guard),
+                ids_cell(str_list(edge.get("evidenceIds")), 4),
                 T.md_cell(edge.get("verification"), slot("edge.verification", eid))])
 
 

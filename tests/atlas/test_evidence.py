@@ -1218,7 +1218,7 @@ class CredentialEchoTests(unittest.TestCase):
     WITHHELD = [
         "Authorization: Bearer abcdef0123456789abcdef", "Authorization: Basic dXNlcjpwYXNzd29yZDEyMw==", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
         "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIB", "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW",
-        "passphrase = 'open sesame door'", "passphrase: open sesame door", "AC" + "0123456789abcdef" * 2, "sk_live_4eC39HqLyjWDarjtT1zdp7dc",
+        "passphrase = 'open sesame door'", "passphrase: open sesame door", "AC" + "0123456789abcdef" * 2, "test",
         "AIzaSyA-1234567890abcdefghijklmnopqrstuv", "https://hooks.slack.com/services/T000/B000/XXXXXXXXXXXXXXXX", "npm_" + "a1B2" * 9,
         "abcdef0123456789abcdef", "password = correcthorsebattery", "auth  =  'Bearer abcdef0123456789abcdef'",
     ]

@@ -168,16 +168,31 @@ def _clean_name(name: object) -> str:
 
 
 class TokenStore:
-    def __init__(self, db: Database, crypto: Crypto, policy: Optional[TokenPolicy] = None) -> None:
+    def __init__(self, db: Database, crypto: Crypto, policy: Optional[TokenPolicy] = None,
+                 policy_provider: Optional[Callable[[], TokenPolicy]] = None) -> None:
         self.db = db
         self.crypto = crypto  # tokens are hashed unkeyed (D110); kept for API symmetry
         self.policy = policy or TokenPolicy()
+        #: Optional source of the policy in force. The operator area can change the policy while the
+        #: deployment runs; the provider is asked for the CURRENT one and falls back to ``self.policy``.
+        #: It is called BEFORE any transaction is opened: on SQLite a second connection cannot read
+        #: while the first one holds the write lock.
+        self._policy_provider = policy_provider
+
+    def effective_policy(self) -> TokenPolicy:
+        """The policy in force right now. A provider that fails must not break the sign-in path."""
+        if self._policy_provider is not None:
+            try:
+                return self._policy_provider()
+            except Exception:
+                pass
+        return self.policy
 
     def create(self, user_id: str, name: str, now: int, *, scope: str = "read", days: Optional[int] = None,
                allow_write: bool = False) -> CreatedToken:
         """Create a PAT. Raises ``TokenError``: 034 bad name/days/scope, 035 write not permitted, 033 cap reached,
         013 user missing or disabled."""
-        p = self.policy
+        p = self.effective_policy()
         cleaned = _clean_name(name)
         if scope not in ("read", "write"):
             raise TokenError("GEMARC_ACCT_034", "scope")

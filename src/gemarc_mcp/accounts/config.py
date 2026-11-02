@@ -58,6 +58,7 @@ class AccountsConfig:
     db: DbTarget = field(repr=False)
     allowed_domains: "tuple[str, ...]"
     allowed_emails: "tuple[str, ...]" = field(repr=False)
+    admin_emails: "tuple[str, ...]" = field(repr=False)
     open_registration: bool
     max_users: int
     session_idle_min: int
@@ -279,6 +280,12 @@ def load(environ: Mapping[str, str], *, toolset: Optional[str] = None) -> Config
         problems.append(Problem("GEMARC_ACCOUNTS_ALLOWED_EMAILS", "invalid"))
     open_registration = not emails and any(d in OPEN_REGISTRATION_DOMAINS for d in domains)
 
+    # administrators: the addresses that may change the deployment settings (the admin area).
+    # A separate list from ALLOWED_EMAILS: "may sign in" and "may administer" are different permissions.
+    admin_emails = _split_list(environ.get("GEMARC_ACCOUNTS_ADMIN_EMAILS"))
+    if any(e.count("@") != 1 or e.startswith("@") or e.endswith("@") or " " in e for e in admin_emails):
+        problems.append(Problem("GEMARC_ACCOUNTS_ADMIN_EMAILS", "invalid"))
+
     # numbers (out of range = incomplete; never clamped)
     max_users = _int(environ, "GEMARC_ACCOUNTS_MAX_USERS", 1000, 0, 10_000_000, problems)
     idle = _int(environ, "GEMARC_ACCOUNTS_SESSION_IDLE_MIN", 30, 5, 240, problems)
@@ -327,7 +334,8 @@ def load(environ: Mapping[str, str], *, toolset: Optional[str] = None) -> Config
     config = AccountsConfig(
         base_url=base[0], origin=base[1], host=base[2], secure_cookies=base[3],
         google_client_id=client_id, google_client_secret=client_secret, keyring=ring, db=target,
-        allowed_domains=tuple(domains), allowed_emails=tuple(emails), open_registration=open_registration,
+        allowed_domains=tuple(domains), allowed_emails=tuple(emails), admin_emails=tuple(admin_emails),
+        open_registration=open_registration,
         max_users=max_users, session_idle_min=idle, session_max_hours=max_hours,
         pat_default_days=pat_default, pat_max_days=pat_max, pat_max_per_user=pat_per_user,
         pat_cache_seconds=cache, pat_negcache_seconds=negcache, audit_retention_days=retention,

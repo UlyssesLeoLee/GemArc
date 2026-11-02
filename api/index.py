@@ -80,6 +80,7 @@ import json
 import logging
 import os
 import re
+import secrets
 import shutil
 import sys
 import tempfile
@@ -315,6 +316,49 @@ class LazySite:
 
 # --- application factory -----------------------------------------------------
 
+#: How long the cold start waits for the tool set the operator area selected. The database connect
+#: has its own timeout (5 s); this bound is shorter, so a slow database delays the cold start only.
+TOOLSET_LOOKUP_TIMEOUT_S = 4.0
+
+#: Where the operator area lives (the accounts module owns the paths under /account).
+ACCOUNT_ADMIN_PATH = "/account/admin"
+
+
+def _toolset_override(account_config) -> str:
+    """The tool set the operator area selected, or "" when there is none (or it cannot be read).
+
+    Best effort and bounded: the worker is a daemon thread, so a hanging database can neither delay
+    the cold start beyond the timeout nor keep the process alive at exit. A deployment that cannot
+    reach the database keeps the environment's tool set.
+    """
+    if account_config is None:
+        return ""
+
+    def read() -> str:
+        try:
+            from gemarc_mcp.accounts import admin as admin_mod
+            from gemarc_mcp.accounts import schema as accounts_schema
+            from gemarc_mcp.accounts.crypto import Crypto
+            from gemarc_mcp.accounts.db import Database
+            db = Database.from_target(account_config.db, enforce_role=account_config.db.kind == "postgres",
+                                      role_relaxed=account_config.db_role_relaxed)
+            accounts_schema.require_current(db)
+            service = admin_mod.AdminService(db, Crypto(account_config.keyring), account_config.admin_emails)
+            value = service.settings().get(admin_mod.TOOLSET, "")
+            return value if value in admin_mod.TOOLSETS else ""
+        except Exception:
+            return ""
+
+    box: dict = {}
+
+    def run() -> None:
+        box["value"] = read()
+
+    worker = threading.Thread(target=run, daemon=True)
+    worker.start()
+    worker.join(TOOLSET_LOOKUP_TIMEOUT_S)
+    return box.get("value", "")
+
 #: How long a request waits for a lazily started session manager.
 LAZY_START_TIMEOUT_S = 15.0
 
@@ -374,11 +418,7 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
 
     # The tool set is passed explicitly instead of through os.environ, so
     # building an app never changes the configuration of the host process.
-    mode = gemarc_server.active_toolset(toolset or os.environ.get("GEMARC_TOOLSET") or DEFAULT_REMOTE_TOOLSET)
-    mcp_server = gemarc_server.create_server(mode)
-    # create_server refills these module-level lists on every call; keep this app's copy.
-    registered = tuple(gemarc_server.REGISTERED_TOOLS)
-    write_tools = tuple(sorted(gemarc_server.WRITE_TOOLS))
+    requested_mode = gemarc_server.active_toolset(toolset or os.environ.get("GEMARC_TOOLSET") or DEFAULT_REMOTE_TOOLSET)
 
     # --- accounts: decided once, here. Off and no login intent: nothing below runs. ---
     env_view = dict(env_source)
@@ -394,7 +434,7 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
         from gemarc_mcp.accounts import pages as account_pages  # noqa: F811
         from gemarc_mcp.accounts import security as account_security
         owns_account_path = account_security.owns
-        loaded = accounts_config.load(env_view, toolset=mode)
+        loaded = accounts_config.load(env_view, toolset=requested_mode)
         if loaded.ok:
             account_config, accounts_state = loaded.config, "ok"
             for warning in loaded.warnings:  # slugs only (no values); the operator CLI `doctor` explains each
@@ -407,6 +447,25 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
         log.error("a login is required but accounts are not enabled (GEMARC_ACCT_001)")
     #: Login required but accounts unusable: /mcp answers 503 to everything, even with a valid env token.
     fail_closed = switches.login_intent and accounts_state != "ok"
+
+    # The tool set the operator area selected (migration 0002). It is read ONCE per cold start and
+    # only when the accounts are usable; a deployment that cannot reach the database keeps the
+    # environment's tool set. A "full" tool set is refused when the shared-workspace rule (D90)
+    # would not allow it: the operator area must not be able to bypass that check.
+    mode = requested_mode
+    if accounts_state == "ok":
+        chosen = _toolset_override(account_config)
+        if chosen and chosen != requested_mode:
+            if chosen == "full" and account_config.open_registration and not account_config.ack_shared_workspace:
+                log.error("the stored tool set was refused: the shared workspace is not acknowledged")
+            else:
+                mode = chosen
+
+    mcp_server = gemarc_server.create_server(mode)
+    # create_server refills these module-level lists on every call; keep this app's copy.
+    registered = tuple(gemarc_server.REGISTERED_TOOLS)
+    write_tools = tuple(sorted(gemarc_server.WRITE_TOOLS))
+
     account_runtime: list = []           # at most one AccountsRuntime, built on first use
     account_mcp_auth: list = []
     account_lock = threading.Lock()
@@ -544,14 +603,23 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
         }
         if switches.accounts_present or switches.login_intent:
             payload["accounts"] = accounts_health()
+        if accounts_state == "ok":
+            # Only when the accounts feature is actually running. A deployment without accounts must
+            # answer exactly as it did before the accounts work (invariant I1): these two fields
+            # would change the body of /healthz for every existing deployment.
+            payload["sessionAuth"] = bool(switches.uses_pat)
+            payload["consoleRequiresLogin"] = True
         return payload
 
-    def render_console() -> str:
+    def render_console(admin: bool = False) -> str:
         html = CONSOLE_HTML.read_text(encoding="utf-8")
         html = html.replace("__MCP_PATH__", MCP_PATH)
         html = html.replace("__HEALTH_PATH__", HEALTH_PATH)
         html = html.replace("__SITE_PATH__", SITE_PATH)
         html = html.replace("__VERSION__", gemarc_mcp.__version__)
+        html = html.replace("__ADMIN_PATH__", ACCOUNT_ADMIN_PATH)
+        html = html.replace("__ADMIN__", "true" if admin else "false")
+        html = html.replace("__ACCOUNTS__", "true" if accounts_state == "ok" else "false")
         return html.replace("__WRITE_TOOLS__", json.dumps(list(write_tools), ensure_ascii=False))
 
     async def reply(response: Response, scope, receive, send):
@@ -632,12 +700,30 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
     async def console_endpoint(scope, receive, send):
         if not await read_only(scope, receive, send):
             return
+        admin = False
+        if accounts_state == "ok":
+            # The console is behind the login: a caller without a session is sent to the sign-in.
+            # The DB is consulted for the session, so a broken database answers 503 (fail closed)
+            # instead of serving the console to anyone.
+            try:
+                runtime = get_account_runtime()
+                user_id = await runtime.signed_in_user(Headers(scope=scope))
+                admin = bool(user_id) and await runtime.is_admin_user(user_id)
+            except Exception as exc:
+                log.error("accounts_event id=%s class=%s", secrets.token_hex(4), type(exc).__name__)
+                await reply(_json(503, {"error": "accounts_unavailable", "code": "GEMARC_ACCT_002"},
+                                  {"Cache-Control": "no-store"}), scope, receive, send)
+                return
+            if not user_id:
+                await reply(account_pages.redirect("/auth/google/start", 303, hsts=runtime.hsts),
+                            scope, receive, send)
+                return
         if not CONSOLE_HTML.is_file():
             response = Response("The console shell is not present in this deployment bundle. "
                                 "The MCP endpoint at /mcp is unaffected.",
                                 status_code=404, media_type="text/plain; charset=utf-8")
         else:
-            response = HTMLResponse(render_console(), headers={"Cache-Control": "no-cache"})
+            response = HTMLResponse(render_console(admin), headers={"Cache-Control": "no-cache"})
         await reply(response, scope, receive, send)
 
     async def console_asset(scope, receive, send, name: str):

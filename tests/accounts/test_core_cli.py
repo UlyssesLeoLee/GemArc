@@ -68,7 +68,7 @@ class MigrateCli(DbCase):
     def test_migrate_twice(self):
         code, out, err = run(["migrate"], self.env())
         self.assertEqual(code, 0, err)
-        self.assertIn("applied: 0001_init", out)
+        self.assertIn("applied: 0001_init, 0002_admin", out)
         self.assertIn("pending: 0", out)
         code, out, _ = run(["migrate"], self.env())
         self.assertEqual((code, out.split("\n")[0]), (0, "up to date"))
@@ -114,7 +114,7 @@ class Doctor(DbCase):
     def test_healthy_setup_passes_and_leaves_no_row_behind(self):
         code, out, err = run(["doctor"], self.env())
         self.assertEqual(code, 0, out)
-        for needle in ("config: every variable", "key ring: 1 key(s)", "connected", "schema: up to date at 0001_init",
+        for needle in ("config: every variable", "key ring: 1 key(s)", "connected", "schema: up to date at 0002_admin",
                        "runtime role class: app", "round trip", "all checks passed"):
             self.assertIn(needle, out)
         self.assertEqual(self.count("rate_limits"), 0)

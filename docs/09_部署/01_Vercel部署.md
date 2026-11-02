@@ -275,6 +275,60 @@ Sensitive 变量创建后无法再读出明文，所以**必须自己保存令�
 `requirements.txt` 已同步这两项（2026-10-30，由主线补上）。账号路由只认 `GEMARC_ACCOUNTS_BASE_URL` 里的那一个主机名（生产别名），
 预览地址或 `*.vercel.app` 部署地址会得到 421，请只在生产别名上测试登录。
 
+### 4.3 登录门禁与管理员设置区（2026-11-02 新增）
+
+账号功能开启后，本部署的形态是「**登录才能用**」：
+
+| 路径 | 谁能访问 |
+|---|---|
+| `/`（MCP 控制台） | 任何已登录用户；未登录 303 跳 `/auth/google/start` |
+| `/account`（我的账号与个人访问令牌） | 任何已登录用户 |
+| `/account/admin`（管理员设置区） | **仅管理员**；其他人 403 `GEMARC_ACCT_060` |
+| `POST /mcp` | 任何已登录用户（浏览器会话），或个人访问令牌（外部客户端） |
+
+「管理员」= 环境变量白名单 `GEMARC_ACCOUNTS_ADMIN_EMAILS` **或** 数据库表 `admin_users` 里的一行
+（迁移 `0002_admin`）。两者独立：**收权必须同时做两件**。详细设计见 `docs/09_部署/02_账号与安全.md` 第 3.14 节。
+
+#### 4.3.1 本部署要设的环境变量
+
+```powershell
+# 开关与登录要求
+npx vercel@65.8.0 env add GEMARC_ACCOUNTS production --value 1
+npx vercel@65.8.0 env add GEMARC_REQUIRE_LOGIN production --value 1
+# pat-or-env：个人访问令牌可用，同时保留 GEMARC_MCP_TOKEN，运维脚本与既有客户端不受影响
+npx vercel@65.8.0 env add GEMARC_MCP_AUTH production --value pat-or-env
+# 管理员白名单（本机部署的属主）
+npx vercel@65.8.0 env add GEMARC_ACCOUNTS_ADMIN_EMAILS production --value lidian727@gmail.com
+```
+
+其余账号变量（`GEMARC_ACCOUNTS_BASE_URL`、`GEMARC_GOOGLE_CLIENT_ID/SECRET`、
+`GEMARC_ACCOUNTS_KEYS`、`GEMARC_ACCOUNTS_DATABASE_URL`）按第 4.2 节与
+`docs/09_部署/02_账号与安全.md` 第 8 节的运营手册配置。
+
+#### 4.3.2 上线步骤（按顺序）
+
+1. **先跑迁移**（新表 `admin_users`、`operator_settings`）：
+   ```powershell
+   $env:GEMARC_MIGRATE_DATABASE_URL = "<unpooled 连接串>"
+   $env:GEMARC_ACCOUNTS_KEYS = "k1:<base64url>"
+   python -m gemarc_mcp.accounts migrate
+   ```
+   期望输出 `applied: 0001_init, 0002_admin`。
+2. **设环境变量**（4.3.1），然后**重新部署**。
+3. **验证**：用 `lidian727@gmail.com` 打开 `https://gem-arc.vercel.app/` → 应跳到 Google 登录；
+   登录后应回到控制台，左下角出现「管理员设置」入口。
+4. **验证越权**：用另一个 gmail 账号登录 → 控制台可用，但 `/account/admin` 返回 403。
+
+#### 4.3.3 运营者 CLI（管理员授予与撤销）
+
+```powershell
+python -m gemarc_mcp.accounts admin list                  # 看白名单与运行时授予
+python -m gemarc_mcp.accounts admin grant --email x@y.com  # 运行时追加一个管理员
+python -m gemarc_mcp.accounts admin revoke --email x@y.com # 撤销运行时授予
+```
+
+`grant`/`revoke` 只动数据库，**不动环境变量里的白名单**：收权要两边都做。
+
 ## 5. 工具可用性
 
 ### 5.1 远程默认：`stateless` 工具集（8 个）

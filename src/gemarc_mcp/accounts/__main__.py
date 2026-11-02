@@ -1,5 +1,5 @@
 """Operator CLI: ``python -m gemarc_mcp.accounts keygen|migrate|doctor|status|rekey|gc|reconcile|disable-user|
-enable-user|grant-write|revoke-write|purge-user``.
+enable-user|grant-write|revoke-write|purge-user|admin``.
 
 * ``keygen``  prints a fresh ``kid:base64url(32 random bytes)`` keyring entry to stdout. It never writes a file; the
   operator places the value into the Vercel environment (design 8.4). Output is the only place a secret appears.
@@ -28,6 +28,7 @@ import time
 from typing import Callable, Mapping, Optional, Sequence, TextIO
 
 from . import audit, config, retention, schema
+from .admin import AdminService
 from .crypto import Crypto, KeyRing, KeyRingError, b64u
 from .db import Database, DBError
 from .flags import parse_flag
@@ -372,6 +373,40 @@ def cmd_status(args, environ, out, err, clock) -> int:
     return 0 if not attention else 1
 
 
+def cmd_admin(args, environ, out, err, clock) -> int:
+    """The administrator role: list, grant or revoke the runtime grants (migration 0002).
+
+    The environment allow-list (``GEMARC_ACCOUNTS_ADMIN_EMAILS``) is NOT changed by this command:
+    the two are independent, so taking a role away means doing both.
+    """
+    problems: list = []
+    admin_emails = config._split_list(environ.get("GEMARC_ACCOUNTS_ADMIN_EMAILS"))
+    if any(e.count("@") != 1 or e.startswith("@") or e.endswith("@") or " " in e for e in admin_emails):
+        raise CliError(f"{config.CODE} GEMARC_ACCOUNTS_ADMIN_EMAILS: invalid")
+    db, crypto, store = _admin(environ)
+    service = AdminService(db, crypto, tuple(admin_emails))
+    try:
+        if args.admin_action == "list":
+            granted = service.granted_ids()
+            print(f"environment allow-list: {len(admin_emails)} address(es)", file=out)
+            print(f"runtime grants: {len(granted)}", file=out)
+            for user_id in granted:
+                print(f"  {user_id}", file=out)
+            return 0
+        user_id = _target_user(args, store)
+        now = int(clock())
+        if args.admin_action == "grant":
+            done = service.grant(user_id, now, by="cli")
+            print(f"{'granted' if done else 'already granted'}: {user_id}", file=out)
+        else:
+            done = service.revoke(user_id)
+            print(f"{'revoked' if done else 'not granted'}: {user_id}", file=out)
+    except (DBError, schema.MigrationError) as exc:
+        print(_describe_error(exc), file=err)
+        return 1
+    return 0 if done else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m gemarc_mcp.accounts", description="GemArc accounts: operator commands (no command prints a secret, a URL or an e-mail address)")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -395,6 +430,14 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--email", help="user e-mail (looked up by blind index, never printed)")
         if name == "purge-user":
             sp.add_argument("--yes", action="store_true", help="confirm the irreversible deletion")
+    ap = sub.add_parser("admin", help="the administrator role: list, grant or revoke the runtime grants")
+    asub = ap.add_subparsers(dest="admin_action", required=True)
+    asub.add_parser("list", help="show the environment allow-list and the runtime grants")
+    for name, text in (("grant", "give one user the administrator role"),
+                       ("revoke", "take the runtime grant away from one user")):
+        sp = asub.add_parser(name, help=text)
+        sp.add_argument("--id", help="user id (32 hex)")
+        sp.add_argument("--email", help="user e-mail (looked up by blind index, never printed)")
     return parser
 
 
@@ -406,6 +449,7 @@ COMMANDS = {
     "grant-write": _user_action("grant", "write granted", "no such user"),
     "revoke-write": _user_action("revoke", "write revoked", "no such user"),
     "purge-user": _user_action("purge", "purged", "no such user"),
+    "admin": cmd_admin,
 }
 
 

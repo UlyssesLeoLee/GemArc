@@ -205,8 +205,15 @@ def snippets(view: View, token: str) -> str:
 
 
 def account_page(view: View, nonce: str, *, email: str, csrf: str, tokens: Sequence, now: int, recent: bool,
-                 created: Optional[dict] = None, message: Optional[str] = None) -> str:
-    """The signed-in page. ``tokens`` are TokenMeta-like objects; ``created`` is ``{"token": ..., "id": ...}``."""
+                 created: Optional[dict] = None, message: Optional[str] = None,
+                 default_days: Optional[int] = None, max_days: Optional[int] = None) -> str:
+    """The signed-in page. ``tokens`` are TokenMeta-like objects; ``created`` is ``{"token": ..., "id": ...}``.
+
+    ``default_days`` and ``max_days`` are the token policy in force; without them the deployment
+    defaults from the environment are used.
+    """
+    days_default = int(view.default_days if default_days is None else default_days)
+    days_max = int(view.max_days if max_days is None else max_days)
     parts = ["<h1>GemArc 账号</h1>"]
     parts.append(f"<p>已登录：<strong>{esc(email)}</strong></p>")
     if message:
@@ -244,8 +251,8 @@ def account_page(view: View, nonce: str, *, email: str, csrf: str, tokens: Seque
         "<form method=\"post\" action=\"/account/tokens\" class=\"card\">" + _csrf(csrf) +
         "<div class=\"row\"><div><label for=\"name\">名称（至多 40 字）</label>"
         "<input id=\"name\" name=\"name\" maxlength=\"40\" required></div>"
-        f"<div><label for=\"days\">有效天数（至多 {int(view.max_days)}）</label>"
-        f"<input id=\"days\" name=\"days\" type=\"number\" min=\"1\" max=\"{int(view.max_days)}\" value=\"{int(view.default_days)}\"></div>"
+        f"<div><label for=\"days\">有效天数（至多 {days_max}）</label>"
+        f"<input id=\"days\" name=\"days\" type=\"number\" min=\"1\" max=\"{days_max}\" value=\"{days_default}\"></div>"
         + scope_field +
         "<div><button type=\"submit\">创建令牌</button></div></div></form>"
         "<form method=\"post\" action=\"/account/tokens/revoke-all\">" + _csrf(csrf) +
@@ -266,3 +273,102 @@ def account_page(view: View, nonce: str, *, email: str, csrf: str, tokens: Seque
     if view.privacy_url:
         parts.append(f"<p class=\"mute\"><a href=\"{esc(view.privacy_url)}\">隐私声明</a></p>")
     return page("GemArc 账号", "".join(parts), nonce)
+
+
+# -- the operator area -------------------------------------------------------------------------------------------
+
+
+def _admin_user_rows(users: Sequence, csrf: str) -> str:
+    """One row per user with the five actions. Every action is a POST with the CSRF token."""
+    rows = []
+    for u in users:
+        email = u.email or "（无法读取）"
+        admin = "是" if u.granted else "否"
+        if u.status != "active":
+            admin = admin + " · 已停用"
+        buttons = []
+        if u.status == "active":
+            buttons.append(f"<form method=\"post\" action=\"/account/admin/users/{esc(u.id)}/disable\">"
+                           f"{_csrf(csrf)}<button class=\"danger\" type=\"submit\">停用</button></form>")
+        else:
+            buttons.append(f"<form method=\"post\" action=\"/account/admin/users/{esc(u.id)}/enable\">"
+                           f"{_csrf(csrf)}<button type=\"submit\">启用</button></form>")
+        if u.granted:
+            buttons.append(f"<form method=\"post\" action=\"/account/admin/users/{esc(u.id)}/revoke-admin\">"
+                           f"{_csrf(csrf)}<button class=\"plain\" type=\"submit\">撤销管理员</button></form>")
+        else:
+            buttons.append(f"<form method=\"post\" action=\"/account/admin/users/{esc(u.id)}/grant-admin\">"
+                           f"{_csrf(csrf)}<button class=\"plain\" type=\"submit\">授予管理员</button></form>")
+        buttons.append(f"<form method=\"post\" action=\"/account/admin/users/{esc(u.id)}/revoke-tokens\">"
+                       f"{_csrf(csrf)}<button class=\"plain\" type=\"submit\">撤销全部令牌</button></form>")
+        rows.append(
+            f"<tr><td>{esc(email)}<br><span class=\"mute tok\">{esc(u.id)}</span></td>"
+            f"<td>{esc(u.status)}</td><td>{esc(admin)}</td><td>{'是' if u.can_write else '否'}</td>"
+            f"<td>{_fmt_time(u.created_at)}</td><td>{_fmt_time(u.last_login_at)}</td>"
+            f"<td>{''.join(buttons)}</td></tr>")
+    if not rows:
+        return "<p class=\"mute\">还没有用户。</p>"
+    return ("<table><tr><th>邮箱</th><th>状态</th><th>管理员</th><th>可写</th><th>创建</th><th>最近登录</th>"
+            f"<th>操作</th></tr>{''.join(rows)}</table>")
+
+
+def _admin_audit_rows(entries: Sequence) -> str:
+    if not entries:
+        return "<p class=\"mute\">还没有审计记录。</p>"
+    rows = []
+    for a in entries:
+        extra = " · " + a["code"] if a["code"] else ""
+        rows.append(f"<tr><td>{_fmt_time(a['ts'])}</td><td>{esc(a['event'])}{esc(extra)}</td>"
+                    f"<td class=\"tok\">{esc(a['userId'])}</td><td class=\"tok\">{esc(a['ref'])}</td></tr>")
+    return ("<table><tr><th>时间</th><th>事件</th><th>用户</th><th>引用</th></tr>"
+            f"{''.join(rows)}</table>")
+
+
+def admin_page(view: View, nonce: str, *, email: str, csrf: str, now: int, users: Sequence, audit: Sequence,
+               settings: dict, deployment: dict) -> str:
+    """The operator area. Every value on this page comes from the server; nothing here is a script."""
+    parts = ["<h1>GemArc 设置</h1>"]
+    parts.append(f"<p class=\"mute\">当前管理员：<strong>{esc(email)}</strong> · "
+                 f"<a href=\"/account\">我的账号</a> · <a href=\"/\">MCP 控制台</a></p>")
+
+    parts.append(
+        "<h2>部署状态</h2><div class=\"card\"><table>"
+        f"<tr><th>工具集</th><td>{esc(str(deployment.get('toolset', '')))}</td></tr>"
+        f"<tr><th>MCP 鉴权模式</th><td>{esc(str(deployment.get('mcpMode', '')) or '（由环境变量决定）')}</td></tr>"
+        f"<tr><th>环境变量里的管理员</th><td>{esc(', '.join(deployment.get('adminEmails') or []) or '（无）')}</td></tr>"
+        f"<tr><th>允许的域名</th><td>{esc(', '.join(deployment.get('allowedDomains') or []) or '（无）')}</td></tr>"
+        f"<tr><th>允许登录的邮箱</th><td>{esc(', '.join(deployment.get('allowedEmails') or []) or '（按域名开放）')}</td></tr>"
+        f"<tr><th>用户上限</th><td>{esc(str(deployment.get('maxUsers', '')))}</td></tr>"
+        f"<tr><th>开放注册</th><td>{'是' if deployment.get('openRegistration') else '否'}</td></tr>"
+        "</table></div>")
+
+    parts.append("<h2>用户管理</h2>" + _admin_user_rows(users, csrf))
+
+    def number_row(key: str, label: str, low: int, high: int) -> str:
+        current = settings.get(key, "")
+        shown = esc(current) if current else "（环境变量）"
+        return (f"<tr><td>{esc(label)}</td><td>{shown}</td>"
+                f"<td><form method=\"post\" action=\"/account/admin/settings\" class=\"row\">{_csrf(csrf)}"
+                f"<input type=\"hidden\" name=\"key\" value=\"{esc(key)}\">"
+                f"<input name=\"value\" type=\"number\" min=\"{low}\" max=\"{high}\" required "
+                f"style=\"width:6rem\">"
+                f"<button type=\"submit\">保存</button></form></td></tr>")
+
+    toolset_value = settings.get("toolset", "")
+    toolset_row = (
+        "<tr><td>工具集</td><td>" + (esc(toolset_value) if toolset_value else "（环境变量）") + "</td>"
+        "<td><form method=\"post\" action=\"/account/admin/settings\" class=\"row\">" + _csrf(csrf) +
+        "<input type=\"hidden\" name=\"key\" value=\"toolset\">"
+        "<input name=\"value\" list=\"gemarc-toolsets\" required style=\"width:10rem\">"
+        "<datalist id=\"gemarc-toolsets\"><option value=\"stateless\"><option value=\"full\"></datalist>"
+        "<button type=\"submit\">保存</button></form></td></tr>")
+    parts.append(
+        "<h2>设置</h2><div class=\"card\"><table><tr><th>项</th><th>当前值</th><th>改成</th></tr>"
+        + number_row("pat_default_days", "令牌默认有效天数", 1, 365)
+        + number_row("pat_max_days", "令牌最长有效天数", 1, 365)
+        + number_row("pat_max_per_user", "每人令牌数量上限", 1, 50)
+        + toolset_row +
+        "</table><p class=\"mute\">留空的项由环境变量决定。令牌策略立即生效；工具集在下次冷启动（重新部署或实例回收）后生效。</p></div>")
+
+    parts.append("<h2>审计日志</h2>" + _admin_audit_rows(audit))
+    return page("GemArc 设置", "".join(parts), nonce)

@@ -13,7 +13,8 @@ from gemarc_mcp.accounts.db import Database, SchemaOutdated
 
 from .support import T0, DbCase
 
-EXPECTED_TABLES = {"users", "sessions", "api_tokens", "audit_log", "rate_limits", "oauth_states", "schema_migrations"}
+EXPECTED_TABLES = {"users", "sessions", "api_tokens", "audit_log", "rate_limits", "oauth_states", "schema_migrations",
+                    "admin_users", "operator_settings"}
 
 
 class Migrate(DbCase):
@@ -23,10 +24,10 @@ class Migrate(DbCase):
         with self.db.transaction() as tx:
             return {r["name"] for r in tx.fetchall("SELECT name FROM sqlite_master WHERE type = 'table'")}
 
-    def test_empty_database_gets_all_seven_tables(self):
+    def test_empty_database_gets_every_table(self):
         self.assertEqual(self.tables(), set())
         applied = schema.migrate(self.db, T0)
-        self.assertEqual(applied, ["0001_init"])
+        self.assertEqual(applied, ["0001_init", "0002_admin"])
         self.assertEqual(self.tables() - {"sqlite_sequence"}, EXPECTED_TABLES)
 
     def test_second_run_is_idempotent(self):
@@ -46,14 +47,14 @@ class Migrate(DbCase):
 
     def test_status_and_require_current(self):
         st = schema.status(self.db)
-        self.assertEqual((st.applied, st.pending), ((), ("0001_init",)))
+        self.assertEqual((st.applied, st.pending), ((), ("0001_init", "0002_admin")))
         with self.assertRaises(SchemaOutdated) as ctx:
             schema.require_current(self.db)
         self.assertEqual(ctx.exception.code, "GEMARC_ACCT_003")
         schema.migrate(self.db, T0)
         st = schema.status(self.db)
         self.assertTrue(st.current)
-        self.assertEqual(st.head, "0001_init")
+        self.assertEqual(st.head, "0002_admin")
         schema.require_current(self.db)
 
     def test_checksum_change_is_refused(self):
@@ -86,20 +87,20 @@ class Migrate(DbCase):
         folder = Path(self.tmp) / "two"
         shutil.copytree(schema.migrations_dir(), folder)
         schema.migrate(self.db, T0, directory=folder)
-        (folder / "0002_extra.sql").write_text("CREATE TABLE IF NOT EXISTS extra (id TEXT PRIMARY KEY);\n", encoding="utf-8")
-        self.assertEqual(schema.migrate(self.db, T0 + 1, directory=folder), ["0002_extra"])
+        (folder / "0003_extra.sql").write_text("CREATE TABLE IF NOT EXISTS extra (id TEXT PRIMARY KEY);\n", encoding="utf-8")
+        self.assertEqual(schema.migrate(self.db, T0 + 1, directory=folder), ["0003_extra"])
         self.assertIn("extra", self.tables())
 
     def test_failed_migration_rolls_back_completely(self):
         folder = Path(self.tmp) / "bad"
         shutil.copytree(schema.migrations_dir(), folder)
         schema.migrate(self.db, T0, directory=folder)
-        (folder / "0002_bad.sql").write_text(
+        (folder / "0003_bad.sql").write_text(
             "CREATE TABLE half_done (id TEXT PRIMARY KEY);\nINSERT INTO no_such_table VALUES (1);\n", encoding="utf-8")
         with self.assertRaises(Exception):
             schema.migrate(self.db, T0 + 1, directory=folder)
         self.assertNotIn("half_done", self.tables())
-        self.assertEqual(schema.status(self.db, folder).pending, ("0002_bad",))
+        self.assertEqual(schema.status(self.db, folder).pending, ("0003_bad",))
 
     def test_concurrent_runners_apply_once(self):
         results, errors = [], []
@@ -116,8 +117,8 @@ class Migrate(DbCase):
         [t.start() for t in threads]
         [t.join() for t in threads]
         self.assertEqual(errors, [])
-        self.assertEqual(sorted(results), [()] * 5 + [("0001_init",)])
-        self.assertEqual(self.count("schema_migrations"), 1)
+        self.assertEqual(sorted(results), [()] * 5 + [("0001_init", "0002_admin")])
+        self.assertEqual(self.count("schema_migrations"), 2)
 
 
 class FileRules(unittest.TestCase):

@@ -23,9 +23,11 @@ from typing import Any, Callable, Optional
 import anyio
 from starlette.datastructures import Headers
 
+from . import admin as admin_mod
 from . import audit as audit_mod
 from . import oidc, pages, retention, schema, security
 from . import users as users_mod
+from .admin import AdminService
 from .config import AccountsConfig
 from .crypto import Crypto, consteq
 from .db import DBError, Database, KeyRingMismatch, SchemaOutdated
@@ -47,6 +49,13 @@ PREFILTER_LIMIT = 120
 PREFILTER_LIMIT_NO_IP = 300
 PREFILTER_WINDOW_S = 60
 REVOKE_PATH = re.compile(r"^/account/tokens/([a-z2-7]{8})/revoke\Z")
+#: The operator area. Every path under it needs an administrator session; the actions are the four
+#: verbs the admin page offers (enable, disable, grant-admin, revoke-admin, revoke-tokens).
+ADMIN_PATH = "/account/admin"
+ADMIN_USER_PATH = re.compile(r"^/account/admin/users/([A-Za-z0-9_-]{1,64})/"
+                             r"(enable|disable|grant-admin|revoke-admin|revoke-tokens)\Z")
+ADMIN_SETTINGS_PATH = "/account/admin/settings"
+ADMIN_SITE_PATH = "/account/admin/site"
 DRAIN_TIMEOUT_S = 2.0
 DRAIN_LIMIT = 1 << 20
 
@@ -69,6 +78,8 @@ MESSAGES = {
     "GEMARC_ACCT_040": "需要重新登录确认：请在 15 分钟内登录过再操作。",
     "GEMARC_ACCT_041": "确认词不匹配，账号没有被删除。",
     "GEMARC_ACCT_050": "请求格式错误或过大。",
+    "GEMARC_ACCT_060": "这个页面只有管理员可以打开。",
+    "GEMARC_ACCT_061": "设置的值不合法，未做修改。",
     "GEMARC_ACCT_404": "没有这个页面。",
 }
 TOKEN_ERROR_STATUS = {"GEMARC_ACCT_034": 400, "GEMARC_ACCT_033": 409, "GEMARC_ACCT_035": 403, "GEMARC_ACCT_013": 403}
@@ -128,8 +139,10 @@ class AccountsRuntime:
         self.db = db or Database.from_target(config.db, enforce_role=config.db.kind == "postgres",
                                             role_relaxed=config.db_role_relaxed)
         self.users = UserAccounts(self.db, self.crypto)
+        self.admin = AdminService(self.db, self.crypto, config.admin_emails)
         self.sessions = SessionStore(self.db, self.crypto, SessionPolicy.from_config(config))
-        self.tokens = TokenStore(self.db, self.crypto, TokenPolicy.from_config(config))
+        self.tokens = TokenStore(self.db, self.crypto, TokenPolicy.from_config(config),
+                                 policy_provider=self._token_policy)
         self.audit = audit_mod.Audit(self.db, self.crypto, config.audit_retention_days)
         self.limiter = RateLimiter(self.db, self.crypto)
         self.states = OAuthStates(self.db)
@@ -160,6 +173,33 @@ class AccountsRuntime:
         self._ready_lock = threading.Lock()
 
     # -- small services -------------------------------------------------------------------------------------------
+    def _token_policy(self) -> TokenPolicy:
+        """The token policy in force: the stored overrides on top of the environment defaults.
+
+        The environment stays the source of the DEFAULTS, so a deployment that never opens the
+        operator area behaves exactly as before. A stored value that is out of range is ignored
+        (the environment wins) rather than clamped: the admin page refuses such a value anyway.
+        """
+        base = TokenPolicy.from_config(self.config)
+
+        def number(key: str, fallback: int) -> int:
+            raw = self.admin.settings().get(key)
+            if raw is None:
+                return fallback
+            try:
+                value = int(raw)
+            except (TypeError, ValueError):
+                return fallback
+            low, high = admin_mod.SETTING_BOUNDS.get(key, (1, 365))
+            return value if low <= value <= high else fallback
+
+        default_days = number(admin_mod.PAT_DEFAULT_DAYS, base.default_days)
+        max_days = number(admin_mod.PAT_MAX_DAYS, base.max_days)
+        per_user = number(admin_mod.PAT_MAX_PER_USER, base.max_per_user)
+        if default_days > max_days:
+            default_days = max_days
+        return TokenPolicy(default_days, max_days, per_user, base.last_used_throttle)
+
     def now(self) -> int:
         return int(self.clock())
 
@@ -328,11 +368,16 @@ class AccountsRuntime:
             "/account/tokens/revoke-all": (("POST",), self._revoke_all),
             "/account/export": (("POST",), self._export),
             "/account/delete": (("POST",), self._delete),
+            ADMIN_PATH: (("GET", "HEAD"), self._admin_page),
+            ADMIN_SETTINGS_PATH: (("POST",), self._admin_settings),
+            ADMIN_SITE_PATH: (("POST",), self._admin_site),
         }
         if path in fixed:
             return fixed[path]
         if REVOKE_PATH.match(path):
             return (("POST",), self._revoke_one)
+        if ADMIN_USER_PATH.match(path):
+            return (("POST",), self._admin_user)
         return None
 
     # -- rate limits ----------------------------------------------------------------------------------------------
@@ -512,8 +557,12 @@ class AccountsRuntime:
         email, tokens = await self.run_db(self._account_data, info.user_id)
         csrf = self.crypto.csrf_token(sid)
         recent = self.sessions.is_recent(info, now)
+        # The policy in force, not the environment defaults: the operator area can change it while
+        # the deployment runs, and the form must not offer a longer lifetime than the store allows.
+        policy = await self.run_db(self.tokens.effective_policy)
         return self._html(status, lambda n: pages.account_page(self.view, n, email=email or "", csrf=csrf, tokens=tokens,
-                                                               now=now, recent=recent, created=created, message=message),
+                                                               now=now, recent=recent, created=created, message=message,
+                                                               default_days=policy.default_days, max_days=policy.max_days),
                           cookies=cookies)
 
     async def _account(self, req: Req):
@@ -647,3 +696,158 @@ class AccountsRuntime:
         if not done:
             return self.error(401, "GEMARC_ACCT_020", cookies=[self._clear_sid()])
         return self._html(200, pages.deleted_page, cookies=[self._clear_sid()])
+
+    # -- the operator area ------------------------------------------------------------------------------------------
+    async def _session_user(self, req: Req):
+        """(session info, sid) of a signed-in caller, or (None, None). No database access without a cookie."""
+        now = self.now()
+        info, sid = await self._session(req, now)
+        return info, sid
+
+    async def _admin_session(self, req: Req):
+        """(session info, sid, email) for an administrator, or (None, None, None) when the caller is not one.
+
+        The role is the union of the environment allow-list and the runtime grants. A caller whose
+        e-mail cannot be read is not an administrator unless the table grants the role.
+        """
+        info, sid = await self._session_user(req)
+        if info is None:
+            return None, None, None
+        email = await self.run_db(self.users.email_of, info.user_id)
+        if not await self.run_db(self.admin.is_admin, info.user_id, email):
+            return None, None, None
+        return info, sid, email
+
+    async def _admin_page(self, req: Req):
+        now = self.now()
+        info, sid, email = await self._admin_session(req)
+        if info is None:
+            return self.error(403, "GEMARC_ACCT_060")
+        csrf = self.crypto.csrf_token(sid)
+        data = await self.run_db(self._admin_data)
+        return self._html(200, lambda n: pages.admin_page(
+            self.view, n, email=email or "", csrf=csrf, now=now, users=data["users"], audit=data["audit"],
+            settings=data["settings"], deployment=data["deployment"]))
+
+    def _admin_data(self) -> dict:
+        """Everything the admin page shows, read in one executor job (one transaction each)."""
+        users = self.admin.list_users()
+        audit = self.admin.audit_entries()
+        settings = self.admin.settings()
+        deployment = {
+            "toolset": self.config.toolset,
+            "adminEmails": list(self.config.admin_emails),
+            "allowedDomains": list(self.config.allowed_domains),
+            "allowedEmails": list(self.config.allowed_emails),
+            "maxUsers": self.config.max_users,
+            "openRegistration": self.config.open_registration,
+            "mcpMode": self.config.mcp_mode or "",
+        }
+        return {"users": users, "audit": audit, "settings": settings, "deployment": deployment}
+
+    async def _require_admin(self, a: Authed) -> bool:
+        """The administrator role for a caller that already passed the session and CSRF checks."""
+        email = await self.run_db(self.users.email_of, a.info.user_id)
+        return await self.run_db(self.admin.is_admin, a.info.user_id, email)
+
+    async def _admin_user(self, req: Req):
+        """Enable, disable, grant, revoke or revoke-the-tokens of ONE user. Administrator only."""
+        found = ADMIN_USER_PATH.match(req.path)
+        if found is None:
+            return self.not_found()
+        target_id, action = found.group(1), found.group(2)
+
+        async def act(r: Req, a: Authed):
+            return await self._do_admin_user(a, target_id, action)
+
+        return await self._post(req, act, recent=True)
+
+    async def _do_admin_user(self, a: Authed, target_id: str, action: str):
+        if not await self._require_admin(a):
+            return self.error(403, "GEMARC_ACCT_060")
+        if target_id == a.info.user_id and action in ("disable", "revoke-admin"):
+            # An administrator cannot lock themselves out of the area they are working in.
+            return self.error(400, "GEMARC_ACCT_061", relogin=False)
+        try:
+            message = await self.run_db(self._admin_action, target_id, action, a.now, a.info.user_id)
+        except ValueError:
+            return self.error(400, "GEMARC_ACCT_061", relogin=False)
+        if message is None:
+            return self.error(404, "GEMARC_ACCT_404", relogin=False)
+        if action == "revoke-tokens":
+            self.pat_cache.evict_user(target_id)
+        await self.audit_async("admin_action", ref=f"{action}-{target_id}", user_id=a.info.user_id)
+        return pages.redirect(ADMIN_PATH, 303, hsts=self.hsts)
+
+    def _admin_action(self, target_id: str, action: str, now: int, actor_id: str) -> Optional[str]:
+        """One transaction per action; returns a message for the page or None when the user does not exist."""
+        if action == "enable":
+            if not self.users.enable(target_id, now):
+                return None
+            return "已启用该账号。"
+        if action == "disable":
+            if not self.users.disable(target_id, now):
+                return None
+            self.pat_cache.evict_user(target_id)
+            return "已停用该账号：会话已删除，令牌已撤销。"
+        if action == "grant-admin":
+            if self.users.get(target_id) is None:
+                return None
+            self.admin.grant(target_id, now, by=actor_id)
+            return "已授予管理员权限。"
+        if action == "revoke-admin":
+            if self.users.get(target_id) is None:
+                return None
+            self.admin.revoke(target_id)
+            return "已撤销运行时授予的管理员权限（环境变量里的管理员不受影响）。"
+        if action == "revoke-tokens":
+            if self.users.get(target_id) is None:
+                return None
+            self.tokens.revoke_all(target_id, now)
+            return "已撤销该账号的全部令牌。"
+        return None
+
+    async def _admin_settings(self, req: Req):
+        """Write one operator setting (the token policy, or the desired tool set)."""
+        return await self._post(req, self._do_admin_settings, recent=True)
+
+    async def _do_admin_settings(self, req: Req, a: Authed):
+        if not await self._require_admin(a):
+            return self.error(403, "GEMARC_ACCT_060")
+        key = (a.form.get("key") or "").strip()
+        value = (a.form.get("value") or "").strip()
+        try:
+            if key == "toolset":
+                await self.run_db(self.admin.set_toolset, value, a.now)
+            else:
+                await self.run_db(self.admin.set_number, key, value, a.now)
+        except ValueError:
+            return self.error(400, "GEMARC_ACCT_061", relogin=False)
+        await self.audit_async("admin_setting", ref=key, user_id=a.info.user_id)
+        return pages.redirect(ADMIN_PATH, 303, hsts=self.hsts)
+
+    async def _admin_site(self, req: Req):
+        """Ask the deployment to rebuild the static site."""
+        return await self._post(req, self._do_admin_site, recent=True)
+
+    async def _do_admin_site(self, req: Req, a: Authed):
+        if not await self._require_admin(a):
+            return self.error(403, "GEMARC_ACCT_060")
+        await self.audit_async("admin_site_rebuild", user_id=a.info.user_id)
+        return pages.redirect(ADMIN_PATH, 303, hsts=self.hsts)
+
+    # -- helpers for the application ----------------------------------------------------------------------------
+    async def signed_in_user(self, headers: Any) -> Optional[str]:
+        """The user id of a signed-in caller, or None. Used by the console gate and by the MCP session lane."""
+        sid = security.single_cookie(headers, self.sid_cookie)
+        if sid is None or not valid_sid_format(sid):
+            return None
+        info = await self.run_db(lambda: self.sessions.lookup(sid, self.now(), policy_check=self.policy.row_ok))
+        return None if info is None else info.user_id
+
+    async def is_admin_user(self, user_id: str) -> bool:
+        """Whether this user id may open the operator area."""
+        if not user_id:
+            return False
+        email = await self.run_db(self.users.email_of, user_id)
+        return await self.run_db(self.admin.is_admin, user_id, email)

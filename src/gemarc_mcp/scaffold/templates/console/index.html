@@ -45,6 +45,8 @@
         <div><code>GET /healthz</code><span>服务器状态</span></div>
         <div><code><a href="__SITE_PATH__">__SITE_PATH__</a></code><span>脚手架产出的 5D 站</span></div>
         <div><code>GET /kit/static.zip</code><span>站点固定件(另有 vite)</span></div>
+        <div id="admin-entry" hidden><code><a href="__ADMIN_PATH__">__ADMIN_PATH__</a></code><span>管理员设置</span></div>
+        <div id="account-entry" hidden><code><a href="/account">/account</a></code><span>我的账号与令牌</span></div>
       </div>
     </aside>
 
@@ -100,7 +102,10 @@
       healthPath: "__HEALTH_PATH__",
       sitePath: "__SITE_PATH__",
       writeTools: __WRITE_TOOLS__,
-      version: "__VERSION__"
+      version: "__VERSION__",
+      admin: __ADMIN__,
+      adminPath: "__ADMIN_PATH__",
+      accounts: __ACCOUNTS__
     };
   </script>
   <script type="module" src="./console.js"></script>

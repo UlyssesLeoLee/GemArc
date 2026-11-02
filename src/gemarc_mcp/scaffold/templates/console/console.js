@@ -44,6 +44,7 @@ const state = {
   history: [],
   seq: 0,
   token: readStoredToken(),
+  sessionAuth: false,
   bootSeq: 0,
 };
 
@@ -74,7 +75,9 @@ async function rpc(method, params) {
   if (response.status === 401) {
     const err = new Error(tokenUsed
       ? '令牌无效或已被轮换 (HTTP 401)。请在上方重新粘贴令牌。'
-      : '该服务器需要访问令牌 (HTTP 401)。请在上方粘贴令牌。');
+      : (state.sessionAuth
+        ? '登录会话无效或已过期 (HTTP 401)。请重新登录,或在右方粘贴令牌。'
+        : '该服务器需要访问令牌 (HTTP 401)。请在上方粘贴令牌。'));
     err.unauthorized = true;
     err.tokenUsed = tokenUsed;
     throw err;
@@ -205,7 +208,7 @@ function renderStatus(health) {
   bar.append(chip('static site', health.staticSiteSource || '—'));
   bar.append(chip(
     'auth',
-    health.authRequired ? 'bearer token' : 'open',
+    health.authRequired ? (health.sessionAuth ? '登录会话 / 令牌' : 'bearer token') : 'open',
     health.authRequired ? 'good' : 'warn'
   ));
   const writeable = state.writeEnabled && WRITE_TOOLS.size > 0;
@@ -577,13 +580,22 @@ async function boot() {
     if (!current()) return;
     renderStatus(health);
     healthShown = true;
+    state.sessionAuth = !!health.sessionAuth;
     if (health.authRequired) {
-      showAuthBar(state.token ? '已使用本标签页保存的令牌。' : '该服务器需要访问令牌,请粘贴后点「使用令牌」。',
-        state.token ? 'good' : 'warn');
-      if (!state.token) {
-        dot.className = 'dot off';
-        text.textContent = '需要访问令牌';
-        return;
+      if (health.sessionAuth) {
+        // The deployment accepts the login session, so the token bar is optional: pasting one
+        // acts as another identity. Without a token the session alone is enough.
+        showAuthBar(state.token
+          ? '已使用本标签页保存的令牌(登录会话同样可用)。'
+          : '正在使用登录会话;也可以粘贴令牌改用其他身份。', state.token ? 'good' : 'muted');
+      } else {
+        showAuthBar(state.token ? '已使用本标签页保存的令牌。' : '该服务器需要访问令牌,请粘贴后点「使用令牌」。',
+          state.token ? 'good' : 'warn');
+        if (!state.token) {
+          dot.className = 'dot off';
+          text.textContent = '需要访问令牌';
+          return;
+        }
       }
     }
     const [toolResult, resourceResult, promptResult] = await Promise.all([
@@ -648,8 +660,7 @@ $('#token-input').addEventListener('keydown', (event) => {
   if (event.key === 'Enter') useToken();
 });
 $('#call-btn').addEventListener('click', callSelected);
-$('#tool-filter').addEventListener('input', (event) => renderToolList(event.target.value));
-$('#copy-btn').addEventListener('click', async () => {
+$('#tool-filter').addEventListener('input', (event) => renderToolList(event.target.value));$('#copy-btn').addEventListener('click', async () => {
   const text = $('#result').innerText;
   try {
     await navigator.clipboard.writeText(text);
@@ -658,5 +669,17 @@ $('#copy-btn').addEventListener('click', async () => {
     $('#result-meta').textContent = '浏览器拒绝了剪贴板访问,请手动复制';
   }
 });
+
+// The account page and the operator area exist only when the deployment has accounts; the
+// operator area only for an administrator. The server decides both, so the panel can never
+// offer an entry the server would refuse.
+if (CFG.accounts) {
+  const accountEntry = document.getElementById('account-entry');
+  if (accountEntry) accountEntry.hidden = false;
+}
+if (CFG.admin) {
+  const adminEntry = document.getElementById('admin-entry');
+  if (adminEntry) adminEntry.hidden = false;
+}
 
 boot();

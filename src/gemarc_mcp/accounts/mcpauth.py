@@ -29,9 +29,11 @@ from typing import Any, Callable, Optional
 
 from starlette.responses import JSONResponse, Response
 
+from . import security
 from . import tokens as tokens_mod
 from .db import DBError
 from .security import Busy
+from .sessions import valid_sid_format
 
 log = logging.getLogger("gemarc.accounts")
 
@@ -262,6 +264,11 @@ class McpAuth:
         rt = self.runtime
         if rt.config.mcp_host_only and (headers.get("host") or "").lower() != rt.config.host.lower():
             return Decision(False, unauthorized_response())
+        if presented is None:
+            # No bearer token: this may be the browser console, which carries the login session instead.
+            decision = await self._session_grant(scope, headers, receive)
+            if decision is not None:
+                return decision
         token = None
         if presented is not None and presented.isascii():
             token = presented.decode("ascii")
@@ -305,6 +312,28 @@ class McpAuth:
         return await self._admit(verification.user_id or "", verification.scope or "read", scope, receive, pid)
 
     # -- internals -----------------------------------------------------------------------------------------------
+    async def _session_grant(self, scope: dict, headers: Any, receive: Callable) -> Optional[Decision]:
+        """The browser case: a signed-in session may call ``/mcp`` without a bearer token.
+
+        The session cookie alone must never be enough: another site could make the browser send it.
+        The request therefore also has to prove it is same-origin (``Origin`` equal to the configured
+        origin, or ``Sec-Fetch-Site: same-origin``), the same rule the account forms use.
+
+        The scope is the user's own: ``write`` when the operator allowed that user to write, ``read``
+        otherwise. A read scope is still checked against the read allow-list by :meth:`_admit`.
+        """
+        rt = self.runtime
+        if not security.origin_ok(headers, rt.config.origin):
+            return None
+        sid = security.single_cookie(headers, rt.sid_cookie)
+        if sid is None or not valid_sid_format(sid):
+            return None
+        info = await rt.run_db(lambda: rt.sessions.lookup(sid, rt.now(), policy_check=rt.policy.row_ok))
+        if info is None:
+            return None
+        effective = "write" if info.can_write else "read"
+        return await self._admit(info.user_id, effective, scope, receive, "")
+
     async def _single_flight(self, key: "tuple[str, str]", token: str):
         loop = asyncio.get_running_loop()
         flight = (id(loop),) + key

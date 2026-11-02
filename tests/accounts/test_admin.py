@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import io
 import unittest
+from unittest import mock
 
 from gemarc_mcp.accounts import admin as admin_mod
 from gemarc_mcp.accounts import __main__ as cli
@@ -204,6 +205,27 @@ class AdminArea(ServerCase):
                                  {"csrf": self.browser.csrf(page.text), "key": "pat_max_days", "value": "9999"})
         self.assertEqual(resp.status, 400)
         self.assertNotIn("pat_max_days", self.srv.runtime().admin.settings())
+
+    def test_a_tool_set_this_deployment_cannot_serve_is_refused(self):
+        # The name may be known while the code is not here (the Vercel upload excludes the atlas
+        # package). Storing it would break the NEXT cold start, so the write is refused instead.
+        self.login_as("owner@gmail.com")
+        page = self.browser.get("/account/admin")
+        with mock.patch.object(admin_mod, "toolset_available", return_value=False):
+            resp = self.browser.post("/account/admin/settings",
+                                     {"csrf": self.browser.csrf(page.text), "key": "toolset", "value": "atlas"})
+        self.assertEqual(resp.status, 400)
+        self.assertIn("GEMARC_ACCT_062", resp.text)
+        self.assertNotIn("toolset", self.srv.runtime().admin.settings())
+
+    def test_a_tool_set_this_deployment_can_serve_is_accepted(self):
+        self.login_as("owner@gmail.com")
+        page = self.browser.get("/account/admin")
+        with mock.patch.object(admin_mod, "toolset_available", return_value=True):
+            resp = self.browser.post("/account/admin/settings",
+                                     {"csrf": self.browser.csrf(page.text), "key": "toolset", "value": "stateless"})
+        self.assertEqual(resp.status, 303)
+        self.assertEqual(self.srv.runtime().admin.settings().get("toolset"), "stateless")
 
 
 class ConsoleGate(ServerCase):

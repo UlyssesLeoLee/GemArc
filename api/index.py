@@ -376,7 +376,11 @@ def _toolset_override(account_config) -> str:
             with db.transaction() as tx:
                 row = tx.fetchone("SELECT value FROM operator_settings WHERE key = ?", (admin_mod.TOOLSET,))
             value = (row or {}).get("value", "")
-            return value if value in admin_mod.TOOLSETS else ""
+            # A stored tool set this deployment cannot serve is ignored: adopting it would make the
+            # next cold start fail to import and stop the whole function from answering.
+            if value not in admin_mod.TOOLSETS or not admin_mod.toolset_available(value):
+                return ""
+            return value
         except Exception:
             return ""
 

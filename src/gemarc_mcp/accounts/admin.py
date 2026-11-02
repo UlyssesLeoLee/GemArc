@@ -24,6 +24,7 @@ ip hash.
 """
 from __future__ import annotations
 
+import importlib.util
 from dataclasses import dataclass
 from typing import Optional
 
@@ -52,6 +53,28 @@ SETTING_BOUNDS = {
 #: because the code knows them, but whether they can run at all is decided by the
 # deployment (the atlas package is not part of the Vercel upload).
 TOOLSETS = ("full", "stateless", "atlas", "atlas_remote")
+
+#: The modules a tool set needs at run time. A deployment that does not ship them cannot serve that
+#: tool set: the Vercel upload excludes the atlas package, so ``create_server("atlas")`` fails to
+#: import and the whole function stops answering -- not at the moment the setting is written, but at
+#: the NEXT cold start. Knowing the name is not the same as having the code.
+TOOLSET_REQUIRES = {
+    "full": (),
+    "stateless": (),
+    "atlas": ("gemarc_mcp.atlas_tools", "gemarc_mcp.atlas"),
+    "atlas_remote": ("gemarc_mcp.atlas",),
+}
+
+
+def toolset_available(name: str) -> bool:
+    """True when THIS deployment can serve the tool set (the code it needs is importable here)."""
+    for module in TOOLSET_REQUIRES.get(name, ()):
+        try:
+            if importlib.util.find_spec(module) is None:
+                return False
+        except (ImportError, ValueError):
+            return False
+    return True
 
 GRANT_SQL = (
     "INSERT INTO admin_users (user_id, granted_at, granted_by) VALUES (?, ?, ?) "
@@ -184,10 +207,14 @@ class AdminService:
             tx.execute(SETTING_PUT_SQL, (key, str(number), int(now), str(number), int(now)))
 
     def set_toolset(self, value: str, now: int) -> None:
-        """Write the desired tool set. Only the known names are accepted."""
+        """Write the desired tool set. Only the known names are accepted, and only the ones THIS
+        deployment can actually serve: a stored tool set the deployment cannot run would break the
+        next cold start, not this request."""
         name = (value or "").strip().lower()
         if name not in TOOLSETS:
             raise ValueError("unknown_toolset")
+        if not toolset_available(name):
+            raise ValueError("toolset_unavailable")
         with self.db.transaction() as tx:
             tx.execute(SETTING_PUT_SQL, (TOOLSET, name, int(now), name, int(now)))
 

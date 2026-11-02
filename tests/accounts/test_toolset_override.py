@@ -102,6 +102,15 @@ class ToolsetOverride(unittest.TestCase):
         with mock.patch.object(Database, "from_target", return_value=db):
             self.assertEqual(_toolset_override(postgres_config()), "")
 
+    def test_a_stored_tool_set_this_deployment_cannot_serve_is_ignored(self):
+        # The name is known but the code is not here (the Vercel upload excludes the atlas package).
+        # Adopting it would make the next cold start fail to import: the environment's tool set stays.
+        db = self.migrated()
+        self.store(db, "atlas")
+        with mock.patch.object(Database, "from_target", return_value=db):
+            with mock.patch("gemarc_mcp.accounts.admin.toolset_available", return_value=False):
+                self.assertEqual(_toolset_override(postgres_config()), "")
+
     def test_a_database_that_cannot_be_reached_keeps_the_environment_tool_set(self):
         with mock.patch.object(Database, "from_target", side_effect=RuntimeError("no database")):
             self.assertEqual(_toolset_override(postgres_config()), "")

@@ -80,6 +80,7 @@ MESSAGES = {
     "GEMARC_ACCT_050": "请求格式错误或过大。",
     "GEMARC_ACCT_060": "这个页面只有管理员可以打开。",
     "GEMARC_ACCT_061": "设置的值不合法，未做修改。",
+    "GEMARC_ACCT_062": "这个部署不提供该工具集（它的代码不在上传内容里），未做修改。",
     "GEMARC_ACCT_404": "没有这个页面。",
 }
 TOKEN_ERROR_STATUS = {"GEMARC_ACCT_034": 400, "GEMARC_ACCT_033": 409, "GEMARC_ACCT_035": 403, "GEMARC_ACCT_013": 403}
@@ -833,7 +834,11 @@ class AccountsRuntime:
                 await self.run_db(self.admin.set_toolset, value, a.now)
             else:
                 await self.run_db(self.admin.set_number, key, value, a.now)
-        except ValueError:
+        except ValueError as exc:
+            if str(exc) == "toolset_unavailable":
+                # The name is known but this deployment does not ship the code: writing it would
+                # break the next cold start, so the request is refused instead.
+                return self.error(400, "GEMARC_ACCT_062", relogin=False)
             return self.error(400, "GEMARC_ACCT_061", relogin=False)
         await self.audit_async("admin_setting", ref=key, user_id=a.info.user_id)
         return pages.redirect(ADMIN_PATH, 303, hsts=self.hsts)

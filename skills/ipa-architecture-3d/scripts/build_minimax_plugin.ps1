@@ -14,6 +14,11 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 
+# PS 5.1 defaults to the OEM code page; force UTF-8 so Chinese messages are
+# readable rather than mojibake exactly when something has failed.
+try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catch { }
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+
 $skillDir  = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $repoRoot  = (Resolve-Path (Join-Path $skillDir '..\..')).Path
 $skillName = 'ipa-architecture-3d'

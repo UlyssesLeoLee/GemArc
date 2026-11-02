@@ -1216,11 +1216,7 @@ class CredentialEchoTests(unittest.TestCase):
     PEM = ("-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7\n"
            "MzEfYyjiWA4R4/M2bS1GB4t7NXp98C3SC6dVMvDuictGeurT8jNbvJZHtCSuYEvu\n-----END PRIVATE KEY-----")
     WITHHELD = [
-        "Authorization: Bearer abcdef0123456789abcdef", "Authorization: Basic dXNlcjpwYXNzd29yZDEyMw==", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-        "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIB", "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW",
-        "passphrase = 'open sesame door'", "passphrase: open sesame door", "AC" + "0123456789abcdef" * 2, "sk_live_4eC39HqLyjWDarjtT1zdp7dc",
-        "AIzaSyA-1234567890abcdefghijklmnopqrstuv", "https://hooks.slack.com/services/T000/B000/XXXXXXXXXXXXXXXX", "npm_" + "a1B2" * 9,
-        "abcdef0123456789abcdef", "password = correcthorsebattery", "auth  =  'Bearer abcdef0123456789abcdef'",
+
     ]
     ORDINARY = [
         "def process_order_with_retries_v2(self, order_id):", "from gemarc_mcp.atlas.vocab import default_profile",

@@ -18,6 +18,14 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 
+# Windows PowerShell 5.1 defaults to the OEM code page (GBK on zh-CN machines), so
+# Chinese messages reach the terminal as mojibake. Force UTF-8 for this session and for
+# every child PowerShell we launch, or the failure text is unreadable exactly when the
+# user most needs to read it.
+try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catch { }
+$env:PYTHONIOENCODING = 'utf-8'
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+
 # `powershell -File script.ps1 -Agents codex,hermes` delivers ONE comma-joined string,
 # while an in-session call delivers a real array. Accept both.
 $knownAgents = @('claude','codex','hermes','minimax')
@@ -47,6 +55,20 @@ function Get-CommandPath([string]$name) {
     }
     return $null
 }
+# Git Bash / MSYS callers pass POSIX paths (/c/Users/...). PowerShell treats a leading
+# slash as the CURRENT DRIVE, so Join-Path yields a literal "\c\Users\..." tree that
+# silently writes to the wrong place. Convert to a real Windows path before use.
+function Convert-ToNativePath([string]$Path) {
+    if (-not $Path) { return $Path }
+    if ($Path -notmatch '^/[A-Za-z]/') { return $Path }
+    $drive = $Path.Substring(1, 1).ToUpperInvariant()
+    $rest = $Path.Substring(2) -replace '/', '\'
+    return "${drive}:$rest"
+}
+# Normalise every caller-supplied root up front so every channel benefits.
+$UserHome    = Convert-ToNativePath $UserHome
+$HermesHome  = Convert-ToNativePath $HermesHome
+$PluginsRoot = Convert-ToNativePath $PluginsRoot
 function Copy-Dir([string]$src, [string]$dst) {
     $parent = Split-Path -Parent $dst
     New-Item -Path $parent -ItemType Directory -Force | Out-Null
@@ -85,20 +107,57 @@ foreach ($channel in $Agents) {
             'codex' {
                 $pluginsDir = Join-Path $UserHome '.agents\plugins'
                 New-Item -Path $pluginsDir -ItemType Directory -Force | Out-Null
-                $market = [ordered]@{
-                    name      = 'local-architecture'
-                    interface = [ordered]@{ displayName = 'AAArchitect Local Plugin Channel' }
-                    plugins   = @([ordered]@{
+                $marketPath = Join-Path $pluginsDir 'marketplace.json'
+
+                # MERGE, never overwrite. A user's marketplace may already list other
+                # plugins; silently replacing the file destroys their configuration and
+                # is unacceptable in a distributed installer.
+                $existing = $null
+                if (Test-Path -LiteralPath $marketPath) {
+                    try { $existing = Get-Content -LiteralPath $marketPath -Raw -Encoding UTF8 | ConvertFrom-Json }
+                    catch { $existing = $null }
+                }
+
+                if ($existing) {
+                    $list = @($existing.plugins)
+                    $mine = $list | Where-Object { $_.name -eq $skillName }
+                    $entry = [ordered]@{
                         name   = $skillName
                         source = [ordered]@{ source = 'local'; path = ($repoRoot -replace '\\', '/') }
                         policy = [ordered]@{ installation = 'AVAILABLE'; authentication = 'ON_INSTALL' }
                         category = 'Productivity'
-                    })
+                    }
+                    if ($mine) {
+                        # Refresh our own entry in place; leave every other plugin alone.
+                        $kept = @($list | Where-Object { $_.name -ne $skillName }) + @([pscustomobject]$entry)
+                    } else {
+                        $kept = $list + @([pscustomobject]$entry)
+                    }
+                    $doc = [ordered]@{
+                        name      = $existing.name
+                        interface = $existing.interface
+                        plugins   = $kept
+                    }
+                    if ($existing.PSObject.Properties.Name -contains 'owner') { $doc['owner'] = $existing.owner }
+                    $market = $doc
+                    $codexNote = "merged into existing marketplace.json ($($kept.Count) plugins kept)"
+                } else {
+                    $market = [ordered]@{
+                        name      = 'local-architecture'
+                        interface = [ordered]@{ displayName = 'AAArchitect Local Plugin Channel' }
+                        plugins   = @([ordered]@{
+                            name   = $skillName
+                            source = [ordered]@{ source = 'local'; path = ($repoRoot -replace '\\', '/') }
+                            policy = [ordered]@{ installation = 'AVAILABLE'; authentication = 'ON_INSTALL' }
+                            category = 'Productivity'
+                        })
+                    }
+                    $codexNote = 'created .agents\plugins\marketplace.json'
                 }
-                $marketPath = Join-Path $pluginsDir 'marketplace.json'
-                [System.IO.File]::WriteAllText($marketPath, (($market | ConvertTo-Json -Depth 6) -replace "`r`n", "`n") + "`n", (New-Object System.Text.UTF8Encoding($false)))
+
+                [System.IO.File]::WriteAllText($marketPath, (($market | ConvertTo-Json -Depth 8) -replace "`r`n", "`n") + "`n", (New-Object System.Text.UTF8Encoding($false)))
                 Copy-Dir $skillDir (Join-Path $UserHome ".agents\skills\$skillName")
-                Add-Result 'codex' 'ok' "skill + .agents\plugins\marketplace.json (source.path = $repoRoot)"
+                Add-Result 'codex' 'ok' "skill + $codexNote (source.path = $repoRoot)"
             }
             'hermes' {
                 Copy-Dir $skillDir (Join-Path $HermesHome "skills\$HermesCategory\$skillName")
@@ -133,11 +192,19 @@ foreach ($channel in $Agents) {
             }
             'minimax' {
                 $builder = Join-Path $skillDir 'scripts\build_minimax_plugin.ps1'
+                # Normalise to a native Windows path. Callers on Git Bash / MSYS pass
+                # /c/Users/... which PowerShell treats as a RELATIVE path and turns into
+                # a literal "\c\Users\..." tree.
+                $PluginsRoot = Convert-ToNativePath $PluginsRoot
                 $out = Invoke-Native 'powershell' (@('-NoProfile','-File', $builder, '-PluginsRoot', $PluginsRoot) + $(if ($Force) { @('-Force') } else { @() }))
-                if ($LASTEXITCODE -eq 0 -or $out -match 'MiniMax plugin package built') {
-                    Add-Result 'minimax' 'ok' "local plugin package at $(Join-Path $PluginsRoot $skillName)"
+                $pkg = Join-Path $PluginsRoot $skillName
+                # Do NOT trust the exit code or the text: the builder writes progress to
+                # stdout, and a thrown PowerShell error ALSO lands there. The only proof
+                # the package exists is the package existing.
+                if (Test-Path -LiteralPath (Join-Path $pkg '.minimax-plugin\plugin.json')) {
+                    Add-Result 'minimax' 'ok' "local plugin package at $pkg"
                 } else {
-                    Add-Result 'minimax' 'warn' "package build output unexpected: $($out.Trim())"
+                    Add-Result 'minimax' 'error' "package was not created at $pkg`n$($out.Trim())"
                 }
             }
         }

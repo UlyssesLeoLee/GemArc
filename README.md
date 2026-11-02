@@ -219,10 +219,72 @@ npx vercel@65.8.0 deploy --prod
 现有 GemArc 仓库：`https://github.com/UlyssesLeoLee/GemArc`。本包**未复制**原仓库源文件，避免造成隐含版本漂移。3D 集成流程：
 
 ```powershell
+<<<<<<< HEAD
 git clone https://github.com/UlyssesLeoLee/GemArc.git E:\GemArcWork\upstream
 cd E:\GemArcWork\upstream\skills\ipa-architecture-3d
 python .\scripts\build.py .\assets\examples\illustrative-architecture.json --out E:\GemArcWork\legacy-build
 cd E:\GemArcWork\legacy-build
+=======
+hermes plugins install https://github.com/UlyssesLeoLee/AAArchitect.git --force
+```
+
+当前实测只有 **1 项** finding，逐条核对为启发式误报：
+
+| 判据 | 位置 | 实际情况 |
+| --- | --- | --- |
+| `inline_shell_exec` | `assets/viewer/src/main.js`（`root.replaceChildren()`） | DOM 元素清空方法，被 shell 执行启发式误判。全文件不调用 `exec`/`eval`/`spawn`，也无任何进程创建；所有文本均通过 `textContent` 写入，不存在 HTML 注入 |
+
+早期的 6 项 finding 中，README 里的 `git clone` 文案、`i18n.js` 的中日文字面量、SKILL.md 的 npm 构建步骤，随文档改写已不再触发。该拦截由启发式规则驱动，finding 数量会随源码变化，**以你本机 `hermes plugins validate .` 的实际输出为准**。
+
+| 判据 | 位置 | 实际情况 |
+| --- | --- | --- |
+| `execution` (HIGH) | `assets/viewer/src/main.js:241` | 搜索过滤用的模板字符串，渲染走 `textContent`，不执行任何 shell |
+| `supply_chain` (MEDIUM) | `README.md` 的安装说明 | 文档里的 `git clone` 命令被当成供应链风险 |
+| `supply_chain` (MEDIUM) | `assets/viewer/src/i18n.js:3` / `:6` | 中/日文界面文案被当成可疑非 ASCII 字符串 |
+| `supply_chain` (MEDIUM) | `SKILL.md:28` | `npm install && npm run test && npm run build` 构建步骤被当成包管理器调用 |
+
+这些由文档与多语言资源本身触发，不应为绕过扫描而删改。也可在 `config.yaml` 里设 `plugins.scan_on_install` 关闭拦截。技能通道 `hermes skills install <raw URL>` 不受此拦截影响。
+
+Skill 通道（不经过 PM）：
+
+```powershell
+hermes skills list
+```
+
+Hermes 的 Skill 根目录是 `$env:LOCALAPPDATA\hermes\skills\<分类>\`，不是 `~/.hermes/skills`。
+
+### 4. MiniMax Code —— 本地插件包
+
+```powershell
+.\skills\ipa-architecture-3d\scripts\build_minimax_plugin.ps1
+```
+
+脚本从仓库内容组装 MiniMax 插件包（`.minimax-plugin/plugin.json` + `skills/<name>/SKILL.md` + 明暗图标），写入 `%USERPROFILE%\.minimax\plugins\ipa-architecture-3d\`，MiniMax Code 自动重扫识别。图标优先取本机 MiniMax 自带的分类图标池，取不到时自动生成占位图，因此在没装 MiniMax 的机器上也能构建。版本号与描述直接读仓库根目录 `plugin.json`，不会与源文件脱节。
+
+注意：包根目录**不要**放 Agent Plugins v1 的 `plugin.json`，否则会覆盖 MiniMax 格式；只用 `.minimax-plugin/plugin.json`。
+
+### 只装 Skill（不装插件包）
+
+```powershell
+cd .\skills\ipa-architecture-3d
+.\scripts\install_windows.ps1 -Agents claude,codex,hermes,minimax
+.\scripts\install_windows.ps1 -Agents claude,codex,hermes,minimax -Force   # 覆盖前自动备份
+```
+
+这条路径只做 Skill 目录投递：`hermes` 和 `minimax` 在这里是 **Skill 回退通道**（`$env:LOCALAPPDATA\hermes\skills\<分类>\` 和 `~/.minimax/skills/`），不是它们各自的插件包机制。需要完整插件包请用仓库根目录的 `install.ps1`。
+
+> Windows PowerShell 5.1 注意事项：仓库内 `.ps1` 文件带 UTF-8 BOM。手动编辑后若删掉 BOM，脚本里的中文字面量会被按 ANSI 解析并导致语法错误。
+
+
+## 生成真正的 Three.js 网站
+
+```powershell
+cd .\skills\ipa-architecture-3d
+python .\scripts\validate.py .\assets\examples\illustrative-architecture.json
+python .\scripts\build.py .\assets\examples\illustrative-architecture.json --out E:\arch3d-cn
+# 需要日语时：追加 --lang ja-JP
+cd E:\arch3d-cn
+>>>>>>> d3cb55f3320c45ed462dfd182f817e14446ece8c
 npm install
 npm run build
 

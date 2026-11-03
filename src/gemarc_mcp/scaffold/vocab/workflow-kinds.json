@@ -1,17 +1,31 @@
 {
   "schemaVersion": "0.2.0",
   "id": "workflow-kinds",
-  "title": "工作流语义模型词表",
-  "description": "v5.0 提示词 §2.7：工作流不能只是一组可以拖动的框和箭头。每个节点、端口、关系、条件、异常、输入、输出和执行约束必须可被程序及大模型明确理解。",
+  "title": "工作流语义模型词表（GWF-IR）",
+  "description": "v5.0 提示词 §2.7 与 §17 GWF-IR：工作流不能只是一组可以拖动的框和箭头。每个节点、端口、关系、条件、异常、输入、输出和执行约束必须可被程序及大模型明确理解。nodeKinds / edgeKinds 覆盖 §17 列出的全部 19 种节点类型与 7 种边类型；legacy* 词表登记旧写法，新写入必须使用规范 id。",
   "nodeKinds": [
-    {"id": "task", "label": "任务", "executes": true},
-    {"id": "decision", "label": "判定", "executes": false, "note": "必须声明分支条件"},
-    {"id": "gateway", "label": "网关", "executes": false, "note": "并行/汇聚/排他"},
-    {"id": "start", "label": "开始", "executes": false},
-    {"id": "end", "label": "结束", "executes": false},
-    {"id": "subprocess", "label": "子流程", "executes": true, "note": "必须声明被调用的流程 ID"},
-    {"id": "event", "label": "事件", "executes": false, "note": "必须声明触发条件"},
-    {"id": "data", "label": "数据对象", "executes": false}
+    {"id": "task", "label": "任务", "specType": "Task", "executes": true},
+    {"id": "decision", "label": "判定", "specType": "Decision", "executes": false, "note": "必须声明分支条件"},
+    {"id": "gateway", "label": "网关（旧写法）", "specType": null, "executes": false, "note": "旧写法。并行拆分用 parallel-fork / parallel-join，汇聚用 parallel-join。"},
+    {"id": "start", "label": "开始", "specType": "Start", "executes": false},
+    {"id": "end", "label": "结束", "specType": "End", "executes": false},
+    {"id": "subprocess", "label": "子流程（旧写法）", "specType": null, "executes": true, "note": "旧写法，等同 subflow。新写入必须用 subflow。"},
+    {"id": "event", "label": "事件", "specType": "Event", "executes": false, "note": "必须声明触发条件"},
+    {"id": "data", "label": "数据对象（旧写法）", "specType": null, "executes": false, "note": "旧写法。新写入用 data-transform 表达转换，纯数据载体用端口与 dataContract 表达。"},
+    {"id": "input", "label": "输入", "specType": "Input", "executes": false, "note": "流程入口数据"},
+    {"id": "output", "label": "输出", "specType": "Output", "executes": false, "note": "流程出口数据"},
+    {"id": "parallel-fork", "label": "并行分流", "specType": "ParallelFork", "executes": false, "note": "把一条控制流拆成多条并行分支"},
+    {"id": "parallel-join", "label": "并行汇聚", "specType": "ParallelJoin", "executes": false, "note": "等待多条并行分支汇聚"},
+    {"id": "timer", "label": "定时器", "specType": "Timer", "executes": false, "note": "必须声明时长与到期后的处理"},
+    {"id": "wait", "label": "等待", "specType": "Wait", "executes": false, "note": "必须声明等待条件或等待的事件"},
+    {"id": "agent", "label": "智能体", "specType": "Agent", "executes": true, "note": "涉及外部副作用，必须声明权限"},
+    {"id": "human-approval", "label": "人工审批", "specType": "HumanApproval", "executes": true, "note": "必须声明审批人角色与超时策略"},
+    {"id": "api-call", "label": "API 调用", "specType": "APICall", "executes": true, "note": "涉及外部副作用，必须声明幂等要求与错误处理"},
+    {"id": "data-transform", "label": "数据转换", "specType": "DataTransform", "executes": true, "note": "必须声明输入输出契约，不得编造真实数据值"},
+    {"id": "subflow", "label": "子流程", "specType": "Subflow", "executes": true, "note": "必须声明被调用的流程 ID"},
+    {"id": "error-handler", "label": "错误处理", "specType": "ErrorHandler", "executes": true, "note": "必须声明捕获的错误类型与处理动作"},
+    {"id": "retry", "label": "重试", "specType": "Retry", "executes": true, "note": "必须声明次数与退避策略"},
+    {"id": "compensation", "label": "补偿", "specType": "Compensation", "executes": true, "note": "必须声明被补偿的节点或事件"}
   ],
   "portKinds": [
     {"id": "input", "label": "输入"},
@@ -19,11 +33,30 @@
     {"id": "control", "label": "控制"},
     {"id": "error", "label": "异常"}
   ],
+  "portDirections": [
+    {"id": "in", "label": "入"},
+    {"id": "out", "label": "出"},
+    {"id": "inout", "label": "双向"}
+  ],
+  "portCardinalities": [
+    {"id": "1", "label": "恰好一个"},
+    {"id": "0..1", "label": "可选一个"},
+    {"id": "0..N", "label": "可选多个"},
+    {"id": "1..N", "label": "至少一个"},
+    {"id": "N", "label": "任意多个"}
+  ],
   "edgeKinds": [
-    {"id": "sequence", "label": "顺序流", "directed": true},
-    {"id": "conditional", "label": "条件流", "directed": true, "requiresCondition": true},
-    {"id": "message", "label": "消息流", "directed": true},
-    {"id": "association", "label": "关联", "directed": false}
+    {"id": "control-flow", "label": "控制流", "specType": "ControlFlow", "directed": true},
+    {"id": "data-flow", "label": "数据流", "specType": "DataFlow", "directed": true},
+    {"id": "event-flow", "label": "事件流", "specType": "EventFlow", "directed": true},
+    {"id": "error-flow", "label": "错误流", "specType": "ErrorFlow", "directed": true},
+    {"id": "conditional-flow", "label": "条件流", "specType": "ConditionalFlow", "directed": true, "requiresCondition": true},
+    {"id": "compensation-flow", "label": "补偿流", "specType": "CompensationFlow", "directed": true},
+    {"id": "dependency", "label": "依赖", "specType": "Dependency", "directed": false},
+    {"id": "sequence", "label": "顺序流（旧写法）", "specType": null, "directed": true, "note": "旧写法，等同 control-flow。新写入必须用 control-flow。"},
+    {"id": "conditional", "label": "条件流（旧写法）", "specType": null, "directed": true, "requiresCondition": true, "note": "旧写法，等同 conditional-flow。"},
+    {"id": "message", "label": "消息流（旧写法）", "specType": null, "directed": true, "note": "旧写法。按语义改写为 event-flow 或 data-flow。"},
+    {"id": "association", "label": "关联（旧写法）", "specType": null, "directed": false, "note": "旧写法。跨节点静态引用改用 dependency。"}
   ],
   "executionConstraints": [
     {"id": "order", "label": "顺序", "note": "源节点完成后目标节点才可执行"},
@@ -33,9 +66,30 @@
     {"id": "retry", "label": "重试", "note": "必须声明次数与退避策略"},
     {"id": "compensation", "label": "补偿", "note": "必须声明失败后的补偿动作"}
   ],
+  "gwfIr": {
+    "version": "0.2.0",
+    "note": "v5.0 提示词 §17 的字段目录。schema_versioning 为必填；GWF-IR 是规范化中间格式，不得把第三方画布快照当作唯一的工作流真相。",
+    "workflowFields": ["workflowId", "name", "version", "entryPoints", "nodes", "edges", "dataSchemas", "executionPolicy", "errorPolicy", "permissions", "evidenceIds", "metadata"],
+    "nodeFields": ["nodeId", "nodeType", "name", "description", "inputs", "outputs", "ports", "preconditions", "postconditions", "stateTransitions", "timeoutPolicy", "retryPolicy", "errorHandlers", "sideEffects", "idempotency", "implementationRef", "evidenceIds", "verification"],
+    "edgeFields": ["edgeId", "sourceNodeId", "sourcePortId", "targetNodeId", "targetPortId", "edgeType", "direction", "guard", "dataMapping", "priority", "errorRoute", "verification", "evidenceIds"],
+    "portFields": ["portId", "direction", "schema", "cardinality", "required", "acceptedTypes"],
+    "nodeTypes": ["Start", "End", "Task", "Input", "Output", "Decision", "ParallelFork", "ParallelJoin", "Event", "Timer", "Wait", "Agent", "HumanApproval", "APICall", "DataTransform", "Subflow", "ErrorHandler", "Retry", "Compensation"],
+    "edgeTypes": ["ControlFlow", "DataFlow", "EventFlow", "ErrorFlow", "ConditionalFlow", "CompensationFlow", "Dependency"],
+    "designOnlyNodeTypes": ["Agent", "HumanApproval"],
+    "validity": [
+      "Port 应通过类型、方向和约束校验；Node/Edge 必须具有稳定 ID。",
+      "不适用的超时、重试或副作用字段可使用有明确定义的 null/omission 语义。",
+      "没有真实执行器的类型标为 Design-only，不得伪称可执行。",
+      "ControlFlow、DataFlow、EventFlow、ErrorFlow 等不得混淆。",
+      "GWF-IR 是规范化中间格式，不得把第三方画布快照当作唯一的工作流真相。"
+    ]
+  },
   "rules": [
     "画布坐标、颜色和动画不应决定业务执行语义；所有计算以明确的数据契约为准。",
     "每个工作流节点必须绑定至少一个 canonical nodeId 或声明为纯流程内部元素。",
-    "条件流必须带可被程序判断的 condition 表达式，不得只写自然语言。"
+    "条件流必须带可被程序判断的 condition 表达式，不得只写自然语言。",
+    "新写入必须使用 §17 的规范 id（control-flow / data-flow / event-flow / error-flow / conditional-flow / compensation-flow / dependency）；旧写法只保留兼容读取。",
+    "没有真实执行器的节点类型（agent / human-approval）必须标为 Design-only，不得声称可执行。",
+    "端口必须声明 direction 与 cardinality；跨节点连线必须连到具体的端口（sourcePortId / targetPortId）。"
   ]
 }

@@ -43,9 +43,21 @@ ENTITY_KINDS = frozenset(item["id"] for item in _vocab("entity-kinds")["kinds"])
 EDGE_TYPES = frozenset(item["id"] for item in _vocab("edge-types")["types"])
 DIAGRAM_TYPES = {item["id"]: item for item in _vocab("diagram-types")["types"]}
 CASE_CATEGORIES = frozenset(item["id"] for item in _vocab("case-categories")["categories"])
+CASE_TYPES = frozenset(item["id"] for item in _vocab("case-types")["types"])
+CASE_REALITIES = frozenset(_vocab("case-types")["reality"]["values"])
 WORKFLOW_NODE_KINDS = frozenset(item["id"] for item in _vocab("workflow-kinds")["nodeKinds"])
 WORKFLOW_EDGE_KINDS = frozenset(item["id"] for item in _vocab("workflow-kinds")["edgeKinds"])
 WORKFLOW_CONSTRAINTS = frozenset(item["id"] for item in _vocab("workflow-kinds")["executionConstraints"])
+
+#: v5.0 §17 names the workflow node and edge types in PascalCase ("Task",
+#: "ControlFlow"). The canonical ids are lower case, so a workflow written in
+#: the specification's spelling has to be mapped back onto them.
+WORKFLOW_NODE_KIND_BY_SPEC = {item["specType"]: item["id"]
+                              for item in _vocab("workflow-kinds")["nodeKinds"]
+                              if item.get("specType")}
+WORKFLOW_EDGE_KIND_BY_SPEC = {item["specType"]: item["id"]
+                              for item in _vocab("workflow-kinds")["edgeKinds"]
+                              if item.get("specType")}
 
 #: A strict model must be backed by implemented or observed facts.
 STRICT_MINIMUM_RANK = 5
@@ -91,6 +103,11 @@ def normalized_model(model: dict) -> dict:
     2. evidence levels are canonicalised
     3. every collection gets a default empty array
     4. meta gets schemaVersion / language / evidenceState defaults
+    5. the field spellings of v5.0 §3 / §17 are accepted as aliases:
+       node ``type`` -> ``kind``, node ``label`` -> ``name``,
+       edge ``direction`` -> ``directed``, workflow node ``nodeType`` -> ``kind``,
+       workflow edge ``edgeType`` -> ``kind`` and ``guard`` -> ``condition``,
+       port ``portId`` -> ``id``, workflow ``workflowId`` -> ``id``
     """
     copied = copy.deepcopy(model if isinstance(model, dict) else {})
     meta = _as_dict(copied.get("meta"))
@@ -104,12 +121,64 @@ def normalized_model(model: dict) -> dict:
     copied["evidence"] = [_normalize_evidence(item) for item in _as_array(copied.get("evidence"))]
     for key in ("views", "scenarios", "cases", "workflows", "prototypes"):
         copied[key] = _as_array(copied.get(key))
+    copied["workflows"] = [_normalize_workflow(item) for item in copied["workflows"]]
     copied["space"] = _as_dict(copied.get("space")) if copied.get("space") else None
     return copied
 
 
+def _normalize_workflow(workflow) -> dict:
+    """Accept the GWF-IR field spellings of v5.0 §17 as aliases.
+
+    The canonical spelling stays ``kind`` / ``condition`` / ``id``; the §17
+    spellings (``nodeType`` / ``edgeType`` / ``guard`` / ``portId`` /
+    ``workflowId``) are read and rewritten so the rest of the code - and the
+    browser runtime - only ever sees one spelling.
+    """
+    item = _as_dict(workflow)
+    if not item.get("id") and isinstance(item.get("workflowId"), str):
+        item["id"] = item["workflowId"]
+    nodes = []
+    for node in _as_array(item.get("nodes")):
+        record = _as_dict(node)
+        if not record.get("id") and isinstance(record.get("nodeId"), str):
+            record["id"] = record["nodeId"]
+        if not record.get("kind") and isinstance(record.get("nodeType"), str):
+            record["kind"] = WORKFLOW_NODE_KIND_BY_SPEC.get(record["nodeType"], record["nodeType"])
+        record["ports"] = [_normalize_port(port) for port in _as_array(record.get("ports"))]
+        nodes.append(record)
+    item["nodes"] = nodes
+    edges = []
+    for edge in _as_array(item.get("edges")):
+        record = _as_dict(edge)
+        if not record.get("id") and isinstance(record.get("edgeId"), str):
+            record["id"] = record["edgeId"]
+        if not record.get("kind") and isinstance(record.get("edgeType"), str):
+            record["kind"] = WORKFLOW_EDGE_KIND_BY_SPEC.get(record["edgeType"], record["edgeType"])
+        if not record.get("sourceId") and isinstance(record.get("sourceNodeId"), str):
+            record["sourceId"] = record["sourceNodeId"]
+        if not record.get("targetId") and isinstance(record.get("targetNodeId"), str):
+            record["targetId"] = record["targetNodeId"]
+        if not record.get("condition") and isinstance(record.get("guard"), str):
+            record["condition"] = record["guard"]
+        edges.append(record)
+    item["edges"] = edges
+    return item
+
+
+def _normalize_port(port) -> dict:
+    record = _as_dict(port)
+    if not record.get("id") and isinstance(record.get("portId"), str):
+        record["id"] = record["portId"]
+    return record
+
+
 def _normalize_node(node) -> dict:
     item = _as_dict(node)
+    # v5.0 §3 names the entity type "type" and the display name "label".
+    if not item.get("kind") and isinstance(item.get("type"), str):
+        item["kind"] = item["type"]
+    if not item.get("name") and isinstance(item.get("label"), str):
+        item["name"] = item["label"]
     item["properties"] = _as_dict(item.get("properties"))
     item["parentId"] = item.get("parentId")
     item["role"] = item.get("role")
@@ -139,7 +208,14 @@ def _normalize_edge(edge) -> dict:
         edge_type = item.get("kind")
     item["type"] = edge_type
     item.pop("kind", None)
-    item["directed"] = bool(item.get("directed", True))
+    # v5.0 §17 names the flow direction "direction"; the canonical spelling is
+    # the boolean "directed". Read the raw value first: the default must not
+    # shadow the alias.
+    raw_directed = item.get("directed")
+    direction = item.get("direction")
+    if raw_directed is None and isinstance(direction, str):
+        raw_directed = direction != "undirected"
+    item["directed"] = True if raw_directed is None else bool(raw_directed)
     condition = item.get("condition")
     item["condition"] = None if condition == "" else condition
     item["weight"] = item.get("weight")
@@ -361,6 +437,12 @@ def _validate_cases(cases, scenarios, node_ids, err, warn) -> None:
             err("GEMARC_CASE_001", "Case 引用的场景不存在", str(cid))
         if case.get("category") not in CASE_CATEGORIES:
             err("GEMARC_CASE_002", "无效的 Case 分类", str(cid))
+        case_type = case.get("caseType")
+        if case_type is not None and case_type not in CASE_TYPES:
+            err("GEMARC_CASE_006", "未登记的 Case 分析类型", str(cid))
+        reality = case.get("reality")
+        if reality is not None and reality not in CASE_REALITIES:
+            err("GEMARC_CASE_007", "未登记的 Case 现实标记", str(cid))
         for node_id in _as_array(case.get("disabledNodeIds")):
             if node_id not in node_ids:
                 err("GEMARC_CASE_003", "Case 屏蔽的节点不存在", str(cid))
@@ -398,7 +480,7 @@ def _validate_workflows(workflows, node_ids, err, warn) -> None:
             for key in ("sourceId", "targetId"):
                 if edge.get(key) not in local_ids:
                     err("GEMARC_WORKFLOW_002", "工作流边引用不存在的节点", str(edge.get("id", "")))
-            if edge.get("kind") == "conditional" and not edge.get("condition"):
+            if edge.get("kind") in ("conditional", "conditional-flow") and not edge.get("condition"):
                 err("GEMARC_WORKFLOW_003", "条件流必须声明可判断的条件", str(edge.get("id", "")))
 
 

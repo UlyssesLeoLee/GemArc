@@ -217,8 +217,8 @@ async def run_checks(session, init, report: Report, args, workspace: Path):
     result, payload, size = await call("gemarc_render", model=DEMO_MODEL)
     files = payload.get("files", [])
     parsed = all(json.loads(f["content"]) is not None for f in files) if payload.get("inline") else False
-    report.check("gemarc_render(model) -> ok, 3 data files inline and parseable, kit.path /kit/static.zip",
-                 not result.is_error and payload.get("status") == "ok" and len(files) == 3 and parsed
+    report.check("gemarc_render(model) -> ok, 8 data files inline and parseable, kit.path /kit/static.zip",
+                 not result.is_error and payload.get("status") == "ok" and len(files) == 8 and parsed
                  and payload.get("kit", {}).get("path") == "/kit/static.zip",
                  f"payload {size} bytes; kit.url={payload.get('kit', {}).get('url')!r}")
     result, payload, _ = await call("gemarc_render", model=DEMO_MODEL, profile="nope")

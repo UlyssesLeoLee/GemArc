@@ -35,6 +35,17 @@
       "default": true,
       "description": "false 表示无向边，渲染与查询都必须按无向处理"
     },
+    "direction": {
+      "type": ["string", "null"],
+      "default": null,
+      "enum": ["directed", "undirected", null],
+      "description": "方向别名。等同 directed；v5.0 提示词 §17 edge_fields 用 direction。两者同时给出时以 directed 为准。"
+    },
+    "version": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "关系版本标识。关系语义变更必须留下可审查的版本记录。"
+    },
     "condition": {
       "type": ["string", "null"],
       "default": null,

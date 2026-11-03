@@ -69,14 +69,87 @@
         "additionalProperties": true,
         "properties": {
           "id": {"type": "string", "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$"},
+          "caseId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$",
+            "description": "§13 caseId 别名。等同 id；两者同时给出时以 id 为准。"
+          },
           "scenarioId": {"type": "string", "description": "必须存在于 scenarios 中"},
           "category": {
             "type": "string",
             "enum": ["normal", "abnormal", "boundary", "combination", "recovery"],
-            "description": "取值见 vocab/case-categories.json"
+            "description": "分诊轴，取值见 vocab/case-categories.json"
+          },
+          "caseType": {
+            "type": ["string", "null"],
+            "default": null,
+            "enum": ["Normal", "Boundary", "Error", "Timeout", "Retry", "Recovery", "Compensation",
+                     "Concurrency", "RaceCondition", "ResourceContention", "PartialFailure",
+                     "CascadingFailure", "Security", "Combined", null],
+            "description": "v5.0 提示词 §13 分析类型，取值见 vocab/case-types.json。与 category 互补。"
+          },
+          "reality": {
+            "type": ["string", "null"],
+            "default": null,
+            "enum": ["Observed", "ImplementedModel", "DesignedModel", "Hypothetical", null],
+            "description": "v5.0 提示词 §13 的 Case 现实标记。缺证据的 Case 不得标为 Observed。"
           },
           "title": {"type": "string", "minLength": 1},
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "§13 name 别名。等同 title；两者同时给出时以 title 为准。"
+          },
           "description": {"type": ["string", "null"], "default": null},
+          "initialState": {"type": ["object", "null"], "default": null},
+          "inputEvents": {
+            "type": "array",
+            "default": [],
+            "items": {"type": "object"},
+            "description": "v5.0 提示词 §13 case_contract：输入事件。"
+          },
+          "preconditions": {
+            "type": "array",
+            "default": [],
+            "items": {"type": "string"},
+            "description": "v5.0 提示词 §13 case_contract：前置条件。"
+          },
+          "executionRules": {
+            "type": "array",
+            "default": [],
+            "items": {"type": "object"},
+            "description": "v5.0 提示词 §13 case_contract：本次 Case 的执行规则覆盖。"
+          },
+          "expectedOutcomes": {
+            "type": ["array", "null"],
+            "default": null,
+            "items": {"type": "object"},
+            "description": "v5.0 提示词 §13 case_contract：预期结果。"
+          },
+          "terminationConditions": {
+            "type": "array",
+            "default": [],
+            "items": {"type": "string"},
+            "description": "v5.0 提示词 §13 case_contract：终止条件。"
+          },
+          "assertions": {
+            "type": "array",
+            "default": [],
+            "items": {"type": "string"},
+            "description": "v5.0 提示词 §13 case_contract：断言。"
+          },
+          "assumptions": {
+            "type": "array",
+            "default": [],
+            "items": {"type": "string"},
+            "description": "v5.0 提示词 §13 case_contract：假设。假设必须显式列出，不得隐藏。"
+          },
+          "evidenceIds": {
+            "type": "array",
+            "default": [],
+            "items": {"type": "string"},
+            "description": "v5.0 提示词 §13 case_contract：证据引用，指向顶层 evidence 数组。"
+          },
           "disabledNodeIds": {
             "type": "array",
             "items": {"type": "string"},

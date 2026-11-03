@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "0.2.0",
+  "id": "case-types",
+  "title": "5D Case 分析类型（v5.0 §13 case_types）",
+  "description": "v5.0 提示词 §13：第五维必须以正常、异常、边界、并发与组合 Case 为基本分析单位，不局限于固定的 A/B 预制动画。本词表登记 §13 列出的全部 14 种分析类型。cases[].category 是分诊轴（见 case-categories 词表），cases[].caseType 是本词表的分析类型：两个字段互补，不互相替代。",
+  "types": [
+    {"id": "Normal", "label": "正常", "assertion": "正常业务执行", "requiresIntervention": false, "category": "normal", "primitives": ["Propagation", "StateTransition", "Parallel", "Convergence"]},
+    {"id": "Boundary", "label": "边界", "assertion": "边界值与极限条件", "requiresIntervention": true, "category": "boundary", "primitives": ["Propagation", "Blocking", "OutcomeComparison"]},
+    {"id": "Error", "label": "错误", "assertion": "输入、处理或业务规则错误", "requiresIntervention": true, "category": "abnormal", "primitives": ["Propagation", "Blocking", "FailurePropagation", "Recovery"]},
+    {"id": "Timeout", "label": "超时", "assertion": "超时与延迟", "requiresIntervention": true, "category": "abnormal", "primitives": ["Propagation", "Waiting", "Timeout", "Retry"]},
+    {"id": "Retry", "label": "重试", "assertion": "重试与退避策略", "requiresIntervention": true, "category": "abnormal", "primitives": ["Propagation", "Waiting", "Retry"]},
+    {"id": "Recovery", "label": "恢复", "assertion": "故障恢复", "requiresIntervention": true, "category": "recovery", "primitives": ["Propagation", "FailurePropagation", "Retry", "Recovery"]},
+    {"id": "Compensation", "label": "补偿", "assertion": "事务补偿或纠正动作", "requiresIntervention": true, "category": "abnormal", "primitives": ["Propagation", "Compensation", "Recovery", "OutcomeComparison"]},
+    {"id": "Concurrency", "label": "并发", "assertion": "并发任务/事件", "requiresIntervention": true, "category": "combination", "primitives": ["Propagation", "Parallel", "Waiting", "Convergence"]},
+    {"id": "RaceCondition", "label": "竞争条件", "assertion": "不同执行顺序竞争", "requiresIntervention": true, "category": "combination", "primitives": ["Propagation", "Parallel", "Branching", "OutcomeComparison"]},
+    {"id": "ResourceContention", "label": "资源竞争", "assertion": "资源竞争", "requiresIntervention": true, "category": "boundary", "primitives": ["Propagation", "Waiting", "Blocking", "Escalation"]},
+    {"id": "PartialFailure", "label": "局部故障", "assertion": "局部模块故障", "requiresIntervention": true, "category": "abnormal", "primitives": ["Propagation", "FailurePropagation", "Compensation", "OutcomeComparison"]},
+    {"id": "CascadingFailure", "label": "级联故障", "assertion": "故障级联", "requiresIntervention": true, "category": "abnormal", "primitives": ["FailurePropagation", "Propagation", "Blocking", "Escalation", "OutcomeComparison"]},
+    {"id": "Security", "label": "安全", "assertion": "身份、权限和安全边界", "requiresIntervention": true, "category": "abnormal", "primitives": ["Propagation", "Blocking", "Escalation", "OutcomeComparison"]},
+    {"id": "Combined", "label": "组合", "assertion": "多种条件和异常组合", "requiresIntervention": true, "category": "combination", "primitives": ["Propagation", "Branching", "Parallel", "Convergence", "OutcomeComparison"]}
+  ],
+  "reality": {
+    "note": "§13 要求每个 Case 标记 Observed / ImplementedModel / DesignedModel / Hypothetical。缺证据的 Case 不得被描述为项目的真实运行事实。",
+    "values": ["Observed", "ImplementedModel", "DesignedModel", "Hypothetical"]
+  },
+  "animationPrimitives": {
+    "note": "§14 animation_primitives。原语只消费计算轨迹，不得反过来创造业务事件或因果关系。",
+    "ids": ["Propagation", "Branching", "Parallel", "Waiting", "Timeout", "Retry", "Blocking", "FailurePropagation", "Recovery", "Compensation", "FeedbackLoop", "Convergence", "StateTransition", "DataTransformation", "Escalation", "Cancellation", "Rollback", "OutcomeComparison"],
+    "terminalStates": ["Completed", "Failed"]
+  },
+  "rules": [
+    "cases[].caseType 取自本词表；cases[].category 取自 case-categories 词表。",
+    "requiresIntervention 为 true 的类型必须给出非空 disabledNodeIds 或显式说明无干预原因。",
+    "组合 Case 必须先检查参数、前置条件、状态与时间约束；矛盾时拒绝执行并说明原因。",
+    "缺少足够规则时返回 Unknown 或 Unsupported，而不是猜测结果。",
+    "primitives 只是可选的动画语法提示，不得当作该 Case 实际发生过的轨迹。"
+  ]
+}

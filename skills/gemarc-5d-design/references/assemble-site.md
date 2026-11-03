@@ -2,10 +2,12 @@
 
 `gemarc_render` 返回两样东西：
 
-- `files[]`：随模型变化的 `data/architecture.json`、`data/scenarios.json`、`data/capabilities.json`，每项有 `path`、`bytes`、`sha256` 和（`inline: true` 时）`content`。
-- `kit`：固定件（站点外壳 + 共用运行时，static 约 52 个文件，压缩约 170 KB），含 `path`（`/kit/static.zip` 或 `/kit/vite.zip`）、`url`、`archiveSha256`、`run`。
+- `files[]`：随模型变化的 8 个文件——`data/architecture.json`、`data/scenarios.json`、`data/capabilities.json`、`data/evidence-index.json`、`data/diagram-catalog.json`、`data/spatial-layout.json`、`data/workflow-ir.json`、`data/case-library.json`——每项有 `path`、`bytes`、`sha256` 和（有 `content` 时）`content`。
+- `kit`：固定件（站点外壳 + 共用运行时 + `data/workflow-schema.json`，static 约 53 个文件，压缩约 180 KB），含 `path`（`/kit/static.zip` 或 `/kit/vite.zip`）、`url`、`archiveSha256`、`run`。
 
 固定件 + `files[]` = 完整站点。服务端什么都没保存。
+
+`inline` 为 `true` 表示 8 个文件全部内联；为 `false` 时**可能只是部分文件放不下**：逐项检查 `content` 是否存在，缺哪个补哪个（补不了就改用本地流程 B）。
 
 ## 取得 kit 的地址
 
@@ -62,5 +64,5 @@ Set-Location site; python -m http.server 8000 --bind 127.0.0.1
 
 1. `kit.archiveSha256` 与下载文件一致；
 2. 每个 `files[].sha256`、`bytes` 与写出的文件一致（`bytes` 是 UTF-8 字节数）；
-3. `inline` 为 `false` 时没有 `content`，**不能**组装，改用本地流程 B 或在本地运行 `gemarc build <project> --profile <profile>`；
+3. `files[]` 里每一项都要有 `content`；**任何一项缺 `content` 就不能组装**，改用本地流程 B 或在本地运行 `gemarc build <project> --profile <profile>`；
 4. 打开 `index.html` 前先说明：站点已通过结构与 schema 校验，**没有**做过真实浏览器、WebGL 或性能测试。

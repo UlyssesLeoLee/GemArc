@@ -18,6 +18,40 @@
       "$ref": "#/$defs/kind"
     },
     "name": {"type": "string", "minLength": 1},
+    "label": {
+      "type": "string",
+      "minLength": 1,
+      "description": "显示名别名。等同 name；v5.0 提示词 §3 node_fields 用 label。两者同时给出时以 name 为准。"
+    },
+    "type": {
+      "type": "string",
+      "description": "实体类型别名。等同 kind；v5.0 提示词 §3 node_fields 用 type。两者同时给出时以 kind 为准。",
+      "$ref": "#/$defs/kind"
+    },
+    "qualifiedName": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "限定名，例如 com.example.billing.InvoiceService。用于把实体与源码符号对齐。"
+    },
+    "sourceLocation": {
+      "type": ["object", "null"],
+      "default": null,
+      "description": "源码位置。v5.0 提示词 §3 provenance_fields：repository / commit / path / startLine / endLine。",
+      "properties": {
+        "repository": {"type": ["string", "null"]},
+        "commit": {"type": ["string", "null"]},
+        "path": {"type": ["string", "null"]},
+        "startLine": {"type": ["integer", "null"], "minimum": 1},
+        "endLine": {"type": ["integer", "null"], "minimum": 1},
+        "symbol": {"type": ["string", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "version": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "实体版本标识。重命名或迁移必须留下可审查的版本记录。"
+    },
     "properties": {
       "type": "object",
       "description": "自由属性。已登记的键必须来自 model-contract 的保留词表，不得用于存放业务语义。",

@@ -69,6 +69,21 @@ GemArc 把「可被写死的东西」（字段名、词表、校验规则、模�
 
 `validate`、`simulate`、`diff` 里 `project` 与 `model` **二选一**，两个都给或都不给得到 `GEMARC_INPUT_003`。
 
+## v5.0 规格字段（能填就填，缺就留空）
+
+模型层支持 v5.0 规格逐条列出的字段。它们**全部可选**，但填了才能让站点表达得更完整：
+
+| 位置 | 字段 | 要点 |
+|---|---|---|
+| 节点 | `qualifiedName`、`sourceLocation`（`repository`/`commit`/`path`/`startLine`/`endLine`）、`version` | `sourceLocation` 指向真实文件与行号；指不回去就留空 |
+| 边 | `version` | 关系语义变更时留版本 |
+| 证据 | `source.path` / `source.startLine` / `source.endLine` | 让证据能定位到一段而不是一行 |
+| 视图 | `diagramType` 可取 `data-dependency`、`event-flow` | 用 `gemarc_brief(section="vocabulary")` 里的 `diagramTypes` 确认允许的实体与关系 |
+| Case | `caseType`（14 种分析类型）、`reality`（`Observed`/`ImplementedModel`/`DesignedModel`/`Hypothetical`）、`initialState`、`inputEvents`、`preconditions`、`executionRules`、`expectedOutcomes`、`terminationConditions`、`assertions`、`assumptions` | `category` 是分诊轴（5 类），`caseType` 是分析类型，两者互补；没有真实运行证据时 `reality` 不要写 `Observed` |
+| 工作流 | `version`、`entryPoints`、`dataSchemas`、`executionPolicy`、`errorPolicy`、`permissions`；节点侧的 `inputs`/`outputs`/`preconditions`/`postconditions`/`stateTransitions`/`timeoutPolicy`/`retryPolicy`/`errorHandlers`/`sideEffects`/`idempotency`/`implementationRef`；边侧的 `dataMapping`/`priority`/`errorRoute`；端口侧的 `direction`/`cardinality`/`required`/`acceptedTypes` | 条件流必须给可被程序判断的 `condition`；没有真实执行器的节点（agent、human-approval）会被标成 Design-only，不要假装它能跑 |
+
+规格的字段拼写与正本拼写都接受（节点的 `type`/`label`、边的 `direction`、工作流的 `nodeType`/`edgeType`/`guard`/`portId`），服务端会归一到正本拼写。写入时用正本拼写更稳。
+
 ## 结果与错误
 
 - 每个工具的结果是一段 JSON 文本，没有 `structuredContent`。
@@ -81,7 +96,7 @@ GemArc 把「可被写死的东西」（字段名、词表、校验规则、模�
 ## 大小与限额
 
 - 模型内联传入，**每次**调用都会占用你的上下文；硬上限 4 MiB（`GEMARC_MODEL_002`）。节点 id 用短而稳定的名字，别在模型里塞大段原文。
-- `gemarc_render` 派生文件合计超过约 24 KiB（24576 字节，三十来个节点的模型就会到这个量级）时 `inline` 为 `false`：只给清单和摘要，不给内容，并提示在本地用 `gemarc build <project> --profile <profile>`。遇到这种规模的模型，改走本地流程 B。
+- `gemarc_render` 的内联上限约 24 KiB（24576 字节，三十来个节点的模型就会到这个量级），按**累计字节逐文件**判定：放得下的文件给内容，放不下的只给清单。**任何一项缺 `content` 就不能组装**，这时改走本地流程 B，用 `gemarc build <project> --profile <profile>`。
 - 客户端对单次工具输出有上限（Claude Code 在 10k token 告警、默认 25k 截断；Codex 约 10k token）。少用不带 `section` 的 `gemarc_brief()`，不要把整个模型反复打印回聊天里。
 - 远程端点可能要求 Bearer token：这是用户的连接配置，不是你要处理的东西。收到 401 就告诉用户检查 `GEMARC_MCP_TOKEN`。
 

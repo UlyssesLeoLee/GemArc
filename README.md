@@ -97,7 +97,7 @@ Claude Code、Codex、Hermes 的配置容器键名各不相同，下一节与 `i
 | 层 | 内容 | 位置 |
 |---|---|---|
 | 契约层 | 8 份 JSON Schema（Canonical Model / Node / Edge / Evidence / Space / View / Scenario / Workflow） | `src/gemarc_mcp/scaffold/contracts/` |
-| 词表层 | 6 级证据等级、21 种实体类型、21 种关系类型、19 种图示类型、相关性分级、空间层级、Case 分类 | `src/gemarc_mcp/scaffold/vocab/` |
+| 词表层 | 6 级证据等级、21 种实体类型、21 种关系类型、21 种图示类型、相关性分级、空间层级、Case 分类（5 类分诊轴 + 14 种分析类型）、工作流语义（GWF-IR） | `src/gemarc_mcp/scaffold/vocab/` |
 | 运行层 | 图引擎、Focus 退避、3D 空间、4D/5D 仿真、跨视图状态、工作流语义、互操作适配器 | `src/gemarc_mcp/scaffold/runtime/` |
 
 词表是**提示词、Python 校验器、浏览器运行时三方共用的唯一事实源**；
@@ -127,7 +127,7 @@ E:\GemArc\.venv\Scripts\python.exe -m gemarc_mcp.cli build demo --profile static
 与 `gemarc_contracts`（读取契约与词表内容）。
 
 `gemarc_brief` 一次性返回：目标、五步流程、六条硬规则、12 个槽位（带 JSON Pointer 与规则）、
-全部允许词值（6 级证据 / 21 实体类型 / 21 关系类型 / 19 图示类型 / Case 分类 / 空间层级）、
+全部允许词值（6 级证据 / 21 实体类型 / 21 关系类型 / 21 图示类型 / Case 分类 / 空间层级）、
 构建命令，以及「哪些固定件已经写好、不要重写」的清单。**实测约 10 KB**，
 用来替掉原先 13323 字节的提示词规格。
 
@@ -207,7 +207,7 @@ npx vercel@65.8.0 deploy --prod
 
 **远程形态与本地的区别**：远程默认是 `stateless` 工具集（`gemarc_brief / contracts / assets / new_model / validate / simulate / diff / render`），
 模型随每次调用传入，服务端不保存任何项目，因此没有跨调用状态丢失的问题，也没有写工具。
-`gemarc_render` 只返回随模型变化的 `data/*.json`（内联上限 24 KB，超出时只给清单与摘要）；固定件通过 `/kit/<profile>.zip` 下载。
+`gemarc_render` 只返回随模型变化的 `data/*.json`（内联上限 24 KB，按累计字节逐文件判定：放不下的文件只给清单与摘要）；固定件通过 `/kit/<profile>.zip` 下载。
 需要工作区、扫描本地仓库、`build/export` 时用本地 stdio 模式。
 
 **鉴权**：设置环境变量 `GEMARC_MCP_TOKEN`（可逗号分隔多个，便于轮换）后，`POST /mcp` 必须带 `Authorization: Bearer <token>`；

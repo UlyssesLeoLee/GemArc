@@ -188,7 +188,7 @@ class ScaffoldFlowTests(unittest.TestCase):
         self.assertEqual(len(vocabulary["evidenceLevels"]), 6)
         self.assertIn("Component", vocabulary["entityKinds"])
         self.assertIn("sends", vocabulary["edgeTypes"])
-        self.assertEqual(len(vocabulary["diagramTypes"]), 19)
+        self.assertEqual(len(vocabulary["diagramTypes"]), 21)
         # The brief must stay far shorter than the specification it replaces.
         self.assertLess(len(json.dumps(brief, ensure_ascii=False)), 40000)
 

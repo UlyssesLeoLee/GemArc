@@ -1,0 +1,479 @@
+{
+  "designOnlyNodeTypes": [
+    "Agent",
+    "HumanApproval"
+  ],
+  "edgeFields": [
+    "edgeId",
+    "sourceNodeId",
+    "sourcePortId",
+    "targetNodeId",
+    "targetPortId",
+    "edgeType",
+    "direction",
+    "guard",
+    "dataMapping",
+    "priority",
+    "errorRoute",
+    "verification",
+    "evidenceIds"
+  ],
+  "edgeTypes": [
+    "ControlFlow",
+    "DataFlow",
+    "EventFlow",
+    "ErrorFlow",
+    "ConditionalFlow",
+    "CompensationFlow",
+    "Dependency"
+  ],
+  "gwfVersion": "0.2.0",
+  "jsonSchema": {
+    "$defs": {
+      "edge": {
+        "additionalProperties": true,
+        "properties": {
+          "dataMapping": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "direction": {
+            "enum": [
+              "source-to-target",
+              "both"
+            ],
+            "type": "string"
+          },
+          "edgeId": {
+            "type": "string"
+          },
+          "edgeType": {
+            "enum": [
+              "ControlFlow",
+              "DataFlow",
+              "EventFlow",
+              "ErrorFlow",
+              "ConditionalFlow",
+              "CompensationFlow",
+              "Dependency"
+            ],
+            "type": "string"
+          },
+          "errorRoute": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidenceIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "guard": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "sourceNodeId": {
+            "type": "string"
+          },
+          "sourcePortId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "targetNodeId": {
+            "type": "string"
+          },
+          "targetPortId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "verification": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "edgeId",
+          "sourceNodeId",
+          "targetNodeId",
+          "edgeType"
+        ],
+        "type": "object"
+      },
+      "node": {
+        "additionalProperties": true,
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "designOnly": {
+            "type": "boolean"
+          },
+          "errorHandlers": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "evidenceIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "executable": {
+            "type": "boolean"
+          },
+          "idempotency": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "implementationRef": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "inputs": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nodeId": {
+            "type": "string"
+          },
+          "nodeType": {
+            "enum": [
+              "Start",
+              "End",
+              "Task",
+              "Input",
+              "Output",
+              "Decision",
+              "ParallelFork",
+              "ParallelJoin",
+              "Event",
+              "Timer",
+              "Wait",
+              "Agent",
+              "HumanApproval",
+              "APICall",
+              "DataTransform",
+              "Subflow",
+              "ErrorHandler",
+              "Retry",
+              "Compensation"
+            ],
+            "type": "string"
+          },
+          "outputs": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "ports": {
+            "items": {
+              "$ref": "#/$defs/port"
+            },
+            "type": "array"
+          },
+          "postconditions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "preconditions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "retryPolicy": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "sideEffects": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "stateTransitions": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "timeoutPolicy": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "verification": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "nodeId",
+          "nodeType",
+          "name"
+        ],
+        "type": "object"
+      },
+      "port": {
+        "additionalProperties": true,
+        "properties": {
+          "acceptedTypes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "cardinality": {
+            "enum": [
+              "1",
+              "0..1",
+              "0..N",
+              "1..N",
+              "N",
+              null
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "direction": {
+            "enum": [
+              "in",
+              "out",
+              "inout",
+              null
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "enum": [
+              "input",
+              "output",
+              "control",
+              "error"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "portId": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "schema": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "portId",
+          "kind"
+        ],
+        "type": "object"
+      }
+    },
+    "$id": "https://gemarc.dev/gwf-ir/0.2.0/workflow-ir.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": true,
+    "properties": {
+      "dataSchemas": {
+        "items": {
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "edges": {
+        "items": {
+          "$ref": "#/$defs/edge"
+        },
+        "type": "array"
+      },
+      "entryPoints": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "errorPolicy": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "evidenceIds": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "executionPolicy": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "metadata": {
+        "type": "object"
+      },
+      "name": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "nodes": {
+        "items": {
+          "$ref": "#/$defs/node"
+        },
+        "type": "array"
+      },
+      "permissions": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "version": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "workflowId": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "workflowId",
+      "name",
+      "nodes",
+      "edges"
+    ],
+    "title": "GWF-IR",
+    "type": "object"
+  },
+  "nodeFields": [
+    "nodeId",
+    "nodeType",
+    "name",
+    "description",
+    "inputs",
+    "outputs",
+    "ports",
+    "preconditions",
+    "postconditions",
+    "stateTransitions",
+    "timeoutPolicy",
+    "retryPolicy",
+    "errorHandlers",
+    "sideEffects",
+    "idempotency",
+    "implementationRef",
+    "evidenceIds",
+    "verification"
+  ],
+  "nodeTypes": [
+    "Start",
+    "End",
+    "Task",
+    "Input",
+    "Output",
+    "Decision",
+    "ParallelFork",
+    "ParallelJoin",
+    "Event",
+    "Timer",
+    "Wait",
+    "Agent",
+    "HumanApproval",
+    "APICall",
+    "DataTransform",
+    "Subflow",
+    "ErrorHandler",
+    "Retry",
+    "Compensation"
+  ],
+  "note": "GWF-IR 是规范化中间格式；第三方画布快照不得当作唯一的工作流真相。",
+  "portFields": [
+    "portId",
+    "direction",
+    "schema",
+    "cardinality",
+    "required",
+    "acceptedTypes"
+  ],
+  "schemaVersion": "0.2.0",
+  "title": "GWF-IR",
+  "validity": [
+    "Port 应通过类型、方向和约束校验；Node/Edge 必须具有稳定 ID。",
+    "不适用的超时、重试或副作用字段可使用有明确定义的 null/omission 语义。",
+    "没有真实执行器的类型标为 Design-only，不得伪称可执行。",
+    "ControlFlow、DataFlow、EventFlow、ErrorFlow 等不得混淆。",
+    "GWF-IR 是规范化中间格式，不得把第三方画布快照当作唯一的工作流真相。"
+  ],
+  "workflowFields": [
+    "workflowId",
+    "name",
+    "version",
+    "entryPoints",
+    "nodes",
+    "edges",
+    "dataSchemas",
+    "executionPolicy",
+    "errorPolicy",
+    "permissions",
+    "evidenceIds",
+    "metadata"
+  ]
+}

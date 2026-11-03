@@ -1,0 +1,77 @@
+{
+  "catalog": [
+    {
+      "allowedEdgeKinds": [
+        "contains",
+        "dependsOn",
+        "calls"
+      ],
+      "allowedNodeKinds": [
+        "System",
+        "Subsystem",
+        "Module",
+        "Service",
+        "Entity"
+      ],
+      "concerns": [
+        "事件依赖"
+      ],
+      "diagramType": "logical-view",
+      "dimension": "2D",
+      "edgeIds": [],
+      "edgeKinds": [
+        "sends"
+      ],
+      "evidenceIds": [],
+      "fidelity": [],
+      "id": "logical",
+      "label": "逻辑视图",
+      "missing": [],
+      "nodeIds": [
+        "sensor",
+        "queue",
+        "rule",
+        "notify"
+      ],
+      "notation": "generic",
+      "scenarioId": null,
+      "stakeholders": [
+        "架构师"
+      ],
+      "title": "逻辑架构"
+    }
+  ],
+  "count": 1,
+  "families": {
+    "Architecture": [
+      "logical-view",
+      "development-view",
+      "process-view",
+      "deployment-view",
+      "data-view",
+      "security-view",
+      "operations-view",
+      "dependency-diagram",
+      "event-flow",
+      "causal-view"
+    ],
+    "Data": [
+      "er-diagram",
+      "dfd",
+      "data-dependency"
+    ],
+    "UML": [
+      "uml-class",
+      "uml-component",
+      "uml-package",
+      "uml-sequence",
+      "uml-state-machine",
+      "uml-activity",
+      "uml-deployment",
+      "uml-use-case"
+    ]
+  },
+  "note": "missing 列出该图示类型要求、但模型无法提供的保真元素；界面必须标注为缺失，不得伪造。",
+  "schemaVersion": "0.2.0",
+  "unregistered": []
+}

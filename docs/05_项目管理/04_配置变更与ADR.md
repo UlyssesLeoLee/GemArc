@@ -24,6 +24,7 @@
 | ADR-010 | 远程端点：可选 Bearer token，未设置则无认证；GET `/mcp` 返回 405 | 建议采纳（实现见 `api/index.py`，本文未随该文件验证） | claude.ai / Desktop 无法携带静态 Bearer；Codex 把 404 当作会话过期 |
 | ADR-011 | 工具结果不返回 `structuredContent`，不声明 `outputSchema` | 建议采纳（已实现） | Codex 用 `structuredContent` 替换 `content`；Hermes 去重并忽略 `outputSchema` |
 | ADR-012 | 5D 设计工作流随服务器发布（工具 `gemarc_5d_guide` + 2 个资源），连上 MCP 即具备该能力 | 建议采纳（已实现） | 「导入 MCP」就该能用，不该再要求单独装 skill；工具是所有客户端都会交给模型的那条通道 |
+| ADR-013 | 采纳 v5.0 规格的模型层要求（词表、Schema 字段、GWF-IR、§25 输出文件），新增字段一律可选增量 | 建议采纳（已实现） | 规格逐条列出的字段与枚举必须能被表达，否则「按规格实现」无从谈起 |
 
 ### ADR-008 工具名：`gemarc_` 前缀 + `[a-z0-9_]`
 
@@ -54,6 +55,22 @@
 - **决策**：工作流的正本仍是仓库里的 `skills/gemarc-5d-design/`，但它会**生成一份副本**进包内 `src/gemarc_mcp/scaffold/skills/gemarc-5d-design/`（`python -m gemarc_mcp.scaffold.skillpack`，`tests/test_skill_pack.py` 断言两者不会漂移、且 package-data 覆盖每个打包文件）。服务器以三条通道把它发出：工具 `gemarc_5d_guide`（`full` 与 `stateless` 都有）、资源 `gemarc://skill/gemarc-5d-design` 与 `gemarc://skill/gemarc-5d-design/references/assemble-site.md`；服务器 instructions 与提示词 `gemarc-design` 都指向它，`gemarc_brief` 的 procedure 第 0 步也是它。
 - **原因**：客户端在「连上 MCP」这一步就该拿到模型需要的一切，不该再要求用户去装一个 skill。而**工具**是唯一所有客户端都会交给模型的通道：Codex 忽略 prompt，Claude API 的 MCP connector 只支持 tools，部分客户端（例如 MCode）根本不暴露 resources——只放资源的话，这些客户端读不到那份工作流。
 - **后果**：v1 工具面从 16/8 变成 17/9，`tests/atlas/test_atlas_v1_frozen.py` 的 pin 按该文件自述的「v1 刻意变更」通道在同一提交内更新（ADR 与 pin 同提交）。文档、集成示例与用户侧白名单（Claude 的 `permissions.allow`、Codex 的 `enabled_tools`）同步更新。`.vercelignore` 仍排除 `/skills`，但打包副本在 `src/` 下面，随部署上传。工作流文本以服务器那份为准；单独安装的 skill 只是同一份文本的离线拷贝。
+
+### ADR-013 采纳 v5.0 规格的模型层要求
+
+- **决策**：把 v5.0 提示词（`Universal_5D_GemArc_Web_v5.0`）逐条列出的模型层要求补进 MCP，且**一律按可选增量**做：
+  - 词表：`diagram-types` 补 `data-dependency` 与 `event-flow`（§9 的 Data 与 Architecture 家族各缺一种），并登记 `specFamilies`；新增 `case-types.json` 承载 §13 的 14 种分析类型与 §14 的 18 个动画原语；`workflow-kinds` 扩到 §17 的 19 种节点类型、7 种边类型，并登记 `gwfIr` 字段目录。
+  - Schema：`node` 补 `qualifiedName` / `sourceLocation` / `version`，`edge` 补 `version`，`evidence.source` 补 `path` / `startLine` / `endLine`，`workflow` 补齐 §17 的工作流、节点、边、端口字段，`case` 补齐 §13 的 case_contract 字段。**全部可选**，既有模型继续有效。
+  - 字段别名：§3 用 `type` / `label`，§17 用 `nodeType` / `edgeType` / `guard` / `portId`。这些拼写被**接受并归一**到正本拼写（`kind` / `name` / `condition` / `id`），Python 与浏览器运行时两侧同步。
+  - 产物：`gemarc_render` 除既有三件外再派生 `evidence-index.json`、`diagram-catalog.json`、`spatial-layout.json`、`workflow-ir.json`、`case-library.json`；`workflow-schema.json`（GWF-IR 的 JSON Schema）只依赖词表，随**固定件（kit）**发布，不随模型重复传输。
+- **原因**：规格逐条列出的字段与枚举必须能被表达，否则「按规格实现」无从谈起；而 MCP 的职责是**模型与计算权威**，不是前端工作台（见 `08_附录/03_v5.0规格能力对照.md` 的职责边界）。全部新增字段可选，是为了不破坏既有模型与既有套件。
+- **后果**：
+  - `cases[].category` 仍是 5 类分诊轴（它与 atlas 的 profile 词表锁步，改动会影响 atlas 的生成器与覆盖规则）；§13 的 14 种分析类型改由新增的 `cases[].caseType` 承载，两者互补。§13 的现实标记由 `cases[].reality` 承载（`Observed` / `ImplementedModel` / `DesignedModel` / `Hypothetical`）。
+  - `gemarc_render` 的内联改为**逐文件**判定：按累计字节内联，放不下的文件只给清单，整体 `inline` 标志表示是否全部内联。
+  - 词表变动 ⇒ `tests/atlas/test_atlas_v1_frozen.py` 的 `VOCAB_FILE_SHA256` / `VOCAB_BYTES_DIGEST` / `VOCAB_SYNC_DIGEST` 按同文件自述的通道在同一提交内更新；`case-types.json` 是新增文件。
+  - 覆盖由 `tests/test_v5_spec_coverage.py` 钉住：规格里的字段与枚举被原样抄进测试，规格变了而 MCP 没跟上就红。
+  - 派生文件一律「缺了就标 missing，不伪造」：图示保真元素缺失写进 `diagram-catalog.json` 的 `missing`，空间缺失写进 `spatial-layout.json` 的 `missing`，GWF-IR 不合法写进 `workflow-ir.json` 的 `issues`。
+  - 规格 §25 给目标工程定的图示清单文件名属于参考系统，在本仓库的哈希禁词表上，因此 MCP 侧改用 `diagram-catalog.json`；详见 `08_附录/04_v5.0实施缺陷提交单.md` 的 D-05。
 
 ## 变更流程
 

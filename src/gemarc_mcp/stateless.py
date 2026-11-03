@@ -24,6 +24,7 @@ from pathlib import Path
 from .model import normalized_model, validate
 from .paths import GemArcError, digest_bytes, encode_json
 from .simulation import compare, simulate
+from .scaffold import derive
 
 #: Profiles that produce a standalone site (``mvp`` is the tiny local viewer).
 SITE_PROFILES = ("static", "vite")
@@ -130,19 +131,29 @@ def render(model: dict, profile: str = "static") -> dict:
     result = validate(model)
     if result["status"] != "ok":
         return result
+    canonical = normalized_model(model)
     artefacts = {
-        "data/architecture.json": normalized_model(model),
+        "data/architecture.json": canonical,
         "data/scenarios.json": precompute_scenarios(model),
         "data/capabilities.json": site_capabilities(model, profile),
     }
+    # The v5.0 deliverables (§3 output_files, §25 output directory): the same
+    # model always yields the same files.
+    artefacts.update(derive.derived_files(canonical))
     encoded = {path: encode_json(value) for path, value in artefacts.items()}
     total = sum(len(raw) for raw in encoded.values())
-    inline = total <= RENDER_INLINE_LIMIT
+    # Inline file by file: a small model gets everything, a large one keeps
+    # the whole manifest and as much content as the budget allows.
     files = []
+    used = 0
+    inline = True
     for path, raw in encoded.items():
         entry = {"path": path, "bytes": len(raw), "sha256": digest_bytes(raw)}
-        if inline:
+        if used + len(raw) <= RENDER_INLINE_LIMIT:
             entry["content"] = raw.decode("utf-8")
+            used += len(raw)
+        else:
+            inline = False
         files.append(entry)
     kit = site_kit(profile)
     payload = {
@@ -164,6 +175,11 @@ def render(model: dict, profile: str = "static") -> dict:
 
 # --- site kit -----------------------------------------------------------------
 
+#: The one file under ``data/`` that does not depend on the model: the GWF-IR
+#: schema follows the vocabulary, so it travels inside the fixed site kit.
+KIT_DATA_FILES = ("data/workflow-schema.json",)
+
+
 @lru_cache(maxsize=None)
 def _kit_entries(profile: str) -> tuple[tuple[str, bytes], ...]:
     """Every file of a site that does not depend on the model, sorted by path."""
@@ -179,7 +195,7 @@ def _kit_entries(profile: str) -> tuple[tuple[str, bytes], ...]:
             if not path.is_file():
                 continue
             relative = path.relative_to(target).as_posix()
-            if relative.startswith("data/"):
+            if relative.startswith("data/") and relative not in KIT_DATA_FILES:
                 continue
             entries.append((relative, path.read_bytes()))
     return tuple(entries)

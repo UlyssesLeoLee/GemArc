@@ -2,14 +2,14 @@
  * GENERATED FILE - DO NOT EDIT.
  *
  * Source: src/gemarc_mcp/scaffold/vocab/*.json
- * Digest: fb8d1213f44a1d626f6d519df97806a86424731308b5a445c4ac672542f5e886
+ * Digest: 7924b5b379c0893105543024f4c49bd754eb98fcc3829fdfb4b914a8bddcbe8c
  * Regenerate: python -m gemarc_mcp.scaffold.sync
  *
  * The vocabulary is the single source of truth shared by the prompt, the
  * Python validator and this runtime. A drift test asserts that this file
  * still matches the JSON sources.
  */
-export const VOCAB_DIGEST = 'fb8d1213f44a1d626f6d519df97806a86424731308b5a445c4ac672542f5e886';
+export const VOCAB_DIGEST = '7924b5b379c0893105543024f4c49bd754eb98fcc3829fdfb4b914a8bddcbe8c';
 
 export const VOCAB = Object.freeze({
   "case-categories": {
@@ -18,35 +18,50 @@ export const VOCAB = Object.freeze({
         "assertion": "预期路径成立",
         "id": "normal",
         "label": "正常",
-        "requiresIntervention": false
+        "requiresIntervention": false,
+        "specType": "Normal"
       },
       {
         "assertion": "预期失败或降级被显式观测到",
         "id": "abnormal",
         "label": "异常",
-        "requiresIntervention": true
+        "requiresIntervention": true,
+        "specType": null,
+        "umbrellaFor": [
+          "Error",
+          "Timeout",
+          "Retry",
+          "Compensation",
+          "PartialFailure",
+          "CascadingFailure",
+          "Security"
+        ]
       },
       {
         "assertion": "极限输入或极限规模下的行为被确定",
         "id": "boundary",
         "label": "边界",
-        "requiresIntervention": true
+        "requiresIntervention": true,
+        "specType": "Boundary"
       },
       {
         "assertion": "多个条件同时成立时的交互被确定",
         "id": "combination",
         "label": "组合",
-        "requiresIntervention": true
+        "requiresIntervention": true,
+        "specType": "Combined"
       },
       {
         "assertion": "故障后恢复到已知良好状态的过程被确定",
         "id": "recovery",
         "label": "恢复",
-        "requiresIntervention": true
+        "requiresIntervention": true,
+        "specType": "Recovery"
       }
     ],
-    "description": "统一管理正常、异常、边界、组合及恢复 Case。Case 与 Scenario 的关系是：Case 是一个可执行的实例（scenarioId + 干预配置 + 期望），Scenario 是规则与事件的定义。",
+    "description": "统一管理正常、异常、边界、组合及恢复 Case。Case 与 Scenario 的关系是：Case 是一个可执行的实例（scenarioId + 干预配置 + 期望），Scenario 是规则与事件的定义。本词表是 Case 的分诊轴（5 类）；v5.0 提示词 §13 的 14 种分析类型登记在 case-types 词表，由 cases[].caseType 承载。两个字段互补：category 说“这类 Case 属于哪一档”，caseType 说“这次分析属于哪一种分析类型”。",
     "fields": {
+      "caseType": "case-types 词表中的分析类型 ID（v5.0 提示词 §13 case_types）",
       "category": "本词表中的分类 ID",
       "disabledNodeIds": "本次 Case 的干预集合（模块屏蔽）",
       "evidenceClass": "沿用 evidence-levels 词表；Hypothetical 的 Case 不得被描述为实际运行结果",
@@ -56,6 +71,7 @@ export const VOCAB = Object.freeze({
         "notes": "文字判定说明"
       },
       "id": "稳定 ID，命名规则 <scenarioId>__<caseId>",
+      "reality": "§13 要求的 Case 现实标记：Observed / ImplementedModel / DesignedModel / Hypothetical",
       "scenarioId": "指向 definitions.scenarios 中的场景 ID",
       "title": "人类可读标题"
     },
@@ -63,10 +79,264 @@ export const VOCAB = Object.freeze({
     "rules": [
       "每个 Case 必须绑定一个 scenarioId，且该 scenario 必须存在于模型中。",
       "requiresIntervention 为 true 的分类必须给出非空 disabledNodeIds 或显式说明无干预原因。",
-      "Case 库与 4D/5D 视图共享同一 scenarioId 引用，切换视图不得改变 Case 语义。"
+      "Case 库与 4D/5D 视图共享同一 scenarioId 引用，切换视图不得改变 Case 语义。",
+      "specType 登记本分类默认对应的 §13 分析类型；abnormal 是伞形分类，本身不对应单一 specType。",
+      "§13 要求每个 Case 标记 Observed / ImplementedModel / DesignedModel / Hypothetical：缺证据的 Case 不得被描述为真实运行事实。",
+      "组合 Case 必须先检查参数、前置条件、状态与时间约束；矛盾时拒绝执行并说明原因。"
     ],
     "schemaVersion": "0.2.0",
-    "title": "Scenario & Causal Lab 用例分类"
+    "specCaseContract": {
+      "fields": [
+        "caseId",
+        "name",
+        "description",
+        "category",
+        "initialState",
+        "inputEvents",
+        "preconditions",
+        "executionRules",
+        "expectedOutcomes",
+        "terminationConditions",
+        "assertions",
+        "evidenceIds",
+        "assumptions"
+      ],
+      "note": "v5.0 提示词 §13 case_contract。全部字段可选，但缺失项必须在界面上标注为缺失而不是伪造。"
+    },
+    "title": "Scenario & Causal Lab 用例分类（分诊轴）"
+  },
+  "case-types": {
+    "animationPrimitives": {
+      "ids": [
+        "Propagation",
+        "Branching",
+        "Parallel",
+        "Waiting",
+        "Timeout",
+        "Retry",
+        "Blocking",
+        "FailurePropagation",
+        "Recovery",
+        "Compensation",
+        "FeedbackLoop",
+        "Convergence",
+        "StateTransition",
+        "DataTransformation",
+        "Escalation",
+        "Cancellation",
+        "Rollback",
+        "OutcomeComparison"
+      ],
+      "note": "§14 animation_primitives。原语只消费计算轨迹，不得反过来创造业务事件或因果关系。",
+      "terminalStates": [
+        "Completed",
+        "Failed"
+      ]
+    },
+    "description": "v5.0 提示词 §13：第五维必须以正常、异常、边界、并发与组合 Case 为基本分析单位，不局限于固定的 A/B 预制动画。本词表登记 §13 列出的全部 14 种分析类型。cases[].category 是分诊轴（见 case-categories 词表），cases[].caseType 是本词表的分析类型：两个字段互补，不互相替代。",
+    "id": "case-types",
+    "reality": {
+      "note": "§13 要求每个 Case 标记 Observed / ImplementedModel / DesignedModel / Hypothetical。缺证据的 Case 不得被描述为项目的真实运行事实。",
+      "values": [
+        "Observed",
+        "ImplementedModel",
+        "DesignedModel",
+        "Hypothetical"
+      ]
+    },
+    "rules": [
+      "cases[].caseType 取自本词表；cases[].category 取自 case-categories 词表。",
+      "requiresIntervention 为 true 的类型必须给出非空 disabledNodeIds 或显式说明无干预原因。",
+      "组合 Case 必须先检查参数、前置条件、状态与时间约束；矛盾时拒绝执行并说明原因。",
+      "缺少足够规则时返回 Unknown 或 Unsupported，而不是猜测结果。",
+      "primitives 只是可选的动画语法提示，不得当作该 Case 实际发生过的轨迹。"
+    ],
+    "schemaVersion": "0.2.0",
+    "title": "5D Case 分析类型（v5.0 §13 case_types）",
+    "types": [
+      {
+        "assertion": "正常业务执行",
+        "category": "normal",
+        "id": "Normal",
+        "label": "正常",
+        "primitives": [
+          "Propagation",
+          "StateTransition",
+          "Parallel",
+          "Convergence"
+        ],
+        "requiresIntervention": false
+      },
+      {
+        "assertion": "边界值与极限条件",
+        "category": "boundary",
+        "id": "Boundary",
+        "label": "边界",
+        "primitives": [
+          "Propagation",
+          "Blocking",
+          "OutcomeComparison"
+        ],
+        "requiresIntervention": true
+      },
+      {
+        "assertion": "输入、处理或业务规则错误",
+        "category": "abnormal",
+        "id": "Error",
+        "label": "错误",
+        "primitives": [
+          "Propagation",
+          "Blocking",
+          "FailurePropagation",
+          "Recovery"
+        ],
+        "requiresIntervention": true
+      },
+      {
+        "assertion": "超时与延迟",
+        "category": "abnormal",
+        "id": "Timeout",
+        "label": "超时",
+        "primitives": [
+          "Propagation",
+          "Waiting",
+          "Timeout",
+          "Retry"
+        ],
+        "requiresIntervention": true
+      },
+      {
+        "assertion": "重试与退避策略",
+        "category": "abnormal",
+        "id": "Retry",
+        "label": "重试",
+        "primitives": [
+          "Propagation",
+          "Waiting",
+          "Retry"
+        ],
+        "requiresIntervention": true
+      },
+      {
+        "assertion": "故障恢复",
+        "category": "recovery",
+        "id": "Recovery",
+        "label": "恢复",
+        "primitives": [
+          "Propagation",
+          "FailurePropagation",
+          "Retry",
+          "Recovery"
+        ],
+        "requiresIntervention": true
+      },
+      {
+        "assertion": "事务补偿或纠正动作",
+        "category": "abnormal",
+        "id": "Compensation",
+        "label": "补偿",
+        "primitives": [
+          "Propagation",
+          "Compensation",
+          "Recovery",
+          "OutcomeComparison"
+        ],
+        "requiresIntervention": true
+      },
+      {
+        "assertion": "并发任务/事件",
+        "category": "combination",
+        "id": "Concurrency",
+        "label": "并发",
+        "primitives": [
+          "Propagation",
+          "Parallel",
+          "Waiting",
+          "Convergence"
+        ],
+        "requiresIntervention": true
+      },
+      {
+        "assertion": "不同执行顺序竞争",
+        "category": "combination",
+        "id": "RaceCondition",
+        "label": "竞争条件",
+        "primitives": [
+          "Propagation",
+          "Parallel",
+          "Branching",
+          "OutcomeComparison"
+        ],
+        "requiresIntervention": true
+      },
+      {
+        "assertion": "资源竞争",
+        "category": "boundary",
+        "id": "ResourceContention",
+        "label": "资源竞争",
+        "primitives": [
+          "Propagation",
+          "Waiting",
+          "Blocking",
+          "Escalation"
+        ],
+        "requiresIntervention": true
+      },
+      {
+        "assertion": "局部模块故障",
+        "category": "abnormal",
+        "id": "PartialFailure",
+        "label": "局部故障",
+        "primitives": [
+          "Propagation",
+          "FailurePropagation",
+          "Compensation",
+          "OutcomeComparison"
+        ],
+        "requiresIntervention": true
+      },
+      {
+        "assertion": "故障级联",
+        "category": "abnormal",
+        "id": "CascadingFailure",
+        "label": "级联故障",
+        "primitives": [
+          "FailurePropagation",
+          "Propagation",
+          "Blocking",
+          "Escalation",
+          "OutcomeComparison"
+        ],
+        "requiresIntervention": true
+      },
+      {
+        "assertion": "身份、权限和安全边界",
+        "category": "abnormal",
+        "id": "Security",
+        "label": "安全",
+        "primitives": [
+          "Propagation",
+          "Blocking",
+          "Escalation",
+          "OutcomeComparison"
+        ],
+        "requiresIntervention": true
+      },
+      {
+        "assertion": "多种条件和异常组合",
+        "category": "combination",
+        "id": "Combined",
+        "label": "组合",
+        "primitives": [
+          "Propagation",
+          "Branching",
+          "Parallel",
+          "Convergence",
+          "OutcomeComparison"
+        ],
+        "requiresIntervention": true
+      }
+    ]
   },
   "diagram-types": {
     "description": "v5.0 提示词 §8.1 要求按真实项目证据生成的图示。不得为了凑数量而生成虚假图示——只有具备证据的图示才允许出现在 view 列表中。",
@@ -75,9 +345,40 @@ export const VOCAB = Object.freeze({
       "每个 view 必须声明 diagramType，且该类型必须在本词表中登记。",
       "view 的 nodeIds 只能包含该类型 nodeKinds 允许的实体；edgeKinds 同理。",
       "fidelity 列出的元素若在模型中不存在对应信息，必须在界面上标注为缺失，不得伪造。",
-      "不得为了凑数量而生成虚假图示：没有证据支撑的图示类型不允许出现在 view 列表中。"
+      "不得为了凑数量而生成虚假图示：没有证据支撑的图示类型不允许出现在 view 列表中。",
+      "specFamilies 登记 v5.0 提示词 §9 supported_diagrams 的家族归属；一个类型只能属于一个家族。",
+      "§9 规定 Data 家族含 DataDependency、Architecture 家族含 EventFlow：这两种类型不可省略。"
     ],
     "schemaVersion": "0.2.0",
+    "specFamilies": {
+      "Architecture": [
+        "logical-view",
+        "development-view",
+        "process-view",
+        "deployment-view",
+        "data-view",
+        "security-view",
+        "operations-view",
+        "dependency-diagram",
+        "event-flow",
+        "causal-view"
+      ],
+      "Data": [
+        "er-diagram",
+        "dfd",
+        "data-dependency"
+      ],
+      "UML": [
+        "uml-class",
+        "uml-component",
+        "uml-package",
+        "uml-sequence",
+        "uml-state-machine",
+        "uml-activity",
+        "uml-deployment",
+        "uml-use-case"
+      ]
+    },
     "title": "图示类型与保真要求",
     "types": [
       {
@@ -488,6 +789,63 @@ export const VOCAB = Object.freeze({
           "Service",
           "Module",
           "State"
+        ],
+        "notation": "generic"
+      },
+      {
+        "dimension": "2D",
+        "edgeKinds": [
+          "dependsOn",
+          "imports",
+          "reads",
+          "writes",
+          "owns",
+          "composes",
+          "derivesFrom"
+        ],
+        "fidelity": [
+          "foreignKey",
+          "primaryKey",
+          "column",
+          "dataType"
+        ],
+        "id": "data-dependency",
+        "label": "数据依赖图",
+        "nodeKinds": [
+          "Table",
+          "Entity",
+          "Attribute",
+          "Module",
+          "Service",
+          "Class"
+        ],
+        "notation": "generic"
+      },
+      {
+        "dimension": "2D",
+        "edgeKinds": [
+          "sends",
+          "receives",
+          "publishes",
+          "subscribes",
+          "triggers",
+          "calls"
+        ],
+        "fidelity": [
+          "eventPayload",
+          "deliveryGuarantee",
+          "ordering"
+        ],
+        "id": "event-flow",
+        "label": "事件流图",
+        "nodeKinds": [
+          "Service",
+          "Module",
+          "Component",
+          "Event",
+          "Actor",
+          "System",
+          "Subsystem"
         ],
         "notation": "generic"
       }
@@ -1127,28 +1485,79 @@ export const VOCAB = Object.freeze({
     "title": "Building–Floor–Room 空间层级"
   },
   "workflow-kinds": {
-    "description": "v5.0 提示词 §2.7：工作流不能只是一组可以拖动的框和箭头。每个节点、端口、关系、条件、异常、输入、输出和执行约束必须可被程序及大模型明确理解。",
+    "description": "v5.0 提示词 §2.7 与 §17 GWF-IR：工作流不能只是一组可以拖动的框和箭头。每个节点、端口、关系、条件、异常、输入、输出和执行约束必须可被程序及大模型明确理解。nodeKinds / edgeKinds 覆盖 §17 列出的全部 19 种节点类型与 7 种边类型；legacy* 词表登记旧写法，新写入必须使用规范 id。",
     "edgeKinds": [
       {
         "directed": true,
+        "id": "control-flow",
+        "label": "控制流",
+        "specType": "ControlFlow"
+      },
+      {
+        "directed": true,
+        "id": "data-flow",
+        "label": "数据流",
+        "specType": "DataFlow"
+      },
+      {
+        "directed": true,
+        "id": "event-flow",
+        "label": "事件流",
+        "specType": "EventFlow"
+      },
+      {
+        "directed": true,
+        "id": "error-flow",
+        "label": "错误流",
+        "specType": "ErrorFlow"
+      },
+      {
+        "directed": true,
+        "id": "conditional-flow",
+        "label": "条件流",
+        "requiresCondition": true,
+        "specType": "ConditionalFlow"
+      },
+      {
+        "directed": true,
+        "id": "compensation-flow",
+        "label": "补偿流",
+        "specType": "CompensationFlow"
+      },
+      {
+        "directed": false,
+        "id": "dependency",
+        "label": "依赖",
+        "specType": "Dependency"
+      },
+      {
+        "directed": true,
         "id": "sequence",
-        "label": "顺序流"
+        "label": "顺序流（旧写法）",
+        "note": "旧写法，等同 control-flow。新写入必须用 control-flow。",
+        "specType": null
       },
       {
         "directed": true,
         "id": "conditional",
-        "label": "条件流",
-        "requiresCondition": true
+        "label": "条件流（旧写法）",
+        "note": "旧写法，等同 conditional-flow。",
+        "requiresCondition": true,
+        "specType": null
       },
       {
         "directed": true,
         "id": "message",
-        "label": "消息流"
+        "label": "消息流（旧写法）",
+        "note": "旧写法。按语义改写为 event-flow 或 data-flow。",
+        "specType": null
       },
       {
         "directed": false,
         "id": "association",
-        "label": "关联"
+        "label": "关联（旧写法）",
+        "note": "旧写法。跨节点静态引用改用 dependency。",
+        "specType": null
       }
     ],
     "executionConstraints": [
@@ -1183,51 +1592,296 @@ export const VOCAB = Object.freeze({
         "note": "必须声明失败后的补偿动作"
       }
     ],
+    "gwfIr": {
+      "designOnlyNodeTypes": [
+        "Agent",
+        "HumanApproval"
+      ],
+      "edgeFields": [
+        "edgeId",
+        "sourceNodeId",
+        "sourcePortId",
+        "targetNodeId",
+        "targetPortId",
+        "edgeType",
+        "direction",
+        "guard",
+        "dataMapping",
+        "priority",
+        "errorRoute",
+        "verification",
+        "evidenceIds"
+      ],
+      "edgeTypes": [
+        "ControlFlow",
+        "DataFlow",
+        "EventFlow",
+        "ErrorFlow",
+        "ConditionalFlow",
+        "CompensationFlow",
+        "Dependency"
+      ],
+      "nodeFields": [
+        "nodeId",
+        "nodeType",
+        "name",
+        "description",
+        "inputs",
+        "outputs",
+        "ports",
+        "preconditions",
+        "postconditions",
+        "stateTransitions",
+        "timeoutPolicy",
+        "retryPolicy",
+        "errorHandlers",
+        "sideEffects",
+        "idempotency",
+        "implementationRef",
+        "evidenceIds",
+        "verification"
+      ],
+      "nodeTypes": [
+        "Start",
+        "End",
+        "Task",
+        "Input",
+        "Output",
+        "Decision",
+        "ParallelFork",
+        "ParallelJoin",
+        "Event",
+        "Timer",
+        "Wait",
+        "Agent",
+        "HumanApproval",
+        "APICall",
+        "DataTransform",
+        "Subflow",
+        "ErrorHandler",
+        "Retry",
+        "Compensation"
+      ],
+      "note": "v5.0 提示词 §17 的字段目录。schema_versioning 为必填；GWF-IR 是规范化中间格式，不得把第三方画布快照当作唯一的工作流真相。",
+      "portFields": [
+        "portId",
+        "direction",
+        "schema",
+        "cardinality",
+        "required",
+        "acceptedTypes"
+      ],
+      "validity": [
+        "Port 应通过类型、方向和约束校验；Node/Edge 必须具有稳定 ID。",
+        "不适用的超时、重试或副作用字段可使用有明确定义的 null/omission 语义。",
+        "没有真实执行器的类型标为 Design-only，不得伪称可执行。",
+        "ControlFlow、DataFlow、EventFlow、ErrorFlow 等不得混淆。",
+        "GWF-IR 是规范化中间格式，不得把第三方画布快照当作唯一的工作流真相。"
+      ],
+      "version": "0.2.0",
+      "workflowFields": [
+        "workflowId",
+        "name",
+        "version",
+        "entryPoints",
+        "nodes",
+        "edges",
+        "dataSchemas",
+        "executionPolicy",
+        "errorPolicy",
+        "permissions",
+        "evidenceIds",
+        "metadata"
+      ]
+    },
     "id": "workflow-kinds",
     "nodeKinds": [
       {
         "executes": true,
         "id": "task",
-        "label": "任务"
+        "label": "任务",
+        "specType": "Task"
       },
       {
         "executes": false,
         "id": "decision",
         "label": "判定",
-        "note": "必须声明分支条件"
+        "note": "必须声明分支条件",
+        "specType": "Decision"
       },
       {
         "executes": false,
         "id": "gateway",
-        "label": "网关",
-        "note": "并行/汇聚/排他"
+        "label": "网关（旧写法）",
+        "note": "旧写法。并行拆分用 parallel-fork / parallel-join，汇聚用 parallel-join。",
+        "specType": null
       },
       {
         "executes": false,
         "id": "start",
-        "label": "开始"
+        "label": "开始",
+        "specType": "Start"
       },
       {
         "executes": false,
         "id": "end",
-        "label": "结束"
+        "label": "结束",
+        "specType": "End"
       },
       {
         "executes": true,
         "id": "subprocess",
-        "label": "子流程",
-        "note": "必须声明被调用的流程 ID"
+        "label": "子流程（旧写法）",
+        "note": "旧写法，等同 subflow。新写入必须用 subflow。",
+        "specType": null
       },
       {
         "executes": false,
         "id": "event",
         "label": "事件",
-        "note": "必须声明触发条件"
+        "note": "必须声明触发条件",
+        "specType": "Event"
       },
       {
         "executes": false,
         "id": "data",
-        "label": "数据对象"
+        "label": "数据对象（旧写法）",
+        "note": "旧写法。新写入用 data-transform 表达转换，纯数据载体用端口与 dataContract 表达。",
+        "specType": null
+      },
+      {
+        "executes": false,
+        "id": "input",
+        "label": "输入",
+        "note": "流程入口数据",
+        "specType": "Input"
+      },
+      {
+        "executes": false,
+        "id": "output",
+        "label": "输出",
+        "note": "流程出口数据",
+        "specType": "Output"
+      },
+      {
+        "executes": false,
+        "id": "parallel-fork",
+        "label": "并行分流",
+        "note": "把一条控制流拆成多条并行分支",
+        "specType": "ParallelFork"
+      },
+      {
+        "executes": false,
+        "id": "parallel-join",
+        "label": "并行汇聚",
+        "note": "等待多条并行分支汇聚",
+        "specType": "ParallelJoin"
+      },
+      {
+        "executes": false,
+        "id": "timer",
+        "label": "定时器",
+        "note": "必须声明时长与到期后的处理",
+        "specType": "Timer"
+      },
+      {
+        "executes": false,
+        "id": "wait",
+        "label": "等待",
+        "note": "必须声明等待条件或等待的事件",
+        "specType": "Wait"
+      },
+      {
+        "executes": true,
+        "id": "agent",
+        "label": "智能体",
+        "note": "涉及外部副作用，必须声明权限",
+        "specType": "Agent"
+      },
+      {
+        "executes": true,
+        "id": "human-approval",
+        "label": "人工审批",
+        "note": "必须声明审批人角色与超时策略",
+        "specType": "HumanApproval"
+      },
+      {
+        "executes": true,
+        "id": "api-call",
+        "label": "API 调用",
+        "note": "涉及外部副作用，必须声明幂等要求与错误处理",
+        "specType": "APICall"
+      },
+      {
+        "executes": true,
+        "id": "data-transform",
+        "label": "数据转换",
+        "note": "必须声明输入输出契约，不得编造真实数据值",
+        "specType": "DataTransform"
+      },
+      {
+        "executes": true,
+        "id": "subflow",
+        "label": "子流程",
+        "note": "必须声明被调用的流程 ID",
+        "specType": "Subflow"
+      },
+      {
+        "executes": true,
+        "id": "error-handler",
+        "label": "错误处理",
+        "note": "必须声明捕获的错误类型与处理动作",
+        "specType": "ErrorHandler"
+      },
+      {
+        "executes": true,
+        "id": "retry",
+        "label": "重试",
+        "note": "必须声明次数与退避策略",
+        "specType": "Retry"
+      },
+      {
+        "executes": true,
+        "id": "compensation",
+        "label": "补偿",
+        "note": "必须声明被补偿的节点或事件",
+        "specType": "Compensation"
+      }
+    ],
+    "portCardinalities": [
+      {
+        "id": "1",
+        "label": "恰好一个"
+      },
+      {
+        "id": "0..1",
+        "label": "可选一个"
+      },
+      {
+        "id": "0..N",
+        "label": "可选多个"
+      },
+      {
+        "id": "1..N",
+        "label": "至少一个"
+      },
+      {
+        "id": "N",
+        "label": "任意多个"
+      }
+    ],
+    "portDirections": [
+      {
+        "id": "in",
+        "label": "入"
+      },
+      {
+        "id": "out",
+        "label": "出"
+      },
+      {
+        "id": "inout",
+        "label": "双向"
       }
     ],
     "portKinds": [
@@ -1251,9 +1905,12 @@ export const VOCAB = Object.freeze({
     "rules": [
       "画布坐标、颜色和动画不应决定业务执行语义；所有计算以明确的数据契约为准。",
       "每个工作流节点必须绑定至少一个 canonical nodeId 或声明为纯流程内部元素。",
-      "条件流必须带可被程序判断的 condition 表达式，不得只写自然语言。"
+      "条件流必须带可被程序判断的 condition 表达式，不得只写自然语言。",
+      "新写入必须使用 §17 的规范 id（control-flow / data-flow / event-flow / error-flow / conditional-flow / compensation-flow / dependency）；旧写法只保留兼容读取。",
+      "没有真实执行器的节点类型（agent / human-approval）必须标为 Design-only，不得声称可执行。",
+      "端口必须声明 direction 与 cardinality；跨节点连线必须连到具体的端口（sourcePortId / targetPortId）。"
     ],
     "schemaVersion": "0.2.0",
-    "title": "工作流语义模型词表"
+    "title": "工作流语义模型词表（GWF-IR）"
   }
 });

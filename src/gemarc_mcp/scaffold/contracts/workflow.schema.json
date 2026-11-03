@@ -1,19 +1,71 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://gemarc.dev/schemas/0.2.0/workflow.schema.json",
-  "title": "Canonical Workflow",
-  "description": "v5.0 提示词 §2.7 与 AI-Native Infinite Workflow Canvas。工作流必须具有机器可读语义：节点、端口、关系、条件、异常、输入、输出、执行约束都要可被程序及大模型理解。画布坐标不承载执行语义。",
+  "title": "Canonical Workflow（GWF-IR）",
+  "description": "v5.0 提示词 §2.7 与 §17 GWF-IR。工作流必须具有机器可读语义：节点、端口、关系、条件、异常、输入、输出、执行约束都要可被程序及大模型理解。画布坐标不承载执行语义。所有新增字段都是可选的：旧模型继续有效。",
   "type": "object",
   "required": ["id", "name", "nodes", "edges"],
   "additionalProperties": true,
   "properties": {
     "id": {"type": "string", "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$"},
+    "workflowId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$",
+      "description": "§17 workflowId 别名。等同 id；两者同时给出时以 id 为准。"
+    },
     "name": {"type": "string", "minLength": 1},
     "description": {"type": ["string", "null"], "default": null},
     "kind": {
       "type": "string",
-      "enum": ["task", "decision", "gateway", "start", "end", "subprocess", "event", "data"],
+      "enum": ["task", "decision", "gateway", "start", "end", "subprocess", "event", "data",
+               "input", "output", "parallel-fork", "parallel-join", "timer", "wait", "agent",
+               "human-approval", "api-call", "data-transform", "subflow", "error-handler",
+               "retry", "compensation"],
       "description": "流程类型，取值见 vocab/workflow-kinds.json nodeKinds"
+    },
+    "version": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "GWF-IR 版本。§17 要求 schema_versioning：版本变化必须可审查。"
+    },
+    "entryPoints": {
+      "type": "array",
+      "default": [],
+      "items": {"type": "string"},
+      "description": "入口节点 ID 列表。空数组表示未声明，不得由界面推测。"
+    },
+    "dataSchemas": {
+      "type": "array",
+      "default": [],
+      "items": {"type": "object"},
+      "description": "流程级数据契约目录。必须可被程序读取。"
+    },
+    "executionPolicy": {
+      "type": ["object", "null"],
+      "default": null,
+      "description": "执行策略：并发度、事务边界、幂等要求等。缺失时按未声明处理。"
+    },
+    "errorPolicy": {
+      "type": ["object", "null"],
+      "default": null,
+      "description": "全局错误策略：默认重试、默认超时、失败终止方式。缺失时按未声明处理。"
+    },
+    "permissions": {
+      "type": "array",
+      "default": [],
+      "items": {"type": "string"},
+      "description": "执行该流程所需的权限。涉及外部副作用的节点必须在此或节点自身声明权限。"
+    },
+    "evidenceIds": {
+      "type": "array",
+      "default": [],
+      "items": {"type": "string"},
+      "description": "流程级证据引用，指向顶层 evidence 数组。"
+    },
+    "metadata": {
+      "type": "object",
+      "default": {},
+      "description": "自由元数据。已登记的键必须来自 model-contract 的保留词表。"
     },
     "nodes": {
       "type": "array",
@@ -24,15 +76,46 @@
         "additionalProperties": true,
         "properties": {
           "id": {"type": "string", "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$"},
+          "nodeId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$",
+            "description": "§17 nodeId 别名。等同 id；两者同时给出时以 id 为准。"
+          },
           "kind": {
             "type": "string",
-            "enum": ["task", "decision", "gateway", "start", "end", "subprocess", "event", "data"]
+            "enum": ["task", "decision", "gateway", "start", "end", "subprocess", "event", "data",
+                     "input", "output", "parallel-fork", "parallel-join", "timer", "wait", "agent",
+                     "human-approval", "api-call", "data-transform", "subflow", "error-handler",
+                     "retry", "compensation"],
+            "description": "取值见 vocab/workflow-kinds.json nodeKinds"
+          },
+          "nodeType": {
+            "type": "string",
+            "description": "§17 nodeType 别名。等同 kind；两者同时给出时以 kind 为准。"
           },
           "name": {"type": "string", "minLength": 1},
+          "description": {"type": ["string", "null"], "default": null},
           "canonicalNodeId": {
             "type": ["string", "null"],
             "default": null,
             "description": "绑定的 canonical 节点 ID；纯流程内部元素可为空"
+          },
+          "implementationRef": {
+            "type": ["string", "null"],
+            "default": null,
+            "description": "实现引用：源码位置或可执行体标识。没有真实执行器时必须为空并标 Design-only。"
+          },
+          "inputs": {
+            "type": "array",
+            "default": [],
+            "items": {"type": "object"},
+            "description": "输入契约。必须可被程序读取。"
+          },
+          "outputs": {
+            "type": "array",
+            "default": [],
+            "items": {"type": "object"},
+            "description": "输出契约。必须可被程序读取。"
           },
           "ports": {
             "type": "array",
@@ -43,9 +126,30 @@
               "additionalProperties": true,
               "properties": {
                 "id": {"type": "string"},
+                "portId": {"type": "string", "description": "§17 portId 别名。等同 id。"},
                 "kind": {"type": "string", "enum": ["input", "output", "control", "error"]},
+                "direction": {
+                  "type": ["string", "null"],
+                  "default": null,
+                  "enum": ["in", "out", "inout", null],
+                  "description": "端口方向，取值见 vocab/workflow-kinds.json portDirections"
+                },
                 "name": {"type": ["string", "null"], "default": null},
-                "schemaRef": {"type": ["string", "null"], "default": null}
+                "schemaRef": {"type": ["string", "null"], "default": null},
+                "schema": {"type": ["object", "null"], "default": null, "description": "端口数据结构契约。"},
+                "cardinality": {
+                  "type": ["string", "null"],
+                  "default": null,
+                  "enum": ["1", "0..1", "0..N", "1..N", "N", null],
+                  "description": "基数，取值见 vocab/workflow-kinds.json portCardinalities"
+                },
+                "required": {"type": "boolean", "default": false},
+                "acceptedTypes": {
+                  "type": "array",
+                  "default": [],
+                  "items": {"type": "string"},
+                  "description": "可接受的数据类型。端口连线必须通过类型校验。"
+                }
               }
             }
           },
@@ -71,8 +175,64 @@
           "dataContract": {
             "type": ["object", "null"],
             "default": null,
-            "description": "输入输出的数据契约。必须可被程序读取。",
-            "additionalProperties": true
+            "description": "输入输出的数据契约。必须可被程序读取。"
+          },
+          "preconditions": {
+            "type": "array",
+            "default": [],
+            "items": {"type": "string"},
+            "description": "前置条件。必须可被程序判断。"
+          },
+          "postconditions": {
+            "type": "array",
+            "default": [],
+            "items": {"type": "string"},
+            "description": "后置条件。必须可被程序判断。"
+          },
+          "stateTransitions": {
+            "type": "array",
+            "default": [],
+            "items": {"type": "object"},
+            "description": "状态迁移声明：from / to / trigger。缺失时按未声明处理。"
+          },
+          "timeoutPolicy": {
+            "type": ["object", "null"],
+            "default": null,
+            "description": "超时策略：时长与超时后的处理。不适用时用有明确定义的 null 或省略。"
+          },
+          "retryPolicy": {
+            "type": ["object", "null"],
+            "default": null,
+            "description": "重试策略：次数与退避。不适用时用有明确定义的 null 或省略。"
+          },
+          "errorHandlers": {
+            "type": "array",
+            "default": [],
+            "items": {"type": "object"},
+            "description": "错误处理声明。缺失错误处理的危险副作用节点必须被校验拦下。"
+          },
+          "sideEffects": {
+            "type": "array",
+            "default": [],
+            "items": {"type": "string"},
+            "description": "副作用声明。涉及真实 API、Agent、脚本的副作用必须在此登记。"
+          },
+          "idempotency": {
+            "type": ["string", "null"],
+            "default": null,
+            "description": "幂等要求说明。有副作用的节点必须声明。"
+          },
+          "verification": {
+            "type": ["string", "null"],
+            "default": null,
+            "enum": ["Implemented", "Observed", "Designed", "Inferred", "Hypothetical", "Unknown", null],
+            "description": "该节点的证据等级，取值见 vocab/evidence-levels.json"
+          },
+          "evidenceIds": {
+            "type": "array",
+            "default": [],
+            "items": {"type": "string"},
+            "description": "节点级证据引用，指向顶层 evidence 数组。"
           },
           "exceptionHandling": {
             "type": ["object", "null"],
@@ -107,21 +267,79 @@
         "additionalProperties": true,
         "properties": {
           "id": {"type": "string", "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$"},
+          "edgeId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$",
+            "description": "§17 edgeId 别名。等同 id；两者同时给出时以 id 为准。"
+          },
           "sourceId": {"type": "string"},
           "targetId": {"type": "string"},
+          "sourceNodeId": {
+            "type": "string",
+            "description": "§17 sourceNodeId 别名。等同 sourceId；两者同时给出时以 sourceId 为准。"
+          },
+          "targetNodeId": {
+            "type": "string",
+            "description": "§17 targetNodeId 别名。等同 targetId；两者同时给出时以 targetId 为准。"
+          },
           "sourcePortId": {"type": ["string", "null"], "default": null},
           "targetPortId": {"type": ["string", "null"], "default": null},
           "kind": {
             "type": "string",
-            "enum": ["sequence", "conditional", "message", "association"]
+            "enum": ["control-flow", "data-flow", "event-flow", "error-flow", "conditional-flow",
+                     "compensation-flow", "dependency",
+                     "sequence", "conditional", "message", "association"],
+            "description": "取值见 vocab/workflow-kinds.json edgeKinds；旧写法保留兼容读取。"
+          },
+          "edgeType": {
+            "type": "string",
+            "description": "§17 edgeType 别名。等同 kind；两者同时给出时以 kind 为准。"
           },
           "directed": {"type": "boolean", "default": true},
+          "direction": {
+            "type": ["string", "null"],
+            "default": null,
+            "enum": ["source-to-target", "both", null],
+            "description": "§17 direction。source-to-target 等同 directed=true。"
+          },
           "condition": {
             "type": ["string", "null"],
             "default": null,
-            "description": "kind=conditional 时必填。必须是可被程序判断的表达式。"
+            "description": "kind=conditional-flow 时必填。必须是可被程序判断的表达式。"
+          },
+          "guard": {
+            "type": ["string", "null"],
+            "default": null,
+            "description": "§17 guard 别名。等同 condition；两者同时给出时以 condition 为准。"
           },
           "dataContract": {"type": ["object", "null"], "default": null},
+          "dataMapping": {
+            "type": ["object", "null"],
+            "default": null,
+            "description": "数据映射：从源端口数据到目标端口数据的映射契约。"
+          },
+          "priority": {
+            "type": ["number", "null"],
+            "default": null,
+            "description": "分支优先级。用于在多个条件分支中确定选择顺序。"
+          },
+          "errorRoute": {
+            "type": ["string", "null"],
+            "default": null,
+            "description": "出错时改走的边或节点 ID。"
+          },
+          "verification": {
+            "type": ["string", "null"],
+            "default": null,
+            "enum": ["Implemented", "Observed", "Designed", "Inferred", "Hypothetical", "Unknown", null],
+            "description": "该边的证据等级，取值见 vocab/evidence-levels.json"
+          },
+          "evidenceIds": {
+            "type": "array",
+            "default": [],
+            "items": {"type": "string"},
+            "description": "边级证据引用，指向顶层 evidence 数组。"
+          },
           "canvas": {
             "type": ["object", "null"],
             "default": null,

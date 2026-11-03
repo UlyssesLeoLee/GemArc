@@ -11,6 +11,7 @@ from importlib import resources
 from pathlib import Path
 from .paths import Workspace, GemArcError, read_json, atomic_json, digest
 from .model import validate, normalized_model
+from .scaffold import derive
 from .stateless import precompute_scenarios, site_capabilities
 
 SKIP_DIRS = {".git", "node_modules", "target", "dist", "build", ".venv", ".next"}
@@ -192,6 +193,9 @@ def brief(project: str = "", section: str = "", stateless: bool = False) -> dict
             "缺失信息写进 missing 字段，不要伪造。",
             "实际项目不存在的实体类型不必生成；不要为了凑数量造图示。",
             "所有新增实现必须模块化，不要覆盖固定件。",
+            "Case 同时给 category（分诊轴）与 caseType（§13 分析类型）；缺证据的 Case 的 reality 不得写 Observed。",
+            "§3 与 §17 的字段拼写两种都接受：节点的 type/label、边的 direction、工作流的 nodeType/edgeType/guard。"
+            "写入时用 kind/name/directed/condition 这些正本拼写。",
         ],
         "slots": [
             {"id": slot["id"], "pointer": slot["pointer"], "what": slot["what"],
@@ -211,12 +215,26 @@ def brief(project: str = "", section: str = "", stateless: bool = False) -> dict
                  "fidelity": item["fidelity"]}
                 for item in vocabulary["diagram-types"]["types"]
             ],
+            "diagramFamilies": vocabulary["diagram-types"].get("specFamilies", {}),
             "caseCategories": [
-                {"id": item["id"], "assertion": item["assertion"]}
+                {"id": item["id"], "assertion": item["assertion"], "specType": item.get("specType")}
                 for item in vocabulary["case-categories"]["categories"]
             ],
-            "workflowNodeKinds": [item["id"] for item in vocabulary["workflow-kinds"]["nodeKinds"]],
-            "workflowEdgeKinds": [item["id"] for item in vocabulary["workflow-kinds"]["edgeKinds"]],
+            "caseTypes": [
+                {"id": item["id"], "assertion": item["assertion"], "category": item.get("category"),
+                 "primitives": item.get("primitives", [])}
+                for item in vocabulary["case-types"]["types"]
+            ],
+            "caseReality": vocabulary["case-types"].get("reality", {}).get("values", []),
+            "workflowNodeKinds": [
+                {"id": item["id"], "specType": item.get("specType")}
+                for item in vocabulary["workflow-kinds"]["nodeKinds"]
+            ],
+            "workflowEdgeKinds": [
+                {"id": item["id"], "specType": item.get("specType")}
+                for item in vocabulary["workflow-kinds"]["edgeKinds"]
+            ],
+            "gwfIr": vocabulary["workflow-kinds"].get("gwfIr", {}),
             "spaceLevels": [
                 {"id": item["id"], "represents": item["represents"]}
                 for item in vocabulary["space-levels"]["levels"]
@@ -390,6 +408,10 @@ def build(ws: Workspace, name: str, legacy_dist: str | None = None, profile: str
             (stage / "data").mkdir()
             atomic_json(stage / "data" / "architecture.json", canonical)
             atomic_json(stage / "data" / "scenarios.json", precomputed)
+            # The same v5.0 deliverables the static and vite profiles write.
+            for relative, payload in derive.derived_files(canonical).items():
+                atomic_json(stage / relative, payload)
+            atomic_json(stage / "data" / "workflow-schema.json", derive.workflow_schema())
         else:
             from .scaffold import builder
             builder.build_site(stage, canonical, profile, precomputed, None)

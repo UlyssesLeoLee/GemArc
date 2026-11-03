@@ -33,3 +33,38 @@
 ## 结构示例
 
 参见 `../08_附录/schema/architecture.schema.json` 和 `../08_附录/examples/architecture.example.json`。示例仅为最小样例；真实验证器需校验全部语义引用和跨对象规则。
+
+## 已实现的契约与词表（ADR-013）
+
+上面的章节是目标设计。**实际生效**的契约与词表是随包发布的那一套，Python 校验器、浏览器运行时与站点共用同一份事实：
+
+| 类别 | 位置 | 内容 |
+|---|---|---|
+| 契约（JSON Schema） | `src/gemarc_mcp/scaffold/contracts/` | `canonical-model` / `node` / `edge` / `evidence` / `space` / `view` / `scenario` / `workflow` |
+| 词表 | `src/gemarc_mcp/scaffold/vocab/` | `entity-kinds`(20) / `evidence-levels`(6) / `edge-types`(20) / `diagram-types`(21) / `relation-classes`(4) / `space-levels`(3) / `case-categories`(5) / **`case-types`(14)** / **`workflow-kinds`(22 节点类型 / 11 边类型 / GWF-IR 字段目录)** |
+| 生成物 | `runtime/core/vocab-data.js` | 由 `python -m gemarc_mcp.scaffold.sync` 从词表生成；`tests/test_scaffold_vocab.py` 断言两者不会漂移 |
+
+### v5.0 规格带来的增量（全部可选，既有模型继续有效）
+
+- **节点**：`qualifiedName`、`sourceLocation`（repository / commit / path / startLine / endLine）、`version`。
+- **边**：`version`。
+- **证据**：`source.path` / `source.startLine` / `source.endLine`。
+- **工作流**：§17 的 `version`、`entryPoints`、`dataSchemas`、`executionPolicy`、`errorPolicy`、`permissions`、`metadata`；节点侧的 `inputs` / `outputs` / `preconditions` / `postconditions` / `stateTransitions` / `timeoutPolicy` / `retryPolicy` / `errorHandlers` / `sideEffects` / `idempotency` / `implementationRef`；边侧的 `dataMapping` / `priority` / `errorRoute`；端口侧的 `direction` / `cardinality` / `required` / `acceptedTypes`。
+- **Case**：§13 case_contract 的 `initialState` / `inputEvents` / `preconditions` / `executionRules` / `expectedOutcomes` / `terminationConditions` / `assertions` / `evidenceIds` / `assumptions`，加 `caseType`（14 种分析类型）与 `reality`（Observed / ImplementedModel / DesignedModel / Hypothetical）。
+
+### 字段别名
+
+规格 §3 用 `type` / `label`，§17 用 `nodeType` / `edgeType` / `guard` / `portId` / `caseId`。这些拼写**被接受并归一**到正本拼写：
+
+| 别名 | 归一到 | 适用范围 |
+|---|---|---|
+| `type` | `kind` | 节点 |
+| `label` | `name` | 节点 |
+| `direction` | `directed` | 边（`undirected` → false） |
+| `nodeType` / `nodeId` | `kind` / `id` | 工作流节点 |
+| `edgeType` / `edgeId` / `sourceNodeId` / `targetNodeId` / `guard` | `kind` / `id` / `sourceId` / `targetId` / `condition` | 工作流边 |
+| `portId` | `id` | 端口 |
+| `workflowId` | `id` | 工作流 |
+| `caseId` / `name` | `id` / `title` | Case |
+
+§17 的 PascalCase 类型名（`Task`、`ControlFlow`…）会先映射回正本 id 再校验。Python 与浏览器运行时两侧规则一致（`src/gemarc_mcp/model.py` 与 `runtime/core/model.js`、`runtime/workflow/workflow-model.js`）。

@@ -53,11 +53,14 @@ export function normalizeModel(model) {
 
 export function normalizeNode(node) {
   const source = asObject(node);
+  // v5.0 §3 names the entity type "type" and the display name "label".
+  const kind = source.kind ?? (typeof source.type === 'string' ? source.type : undefined);
+  const name = source.name ?? (typeof source.label === 'string' ? source.label : undefined);
   return {
     ...source,
     id: source.id,
-    kind: source.kind,
-    name: source.name,
+    kind,
+    name,
     properties: asObject(source.properties),
     parentId: source.parentId ?? null,
     role: source.role ?? null,
@@ -82,13 +85,21 @@ export function normalizeEdge(edge) {
   // 0.1.x models called the relation type "kind"; 0.2.0 calls it "type".
   const edgeType = source.type ?? source.kind ?? null;
   delete source.kind;
+  // v5.0 §17 names the flow direction "direction"; the canonical spelling is
+  // the boolean "directed". Read the raw value first: the default must not
+  // shadow the alias.
+  const rawDirected = source.directed;
+  const direction = source.direction;
+  const directed = rawDirected === undefined
+    ? (typeof direction === 'string' ? direction !== 'undirected' : true)
+    : Boolean(rawDirected);
   return {
     ...source,
     id: source.id,
     sourceId,
     targetId,
     type: edgeType,
-    directed: source.directed === undefined ? true : Boolean(source.directed),
+    directed,
     condition: source.condition === '' ? null : (source.condition ?? null),
     weight: source.weight ?? null,
     properties: asObject(source.properties),

@@ -1,0 +1,7 @@
+{
+  "count": 0,
+  "gwfVersion": "0.2.0",
+  "note": "designOnly 的节点没有真实执行器；executable=false 表示未声明实现引用。missing 列出 GWF-IR 必填但未给出的字段。",
+  "schemaVersion": "0.2.0",
+  "workflows": []
+}

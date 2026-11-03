@@ -232,7 +232,7 @@ class RenderTests(unittest.TestCase):
 
     def test_render_withholds_content_when_it_would_be_too_large(self):
         original = stateless.RENDER_INLINE_LIMIT
-        stateless.RENDER_INLINE_LIMIT = 100
+        stateless.RENDER_INLINE_LIMIT = 1
         try:
             out = stateless.render(DEMO_MODEL)
         finally:
@@ -251,7 +251,10 @@ class SiteKitTests(unittest.TestCase):
     def test_kit_excludes_model_dependent_files(self):
         for profile in stateless.SITE_PROFILES:
             paths = [e["path"] for e in stateless.kit_listing(profile)]
-            self.assertFalse([p for p in paths if p.startswith("data/")])
+            data_files = [p for p in paths if p.startswith("data/")]
+            # Only the GWF-IR schema may live in the kit: it follows the
+            # vocabulary, not the model.
+            self.assertEqual(data_files, list(stateless.KIT_DATA_FILES))
             self.assertIn("runtime/core/model.js", paths)
             self.assertIn("index.html", paths)
 

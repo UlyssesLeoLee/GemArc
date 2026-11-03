@@ -25,6 +25,7 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
+from . import derive
 from . import sync
 
 SCAFFOLD_ROOT = Path(__file__).resolve().parent
@@ -245,6 +246,13 @@ def build_site(target: Path, model: dict, profile: str, scenarios: dict | None =
         _write_json(target / "data" / "scenarios.json", scenarios)
     if capabilities is not None:
         _write_json(target / "data" / "capabilities.json", capabilities)
+    # The v5.0 deliverables (§3 output_files, §25 output directory). They are
+    # derived from the same model, so render and build stay byte for byte equal.
+    for relative, payload in derive.derived_files(model).items():
+        _write_json(target / relative, payload)
+    # The GWF-IR schema depends on the vocabulary, not on the model: it is a
+    # fixed part and travels inside the site kit.
+    _write_json(target / "data" / "workflow-schema.json", derive.workflow_schema())
     return written
 
 

@@ -27,6 +27,8 @@ import {
   WORKFLOW_NODE_KIND_IDS,
   WORKFLOW_EDGE_KIND_IDS,
   WORKFLOW_CONSTRAINT_IDS,
+  workflowNodeKindBySpec,
+  workflowEdgeKindBySpec,
 } from '../core/vocab.js';
 
 /** Port kinds, taken from the generated vocabulary so they cannot drift. */
@@ -58,9 +60,12 @@ function optionalString(value) {
 
 function normalizePort(port) {
   const source = asObject(port);
+  // v5.0 §17 calls the port id "portId"; the canonical spelling is "id".
+  const portId = typeof source.id === 'string' ? source.id
+    : (typeof source.portId === 'string' ? source.portId : '');
   return {
     ...source,
-    id: typeof source.id === 'string' ? source.id : '',
+    id: portId,
     kind: typeof source.kind === 'string' ? source.kind : 'input',
     name: optionalString(source.name),
     schemaRef: optionalString(source.schemaRef),
@@ -93,10 +98,17 @@ function normalizeCanvas(canvas) {
 
 function normalizeNode(node) {
   const source = asObject(node);
+  // v5.0 §17 calls the node type "nodeType"; the canonical spelling is "kind".
+  // A §17 type name ("Task") is mapped back onto its canonical id.
+  const kind = typeof source.kind === 'string' ? source.kind
+    : (typeof source.nodeType === 'string'
+      ? (workflowNodeKindBySpec(source.nodeType) || source.nodeType)
+      : 'task');
   return {
     ...source,
-    id: typeof source.id === 'string' ? source.id : '',
-    kind: typeof source.kind === 'string' ? source.kind : 'task',
+    id: typeof source.id === 'string' ? source.id
+      : (typeof source.nodeId === 'string' ? source.nodeId : ''),
+    kind,
     name: typeof source.name === 'string' ? source.name : '',
     canonicalNodeId: optionalString(source.canonicalNodeId),
     ports: asArray(source.ports).map(normalizePort),
@@ -110,17 +122,26 @@ function normalizeNode(node) {
 
 function normalizeEdge(edge) {
   const source = asObject(edge);
-  const condition = source.condition === '' ? null : (source.condition ?? null);
+  // v5.0 §17 calls the edge type "edgeType" and the condition "guard"; the
+  // canonical spellings are "kind" and "condition".
+  const kind = typeof source.kind === 'string' ? source.kind
+    : (typeof source.edgeType === 'string'
+      ? (workflowEdgeKindBySpec(source.edgeType) || source.edgeType)
+      : 'sequence');
+  const rawCondition = source.condition === '' ? null : (source.condition ?? source.guard ?? null);
   return {
     ...source,
-    id: typeof source.id === 'string' ? source.id : '',
-    sourceId: typeof source.sourceId === 'string' ? source.sourceId : '',
-    targetId: typeof source.targetId === 'string' ? source.targetId : '',
+    id: typeof source.id === 'string' ? source.id
+      : (typeof source.edgeId === 'string' ? source.edgeId : ''),
+    sourceId: typeof source.sourceId === 'string' ? source.sourceId
+      : (typeof source.sourceNodeId === 'string' ? source.sourceNodeId : ''),
+    targetId: typeof source.targetId === 'string' ? source.targetId
+      : (typeof source.targetNodeId === 'string' ? source.targetNodeId : ''),
     sourcePortId: optionalString(source.sourcePortId),
     targetPortId: optionalString(source.targetPortId),
-    kind: typeof source.kind === 'string' ? source.kind : 'sequence',
+    kind,
     directed: source.directed === undefined ? true : Boolean(source.directed),
-    condition: condition === null ? null : String(condition),
+    condition: rawCondition === null ? null : String(rawCondition),
     dataContract: source.dataContract ? asObject(source.dataContract) : null,
     canvas: source.canvas ? asObject(source.canvas) : null,
     properties: asObject(source.properties),
@@ -133,9 +154,12 @@ function normalizeEdge(edge) {
  */
 export function normalizeWorkflow(workflow) {
   const source = asObject(workflow);
+  // v5.0 §17 calls the workflow id "workflowId"; the canonical spelling is "id".
+  const id = typeof source.id === 'string' ? source.id
+    : (typeof source.workflowId === 'string' ? source.workflowId : '');
   return {
     ...source,
-    id: typeof source.id === 'string' ? source.id : '',
+    id,
     name: typeof source.name === 'string' ? source.name : '',
     kind: optionalString(source.kind),
     description: optionalString(source.description),

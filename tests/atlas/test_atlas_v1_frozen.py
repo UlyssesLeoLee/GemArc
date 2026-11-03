@@ -35,7 +35,9 @@ VOCAB_DIR = REPO / "src" / "gemarc_mcp" / "scaffold" / "vocab"
 # --------------------------------------------------------------------------------------------------------
 # Pinned values (computed at commit dad6f73 plus the strict-evidence fix, which touches neither artifact).
 # The tool lists moved on when v1 deliberately added gemarc_5d_guide (ADR-012): the server now ships the
-# 5D design workflow itself. The vocabulary and the golden file did not move with them.
+# 5D design workflow itself. The vocabulary moved on when v1 deliberately adopted the v5.0 specification
+# (ADR-013): the diagram catalogue gained data-dependency and event-flow, case-types.json was added for
+# the §13 analysis types, and workflow-kinds.json expanded to the GWF-IR granularity. The golden file did not move.
 # --------------------------------------------------------------------------------------------------------
 
 FULL_TOOLS = (
@@ -51,19 +53,20 @@ WRITE_TOOLS = ("gemarc_build", "gemarc_export", "gemarc_init", "gemarc_model", "
 
 GOLDEN_SHA256 = "d3f55d2558e6f6cd8ef8f42a07a121694abe3d62a799c8b64bb93f743f7b76d6"
 VOCAB_FILE_SHA256 = {
-    "case-categories.json": "a6fe24e4e4f9258906c16161c5baf38e04c8daaaacaae308a84399ac551b1df9",
-    "diagram-types.json": "7b2c0ba0368165ed609a0071becf920d16222edb8b1eef96b572a92958f29f65",
+    "case-categories.json": "cffda6a4198882f303240230aa721b078e572bd53f4b0742b2e7f9833c97c1dc",
+    "case-types.json": "264e14e484ca1b5e0ad69118d13d39d721bb28d3539fea7cccbe2b18e8316c07",
+    "diagram-types.json": "29888a91573a12da0a8d8674f22076ce99962632d30645fb3df41f5c635a9264",
     "edge-types.json": "abaa2d5c42b3b1e64c975b0add23637054ca93161eda5b6e5608d04f87868d7c",
     "entity-kinds.json": "3e122f6a458b200723f2f142ce329e66404ee1b31788fb4a620a5f56c06d13e1",
     "evidence-levels.json": "68d073f5b1f0d257b3dd9488659e3002b319b581e1e6af6bf5868996f06fc6da",
     "relation-classes.json": "ece00f119702565e50ceacbab1e331c9c505d874c5be6e0fabdbec122af4b1f9",
     "space-levels.json": "af9f12817abdb7f7377c063ebd8b40199d2c00a857c605d5e11c6744d605ff23",
-    "workflow-kinds.json": "00c79a1a621a361ba32d24e7190f56cc246696ffd197138938bb60dc5f5767fe",
+    "workflow-kinds.json": "82e8c03e5f8c81a96e3c95bbde2c2bf22736bf987f8de19d061db95ad628585b",
 }
 #: sha256 over ``name\n<LF-normalised bytes>\n`` of every vocab file in name order.
-VOCAB_BYTES_DIGEST = "9a921e3fab4774751413de13e9939a5ed0fc0381d8af187e79ce27b5f4342546"
+VOCAB_BYTES_DIGEST = "373fd9ee65dbc3a11eb32e88db6ee31d12ff5d7ec0c0aa7c8493f540cb2bc26b"
 #: ``gemarc_mcp.scaffold.sync.vocab_digest()``: parse-level digest the generated JS vocabulary also embeds.
-VOCAB_SYNC_DIGEST = "fb8d1213f44a1d626f6d519df97806a86424731308b5a445c4ac672542f5e886"
+VOCAB_SYNC_DIGEST = "7924b5b379c0893105543024f4c49bd754eb98fcc3829fdfb4b914a8bddcbe8c"
 
 UPDATE_HINT = (
     " A v1 artifact is frozen while the atlas is built. If v1 was changed on purpose by its maintainers, run "

@@ -34,7 +34,10 @@
         "branch": {"type": ["string", "null"]},
         "commit": {"type": ["string", "null"]},
         "file": {"type": ["string", "null"]},
+        "path": {"type": ["string", "null"], "description": "仓库内相对路径。v5.0 提示词 §3 provenance_fields 用 path。"},
         "line": {"type": ["integer", "null"], "minimum": 1},
+        "startLine": {"type": ["integer", "null"], "minimum": 1},
+        "endLine": {"type": ["integer", "null"], "minimum": 1},
         "symbol": {"type": ["string", "null"]},
         "locator": {"type": "string", "minLength": 1, "description": "人类可读的定位串，例如 src/app/main.py:42"},
         "excerpt": {"type": ["string", "null"]}

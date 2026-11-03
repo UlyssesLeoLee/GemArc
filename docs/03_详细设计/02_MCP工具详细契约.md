@@ -40,7 +40,7 @@
 | `gemarc_validate` | S | `project=""`, `model={}`, `strict=false` | status, errors[], warnings[], summary, modelSha256 | 只读；`project` 与 `model` 二选一（`GEMARC_INPUT_003`）；不改变模型 |
 | `gemarc_simulate` | S | `scenario_id`*, `project=""`, `model={}`, `disabled_nodes=[]`, `compare_baseline=false` | trace[], summary, truncation, evidenceClass；`compare_baseline=true` 时为 baseline, intervention, lostEvents, gainedEvents, notice | 只读；事件/循环有上限（`truncation`）；场景不存在 `GEMARC_DYNAMIC_006`，屏蔽模块不存在 `GEMARC_DYNAMIC_007`；规则式 what-if，不是因果识别 |
 | `gemarc_diff` | S | `base_project=""`, `target_project=""`, `base_model={}`, `target_model={}` | nodes, edges, affectedNodes, baseSha256, targetSha256 | 只读；两侧各自二选一 |
-| `gemarc_render` | S | `model`*, `profile="static"` | profile, validation（warning 最多回显 20 条，其余只给 `warningsOmitted`，总数在 `summary.warnings`）, inline, files[]（path, bytes, sha256, content）, kit{}, assemble, notice | 只读；`profile` 为 `static` 或 `vite`（`GEMARC_BUILD_005`）；校验未通过时直接返回校验结果；派生文件合计超过 24 KiB 时 `inline=false`，只给清单 |
+| `gemarc_render` | S | `model`*, `profile="static"` | profile, validation（warning 最多回显 20 条，其余只给 `warningsOmitted`，总数在 `summary.warnings`）, inline, files[]（path, bytes, sha256, content）, kit{}, assemble, notice | 只读；`profile` 为 `static` 或 `vite`（`GEMARC_BUILD_005`）；校验未通过时直接返回校验结果；内联按**累计字节逐文件**判定，放不下的文件只给清单，整体 `inline` 表示是否全部内联 |
 | `gemarc_inspect` | F | `path`* | scannedFiles, scannedBytes, extensions, candidateFacts[], evidenceState | 只读；路径必须在工作区内；候选事实一律未确认 |
 | `gemarc_plan` | F | `project`*, `goals=[]` | goals, views, dimensions, gaps | 只读；不修改事实 |
 | `gemarc_scaffold` | F | `project`*, `profile="static"` | scaffold, manifest, model, slots, fixedFileCount, commands | 写；需 `GEMARC_ALLOW_WRITE=1`；已存在则拒绝（`GEMARC_SCAFFOLD_002`） |
@@ -53,7 +53,7 @@
 ### 与远程部署相关的两个工具
 
 - `gemarc_new_model` 返回空模型与槽位清单，模型自己填写；服务端不读用户的仓库，填写事实用的是调用方 agent 自己的文件访问能力。
-- `gemarc_render` 返回随模型变化的 `data/architecture.json`、`data/scenarios.json`、`data/capabilities.json`，以及固定件的描述 `kit`（`path` 为 `/kit/<profile>.zip`，`url` 仅在服务端知道自己的公开地址时有值，另有 `archiveSha256` 与 `run`）。固定件 + 这三个文件即完整站点；固定件体积约 620 KB，不会放进任何工具结果。内联上限为 `stateless.RENDER_INLINE_LIMIT`（24 KiB，约 8k token），低于 Claude Code 在 10k token 处的告警线和 Codex 约 12k token 的上限。
+- `gemarc_render` 返回随模型变化的 8 个文件：`data/architecture.json`、`data/scenarios.json`、`data/capabilities.json`、`data/evidence-index.json`、`data/diagram-catalog.json`、`data/spatial-layout.json`、`data/workflow-ir.json`、`data/case-library.json`（ADR-013，规格 §3 / §25）。固定件的描述 `kit`（`path` 为 `/kit/<profile>.zip`，`url` 仅在服务端知道自己的公开地址时有值，另有 `archiveSha256` 与 `run`）另计：固定件 + 这 8 个文件即完整站点；固定件体积约 620 KB，不会放进任何工具结果。`data/workflow-schema.json`（GWF-IR 的 JSON Schema）只依赖词表，因此随**固定件**发布而不随模型重复传输。内联上限为 `stateless.RENDER_INLINE_LIMIT`（24 KiB，约 8k token），低于 Claude Code 在 10k token 处的告警线和 Codex 约 12k token 的上限；内联按累计字节逐文件判定，放不下的文件只给清单。
 
 ### 注解（annotations）
 
@@ -128,6 +128,7 @@
 | `GEMARC_BUILD_001`–`005` | `legacy_dist` 不合法 / 超 50 MiB / 目标目录非 GemArc 生成 / 含符号链接 / 未知 profile |
 | `GEMARC_EXPORT_001` / `GEMARC_EXPORT_002` | 未构建或验证失败 / 导出内容含符号链接 |
 | `GEMARC_DYNAMIC_006` / `GEMARC_DYNAMIC_007` | 场景不存在 / 屏蔽的模块不存在 |
+| `GEMARC_CASE_006` / `GEMARC_CASE_007` | **新增**（ADR-013）：`cases[].caseType` 不在 `case-types` 词表 / `cases[].reality` 不在 Observed·ImplementedModel·DesignedModel·Hypothetical |
 | `GEMARC_INTERNAL_001` | 内部异常（只暴露异常类名），状态为 `error`；原样报告，不要重试 |
 
 ## 访问控制示例

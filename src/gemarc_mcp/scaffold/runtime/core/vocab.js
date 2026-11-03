@@ -24,6 +24,15 @@ const WORKFLOW_NODE_KINDS = VOCAB['workflow-kinds'].nodeKinds.map((item) => item
 const WORKFLOW_EDGE_KINDS = VOCAB['workflow-kinds'].edgeKinds.map((item) => item.id);
 const WORKFLOW_CONSTRAINTS = VOCAB['workflow-kinds'].executionConstraints.map((item) => item.id);
 const SPACE_LEVELS = VOCAB['space-levels'].levels.map((item) => item.id);
+// v5.0 §17 names the workflow node and edge types in PascalCase ("Task",
+// "ControlFlow"). The canonical ids are lower case, so the runtime needs the
+// reverse map to read a workflow written in the specification's spelling.
+const WORKFLOW_NODE_KIND_BY_SPEC = new Map(
+  VOCAB['workflow-kinds'].nodeKinds.filter((item) => item.specType).map((item) => [item.specType, item.id]),
+);
+const WORKFLOW_EDGE_KIND_BY_SPEC = new Map(
+  VOCAB['workflow-kinds'].edgeKinds.filter((item) => item.specType).map((item) => [item.specType, item.id]),
+);
 
 export const CANONICAL_EVIDENCE_LEVELS = Object.freeze(CANONICAL_EVIDENCE);
 export const ENTITY_KIND_IDS = Object.freeze(ENTITY_KINDS);
@@ -38,6 +47,16 @@ export const SPACE_LEVEL_IDS = Object.freeze(SPACE_LEVELS);
 
 export function isCanonicalEvidenceLevel(value) {
   return CANONICAL_EVIDENCE.includes(value);
+}
+
+/** The canonical node kind id of a §17 node type, or null when there is none. */
+export function workflowNodeKindBySpec(specType) {
+  return WORKFLOW_NODE_KIND_BY_SPEC.get(specType) || null;
+}
+
+/** The canonical edge kind id of a §17 edge type, or null when there is none. */
+export function workflowEdgeKindBySpec(specType) {
+  return WORKFLOW_EDGE_KIND_BY_SPEC.get(specType) || null;
 }
 
 export function isEntityKind(value) {

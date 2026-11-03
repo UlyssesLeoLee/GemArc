@@ -1,4 +1,4 @@
-/* GemArc 5D site - dark, restrained, semantics over decoration. */
+/* GemArc multimedia document site - dark, restrained, semantics over decoration. */
 :root {
   --bg: #0b0f14;
   --panel: #121821;
@@ -11,6 +11,13 @@
   --good: #6bd68a;
   --edge: #5a7288;
   --edge-trust: var(--warn);
+  /* Pane geometry. The widths are written by the layout code (and restored
+     from local storage); the main column keeps a floor so the primary content
+     can never be squeezed into an unusable strip. */
+  --sidebar-w: 232px;
+  --inspector-w: 300px;
+  --gutter: 8px;
+  --main-min: 480px;
 }
 
 * { box-sizing: border-box; }
@@ -35,6 +42,9 @@ body {
 .brand .gem { color: var(--accent); }
 .brand small { color: var(--muted); font-weight: 400; font-size: 12px; }
 
+.top-actions { display: flex; align-items: center; gap: 12px; }
+.top-actions .action { margin-top: 0; }
+
 .tag {
   padding: 3px 10px;
   border: 1px solid var(--line);
@@ -43,16 +53,62 @@ body {
   font-size: 12px;
 }
 
+/* Three panes with two draggable gutters. The main column is the primary
+   display area: it takes what is left, and it never falls below its floor. */
 main {
   display: grid;
-  grid-template-columns: 232px minmax(0, 1fr) 300px;
-  gap: 1px;
-  background: var(--line);
-  min-height: calc(100vh - 96px);
+  grid-template-columns:
+    var(--sidebar-w) var(--gutter) minmax(var(--main-min), 1fr) var(--gutter) var(--inspector-w);
+  height: calc(100vh - 96px);
+  min-height: 420px;
+  background: var(--bg);
 }
 
-aside, .mainpane { background: var(--bg); padding: 16px; }
-.sidebar, .inspector { overflow-y: auto; }
+aside, .mainpane { background: var(--bg); padding: 16px; min-width: 0; min-height: 0; }
+.sidebar, .inspector, .mainpane { overflow: auto; }
+
+/* A gutter is a real control: focusable, keyboard operable, and it says how
+   wide the neighbouring pane currently is. */
+.splitter {
+  position: relative;
+  background: transparent;
+  cursor: col-resize;
+  touch-action: none;
+}
+.splitter::after {
+  content: "";
+  position: absolute;
+  inset: 0 3px;
+  border-radius: 2px;
+  background: var(--line);
+  transition: background .12s ease;
+}
+.splitter:hover::after, .splitter:focus-visible::after, .splitter.dragging::after { background: var(--accent); }
+.splitter:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+
+/* Focus mode: the side panes collapse and the primary content takes the whole
+   window. The panes keep their grid cells (width 0) on purpose: removing them
+   from the flow would pull the main column into the first, zero-width track
+   and the content would disappear. The sidebar keeps a narrow strip so the
+   navigation is still reachable - a focus mode without navigation is a trap. */
+main.focus { grid-template-columns: 56px 0 minmax(var(--main-min), 1fr) 0 0; }
+main.focus .sidebar { overflow: hidden; padding: 8px 4px; }
+main.focus .sidebar .section-title, main.focus .sidebar .side-foot { display: none; }
+main.focus .sidebar nav button { justify-content: center; padding: 10px 4px; font-size: 0; }
+main.focus .sidebar nav button span { margin: 0; font-size: 11px; }
+main.focus .inspector { overflow: hidden; padding: 0; }
+main.focus .splitter { visibility: hidden; }
+
+@media (max-width: 980px) {
+  main {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    height: auto;
+    min-height: 0;
+  }
+  .splitter { display: none; }
+  aside, .mainpane { overflow: visible; }
+}
 
 .section-title {
   margin: 4px 0 10px;
@@ -95,13 +151,22 @@ h2 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--muted); l
 h3 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
 h4 { margin: 8px 0 4px; font-size: 13px; color: var(--muted); }
 
+/* A panel is a pane of its own: the reader may drag its corner to give it
+   more (or less) width and height. The floor keeps a panel usable. */
 .panel {
   margin-bottom: 16px;
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
+  resize: both;
+  overflow: auto;
+  min-width: 320px;
+  min-height: 140px;
 }
+
+/* The first panel of a view is the primary display area: it reads first. */
+#content > .panel:first-child { border-color: #2c3d50; }
 
 .small { margin: 2px 0; font-size: 12px; }
 .muted { color: var(--muted); }

@@ -1,4 +1,4 @@
-gemarc-5d-output/
+gemarc-media-doc-output/
   index.html
   manifest.json
   gemarc.lock.json

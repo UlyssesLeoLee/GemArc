@@ -2,14 +2,14 @@
  * GENERATED FILE - DO NOT EDIT.
  *
  * Source: src/gemarc_mcp/scaffold/vocab/*.json
- * Digest: 7924b5b379c0893105543024f4c49bd754eb98fcc3829fdfb4b914a8bddcbe8c
+ * Digest: 10b92f6520eeb7fdf7793a9891c1edd300d9e1e9ba8773a981d75cd8cf12b935
  * Regenerate: python -m gemarc_mcp.scaffold.sync
  *
  * The vocabulary is the single source of truth shared by the prompt, the
  * Python validator and this runtime. A drift test asserts that this file
  * still matches the JSON sources.
  */
-export const VOCAB_DIGEST = '7924b5b379c0893105543024f4c49bd754eb98fcc3829fdfb4b914a8bddcbe8c';
+export const VOCAB_DIGEST = '10b92f6520eeb7fdf7793a9891c1edd300d9e1e9ba8773a981d75cd8cf12b935';
 
 export const VOCAB = Object.freeze({
   "case-categories": {
@@ -133,8 +133,83 @@ export const VOCAB = Object.freeze({
         "Failed"
       ]
     },
-    "description": "v5.0 提示词 §13：第五维必须以正常、异常、边界、并发与组合 Case 为基本分析单位，不局限于固定的 A/B 预制动画。本词表登记 §13 列出的全部 14 种分析类型。cases[].category 是分诊轴（见 case-categories 词表），cases[].caseType 是本词表的分析类型：两个字段互补，不互相替代。",
+    "compositionModes": {
+      "ids": [
+        "Sequential",
+        "Parallel",
+        "Conditional",
+        "Nested",
+        "Repeated",
+        "Interrupted",
+        "ReversibleVisualReplay",
+        "Synchronized",
+        "Branched",
+        "Converged"
+      ],
+      "note": "§14 composition_modes：动画组合方式。组合方式只决定呈现，不得改变计算轨迹的因果顺序。"
+    },
+    "description": "v6.0 提示词 §13：第五维必须以正常、异常、边界、并发与组合 Case 为基本分析单位，不局限于固定的 A/B 预制动画。本词表登记 §13 列出的全部 14 种分析类型。cases[].category 是分诊轴（见 case-categories 词表），cases[].caseType 是本词表的分析类型：两个字段互补，不互相替代。§14 的动画原语、终态、组合方式与示例组合也登记在本词表内。",
     "id": "case-types",
+    "illustrativeCompositions": {
+      "entries": [
+        {
+          "caseType": "Normal",
+          "sequence": [
+            "Propagation",
+            "StateTransition",
+            "Parallel",
+            "Convergence",
+            "Completed"
+          ],
+          "terminalState": "Completed"
+        },
+        {
+          "caseType": "Timeout",
+          "sequence": [
+            "Propagation",
+            "Waiting",
+            "Timeout",
+            "Retry",
+            "Failed"
+          ],
+          "terminalState": "Failed"
+        },
+        {
+          "caseType": "Recovery",
+          "sequence": [
+            "Propagation",
+            "FailurePropagation",
+            "Retry",
+            "Recovery",
+            "Completed"
+          ],
+          "terminalState": "Completed"
+        },
+        {
+          "caseType": "CascadingFailure",
+          "sequence": [
+            "FailurePropagation",
+            "Propagation",
+            "Blocking",
+            "Escalation",
+            "OutcomeComparison"
+          ],
+          "terminalState": null
+        },
+        {
+          "caseType": "Compensation",
+          "sequence": [
+            "Propagation",
+            "PartialFailure",
+            "Compensation",
+            "Recovery",
+            "OutcomeComparison"
+          ],
+          "terminalState": null
+        }
+      ],
+      "note": "§14 illustrative_compositions。规格明确标注这些只是动画语法示例，不属于目标仓库自动存在的真实事件轨迹，必须由实际 Case 计算生成。示例里既可能出现原语，也可能出现终态或 Case 类型名，因此本表逐项记录原样，不做归并。"
+    },
     "reality": {
       "note": "§13 要求每个 Case 标记 Observed / ImplementedModel / DesignedModel / Hypothetical。缺证据的 Case 不得被描述为项目的真实运行事实。",
       "values": [
@@ -152,7 +227,7 @@ export const VOCAB = Object.freeze({
       "primitives 只是可选的动画语法提示，不得当作该 Case 实际发生过的轨迹。"
     ],
     "schemaVersion": "0.2.0",
-    "title": "5D Case 分析类型（v5.0 §13 case_types）",
+    "title": "5D Case 分析类型（v6.0 §13 case_types / §14 动画语法）",
     "types": [
       {
         "assertion": "正常业务执行",
@@ -1485,7 +1560,7 @@ export const VOCAB = Object.freeze({
     "title": "Building–Floor–Room 空间层级"
   },
   "workflow-kinds": {
-    "description": "v5.0 提示词 §2.7 与 §17 GWF-IR：工作流不能只是一组可以拖动的框和箭头。每个节点、端口、关系、条件、异常、输入、输出和执行约束必须可被程序及大模型明确理解。nodeKinds / edgeKinds 覆盖 §17 列出的全部 19 种节点类型与 7 种边类型；legacy* 词表登记旧写法，新写入必须使用规范 id。",
+    "description": "v6.0 提示词 §2.7 与 §17 GWF-IR 6D 扩展：工作流不能只是一组可以拖动的框和箭头。每个节点、端口、关系、条件、异常、输入、输出和执行约束必须可被程序及大模型明确理解。nodeKinds / edgeKinds 覆盖 §17 列出的全部 28 种节点类型与 13 种边类型；execution* 覆盖 §25 的 6D 执行图 IR 契约；legacy* 词表登记旧写法，新写入必须使用规范 id。",
     "edgeKinds": [
       {
         "directed": true,
@@ -1529,6 +1604,48 @@ export const VOCAB = Object.freeze({
         "id": "dependency",
         "label": "依赖",
         "specType": "Dependency"
+      },
+      {
+        "directed": true,
+        "id": "state-transition",
+        "label": "状态迁移",
+        "note": "6D：边上传递类型化状态，必须声明 stateSchemaRef 与 stateProjection",
+        "specType": "StateTransition"
+      },
+      {
+        "directed": true,
+        "id": "approval-transition",
+        "label": "审批迁移",
+        "note": "6D：审批结果沿显式路由进入正常或异常分支",
+        "specType": "ApprovalTransition"
+      },
+      {
+        "directed": true,
+        "id": "tool-result",
+        "label": "工具结果",
+        "note": "6D：工具调用的结果回传边",
+        "specType": "ToolResult"
+      },
+      {
+        "directed": true,
+        "id": "retry-transition",
+        "label": "重试迁移",
+        "note": "6D：失败后按重试策略回到原节点",
+        "specType": "RetryTransition"
+      },
+      {
+        "directed": true,
+        "id": "timeout-transition",
+        "label": "超时迁移",
+        "note": "6D：达到时间阈值后的有依据路径",
+        "specType": "TimeoutTransition"
+      },
+      {
+        "directed": true,
+        "id": "resume-transition",
+        "label": "恢复迁移",
+        "note": "6D：从检查点恢复后的继续边",
+        "specType": "ResumeTransition"
       },
       {
         "directed": true,
@@ -1592,10 +1709,143 @@ export const VOCAB = Object.freeze({
         "note": "必须声明失败后的补偿动作"
       }
     ],
+    "executionGraph": {
+      "compilerGates": [
+        "所有入边出边、Port/Schema、Guard、路由优先级、权限、终止条件必须可校验。",
+        "禁止死循环、无界 Agent 迭代、隐式审批绕过、不可追踪工具调用及缺失失败路径。",
+        "Graph IR 通过静态验证后才可编译为 Simulation Graph；真实运行还需执行器能力匹配和授权。"
+      ],
+      "edgeFields": [
+        "edgeId",
+        "sourceNodeId",
+        "sourcePortId",
+        "targetNodeId",
+        "targetPortId",
+        "kind",
+        "guardExpression",
+        "dataMapping",
+        "stateSchemaRef",
+        "priority",
+        "onError",
+        "onTimeout",
+        "deliverySemantics",
+        "checkpointBoundary",
+        "evidenceIds"
+      ],
+      "nodeFields": [
+        "nodeId",
+        "kind",
+        "executorRef",
+        "inputSchema",
+        "outputSchema",
+        "stateReadSet",
+        "stateWriteSet",
+        "timeout",
+        "retry",
+        "idempotencyKeyStrategy",
+        "authorityPolicyRef",
+        "evidenceIds",
+        "verification"
+      ],
+      "note": "v6.0 提示词 §25 的 6D 执行图 IR 契约。它是模型层的契约，不是运行器：MCP 只负责校验与派生，真实执行由获授权的后端负责。",
+      "runFields": [
+        "runId",
+        "workflowId",
+        "workflowVersion",
+        "stateSchemaVersion",
+        "mode",
+        "status",
+        "logicalTime",
+        "currentNodeIds",
+        "pendingEdgeIds",
+        "checkpointId",
+        "actorId",
+        "correlationId",
+        "traceId"
+      ],
+      "stateContract": [
+        "通过版本化 JSON Schema 或等价可机器校验格式定义共享状态，标明字段来源、所有权、可变性和敏感级别。",
+        "执行边传递类型化消息或状态投影；节点只能修改自己获准的状态字段，状态合并冲突必须可检测。",
+        "并行分支必须定义 fan-out、join 条件、状态归并策略及冲突检测，不允许无条件覆盖对方结果。",
+        "状态提交在明确的持久化边界发生，不因“边上有状态”就自动宣称可恢复。"
+      ]
+    },
+    "executionKinds": [
+      {
+        "id": "agent-loop",
+        "label": "智能体循环",
+        "note": "受预算、状态和终止条件约束的 Agent 迭代节点。"
+      },
+      {
+        "id": "deterministic-program",
+        "label": "确定性程序",
+        "note": "由明确定义的程序、纯函数或隔离任务执行的节点。"
+      },
+      {
+        "id": "human-approval",
+        "label": "人工审批",
+        "note": "暂停并等待具权限操作者审批/拒绝/退回的节点。"
+      },
+      {
+        "id": "tool-call",
+        "label": "工具调用",
+        "note": "需校验工具契约和访问权限的外部操作节点。"
+      },
+      {
+        "id": "policy-gate",
+        "label": "策略闸门",
+        "note": "决定路由/审批要求的策略节点。"
+      },
+      {
+        "id": "checkpoint",
+        "label": "检查点",
+        "note": "在关键执行边界提交可恢复快照。"
+      },
+      {
+        "id": "join-fork",
+        "label": "汇合分流",
+        "note": "受控并发启动与结果汇合。"
+      },
+      {
+        "id": "retry-timeout",
+        "label": "重试超时",
+        "note": "可界定的重试、超时和升级机制。"
+      },
+      {
+        "id": "compensation",
+        "label": "补偿",
+        "note": "失败后执行有契约依据的补偿步骤。"
+      },
+      {
+        "id": "end",
+        "label": "结束",
+        "note": "状态/输出被验证后的终止节点。"
+      }
+    ],
+    "executionModes": [
+      {
+        "id": "simulation",
+        "label": "模拟",
+        "note": "默认模式；不得产生真实外部副作用。"
+      },
+      {
+        "id": "dry-run",
+        "label": "预演",
+        "note": "解析执行图但不执行节点。"
+      },
+      {
+        "id": "real",
+        "label": "真实执行",
+        "note": "必须存在已授权的执行后端，否则拒绝。"
+      }
+    ],
     "gwfIr": {
       "designOnlyNodeTypes": [
         "Agent",
-        "HumanApproval"
+        "HumanApproval",
+        "ManualReview",
+        "AgentLoop",
+        "ToolCall"
       ],
       "edgeFields": [
         "edgeId",
@@ -1610,7 +1860,14 @@ export const VOCAB = Object.freeze({
         "priority",
         "errorRoute",
         "verification",
-        "evidenceIds"
+        "evidenceIds",
+        "stateSchemaRef",
+        "stateProjection",
+        "stateMergePolicy",
+        "routingExpression",
+        "deliverySemantics",
+        "resumeBehavior",
+        "policyRef"
       ],
       "edgeTypes": [
         "ControlFlow",
@@ -1619,7 +1876,13 @@ export const VOCAB = Object.freeze({
         "ErrorFlow",
         "ConditionalFlow",
         "CompensationFlow",
-        "Dependency"
+        "Dependency",
+        "StateTransition",
+        "ApprovalTransition",
+        "ToolResult",
+        "RetryTransition",
+        "TimeoutTransition",
+        "ResumeTransition"
       ],
       "nodeFields": [
         "nodeId",
@@ -1639,7 +1902,19 @@ export const VOCAB = Object.freeze({
         "idempotency",
         "implementationRef",
         "evidenceIds",
-        "verification"
+        "verification",
+        "executorKind",
+        "authorityScope",
+        "executionMode",
+        "inputStateSchema",
+        "outputStateSchema",
+        "stateWritePolicy",
+        "checkpointBefore",
+        "checkpointAfter",
+        "budgetPolicy",
+        "iterationLimit",
+        "approvalPolicyRef",
+        "toolContractRef"
       ],
       "nodeTypes": [
         "Start",
@@ -1660,9 +1935,18 @@ export const VOCAB = Object.freeze({
         "Subflow",
         "ErrorHandler",
         "Retry",
-        "Compensation"
+        "Compensation",
+        "DeterministicProgram",
+        "AgentLoop",
+        "ToolCall",
+        "PolicyGate",
+        "Checkpoint",
+        "Resume",
+        "ManualReview",
+        "Escalation",
+        "AuditEvent"
       ],
-      "note": "v5.0 提示词 §17 的字段目录。schema_versioning 为必填；GWF-IR 是规范化中间格式，不得把第三方画布快照当作唯一的工作流真相。",
+      "note": "v6.0 提示词 §17 的字段目录（GWF-IR 6D 扩展）。schema_versioning 为必填；GWF-IR 是规范化中间格式，不得把第三方画布快照当作唯一的工作流真相。",
       "portFields": [
         "portId",
         "direction",
@@ -1676,9 +1960,12 @@ export const VOCAB = Object.freeze({
         "不适用的超时、重试或副作用字段可使用有明确定义的 null/omission 语义。",
         "没有真实执行器的类型标为 Design-only，不得伪称可执行。",
         "ControlFlow、DataFlow、EventFlow、ErrorFlow 等不得混淆。",
-        "GWF-IR 是规范化中间格式，不得把第三方画布快照当作唯一的工作流真相。"
+        "GWF-IR 是规范化中间格式，不得把第三方画布快照当作唯一的工作流真相。",
+        "6D 必须明确定义哪些节点是 agentic、deterministic 或 human-gated，并对每条执行边定义路由、状态投影与约束。",
+        "所有执行状态具有版本化 schema；边上传递的是结构化状态/事件，跨重启的持久化由明确检查点和存储层负责。",
+        "可恢复运行需要 runId、workflowVersion、checkpointId 和幂等策略；断点恢复时拒绝不兼容的工作流版本。"
       ],
-      "version": "0.2.0",
+      "version": "0.3.0",
       "workflowFields": [
         "workflowId",
         "name",
@@ -1691,19 +1978,27 @@ export const VOCAB = Object.freeze({
         "errorPolicy",
         "permissions",
         "evidenceIds",
-        "metadata"
+        "metadata",
+        "executionGraph",
+        "stateSchemaVersion",
+        "checkpointPolicy",
+        "approvalPolicies",
+        "executionCapabilities",
+        "runSecurityPolicy"
       ]
     },
     "id": "workflow-kinds",
     "nodeKinds": [
       {
         "executes": true,
+        "executorClass": "deterministic",
         "id": "task",
         "label": "任务",
         "specType": "Task"
       },
       {
         "executes": false,
+        "executorClass": "routing",
         "id": "decision",
         "label": "判定",
         "note": "必须声明分支条件",
@@ -1711,6 +2006,7 @@ export const VOCAB = Object.freeze({
       },
       {
         "executes": false,
+        "executorClass": "routing",
         "id": "gateway",
         "label": "网关（旧写法）",
         "note": "旧写法。并行拆分用 parallel-fork / parallel-join，汇聚用 parallel-join。",
@@ -1718,18 +2014,21 @@ export const VOCAB = Object.freeze({
       },
       {
         "executes": false,
+        "executorClass": "none",
         "id": "start",
         "label": "开始",
         "specType": "Start"
       },
       {
         "executes": false,
+        "executorClass": "none",
         "id": "end",
         "label": "结束",
         "specType": "End"
       },
       {
         "executes": true,
+        "executorClass": "composite",
         "id": "subprocess",
         "label": "子流程（旧写法）",
         "note": "旧写法，等同 subflow。新写入必须用 subflow。",
@@ -1737,6 +2036,7 @@ export const VOCAB = Object.freeze({
       },
       {
         "executes": false,
+        "executorClass": "none",
         "id": "event",
         "label": "事件",
         "note": "必须声明触发条件",
@@ -1744,6 +2044,7 @@ export const VOCAB = Object.freeze({
       },
       {
         "executes": false,
+        "executorClass": "none",
         "id": "data",
         "label": "数据对象（旧写法）",
         "note": "旧写法。新写入用 data-transform 表达转换，纯数据载体用端口与 dataContract 表达。",
@@ -1751,6 +2052,7 @@ export const VOCAB = Object.freeze({
       },
       {
         "executes": false,
+        "executorClass": "none",
         "id": "input",
         "label": "输入",
         "note": "流程入口数据",
@@ -1758,6 +2060,7 @@ export const VOCAB = Object.freeze({
       },
       {
         "executes": false,
+        "executorClass": "none",
         "id": "output",
         "label": "输出",
         "note": "流程出口数据",
@@ -1765,6 +2068,7 @@ export const VOCAB = Object.freeze({
       },
       {
         "executes": false,
+        "executorClass": "routing",
         "id": "parallel-fork",
         "label": "并行分流",
         "note": "把一条控制流拆成多条并行分支",
@@ -1772,6 +2076,7 @@ export const VOCAB = Object.freeze({
       },
       {
         "executes": false,
+        "executorClass": "routing",
         "id": "parallel-join",
         "label": "并行汇聚",
         "note": "等待多条并行分支汇聚",
@@ -1779,6 +2084,7 @@ export const VOCAB = Object.freeze({
       },
       {
         "executes": false,
+        "executorClass": "deterministic",
         "id": "timer",
         "label": "定时器",
         "note": "必须声明时长与到期后的处理",
@@ -1786,6 +2092,7 @@ export const VOCAB = Object.freeze({
       },
       {
         "executes": false,
+        "executorClass": "deterministic",
         "id": "wait",
         "label": "等待",
         "note": "必须声明等待条件或等待的事件",
@@ -1793,6 +2100,7 @@ export const VOCAB = Object.freeze({
       },
       {
         "executes": true,
+        "executorClass": "agentic",
         "id": "agent",
         "label": "智能体",
         "note": "涉及外部副作用，必须声明权限",
@@ -1800,6 +2108,7 @@ export const VOCAB = Object.freeze({
       },
       {
         "executes": true,
+        "executorClass": "human-gated",
         "id": "human-approval",
         "label": "人工审批",
         "note": "必须声明审批人角色与超时策略",
@@ -1807,6 +2116,7 @@ export const VOCAB = Object.freeze({
       },
       {
         "executes": true,
+        "executorClass": "external",
         "id": "api-call",
         "label": "API 调用",
         "note": "涉及外部副作用，必须声明幂等要求与错误处理",
@@ -1814,6 +2124,7 @@ export const VOCAB = Object.freeze({
       },
       {
         "executes": true,
+        "executorClass": "deterministic",
         "id": "data-transform",
         "label": "数据转换",
         "note": "必须声明输入输出契约，不得编造真实数据值",
@@ -1821,6 +2132,7 @@ export const VOCAB = Object.freeze({
       },
       {
         "executes": true,
+        "executorClass": "composite",
         "id": "subflow",
         "label": "子流程",
         "note": "必须声明被调用的流程 ID",
@@ -1828,6 +2140,7 @@ export const VOCAB = Object.freeze({
       },
       {
         "executes": true,
+        "executorClass": "deterministic",
         "id": "error-handler",
         "label": "错误处理",
         "note": "必须声明捕获的错误类型与处理动作",
@@ -1835,6 +2148,7 @@ export const VOCAB = Object.freeze({
       },
       {
         "executes": true,
+        "executorClass": "deterministic",
         "id": "retry",
         "label": "重试",
         "note": "必须声明次数与退避策略",
@@ -1842,10 +2156,83 @@ export const VOCAB = Object.freeze({
       },
       {
         "executes": true,
+        "executorClass": "deterministic",
         "id": "compensation",
         "label": "补偿",
         "note": "必须声明被补偿的节点或事件",
         "specType": "Compensation"
+      },
+      {
+        "executes": true,
+        "executorClass": "deterministic",
+        "id": "deterministic-program",
+        "label": "确定性程序",
+        "note": "6D：纯函数或隔离任务；必须声明输入输出契约与幂等键策略",
+        "specType": "DeterministicProgram"
+      },
+      {
+        "executes": true,
+        "executorClass": "agentic",
+        "id": "agent-loop",
+        "label": "智能体循环",
+        "note": "6D：必须声明 iterationLimit、budgetPolicy 与终止条件，否则判为无界循环",
+        "specType": "AgentLoop"
+      },
+      {
+        "executes": true,
+        "executorClass": "external",
+        "id": "tool-call",
+        "label": "工具调用",
+        "note": "6D：必须声明 toolContractRef 与 authorityScope，未授权不得发起真实调用",
+        "specType": "ToolCall"
+      },
+      {
+        "executes": false,
+        "executorClass": "routing",
+        "id": "policy-gate",
+        "label": "策略闸门",
+        "note": "6D：必须声明 policyRef，决定路由或审批要求",
+        "specType": "PolicyGate"
+      },
+      {
+        "executes": false,
+        "executorClass": "snapshot",
+        "id": "checkpoint",
+        "label": "检查点",
+        "note": "6D：在关键执行边界提交可恢复快照",
+        "specType": "Checkpoint"
+      },
+      {
+        "executes": false,
+        "executorClass": "routing",
+        "id": "resume",
+        "label": "恢复",
+        "note": "6D：必须声明 runId 与工作流版本，不兼容版本拒绝恢复",
+        "specType": "Resume"
+      },
+      {
+        "executes": true,
+        "executorClass": "human-gated",
+        "id": "manual-review",
+        "label": "人工复核",
+        "note": "6D：人工复核节点，必须声明审批策略与超时处理",
+        "specType": "ManualReview"
+      },
+      {
+        "executes": false,
+        "executorClass": "routing",
+        "id": "escalation",
+        "label": "升级",
+        "note": "6D：把未处理的问题升级到更高权限的处理者",
+        "specType": "Escalation"
+      },
+      {
+        "executes": false,
+        "executorClass": "record",
+        "id": "audit-event",
+        "label": "审计事件",
+        "note": "6D：写入运行审计轨迹，不可改变执行状态",
+        "specType": "AuditEvent"
       }
     ],
     "portCardinalities": [
@@ -1902,13 +2289,29 @@ export const VOCAB = Object.freeze({
         "label": "异常"
       }
     ],
+    "qualityGates": {
+      "honestReporting": "任何受环境限制未执行的功能与测试都必须标明未验证，禁止将演示状态当作真实外部执行。",
+      "note": "v6.0 提示词 quality_gates_6d.reject_on。下列情形必须拒绝，不得放行。",
+      "rejectOn": [
+        "unbounded_agent_loop",
+        "human_approval_bypass",
+        "unvalidated_state_schema",
+        "missing_route_guard",
+        "unsafe_side_effect_replay",
+        "checkpoint_without_state_integrity",
+        "fake_production_execution",
+        "untraceable_decision"
+      ]
+    },
     "rules": [
       "画布坐标、颜色和动画不应决定业务执行语义；所有计算以明确的数据契约为准。",
       "每个工作流节点必须绑定至少一个 canonical nodeId 或声明为纯流程内部元素。",
       "条件流必须带可被程序判断的 condition 表达式，不得只写自然语言。",
-      "新写入必须使用 §17 的规范 id（control-flow / data-flow / event-flow / error-flow / conditional-flow / compensation-flow / dependency）；旧写法只保留兼容读取。",
-      "没有真实执行器的节点类型（agent / human-approval）必须标为 Design-only，不得声称可执行。",
-      "端口必须声明 direction 与 cardinality；跨节点连线必须连到具体的端口（sourcePortId / targetPortId）。"
+      "新写入必须使用 §17 的规范 id（control-flow / data-flow / event-flow / error-flow / conditional-flow / compensation-flow / dependency / state-transition / approval-transition / tool-result / retry-transition / timeout-transition / resume-transition）；旧写法只保留兼容读取。",
+      "没有真实执行器的节点类型（agent / human-approval / manual-review / agent-loop / tool-call）必须标为 Design-only，不得声称可执行。",
+      "端口必须声明 direction 与 cardinality；跨节点连线必须连到具体的端口（sourcePortId / targetPortId）。",
+      "6D：默认运行模式是模拟；真实执行必须存在获授权的执行后端，否则拒绝。",
+      "6D：Agent 循环必须声明 iterationLimit 与 budgetPolicy；人工审批必须有 approvalPolicyRef；工具调用必须有 toolContractRef 与 authorityScope。"
     ],
     "schemaVersion": "0.2.0",
     "title": "工作流语义模型词表（GWF-IR）"

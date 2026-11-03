@@ -48,7 +48,7 @@ CLAUDE_PREFIX = f"mcp__{SERVER_ALIAS}__"  # the longest prefix any of the three 
 CLAUDE_TEXT_LIMIT = 4096                  # Claude Code truncates instructions/descriptions here
 TIMEOUT_S = 180
 
-STATELESS_TOOLS = {"gemarc_5d_guide", "gemarc_brief", "gemarc_contracts", "gemarc_assets", "gemarc_new_model",
+STATELESS_TOOLS = {"gemarc_media_doc_guide", "gemarc_brief", "gemarc_contracts", "gemarc_assets", "gemarc_new_model",
                    "gemarc_validate", "gemarc_simulate", "gemarc_diff", "gemarc_render"}
 WRITE_TOOLS = {"gemarc_scaffold", "gemarc_init", "gemarc_model", "gemarc_build", "gemarc_export"}
 FULL_TOOLS = STATELESS_TOOLS | WRITE_TOOLS | {"gemarc_inspect", "gemarc_plan", "gemarc_verify"}
@@ -243,20 +243,20 @@ async def run_checks(session, init, report: Report, args, workspace: Path):
     uris = sorted(str(r.uri) for r in (await session.list_resources()).resources)
     report.check("resources/list == [gemarc://registry, gemarc://schema/model, gemarc://skill/...]",
                  uris == ["gemarc://registry", "gemarc://schema/model",
-                          "gemarc://skill/gemarc-5d-design",
-                          "gemarc://skill/gemarc-5d-design/references/assemble-site.md"], str(uris))
+                          "gemarc://skill/gemarc-media-doc",
+                          "gemarc://skill/gemarc-media-doc/references/assemble-site.md"], str(uris))
     registry = await session.read_resource("gemarc://registry")
     report.check("resources/read gemarc://registry parses as JSON", bool(json.loads(registry.contents[0].text)))
-    workflow = await session.read_resource("gemarc://skill/gemarc-5d-design")
-    report.check("resources/read gemarc://skill/gemarc-5d-design returns the 5D workflow",
-                 "制作5D设计" in workflow.contents[0].text, f"{len(workflow.contents[0].text)} chars")
-    result, payload, size = await call("gemarc_5d_guide")
-    report.check("gemarc_5d_guide -> ok, carries the workflow",
+    workflow = await session.read_resource("gemarc://skill/gemarc-media-doc")
+    report.check("resources/read gemarc://skill/gemarc-media-doc returns the workflow",
+                 "制作多媒体文档" in workflow.contents[0].text, f"{len(workflow.contents[0].text)} chars")
+    result, payload, size = await call("gemarc_media_doc_guide")
+    report.check("gemarc_media_doc_guide -> ok, carries the workflow",
                  not result.is_error and payload.get("status") == "ok" and payload.get("bytes", 0) > 3000,
                  f"{size} bytes")
     prompts = (await session.list_prompts()).prompts
-    report.check("prompts/list == [gemarc-design]", [p.name for p in prompts] == ["gemarc-design"])
-    prompt = await session.get_prompt("gemarc-design", {"project": "demo"})
+    report.check("prompts/list == [gemarc-media-doc]", [p.name for p in prompts] == ["gemarc-media-doc"])
+    prompt = await session.get_prompt("gemarc-media-doc", {"project": "demo"})
     prompt_text = prompt.messages[0].content.text
     cited = set(re.findall(r"(?<![A-Za-z0-9])gemarc_[a-z0-9][a-z0-9_]*", prompt_text))
     report.check("prompt only cites tools that exist in this toolset", cited <= set(names),

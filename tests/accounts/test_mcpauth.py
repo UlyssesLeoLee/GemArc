@@ -338,7 +338,7 @@ class ScopeGate(ServerCase):
         self.assert_denied(post(self, self.write, self.call("gemarc_model")))
 
     def test_the_read_tool_list_is_pinned_and_matches_the_server_annotations(self):
-        reviewed = {"gemarc_5d_guide", "gemarc_brief", "gemarc_contracts", "gemarc_assets", "gemarc_new_model",
+        reviewed = {"gemarc_media_doc_guide", "gemarc_brief", "gemarc_contracts", "gemarc_assets", "gemarc_new_model",
                     "gemarc_validate", "gemarc_simulate", "gemarc_diff", "gemarc_render", "gemarc_inspect",
                     "gemarc_plan", "gemarc_verify"}
         reviewed_write = {"gemarc_build", "gemarc_export", "gemarc_init", "gemarc_model", "gemarc_scaffold"}

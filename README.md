@@ -81,22 +81,22 @@ Claude Code、Codex、Hermes 的配置容器键名各不相同，下一节与 `i
 - Codex：`codex mcp add gemarc --url 'https://<project>.vercel.app/mcp' --bearer-token-env-var GEMARC_MCP_TOKEN`。
 - Hermes：`hermes mcp add gemarc --url https://<project>.vercel.app/mcp`。
 - claude.ai / Claude Desktop 的远程 connector 只支持 OAuth 或无认证（本仓库未实现 OAuth）：要用就得让部署不设 `GEMARC_MCP_TOKEN`，代价是端点对知道 URL 的人开放。
-- **连上 MCP 就已经具备「制作 5D 设计」的能力**：5D 设计工作流随服务器发布，工具 `gemarc_5d_guide`（或资源 `gemarc://skill/gemarc-5d-design`）就是它，模型按 brief → new_model → 填写 → validate → simulate → render 的顺序执行即可，**不必再单独装 skill**（ADR-012）。
-- `skills/gemarc-5d-design/` 是同一份工作流的独立副本（SKILL.md），用于离线查阅或给不读 MCP 资源的客户端；它与服务器发的那份由 `tests/test_skill_pack.py` 断言不会漂移。
+- **连上 MCP 就已经具备「制作多媒体文档」的能力**：多媒体文档制作流程随服务器发布，工具 `gemarc_media_doc_guide`（或资源 `gemarc://skill/gemarc-media-doc`）就是它，模型按 brief → new_model → 填写 → validate → simulate → render 的顺序执行即可，**不必再单独装 skill**（ADR-012）。
+- `skills/gemarc-media-doc/` 是同一份工作流的独立副本（SKILL.md），用于离线查阅或给不读 MCP 资源的客户端；它与服务器发的那份由 `tests/test_skill_pack.py` 断言不会漂移。
 
 > 上述客户端命令中，只有 Claude Code 加载 `.mcp.json` 并调用本地工具、Codex 的 `mcp add/list/get` 与 `--strict-config`
 > 被实际运行过；Codex 真正调用工具、Hermes、Claude Desktop 未验证（见 `integration-examples/README.md` 矩阵）。
 
 **安全提示**：写权限仅应由本地用户在可信配置中授权。设置 `GEMARC_ALLOW_WRITE=1` 后，允许当前 MCP 客户端调用写入工具；生产环境应增加按调用授权、审计和隔离策略。不要将服务无认证直接暴露到公网。
 
-## 5D 脚手架（固定格式 + 共用代码）
+## 脚手架（固定格式 + 共用代码）
 
-本 MCP 的主要用途是**提供制作 5D 设计的脚手架**：把「可被写死的东西」从大模型手里拿走，
+本 MCP 的主要用途是**提供制作多媒体文档的脚手架**：把「可被写死的东西」从大模型手里拿走，
 模型只填事实。脚手架包含三层固定件：
 
 | 层 | 内容 | 位置 |
 |---|---|---|
-| 契约层 | 8 份 JSON Schema（Canonical Model / Node / Edge / Evidence / Space / View / Scenario / Workflow） | `src/gemarc_mcp/scaffold/contracts/` |
+| 契约层 | 9 份 JSON Schema（Canonical Model / Node / Edge / Evidence / Space / View / Scenario / Workflow / 6D 执行图）+ 1 份执行图示例 | `src/gemarc_mcp/scaffold/contracts/` |
 | 词表层 | 6 级证据等级、21 种实体类型、21 种关系类型、21 种图示类型、相关性分级、空间层级、Case 分类（5 类分诊轴 + 14 种分析类型）、工作流语义（GWF-IR） | `src/gemarc_mcp/scaffold/vocab/` |
 | 运行层 | 图引擎、Focus 退避、3D 空间、4D/5D 仿真、跨视图状态、工作流语义、互操作适配器 | `src/gemarc_mcp/scaffold/runtime/` |
 
@@ -169,7 +169,7 @@ const renderer = createThreeSpaceRenderer(THREE, { container, model, space, stor
 
 ## 远程端点（Vercel）
 
-仓库自带一个 Vercel 部署形态：单个 Python Function 同时提供 MCP Streamable HTTP 端点与 5D 静态站。
+仓库自带一个 Vercel 部署形态：单个 Python Function 同时提供 MCP Streamable HTTP 端点与多媒体架构文档站。
 
 ```powershell
 cd E:\GemArc
@@ -185,7 +185,7 @@ npx vercel@65.8.0 deploy --prod
 | `https://<domain>/mcp` | MCP Streamable HTTP 端点 |
 | `https://<domain>/healthz` | 健康检查与部署状态 |
 | `https://<domain>/` | **MCP 功能微调控制台**（Web 面板：选工具 → 调参数 → 看真实返回；设了令牌时需先粘贴令牌） |
-| `https://<domain>/site/` | 脚手架产出的 5D 架构站（含 3D 适配器，首次访问时从包内源码物化） |
+| `https://<domain>/site/` | 脚手架产出的多媒体架构文档（含 3D 适配器，首次访问时从包内源码物化） |
 | `https://<domain>/kit/static.zip` | 站点**固定件**（外壳 + 共用运行时 + 词表）的确定性压缩包；与 `gemarc_render` 返回的 `data/*.json` 合并即是完整站点 |
 
 主页是**控制台**而不是设计图：远程端点的主角是 MCP 本身。面板里列出的工具、参数表单、
@@ -355,5 +355,20 @@ python -m unittest discover -s tests -v
 > `sourceId`/`targetId`/`type` 时，随附站点的 `app.js` 没有一起更新，
 > 浏览器实测显示它**画出 4 个节点、0 条关系**——仓库里的一切测试都是绿的，站点却是坏的。
 
-完整的 5D 脚手架站（含 3D 适配器）请用 `gemarc build --profile static` 生成；
+完整的多媒体脚手架站（含 3D 适配器）请用 `gemarc build --profile static` 生成；
 远程端点提供的也是这一档（首次访问 `/site/` 时从包内源码物化，见部署文档）。
+
+### 站点外壳的 UI/UX 基线
+
+产出的站点外壳自带下面这些能力，制作多媒体文档时**直接用**，不要手改固定件：
+
+| 能力 | 表现 |
+|---|---|
+| 主要显示内容占比大 | 主栏是主内容区，结构图/时间轴/工作流图是首屏主体 |
+| 窗格可调宽度 | 两侧窗格之间有可拖拽分隔条（双击复位、方向键微调），尺寸存浏览器本地存储 |
+| 窗格可调高度 | 每个内容面板右下角有拖拽手柄，可单独调整宽与高 |
+| 专注模式 | 顶栏「专注」把两侧窗格收成一条窄导航条，主内容占满窗口，页签仍然可达 |
+| 主内容不被挤小 | 主栏有最小宽度下限，两侧窗格各有最小宽度 |
+
+服务器随包发布的那份流程正文把「一轮 UI/UX 优化」列为**硬规则**：每份产出都要按上面这套基线
+复核一遍，并把这一轮做了什么写进最终说明。

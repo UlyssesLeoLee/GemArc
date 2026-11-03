@@ -1,16 +1,16 @@
-"""The 5D design workflow, shipped inside the package and served by the server.
+"""The multimedia document workflow, shipped inside the package and served by the server.
 
-The workflow used to live only in ``skills/gemarc-5d-design/`` at the repository
-root, so a client had to install a separate skill before it could make a 5D
-design. The server now carries the same text inside the wheel
-(``scaffold/skills/gemarc-5d-design/``) and hands it out three ways:
+The workflow used to live only in ``skills/gemarc-media-doc/`` at the repository
+root, so a client had to install a separate skill before it could make a
+multimedia architecture document. The server now carries the same text inside
+the wheel (``scaffold/skills/gemarc-media-doc/``) and hands it out three ways:
 
-* the ``gemarc_5d_guide`` tool - tools are the one channel every client shows
+* the ``gemarc_media_doc_guide`` tool - tools are the one channel every client shows
   to the model, so this is what makes the capability appear on connect;
-* the MCP resource ``gemarc://skill/gemarc-5d-design``;
-* the server instructions and the ``gemarc-design`` prompt, which point at it.
+* the MCP resource ``gemarc://skill/gemarc-media-doc``;
+* the server instructions and the ``gemarc-media-doc`` prompt, which point at it.
 
-``skills/gemarc-5d-design/`` stays the single source of truth. The copy inside
+``skills/gemarc-media-doc/`` stays the single source of truth. The copy inside
 the package is generated from it (``python -m gemarc_mcp.scaffold.skillpack``)
 and ``tests/test_skill_pack.py`` fails when the two drift apart.
 
@@ -31,7 +31,7 @@ SCAFFOLD_ROOT = Path(__file__).resolve().parent
 #: Where the generated copy lives inside the package.
 PACKED_ROOT = SCAFFOLD_ROOT / "skills"
 #: The one skill the server publishes.
-SKILL_NAME = "gemarc-5d-design"
+SKILL_NAME = "gemarc-media-doc"
 
 #: The repository root of an editable checkout (``src/gemarc_mcp/scaffold`` -> repo).
 REPO_ROOT = SCAFFOLD_ROOT.parents[2]
@@ -49,8 +49,8 @@ DEFAULT_SECTION = "workflow"
 
 #: MCP resource URI -> file inside the packed skill.
 RESOURCE_FILES: tuple[tuple[str, str], ...] = (
-    ("gemarc://skill/gemarc-5d-design", "SKILL.md"),
-    ("gemarc://skill/gemarc-5d-design/references/assemble-site.md", "references/assemble-site.md"),
+    ("gemarc://skill/gemarc-media-doc", "SKILL.md"),
+    ("gemarc://skill/gemarc-media-doc/references/assemble-site.md", "references/assemble-site.md"),
 )
 
 _FRONTMATTER = re.compile(r"\A---\r?\n(.*?)\r?\n---\r?\n", re.S)
@@ -69,7 +69,7 @@ def read_bytes(relative: str) -> bytes:
         raw = resources.files("gemarc_mcp").joinpath(
             "scaffold", "skills", SKILL_NAME, relative).read_bytes()
     except (FileNotFoundError, OSError, ModuleNotFoundError) as ex:
-        raise GemArcError("GEMARC_GUIDE_002", f"工作流文件缺失: {relative}") from ex
+        raise GemArcError("GEMARC_GUIDE_002", f"流程正文缺失: {relative}") from ex
     return normalised_bytes(raw)
 
 
@@ -166,7 +166,7 @@ def sync() -> list[Path]:
     """Copy the editable source into the package. Returns the written files."""
     source = source_dir()
     if source is None:
-        raise GemArcError("GEMARC_GUIDE_003", "找不到 skills/gemarc-5d-design 源目录")
+        raise GemArcError("GEMARC_GUIDE_003", "找不到 skills/gemarc-media-doc 源目录")
     target = PACKED_ROOT / SKILL_NAME
     if target.exists():
         shutil.rmtree(target)

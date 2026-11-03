@@ -20,6 +20,11 @@ function asArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+/** An absent or empty value: the alias may fill it. */
+function isEmpty(value) {
+  return value === undefined || value === null || value === '';
+}
+
 function asObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
@@ -54,8 +59,12 @@ export function normalizeModel(model) {
 export function normalizeNode(node) {
   const source = asObject(node);
   // v5.0 §3 names the entity type "type" and the display name "label".
-  const kind = source.kind ?? (typeof source.type === 'string' ? source.type : undefined);
-  const name = source.name ?? (typeof source.label === 'string' ? source.label : undefined);
+  // The alias only fills an *empty* value: an empty string counts as "not
+  // given", which is what the Python normaliser does. The two must agree.
+  let kind = source.kind;
+  if (isEmpty(kind) && typeof source.type === 'string') kind = source.type;
+  let name = source.name;
+  if (isEmpty(name) && typeof source.label === 'string') name = source.label;
   return {
     ...source,
     id: source.id,
@@ -87,11 +96,11 @@ export function normalizeEdge(edge) {
   delete source.kind;
   // v5.0 §17 names the flow direction "direction"; the canonical spelling is
   // the boolean "directed". Read the raw value first: the default must not
-  // shadow the alias.
-  const rawDirected = source.directed;
+  // shadow the alias. A null "directed" counts as "not given".
+  const rawDirected = source.directed ?? undefined;
   const direction = source.direction;
   const directed = rawDirected === undefined
-    ? (typeof direction === 'string' ? direction !== 'undirected' : true)
+    ? (typeof direction === 'string' ? direction !== 'undirected' && direction !== 'both' : true)
     : Boolean(rawDirected);
   return {
     ...source,

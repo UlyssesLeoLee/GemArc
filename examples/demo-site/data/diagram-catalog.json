@@ -28,7 +28,6 @@
       "label": "逻辑视图",
       "missing": [],
       "nodeIds": [
-        "sensor",
         "queue",
         "rule",
         "notify"
@@ -71,7 +70,8 @@
       "uml-use-case"
     ]
   },
-  "note": "missing 列出该图示类型要求、但模型无法提供的保真元素；界面必须标注为缺失，不得伪造。",
+  "note": "missing 列出该图示类型要求、但模型无法提供的保真元素；界面必须标注为缺失，不得伪造。nodeIds / edgeIds 是按运行时同一套规则解析出来的实际选择。unregistered 是声明了未登记的图示类型；undeclared 是没有声明图示类型。",
   "schemaVersion": "0.2.0",
+  "undeclared": [],
   "unregistered": []
 }

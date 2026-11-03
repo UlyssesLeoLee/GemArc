@@ -95,12 +95,56 @@ function renderPrototype(el){clear(el);head('交互式页面原型','UI / MULTI-
  const feedback=node('p','small',content,'可选择下列交互热点，当前为轻量原型组件，不包含 Konva 可视化编辑器。');
  for(const action of pg.actions||[])button(content,action,()=>{feedback.textContent=`已触发原型动作：${action}（演示，不提交实际业务数据）`});
 }
+/* Pane geometry: the side panes are resizable, the main column keeps a floor
+   so the primary content is never squeezed into an unusable strip, and the
+   reader can drop the side panes entirely to give the content the whole
+   window. The sizes live in CSS custom properties and in local storage. */
+const LAYOUT_KEY='gemarc.layout.v1';
+const LAYOUT_DEFAULTS={sidebar:235,inspector:285,focus:false};
+const PANE_LIMITS={sidebar:{min:160,max:520},inspector:{min:200,max:560}};
+const MAIN_MIN=460,GUTTER=8,KEY_STEP=16;
+function readLayout(){try{const raw=window.localStorage.getItem(LAYOUT_KEY);if(!raw)return Object.assign({},LAYOUT_DEFAULTS);
+ const p=JSON.parse(raw);return{sidebar:Number.isFinite(p.sidebar)?p.sidebar:LAYOUT_DEFAULTS.sidebar,inspector:Number.isFinite(p.inspector)?p.inspector:LAYOUT_DEFAULTS.inspector,focus:Boolean(p.focus)};}
+ catch(err){return Object.assign({},LAYOUT_DEFAULTS)}}
+function writeLayout(l){try{window.localStorage.setItem(LAYOUT_KEY,JSON.stringify(l))}catch(err){/* storage refused: the page still works */}}
+function paintLayout(l){const root=document.documentElement;
+ root.style.setProperty('--sidebar-w',l.sidebar+'px');root.style.setProperty('--inspector-w',l.inspector+'px');
+ const main=document.querySelector('main');if(main)main.classList.toggle('focus',Boolean(l.focus));
+ const toggle=document.querySelector('#focus-toggle');if(toggle){toggle.setAttribute('aria-pressed',l.focus?'true':'false');toggle.textContent=l.focus?'退出专注':'专注'}
+ document.querySelectorAll('.splitter').forEach(sp=>{const w=l[sp.dataset.pane];if(Number.isFinite(w))sp.setAttribute('aria-label',(sp.dataset.label||'调整窗格宽度')+'（当前 '+w+' 像素）')})}
+function mainWidth(){const main=document.querySelector('main');return main?main.getBoundingClientRect().width:0}
+function clampPane(pane,value,layout,width){const limits=PANE_LIMITS[pane];const other=pane==='sidebar'?layout.inspector:layout.sidebar;
+ const room=width-MAIN_MIN-other-GUTTER*2;const max=Math.max(limits.min,Math.min(limits.max,room));
+ return Math.round(Math.min(Math.max(value,limits.min),max))}
+function setPaneWidth(pane,value){const layout=readLayout();const next=Object.assign({},layout);next[pane]=clampPane(pane,value,layout,mainWidth());paintLayout(next);return next}
+function wireSplitter(sp,pane){let dragging=false;
+ sp.addEventListener('pointerdown',ev=>{dragging=true;sp.classList.add('dragging');sp.setPointerCapture(ev.pointerId);ev.preventDefault()});
+ sp.addEventListener('pointermove',ev=>{if(!dragging)return;const rect=document.querySelector('main').getBoundingClientRect();
+  const raw=pane==='sidebar'?ev.clientX-rect.left-GUTTER/2:rect.right-ev.clientX-GUTTER/2;setPaneWidth(pane,raw)});
+ const stop=ev=>{if(!dragging)return;dragging=false;sp.classList.remove('dragging');try{sp.releasePointerCapture(ev.pointerId)}catch(err){/* already released */}writeLayout(readLayout())};
+ sp.addEventListener('pointerup',stop);sp.addEventListener('pointercancel',stop);
+ sp.addEventListener('dblclick',()=>{const next=Object.assign({},readLayout());next[pane]=LAYOUT_DEFAULTS[pane];paintLayout(next);writeLayout(next)});
+ sp.addEventListener('keydown',ev=>{const step=ev.shiftKey?KEY_STEP*3:KEY_STEP;const current=readLayout()[pane];let next=null;
+  if(ev.key.startsWith('Arrow')&&ev.key.endsWith('Left'))next=current-step;else if(ev.key.startsWith('Arrow')&&ev.key.endsWith('Right'))next=current+step;
+  else if(ev.key==='Home')next=PANE_LIMITS[pane].min;else if(ev.key==='End')next=PANE_LIMITS[pane].max;
+  else if(ev.key==='Enter'||ev.key===' ')next=LAYOUT_DEFAULTS[pane];
+  if(next===null)return;ev.preventDefault();writeLayout(setPaneWidth(pane,next))})}
+function setupLayout(){paintLayout(readLayout());
+ document.querySelectorAll('.splitter').forEach(sp=>wireSplitter(sp,sp.dataset.pane));
+ const toggle=document.querySelector('#focus-toggle');
+ if(toggle)toggle.addEventListener('click',()=>{const cur=readLayout();const next=Object.assign({},cur,{focus:!cur.focus});paintLayout(next);writeLayout(next)});
+ window.addEventListener('resize',()=>{const cur=readLayout();const width=mainWidth();if(!width)return;
+  let sidebar=cur.sidebar,inspector=cur.inspector;const room=width-MAIN_MIN-GUTTER*2;
+  if(sidebar+inspector>room){const total=sidebar+inspector;const share=total?room/total:0.5;sidebar=Math.round(sidebar*share);inspector=Math.round(inspector*share)}
+  const next=Object.assign({},cur,{sidebar:clampPane('sidebar',sidebar,Object.assign({},cur,{inspector}),width),inspector:clampPane('inspector',inspector,Object.assign({},cur,{sidebar}),width)});
+  paintLayout(next);writeLayout(next)})}
 async function main(){try{
  const [m,c,s]=await Promise.all(['architecture.json','capabilities.json','scenarios.json'].map(x=>fetch('./data/'+x,{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error(x);return r.json()})));
  state.model=m;state.capabilities=c;state.scenarioData=s;
  const evidence=(m.meta||{}).evidenceState||'unknown';$('#evidence').textContent='EVIDENCE · '+evidence.toUpperCase();
  $('#footer').textContent=`GemArc MVP | 模型事实等级: ${evidence} | 3D: ${c.viewer3D} | 4D: ${c.dynamic4D} | 5D: ${c.causal5D}`;
  document.querySelectorAll('#nav button').forEach(btn=>btn.addEventListener('click',()=>showTab(btn.dataset.tab)));
+ setupLayout();
  const requested=location.hash.substring(1);showTab(['1d','2d','3d','4d','5d','prototype'].includes(requested)?requested:'1d');
  }catch(err){$('#content').textContent='加载失败：请使用 python -m http.server 8000 启动本地 HTTP 服务，再访问 http://127.0.0.1:8000/ 。请检查 data/*.json 是否存在。';$('#evidence').textContent='LOAD ERROR';}}
 main();

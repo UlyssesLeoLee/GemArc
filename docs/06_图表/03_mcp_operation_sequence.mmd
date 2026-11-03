@@ -5,8 +5,8 @@ sequenceDiagram
     participant Core as Model Core
     participant Assets as Registry
     participant QA as Validator
-    User->>Host: 生成 5D 设计资料
-    Host->>MCP: guide()（5D 设计工作流，服务器随包发布）
+    User->>Host: 制作多媒体文档
+    Host->>MCP: guide()（多媒体文档制作流程，服务器随包发布）
     MCP-->>Host: 逐步工作流（硬规则 + 工具顺序）
     Host->>MCP: inspect(sources)
     MCP->>Core: extractEvidence()

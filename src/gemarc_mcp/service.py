@@ -113,7 +113,7 @@ def plan(ws: Workspace, name: str, goals: list[str] | None = None) -> dict:
         gaps.append("缺少动态/因果场景，4D/5D 只能标示不可用")
     if model.get("meta", {}).get("evidenceState") != "confirmed":
         gaps.append("存在未确认的事实，严禁标记为已验证架构")
-    return {"status": "ok", "goals": goals or ["5D设计资料"], "views": [x.get("id") for x in model.get("views", [])],
+    return {"status": "ok", "goals": goals or ["多媒体文档资料"], "views": [x.get("id") for x in model.get("views", [])],
             "dimensions": {"1D": True, "2D": True, "3D": "legacy adapter optional", "4D": bool(model.get("scenarios")),
                            "5D": bool(model.get("scenarios"))}, "gaps": gaps}
 
@@ -127,7 +127,7 @@ def assets(query: str = "") -> dict:
 
 
 def guide(topic: str = "") -> dict:
-    """The 5D design workflow the server ships, as a tool result.
+    """The multimedia document workflow the server ships, as a tool result.
 
     The server carries the workflow inside the package, so a client that can
     only call tools - which is every client - already has the whole procedure
@@ -149,9 +149,9 @@ def guide(topic: str = "") -> dict:
         "content": text,
         "bytes": len(raw),
         "sha256": skillpack.digest(raw),
-        "source": "gemarc://skill/gemarc-5d-design",
+        "source": "gemarc://skill/gemarc-media-doc",
         "sections": skillpack.manifest(),
-        "notice": "本工作流随服务器发布：客户端连上 MCP 即已具备制作 5D 设计的能力，无需另外安装 skill；"
+        "notice": "本流程随服务器发布：客户端连上 MCP 即已具备制作多媒体文档的能力，无需另外安装 skill；"
                   "文中出现的工具名以本服务器注册的工具为准。",
     }
 
@@ -174,11 +174,11 @@ def brief(project: str = "", section: str = "", stateless: bool = False) -> dict
         "vocabDigest": sync.vocab_digest(),
         "project": project or None,
         "purpose": (
-            "用固定的架构模型与既成的引擎，产出可审查的 0D–5D 架构站点。"
+            "用固定的架构模型与既成的引擎，产出可审查的 0D–6D 多媒体架构文档。"
             "不要重新发明引擎、字段名或算法；只填事实，并把缺失如实标注为缺失。"
         ),
         "procedure": [
-            "0. gemarc_5d_guide 取得服务器自带的完整 5D 设计工作流（首次做 5D 设计时先读它）。",
+            "0. gemarc_media_doc_guide 取得服务器自带的完整制作流程（第一次做多媒体文档时先读它）。",
             "1. 读 scaffold-manifest.json 与 FILL-IN.md，确认槽位清单。",
             "2. 读 contracts/*.schema.json 确定每个对象该长什么样；读 vocab/*.json 确认允许哪些词。",
             "3. 填写 model/architecture.json 的槽位。证据必须能指回真实来源；指不回去就标 Unknown。",
@@ -246,14 +246,14 @@ def brief(project: str = "", section: str = "", stateless: bool = False) -> dict
             "vocabularies": sorted(p.name for p in builder.VOCAB_DIR.glob("*.json")),
             "runtime": "图引擎 / Focus 退避 / 3D 空间 / 4D-5D 仿真 / 跨视图状态 / 工作流语义 / 互操作适配器",
             "site": "两套交付 profile 共用一份应用源码：static 零构建、vite 为 npm 工程",
-            "workflow": "5D 设计完整工作流随服务器发布：gemarc_5d_guide / gemarc://skill/gemarc-5d-design",
+            "workflow": "制作多媒体文档的完整流程随服务器发布：gemarc_media_doc_guide / gemarc://skill/gemarc-media-doc",
         },
     }
     if stateless:
         # A remote deployment has no workspace: the work order must only name
         # tools that exist there, and must not tell the model to run local CLIs.
         payload["procedure"] = [
-            "0. gemarc_5d_guide 取得服务器自带的完整 5D 设计工作流（首次做 5D 设计时先读它）。",
+            "0. gemarc_media_doc_guide 取得服务器自带的完整制作流程（第一次做多媒体文档时先读它）。",
             "1. gemarc_brief 取得规则与词表；需要完整契约时用 gemarc_contracts。",
             "2. gemarc_new_model 取得空骨架；用你自己对用户仓库的访问能力读取事实并填写槽位。",
             "3. 证据必须能指回真实来源；指不回去就标 Unknown，不要编造。",
@@ -261,6 +261,8 @@ def brief(project: str = "", section: str = "", stateless: bool = False) -> dict
             "（strict 要求节点和边有已实现或已观测的证据，标 Unknown/Hypothetical 的事实必然不过，不要为此改证据等级）。",
             "5. gemarc_simulate(model=…, scenario_id=…, compare_baseline=true) 核对 4D/5D 场景。",
             "6. gemarc_render(model=…) 取得 data/*.json 与固定件下载地址，在本地合并成站点。",
+            "7. 按流程里的 UI/UX 基线复核一遍：主内容是否突出、两侧窗格与内容面板是否可调宽高、"
+            "主内容区会不会被挤小；把这一轮做了什么写进最终说明。",
         ]
         payload["commands"] = {"render": "gemarc_render", "kit": "/kit/static.zip",
                                "note": "远程端点无状态：模型每次随调用传入，服务端不保存任何项目。"}
@@ -412,6 +414,10 @@ def build(ws: Workspace, name: str, legacy_dist: str | None = None, profile: str
             for relative, payload in derive.derived_files(canonical).items():
                 atomic_json(stage / relative, payload)
             atomic_json(stage / "data" / "workflow-schema.json", derive.workflow_schema())
+            # The 6D execution graph contract (v6.0 §25) and its example travel
+            # with the model-independent parts of every profile.
+            atomic_json(stage / "data" / "execution-graph.schema.json", derive.execution_graph_schema())
+            atomic_json(stage / "data" / "execution-graph.example.json", derive.execution_graph_example())
         else:
             from .scaffold import builder
             builder.build_site(stage, canonical, profile, precomputed, None)

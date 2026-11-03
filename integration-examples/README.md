@@ -14,7 +14,7 @@
 
 | 客户端 | stdio（本地） | 远程 + Bearer | 远程 无认证 / OAuth | tools | resources | prompts | skills |
 |---|---|---|---|---|---|---|---|
-| Claude Code | **RAN**：配置展开、启动服务器、调用成功 | DOCS（`--header`）；`claude mcp add` 写入配置 **RAN**；连接 UNVERIFIED | 无认证 DOCS；OAuth 本仓库未实现 | **RAN**（stdio 调 `gemarc_new_model`） | DOCS（`@gemarc:gemarc://registry`） | DOCS（`/mcp__gemarc__gemarc-design`） | UNVERIFIED |
+| Claude Code | **RAN**：配置展开、启动服务器、调用成功 | DOCS（`--header`）；`claude mcp add` 写入配置 **RAN**；连接 UNVERIFIED | 无认证 DOCS；OAuth 本仓库未实现 | **RAN**（stdio 调 `gemarc_new_model`） | DOCS（`@gemarc:gemarc://registry`） | DOCS（`/mcp__gemarc__gemarc-media-doc`） | UNVERIFIED |
 | Claude Desktop | UNVERIFIED（配置 JSON 语法 RAN） | UNVERIFIED（静态 header 仅 beta，DOCS） | 无认证 DOCS | UNVERIFIED | UNVERIFIED | UNVERIFIED | UNVERIFIED |
 | claude.ai / API connector | 不适用 | UNVERIFIED（静态 header 仅 beta，DOCS） | 无认证 DOCS；API connector 仅 tools、token 须为 OAuth（DOCS） | UNVERIFIED | UNVERIFIED（API connector 不支持，DOCS） | UNVERIFIED（API connector 不支持，DOCS） | UNVERIFIED |
 | OpenAI Codex | 配置被 `--strict-config` 接受、`codex mcp add/list/get/remove` **RAN**；启动服务器 UNVERIFIED | SOURCE（`bearer_token_env_var`）；配置解析 **RAN** | SOURCE | SOURCE | SOURCE（仅内置 list/read 工具） | SOURCE（被忽略） | UNVERIFIED |

@@ -23,8 +23,9 @@
 | ADR-009 | 远程部署使用无状态工具集（9 个只读工具，模型内联传入） | 建议采纳（已实现） | Vercel 无持久文件系统、无调用者身份 |
 | ADR-010 | 远程端点：可选 Bearer token，未设置则无认证；GET `/mcp` 返回 405 | 建议采纳（实现见 `api/index.py`，本文未随该文件验证） | claude.ai / Desktop 无法携带静态 Bearer；Codex 把 404 当作会话过期 |
 | ADR-011 | 工具结果不返回 `structuredContent`，不声明 `outputSchema` | 建议采纳（已实现） | Codex 用 `structuredContent` 替换 `content`；Hermes 去重并忽略 `outputSchema` |
-| ADR-012 | 5D 设计工作流随服务器发布（工具 `gemarc_5d_guide` + 2 个资源），连上 MCP 即具备该能力 | 建议采纳（已实现） | 「导入 MCP」就该能用，不该再要求单独装 skill；工具是所有客户端都会交给模型的那条通道 |
+| ADR-012 | 多媒体文档制作流程随服务器发布（工具 `gemarc_media_doc_guide` + 2 个资源），连上 MCP 即具备该能力 | 建议采纳（已实现） | 「导入 MCP」就该能用，不该再要求单独装 skill；工具是所有客户端都会交给模型的那条通道 |
 | ADR-013 | 采纳 v5.0 规格的模型层要求（词表、Schema 字段、GWF-IR、§25 输出文件），新增字段一律可选增量 | 建议采纳（已实现） | 规格逐条列出的字段与枚举必须能被表达，否则「按规格实现」无从谈起 |
+| ADR-014 | 命令改名：制作多媒体文档（原「5D 设计」），并采纳 v6.0 规格的 6D 执行图层；制作流程新增 UI/UX 一轮优化的硬规则 | 建议采纳（已实现） | 模型已覆盖 0D–6D，命令名再绑维度就是过期信息；「能妥善实现」必须包含做出来好不好读 |
 
 ### ADR-008 工具名：`gemarc_` 前缀 + `[a-z0-9_]`
 
@@ -50,11 +51,11 @@
 - **原因**：Codex 一旦看到 `structuredContent` 就用它**替换** `content` 给模型；Hermes 对内容相同的 `content` 与 `structuredContent` 去重并忽略 `outputSchema`。只给 `content` 在三者上表现一致，同一份 JSON 无需发两份。
 - **后果**：没有机器可校验的输出 schema，输出形状由 `docs/03_详细设计/02_MCP工具详细契约.md` 与测试约束；将来若引入 `structuredContent`，必须先在 Codex 上验证模型看到的内容。
 
-### ADR-012 5D 设计工作流由服务器随包发布
+### ADR-012 多媒体文档制作流程由服务器随包发布
 
-- **决策**：工作流的正本仍是仓库里的 `skills/gemarc-5d-design/`，但它会**生成一份副本**进包内 `src/gemarc_mcp/scaffold/skills/gemarc-5d-design/`（`python -m gemarc_mcp.scaffold.skillpack`，`tests/test_skill_pack.py` 断言两者不会漂移、且 package-data 覆盖每个打包文件）。服务器以三条通道把它发出：工具 `gemarc_5d_guide`（`full` 与 `stateless` 都有）、资源 `gemarc://skill/gemarc-5d-design` 与 `gemarc://skill/gemarc-5d-design/references/assemble-site.md`；服务器 instructions 与提示词 `gemarc-design` 都指向它，`gemarc_brief` 的 procedure 第 0 步也是它。
+- **决策**：工作流的正本仍是仓库里的 `skills/gemarc-media-doc/`，但它会**生成一份副本**进包内 `src/gemarc_mcp/scaffold/skills/gemarc-media-doc/`（`python -m gemarc_mcp.scaffold.skillpack`，`tests/test_skill_pack.py` 断言两者不会漂移、且 package-data 覆盖每个打包文件）。服务器以三条通道把它发出：工具 `gemarc_media_doc_guide`（`full` 与 `stateless` 都有）、资源 `gemarc://skill/gemarc-media-doc` 与 `gemarc://skill/gemarc-media-doc/references/assemble-site.md`；服务器 instructions 与提示词 `gemarc-media-doc` 都指向它，`gemarc_brief` 的 procedure 第 0 步也是它。
 - **原因**：客户端在「连上 MCP」这一步就该拿到模型需要的一切，不该再要求用户去装一个 skill。而**工具**是唯一所有客户端都会交给模型的通道：Codex 忽略 prompt，Claude API 的 MCP connector 只支持 tools，部分客户端（例如 MCode）根本不暴露 resources——只放资源的话，这些客户端读不到那份工作流。
-- **后果**：v1 工具面从 16/8 变成 17/9，`tests/atlas/test_atlas_v1_frozen.py` 的 pin 按该文件自述的「v1 刻意变更」通道在同一提交内更新（ADR 与 pin 同提交）。文档、集成示例与用户侧白名单（Claude 的 `permissions.allow`、Codex 的 `enabled_tools`）同步更新。`.vercelignore` 仍排除 `/skills`，但打包副本在 `src/` 下面，随部署上传。工作流文本以服务器那份为准；单独安装的 skill 只是同一份文本的离线拷贝。
+- **后果**：v1 工具面从 16/8 变成 17/9，`tests/atlas/test_atlas_v1_frozen.py` 的 pin 按该文件自述的「v1 刻意变更」通道在同一提交内更新（ADR 与 pin 同提交）。文档、集成示例与用户侧白名单（Claude 的 `permissions.allow`、Codex 的 `enabled_tools`）同步更新。`.vercelignore` 仍排除 `/skills`，但打包副本在 `src/` 下面，随部署上传。工作流以服务器那份为准；单独安装的 skill 只是同一份文本的离线拷贝。
 
 ### ADR-013 采纳 v5.0 规格的模型层要求
 
@@ -71,6 +72,29 @@
   - 覆盖由 `tests/test_v5_spec_coverage.py` 钉住：规格里的字段与枚举被原样抄进测试，规格变了而 MCP 没跟上就红。
   - 派生文件一律「缺了就标 missing，不伪造」：图示保真元素缺失写进 `diagram-catalog.json` 的 `missing`，空间缺失写进 `spatial-layout.json` 的 `missing`，GWF-IR 不合法写进 `workflow-ir.json` 的 `issues`。
   - 规格 §25 给目标工程定的图示清单文件名属于参考系统，在本仓库的哈希禁词表上，因此 MCP 侧改用 `diagram-catalog.json`；详见 `08_附录/04_v5.0实施缺陷提交单.md` 的 D-05。
+
+### ADR-014 命令改名「制作多媒体文档」，并采纳 v6.0 的 6D 执行图层
+
+- **决策（一）改名**：命令面不再叫「5D 设计」。模型覆盖 0D–6D 之后，把命令名绑在某一个维度上就是过期信息。
+  - 工具 `gemarc_5d_guide` → `gemarc_media_doc_guide`（标题 `Multimedia document workflow`）。
+  - 资源 `gemarc://skill/gemarc-5d-design` → `gemarc://skill/gemarc-media-doc`（两条资源同步）。
+  - 提示词 `gemarc-design` → `gemarc-media-doc`；技能目录 `skills/gemarc-5d-design/` → `skills/gemarc-media-doc/`（包内副本同名，`python -m gemarc_mcp.scaffold.skillpack` 生成）。
+  - 站点品牌行与标题：`5D Architecture` → `多媒体架构文档`（`static` 与 `vite` 两套外壳，以及随包发布的 `mvp` 预览）。
+  - 服务器 `INSTRUCTIONS` 与工具描述：`0D-5D architecture site` / `make a 5D design` → `0D-6D multimedia architecture document` / `make a multimedia document`，并把新触发词与旧触发词并列写进同一段。
+  - 随包产物里的命令面命名：`templates/vite/package.json` 的 `name` → `gemarc-media-doc-site`；本地工作流的输出目录示例（`docs/08_附录/gemarc.config.example.yaml`、`docs/08_附录/examples/output-layout.txt`）→ `gemarc-media-doc-output`；`gemarc_plan` 的默认 `goals` → `多媒体文档资料`。
+  - **旧说法仍然受理**：用户说「制作5D设计」「5D 架构模型」时照样走这条命令，触发词写进了技能描述。改名改的是命令名，不是能力。
+- **决策（二）v6.0 的 6D 执行图层**：按 v6.0 规格补齐模型层要求，同样**一律可选增量**：
+  - 词表：`workflow-kinds` 的节点类型 19 → 28、边类型 7 → 13，新增 `executionKinds` / `executionModes` / `executionGraph`（字段目录 + `state_contract` + `compiler_gates`）与 `qualityGates`；`case-types` 新增 `compositionModes` 与 `illustrativeCompositions`。
+  - 契约：新增 `execution-graph.schema.json`（§25 的执行图节点/边契约）与 `execution-graph.example.json`（示例数据，验证等级全为 Hypothetical、证据为空），两者随固定件发布。
+  - 派生：`data/workflow-ir.json` 输出 §18 的 6D 字段、每工作流的 `gates` 与顶层 `gates`。
+  - 校验：8 条 6D 质量门（`GEMARC_EXEC_001`…`008`）**只对声明了执行图的工作流生效**（有 6D 专属字段或 6D 专属节点/边种类）；纯 5D 设计画布不受约束。
+- **决策（三）制作流程新增 UI/UX 一轮优化的硬规则**：产出多媒体文档时必须做一轮 UI/UX 复核——主要显示内容重点突出、占比大；主要内容显示区域不得被挤小；各个窗格可调宽高。固定件外壳据此实现：两侧窗格之间有可拖拽分隔条（宽度）、内容面板右下角有拖拽手柄（宽与高）、顶栏有「专注」开关收起两侧窗格，主栏有最小宽度下限；尺寸写入浏览器本地存储。能力由固定件提供，流程只要求**用它**，不改固定件。
+- **原因**：命令名是用户看到的第一眼信息，绑在一个已经走完的维度上会持续误导；6D 的执行图必须能被表达、被校验，否则「按 v6.0 实现」只是口号；而「做得出来」不等于「读得下去」——主内容被两侧窗格挤成一条窄缝时，再准的事实也没人看。
+- **后果**：
+  - 工具面与词表变动 ⇒ `tests/atlas/test_atlas_v1_frozen.py` 的 pin（工具名、词表哈希与摘要）按同文件自述的通道在同一提交内更新。
+  - 覆盖由 `tests/test_v5_spec_coverage.py` 钉住：6D 字段、8 条质量门、Python 与浏览器运行时的对拍、文档数字绑定各有断言。
+  - 随包发布的预览站按真实构建路径重新生成（`gemarc build --profile mvp`），`tests/test_generated_artifacts.py` 逐字节比对。
+  - ADR-008 的约定继续适用：旧名只允许出现在记录改名的这一条里。
 
 ## 变更流程
 

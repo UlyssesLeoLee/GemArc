@@ -335,7 +335,7 @@ python -m gemarc_mcp.accounts admin revoke --email x@y.com # 撤销运行时授�
 
 | 工具 | 说明 |
 |---|---|
-| `gemarc_5d_guide` | 服务器随包发布的**完整 5D 设计工作流**（ADR-012）：客户端连上即具备「制作 5D 设计」的能力，不必另装 skill |
+| `gemarc_media_doc_guide` | 服务器随包发布的**完整 多媒体文档制作流程**（ADR-012）：客户端连上即具备「制作多媒体文档」的能力，不必另装 skill |
 | `gemarc_brief` `gemarc_contracts` `gemarc_assets` | 工作指令、契约/词表、组件注册表，读取包内文件，不依赖工作区 |
 | `gemarc_new_model` | 返回空骨架模型与槽位清单 |
 | `gemarc_validate` `gemarc_simulate` `gemarc_diff` | 模型通过 `model` 参数**内联**传入；也接受 `project="demo"`（冷启动时植入的示例项目），让第一次试用的人不必先准备模型 |
@@ -531,9 +531,9 @@ curl.exe -I https://<domain>/kit/static.zip              # 期望：200，ETag�
    官方 MCP 客户端握手（协议 `2025-11-25`，8 个工具）、流量后 session manager 仍在运行。
 
 > **时间注记**：上面这段是 **2026-10-30** 那次部署的实测记录，数字按当时的工具面写（8 个工具、2 个资源）。
-> 之后 v1 在 ADR-012 里刻意新增了 `gemarc_5d_guide`（服务器随包发布 5D 设计工作流），当前工具面是
-> stateless 9 个工具 / 4 个资源（`gemarc://skill/gemarc-5d-design` 与
-> `gemarc://skill/gemarc-5d-design/references/assemble-site.md`）。这段记录不改写，新部署请以当前工具面为准。
+> 之后 v1 在 ADR-012 里刻意新增了 `gemarc_media_doc_guide`（服务器随包发布 多媒体文档制作流程），当前工具面是
+> stateless 9 个工具 / 4 个资源（`gemarc://skill/gemarc-media-doc` 与
+> `gemarc://skill/gemarc-media-doc/references/assemble-site.md`）。这段记录不改写，新部署请以当前工具面为准。
 
 副作用（须知）：`vercel curl` 首次运行时**自动在项目里创建了 "Protection Bypass for Automation" 密钥**；不需要时可在项目
 Settings → Deployment Protection 撤销。`vercel link` 会生成含 `VERCEL_OIDC_TOKEN` 的 `.env.local`（已被 `.gitignore` 与 `.vercelignore` 排除，用完应删除）。

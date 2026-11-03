@@ -225,7 +225,7 @@ def _commands(profile: str) -> dict:
 
 def build_site(target: Path, model: dict, profile: str, scenarios: dict | None = None,
                capabilities: dict | None = None) -> list[str]:
-    """Materialise a runnable 5D site into ``target``.
+    """Materialise a runnable multimedia document site into ``target``.
 
     Used by ``gemarc_build`` when the caller asks for the ``static`` or the
     ``vite`` profile. The output is a self-contained project: the site shell,
@@ -251,8 +251,11 @@ def build_site(target: Path, model: dict, profile: str, scenarios: dict | None =
     for relative, payload in derive.derived_files(model).items():
         _write_json(target / relative, payload)
     # The GWF-IR schema depends on the vocabulary, not on the model: it is a
-    # fixed part and travels inside the site kit.
+    # fixed part and travels inside the site kit. The same holds for the 6D
+    # execution graph contract (v6.0 §25) and its example.
     _write_json(target / "data" / "workflow-schema.json", derive.workflow_schema())
+    _write_json(target / "data" / "execution-graph.schema.json", derive.execution_graph_schema())
+    _write_json(target / "data" / "execution-graph.example.json", derive.execution_graph_example())
     return written
 
 

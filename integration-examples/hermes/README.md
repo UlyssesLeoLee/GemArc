@@ -56,15 +56,15 @@ hermes mcp remove gemarc
 
 ## 安装 Skill（可选）
 
-**连上本服务器就已经具备制作 5D 设计的能力**：工作流随服务器发布，工具 `gemarc_5d_guide`（或资源 `gemarc://skill/gemarc-5d-design`）就是它。装 skill 只是为了离线查阅同一份文本。
+**连上本服务器就已经具备制作多媒体文档的能力**：工作流随服务器发布，工具 `gemarc_media_doc_guide`（或资源 `gemarc://skill/gemarc-media-doc`）就是它。装 skill 只是为了离线查阅同一份文本。
 
-`skills/gemarc-5d-design/` 符合 agentskills.io 规则（`name` 与目录名一致、`description` ≤ 1024 字符、`SKILL.md` < 500 行；`tests/test_tool_surface_docs.py` 检查 **[RAN]**）。Hermes 的 skill 目录是 `$HERMES_HOME/skills/<name>/SKILL.md` **[SOURCE]**：
+`skills/gemarc-media-doc/` 符合 agentskills.io 规则（`name` 与目录名一致、`description` ≤ 1024 字符、`SKILL.md` < 500 行；`tests/test_tool_surface_docs.py` 检查 **[RAN]**）。Hermes 的 skill 目录是 `$HERMES_HOME/skills/<name>/SKILL.md` **[SOURCE]**：
 
 ```powershell
-Copy-Item -Recurse D:\GemArc\skills\gemarc-5d-design "$env:LOCALAPPDATA\hermes\skills\"
+Copy-Item -Recurse D:\GemArc\skills\gemarc-media-doc "$env:LOCALAPPDATA\hermes\skills\"
 ```
 
-或者仓库放到 GitHub 后：`hermes skills install <owner>/<repo>/skills/gemarc-5d-design` **[SOURCE]**。Hermes 是否真的发现并使用这个 skill **[UNVERIFIED]**。
+或者仓库放到 GitHub 后：`hermes skills install <owner>/<repo>/skills/gemarc-media-doc` **[SOURCE]**。Hermes 是否真的发现并使用这个 skill **[UNVERIFIED]**。
 
 ## 还没验证的
 

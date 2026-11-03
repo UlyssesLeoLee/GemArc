@@ -26,7 +26,7 @@ from gemarc_mcp import server  # noqa: E402
 CONTRACT_DOC = REPO_ROOT / "docs" / "03_详细设计" / "02_MCP工具详细契约.md"
 ADR_DOC = REPO_ROOT / "docs" / "05_项目管理" / "04_配置变更与ADR.md"
 EXAMPLES = REPO_ROOT / "integration-examples"
-SKILL_DIR = REPO_ROOT / "skills" / "gemarc-5d-design"
+SKILL_DIR = REPO_ROOT / "skills" / "gemarc-media-doc"
 
 LEGACY_NAME = re.compile(
     r"gemarc\.(?:inspect|plan|assets|contracts|brief|scaffold|init|model|validate|build|"

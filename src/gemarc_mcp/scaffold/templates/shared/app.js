@@ -247,6 +247,183 @@ function renderInspector() {
   for (const child of spec.body) renderTree(child, area);
 }
 
+/* ------------------------------------------------------------------ layout */
+
+/**
+ * Pane geometry: the side panes are resizable, the main column keeps a floor
+ * so the primary content is never squeezed into an unusable strip, and the
+ * reader can drop the side panes entirely to give the content the whole
+ * window.
+ *
+ * The sizes live in CSS custom properties, so the layout is a stylesheet
+ * decision and the behaviour here only moves the numbers.
+ */
+const LAYOUT_KEY = 'gemarc.layout.v1';
+const LAYOUT_DEFAULTS = { sidebar: 232, inspector: 300, focus: false };
+const PANE_LIMITS = {
+  sidebar: { min: 160, max: 520 },
+  inspector: { min: 200, max: 560 },
+};
+const MAIN_MIN = 480;
+const GUTTER = 8;
+const KEY_STEP = 16;
+
+function readLayout() {
+  try {
+    const raw = window.localStorage.getItem(LAYOUT_KEY);
+    if (!raw) return { ...LAYOUT_DEFAULTS };
+    const parsed = JSON.parse(raw);
+    return {
+      sidebar: Number.isFinite(parsed.sidebar) ? parsed.sidebar : LAYOUT_DEFAULTS.sidebar,
+      inspector: Number.isFinite(parsed.inspector) ? parsed.inspector : LAYOUT_DEFAULTS.inspector,
+      focus: Boolean(parsed.focus),
+    };
+  } catch (error) {
+    return { ...LAYOUT_DEFAULTS };
+  }
+}
+
+function writeLayout(layout) {
+  try {
+    window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
+  } catch (error) {
+    // A browser that refuses storage (private mode) still gets a working page.
+  }
+}
+
+function paintLayout(layout) {
+  const root = document.documentElement;
+  root.style.setProperty('--sidebar-w', `${layout.sidebar}px`);
+  root.style.setProperty('--inspector-w', `${layout.inspector}px`);
+  const main = document.querySelector('main');
+  if (main) main.classList.toggle('focus', Boolean(layout.focus));
+  const toggle = document.querySelector('#focus-toggle');
+  if (toggle) {
+    toggle.setAttribute('aria-pressed', layout.focus ? 'true' : 'false');
+    toggle.textContent = layout.focus ? '退出专注' : '专注';
+  }
+  document.querySelectorAll('.splitter').forEach((splitter) => {
+    const pane = splitter.dataset.pane;
+    const width = layout[pane];
+    if (Number.isFinite(width)) {
+      splitter.setAttribute('aria-label', `${splitter.dataset.label || '调整窗格宽度'}（当前 ${width} 像素）`);
+    }
+  });
+}
+
+/** Keep the main column above its floor: the side panes give up space first. */
+function clampPane(pane, value, layout, mainWidth) {
+  const limits = PANE_LIMITS[pane];
+  const other = pane === 'sidebar' ? layout.inspector : layout.sidebar;
+  const roomForMain = mainWidth - MAIN_MIN - other - GUTTER * 2;
+  const max = Math.max(limits.min, Math.min(limits.max, roomForMain));
+  return Math.round(Math.min(Math.max(value, limits.min), max));
+}
+
+function mainWidth() {
+  const main = document.querySelector('main');
+  return main ? main.getBoundingClientRect().width : 0;
+}
+
+function setPaneWidth(pane, value, layout) {
+  const width = clampPane(pane, value, layout, mainWidth());
+  const next = { ...layout, [pane]: width };
+  paintLayout(next);
+  return next;
+}
+
+function wireSplitter(splitter, pane) {
+  const layout = readLayout();
+  let dragging = false;
+
+  splitter.addEventListener('pointerdown', (event) => {
+    dragging = true;
+    splitter.classList.add('dragging');
+    splitter.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+  splitter.addEventListener('pointermove', (event) => {
+    if (!dragging) return;
+    const rect = document.querySelector('main').getBoundingClientRect();
+    const raw = pane === 'sidebar'
+      ? event.clientX - rect.left - GUTTER / 2
+      : rect.right - event.clientX - GUTTER / 2;
+    setPaneWidth(pane, raw, readLayout());
+  });
+  const stop = (event) => {
+    if (!dragging) return;
+    dragging = false;
+    splitter.classList.remove('dragging');
+    try { splitter.releasePointerCapture(event.pointerId); } catch (error) { /* already released */ }
+    writeLayout(readLayout());
+  };
+  splitter.addEventListener('pointerup', stop);
+  splitter.addEventListener('pointercancel', stop);
+
+  splitter.addEventListener('dblclick', () => {
+    const next = { ...readLayout(), [pane]: LAYOUT_DEFAULTS[pane] };
+    paintLayout(next);
+    writeLayout(next);
+  });
+
+  splitter.addEventListener('keydown', (event) => {
+    const step = event.shiftKey ? KEY_STEP * 3 : KEY_STEP;
+    const current = readLayout()[pane];
+    let next = null;
+    if (event.key.startsWith('Arrow') && event.key.endsWith('Left')) next = current - step;
+    else if (event.key.startsWith('Arrow') && event.key.endsWith('Right')) next = current + step;
+    else if (event.key === 'Home') next = PANE_LIMITS[pane].min;
+    else if (event.key === 'End') next = PANE_LIMITS[pane].max;
+    else if (event.key === 'Enter' || event.key === ' ') next = LAYOUT_DEFAULTS[pane];
+    if (next === null) return;
+    event.preventDefault();
+    const nextLayout = setPaneWidth(pane, next, readLayout());
+    writeLayout(nextLayout);
+  });
+}
+
+function setupLayout() {
+  const layout = readLayout();
+  paintLayout(layout);
+
+  document.querySelectorAll('.splitter').forEach((splitter) => {
+    wireSplitter(splitter, splitter.dataset.pane);
+  });
+
+  const toggle = document.querySelector('#focus-toggle');
+  if (toggle) {
+    toggle.addEventListener('click', () => {
+      const next = { ...readLayout(), focus: !readLayout().focus };
+      paintLayout(next);
+      writeLayout(next);
+    });
+  }
+
+  // A narrower window cannot hold the same three panes: give the room back
+  // to the main column instead of letting the layout overflow.
+  window.addEventListener('resize', () => {
+    const current = readLayout();
+    const width = mainWidth();
+    if (!width) return;
+    let sidebar = current.sidebar;
+    let inspector = current.inspector;
+    const room = width - MAIN_MIN - GUTTER * 2;
+    if (sidebar + inspector > room) {
+      const total = sidebar + inspector;
+      const share = total ? room / total : 0.5;
+      sidebar = Math.round(sidebar * share);
+      inspector = Math.round(inspector * share);
+    }
+    const next = {
+      ...current,
+      sidebar: clampPane('sidebar', sidebar, { ...current, inspector }, width),
+      inspector: clampPane('inspector', inspector, { ...current, sidebar }, width),
+    };
+    paintLayout(next);
+    writeLayout(next);
+  });
+}
+
 /* -------------------------------------------------------------------- boot */
 
 async function load() {
@@ -272,6 +449,7 @@ async function main() {
     document.querySelectorAll('#nav button').forEach((button) => {
       button.addEventListener('click', () => showTab(button.dataset.tab));
     });
+    setupLayout();
     showTab('1d');
   } catch (error) {
     const root = clear($('#content'));

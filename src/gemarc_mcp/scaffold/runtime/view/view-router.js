@@ -80,6 +80,20 @@ const FIDELITY_RULES = {
   slo: { scope: 'node', paths: ['slo', 'properties.slo'] },
   healthCheck: { scope: 'node', paths: ['healthCheck', 'properties.healthCheck'] },
   counterfactual: { scope: 'node', paths: ['counterfactual', 'properties.counterfactual'] },
+  // --- v5.0 §9 ER semantics (column / data_type) and the event-flow elements ---
+  // Without a rule here the fallback would read a path literally named after the
+  // token, never find it, and report the element as missing for every model.
+  column: {
+    scope: 'node',
+    check: (node) => (node.attributes || []).some((item) => item && item.name),
+  },
+  dataType: {
+    scope: 'node',
+    check: (node) => (node.attributes || []).some((item) => item && item.type),
+  },
+  eventPayload: { scope: 'both', paths: ['payload', 'properties.payload'] },
+  deliveryGuarantee: { scope: 'edge', paths: ['deliveryGuarantee', 'properties.deliveryGuarantee'] },
+  ordering: { scope: 'edge', paths: ['ordering', 'properties.ordering'] },
 };
 
 function toIdArray(value) {

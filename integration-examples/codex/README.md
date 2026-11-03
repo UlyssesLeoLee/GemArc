@@ -43,7 +43,7 @@ codex mcp add gemarc --url 'https://<project>.vercel.app/mcp' --bearer-token-env
 - 工具以命名空间 `mcp__gemarc` 加裸工具名暴露；名字里不属于 `[A-Za-z0-9_]` 的字符会被改成 `_`（冲突时加 sha1 后缀），合计上限 128 **[SOURCE]**。本服务器的名字已是纯下划线，不会被改写，也不会冲突。
 - 结果里若带 `structuredContent`，模型看到的是它而不是 `content` **[SOURCE]**。本服务器**不返回** `structuredContent`（`scripts/verify_stdio.py` 逐次断言 **[RAN]**），所以模型看到的就是 JSON 文本。
 - 单次输出约 10k token 上限（再乘 1.2）**[SOURCE]**。`gemarc_render` 对示例模型约 10 KB；内联上限 24 KiB（约 8k token）低于这个输出上限，更大的模型 `inline` 为 `false`、只返回清单（改用本地 `gemarc build`），所以通常不需要 `output_token_limit`。
-- Codex 忽略 prompt（所以别指望 `gemarc-design` 提示词），只能通过内置的 list/read resource 工具访问资源；服务器的 `instructions` 作为命名空间描述 **[SOURCE]**。让模型先调 `gemarc_brief`。
+- Codex 忽略 prompt（所以别指望 `gemarc-media-doc` 提示词），只能通过内置的 list/read resource 工具访问资源；服务器的 `instructions` 作为命名空间描述 **[SOURCE]**。让模型先调 `gemarc_brief`。
 - Codex 会丢掉 schema 里的 `title`/`default` **[SOURCE]**，不影响本服务器：所有参数都有默认值或必填，且没有 `null` 分支（`verify_stdio.py` 检查 **[RAN]**）。
 
 ## 审批（approval）
@@ -70,4 +70,4 @@ Codex 的 `auto` 模式：工具带 `readOnlyHint=true`，或同时 `destructive
 
 - **[UNVERIFIED]** 真实 Codex 会话里启动 `gemarc` 并调用工具：本机 Codex 已登录，但验证需要付费模型调用，我没有执行；`--strict-config` 只证明配置被接受。
 - **[UNVERIFIED]** 用 Codex 连接真实 Vercel 端点。`GET /mcp` 返回 405、`/.well-known/oauth-*` 返回 404 JSON 已在部署上实测（`docs/09_部署/01_Vercel部署.md` 第 12 节）；Codex 怎样对待这些答复没有验证。
-- **[UNVERIFIED]** Skill 安装位置：本机的 `CODEX_HOME` 下有 `skills/` 目录，我没验证 Codex 是否会发现 `skills/gemarc-5d-design`。
+- **[UNVERIFIED]** Skill 安装位置：本机的 `CODEX_HOME` 下有 `skills/` 目录，我没验证 Codex 是否会发现 `skills/gemarc-media-doc`。

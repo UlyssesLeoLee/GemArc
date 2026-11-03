@@ -44,7 +44,7 @@ MARKER_RE = re.compile(
     re.MULTILINE,
 )
 STATELESS_TOOLS = (
-    "gemarc_5d_guide", "gemarc_brief", "gemarc_contracts", "gemarc_assets", "gemarc_new_model", "gemarc_validate",
+    "gemarc_media_doc_guide", "gemarc_brief", "gemarc_contracts", "gemarc_assets", "gemarc_new_model", "gemarc_validate",
     "gemarc_simulate", "gemarc_diff", "gemarc_render",
 )
 

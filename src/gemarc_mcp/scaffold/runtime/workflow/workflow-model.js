@@ -54,6 +54,11 @@ function asObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
+/** An absent or empty value: an alias may fill it. */
+function isEmpty(value) {
+  return value === undefined || value === null || value === '';
+}
+
 function optionalString(value) {
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
@@ -100,14 +105,16 @@ function normalizeNode(node) {
   const source = asObject(node);
   // v5.0 §17 calls the node type "nodeType"; the canonical spelling is "kind".
   // A §17 type name ("Task") is mapped back onto its canonical id.
-  const kind = typeof source.kind === 'string' ? source.kind
-    : (typeof source.nodeType === 'string'
-      ? (workflowNodeKindBySpec(source.nodeType) || source.nodeType)
-      : 'task');
+  // An empty string counts as "not given", exactly like the Python side.
+  let kind = source.kind;
+  if (isEmpty(kind) && typeof source.nodeType === 'string') {
+    kind = workflowNodeKindBySpec(source.nodeType) || source.nodeType;
+  }
+  let id = source.id;
+  if (isEmpty(id) && typeof source.nodeId === 'string') id = source.nodeId;
   return {
     ...source,
-    id: typeof source.id === 'string' ? source.id
-      : (typeof source.nodeId === 'string' ? source.nodeId : ''),
+    id,
     kind,
     name: typeof source.name === 'string' ? source.name : '',
     canonicalNodeId: optionalString(source.canonicalNodeId),
@@ -124,24 +131,38 @@ function normalizeEdge(edge) {
   const source = asObject(edge);
   // v5.0 §17 calls the edge type "edgeType" and the condition "guard"; the
   // canonical spellings are "kind" and "condition".
-  const kind = typeof source.kind === 'string' ? source.kind
-    : (typeof source.edgeType === 'string'
-      ? (workflowEdgeKindBySpec(source.edgeType) || source.edgeType)
-      : 'sequence');
-  const rawCondition = source.condition === '' ? null : (source.condition ?? source.guard ?? null);
+  let kind = source.kind;
+  if (isEmpty(kind) && typeof source.edgeType === 'string') {
+    kind = workflowEdgeKindBySpec(source.edgeType) || source.edgeType;
+  }
+  let id = source.id;
+  if (isEmpty(id) && typeof source.edgeId === 'string') id = source.edgeId;
+  let sourceId = source.sourceId;
+  if (isEmpty(sourceId) && typeof source.sourceNodeId === 'string') sourceId = source.sourceNodeId;
+  let targetId = source.targetId;
+  if (isEmpty(targetId) && typeof source.targetNodeId === 'string') targetId = source.targetNodeId;
+  // An empty condition counts as "not given": the guard alias fills it.
+  let condition = source.condition;
+  if (isEmpty(condition)) {
+    condition = typeof source.guard === 'string' && source.guard ? source.guard : null;
+  }
+  // §17 direction: "both" means the edge is not directed.
+  const rawDirected = source.directed ?? undefined;
+  const directed = rawDirected === undefined
+    ? (typeof source.direction === 'string'
+      ? source.direction !== 'both' && source.direction !== 'undirected'
+      : true)
+    : Boolean(rawDirected);
   return {
     ...source,
-    id: typeof source.id === 'string' ? source.id
-      : (typeof source.edgeId === 'string' ? source.edgeId : ''),
-    sourceId: typeof source.sourceId === 'string' ? source.sourceId
-      : (typeof source.sourceNodeId === 'string' ? source.sourceNodeId : ''),
-    targetId: typeof source.targetId === 'string' ? source.targetId
-      : (typeof source.targetNodeId === 'string' ? source.targetNodeId : ''),
+    id,
+    sourceId,
+    targetId,
     sourcePortId: optionalString(source.sourcePortId),
     targetPortId: optionalString(source.targetPortId),
     kind,
-    directed: source.directed === undefined ? true : Boolean(source.directed),
-    condition: rawCondition === null ? null : String(rawCondition),
+    directed,
+    condition: condition === null || condition === undefined ? null : String(condition),
     dataContract: source.dataContract ? asObject(source.dataContract) : null,
     canvas: source.canvas ? asObject(source.canvas) : null,
     properties: asObject(source.properties),

@@ -1,7 +1,7 @@
-"""The 5D design workflow must ship with the server, not beside it as a skill.
+"""The multimedia document workflow must ship with the server, not beside it as a skill.
 
-The workflow used to live only in ``skills/gemarc-5d-design/``, so a client had
-to install a separate skill before it could make a 5D design. The server now
+The workflow used to live only in ``skills/gemarc-media-doc/``, so a client had
+to install a separate skill before it could make a multimedia document. The server now
 carries the same text inside the package and hands it out as a tool, as
 resources and through the prompt (see ADR-012).
 
@@ -37,10 +37,10 @@ PACKAGE_ROOT = REPO_ROOT / "src" / "gemarc_mcp"
 PYPROJECT = REPO_ROOT / "pyproject.toml"
 
 #: The tool a client calls to get the workflow.
-GUIDE_TOOL = "gemarc_5d_guide"
+GUIDE_TOOL = "gemarc_media_doc_guide"
 #: The URIs the workflow is served under.
-WORKFLOW_URI = "gemarc://skill/gemarc-5d-design"
-ASSEMBLE_URI = "gemarc://skill/gemarc-5d-design/references/assemble-site.md"
+WORKFLOW_URI = "gemarc://skill/gemarc-media-doc"
+ASSEMBLE_URI = "gemarc://skill/gemarc-media-doc/references/assemble-site.md"
 
 #: ``gemarc_`` words that are not tool names.
 NOT_TOOLS = {"gemarc_mcp", "gemarc_local"}
@@ -81,10 +81,10 @@ class PackedCopyTests(unittest.TestCase):
                   skillpack.normalised_bytes(p.read_bytes())
                   for p in skillpack.packed_files()}
         self.assertEqual(sorted(actual), sorted(expected),
-                         "the packed copy has other files than skills/gemarc-5d-design")
+                         "the packed copy has other files than skills/gemarc-media-doc")
         for name, raw in expected.items():
             self.assertEqual(actual.get(name), raw,
-                             f"{name} differs from skills/gemarc-5d-design; "
+                             f"{name} differs from skills/gemarc-media-doc; "
                              "run python -m gemarc_mcp.scaffold.skillpack")
         self.assertTrue(skillpack.is_in_sync())
 
@@ -167,8 +167,10 @@ class ServerSurfaceTests(unittest.TestCase):
             self.assertIn(GUIDE_TOOL, tools)
             description = tools[GUIDE_TOOL].description or ""
             self.assertLessEqual(len(description), 4096)
-            self.assertIn("制作5D设计", description,
+            self.assertIn("制作多媒体文档", description,
                           "the description must name the Chinese trigger words")
+            self.assertIn("制作5D设计", description,
+                          "the legacy trigger words must keep working")
             self.assertTrue(tools[GUIDE_TOOL].annotations.read_only_hint)
 
     def test_the_guide_returns_the_workflow(self):
@@ -177,7 +179,9 @@ class ServerSurfaceTests(unittest.TestCase):
         self.assertEqual(payload["topic"], "workflow")
         self.assertGreater(payload["bytes"], 3000)
         self.assertNotIn("\ufffd", payload["content"])
-        self.assertIn("制作5D设计", payload["content"] + payload["notice"])
+        self.assertIn("制作多媒体文档", payload["content"] + payload["notice"])
+        self.assertIn("制作5D设计", payload["content"] + payload["notice"],
+                      "the legacy trigger words must keep working")
         self.assertEqual(payload["source"], WORKFLOW_URI)
         self.assertEqual([item["id"] for item in payload["sections"]], ["workflow", "assemble"])
 
@@ -211,8 +215,8 @@ class ServerSurfaceTests(unittest.TestCase):
     def test_the_prompt_and_the_instructions_point_at_the_guide(self):
         app = server.create_server("stateless")
         prompts = {getattr(item, "name", item): item for item in asyncio.run(app.list_prompts())}
-        self.assertIn("gemarc-design", prompts)
-        text = asyncio.run(app.get_prompt("gemarc-design", {"project": "demo"}))
+        self.assertIn("gemarc-media-doc", prompts)
+        text = asyncio.run(app.get_prompt("gemarc-media-doc", {"project": "demo"}))
         prompt_text = text.messages[0].content.text
         self.assertIn(GUIDE_TOOL, prompt_text)
         self.assertIn(WORKFLOW_URI, prompt_text)

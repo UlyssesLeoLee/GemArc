@@ -1,2 +1,2 @@
-"""GemArc model-driven 5D design scaffolding (MVP)."""
+"""GemArc model-driven multimedia architecture document scaffolding (MVP)."""
 __version__ = "0.3.0"

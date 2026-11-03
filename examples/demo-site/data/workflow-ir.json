@@ -1,7 +1,23 @@
 {
   "count": 0,
-  "gwfVersion": "0.2.0",
-  "note": "designOnly 的节点没有真实执行器；executable=false 表示未声明实现引用。missing 列出 GWF-IR 必填但未给出的字段。",
+  "gates": {
+    "byWorkflow": {},
+    "note": "命中的门表示该执行图不得放行。门只对声明了执行图的工作流生效：纯设计画布不是执行图，不受 6D 门禁约束。",
+    "rejectOn": [
+      "unbounded_agent_loop",
+      "human_approval_bypass",
+      "unvalidated_state_schema",
+      "missing_route_guard",
+      "unsafe_side_effect_replay",
+      "checkpoint_without_state_integrity",
+      "fake_production_execution",
+      "untraceable_decision"
+    ],
+    "rejectedWorkflowIds": [],
+    "schemaVersion": "0.2.0"
+  },
+  "gwfVersion": "0.3.0",
+  "note": "designOnly 的节点没有真实执行器；executable=false 表示未声明实现引用。missing 列出 GWF-IR 必填但未给出的字段。gates 是 v6.0 quality_gates_6d 的判定结果：命中的门表示该执行图不得放行。",
   "schemaVersion": "0.2.0",
   "workflows": []
 }

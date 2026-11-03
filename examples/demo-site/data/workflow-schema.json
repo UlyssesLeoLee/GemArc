@@ -1,7 +1,10 @@
 {
   "designOnlyNodeTypes": [
     "Agent",
-    "HumanApproval"
+    "HumanApproval",
+    "ManualReview",
+    "AgentLoop",
+    "ToolCall"
   ],
   "edgeFields": [
     "edgeId",
@@ -16,7 +19,14 @@
     "priority",
     "errorRoute",
     "verification",
-    "evidenceIds"
+    "evidenceIds",
+    "stateSchemaRef",
+    "stateProjection",
+    "stateMergePolicy",
+    "routingExpression",
+    "deliverySemantics",
+    "resumeBehavior",
+    "policyRef"
   ],
   "edgeTypes": [
     "ControlFlow",
@@ -25,9 +35,15 @@
     "ErrorFlow",
     "ConditionalFlow",
     "CompensationFlow",
-    "Dependency"
+    "Dependency",
+    "StateTransition",
+    "ApprovalTransition",
+    "ToolResult",
+    "RetryTransition",
+    "TimeoutTransition",
+    "ResumeTransition"
   ],
-  "gwfVersion": "0.2.0",
+  "gwfVersion": "0.3.0",
   "jsonSchema": {
     "$defs": {
       "edge": {
@@ -36,6 +52,12 @@
           "dataMapping": {
             "type": [
               "object",
+              "null"
+            ]
+          },
+          "deliverySemantics": {
+            "type": [
+              "string",
               "null"
             ]
           },
@@ -57,7 +79,13 @@
               "ErrorFlow",
               "ConditionalFlow",
               "CompensationFlow",
-              "Dependency"
+              "Dependency",
+              "StateTransition",
+              "ApprovalTransition",
+              "ToolResult",
+              "RetryTransition",
+              "TimeoutTransition",
+              "ResumeTransition"
             ],
             "type": "string"
           },
@@ -79,9 +107,27 @@
               "null"
             ]
           },
+          "policyRef": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "priority": {
             "type": [
               "number",
+              "null"
+            ]
+          },
+          "resumeBehavior": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "routingExpression": {
+            "type": [
+              "string",
               "null"
             ]
           },
@@ -89,6 +135,24 @@
             "type": "string"
           },
           "sourcePortId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stateMergePolicy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stateProjection": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "stateSchemaRef": {
             "type": [
               "string",
               "null"
@@ -121,6 +185,36 @@
       "node": {
         "additionalProperties": true,
         "properties": {
+          "approvalPolicyRef": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "authorityScope": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "budgetPolicy": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "checkpointAfter": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "checkpointBefore": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "description": {
             "type": [
               "string",
@@ -145,6 +239,18 @@
           "executable": {
             "type": "boolean"
           },
+          "executionMode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "executorKind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "idempotency": {
             "type": [
               "string",
@@ -157,11 +263,23 @@
               "null"
             ]
           },
+          "inputStateSchema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "inputs": {
             "items": {
               "type": "object"
             },
             "type": "array"
+          },
+          "iterationLimit": {
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "name": {
             "type": "string"
@@ -189,9 +307,24 @@
               "Subflow",
               "ErrorHandler",
               "Retry",
-              "Compensation"
+              "Compensation",
+              "DeterministicProgram",
+              "AgentLoop",
+              "ToolCall",
+              "PolicyGate",
+              "Checkpoint",
+              "Resume",
+              "ManualReview",
+              "Escalation",
+              "AuditEvent"
             ],
             "type": "string"
+          },
+          "outputStateSchema": {
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "outputs": {
             "items": {
@@ -235,9 +368,21 @@
             },
             "type": "array"
           },
+          "stateWritePolicy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "timeoutPolicy": {
             "type": [
               "object",
+              "null"
+            ]
+          },
+          "toolContractRef": {
+            "type": [
+              "string",
               "null"
             ]
           },
@@ -325,10 +470,22 @@
         "type": "object"
       }
     },
-    "$id": "https://gemarc.dev/gwf-ir/0.2.0/workflow-ir.schema.json",
+    "$id": "https://gemarc.dev/gwf-ir/0.3.0/workflow-ir.schema.json",
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": true,
     "properties": {
+      "approvalPolicies": {
+        "items": {
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "checkpointPolicy": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
       "dataSchemas": {
         "items": {
           "type": "object"
@@ -359,6 +516,18 @@
         },
         "type": "array"
       },
+      "executionCapabilities": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "executionGraph": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
       "executionPolicy": {
         "type": [
           "object",
@@ -383,6 +552,18 @@
           "type": "string"
         },
         "type": "array"
+      },
+      "runSecurityPolicy": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "stateSchemaVersion": {
+        "type": [
+          "string",
+          "null"
+        ]
       },
       "version": {
         "type": [
@@ -421,7 +602,19 @@
     "idempotency",
     "implementationRef",
     "evidenceIds",
-    "verification"
+    "verification",
+    "executorKind",
+    "authorityScope",
+    "executionMode",
+    "inputStateSchema",
+    "outputStateSchema",
+    "stateWritePolicy",
+    "checkpointBefore",
+    "checkpointAfter",
+    "budgetPolicy",
+    "iterationLimit",
+    "approvalPolicyRef",
+    "toolContractRef"
   ],
   "nodeTypes": [
     "Start",
@@ -442,7 +635,16 @@
     "Subflow",
     "ErrorHandler",
     "Retry",
-    "Compensation"
+    "Compensation",
+    "DeterministicProgram",
+    "AgentLoop",
+    "ToolCall",
+    "PolicyGate",
+    "Checkpoint",
+    "Resume",
+    "ManualReview",
+    "Escalation",
+    "AuditEvent"
   ],
   "note": "GWF-IR 是规范化中间格式；第三方画布快照不得当作唯一的工作流真相。",
   "portFields": [
@@ -460,7 +662,10 @@
     "不适用的超时、重试或副作用字段可使用有明确定义的 null/omission 语义。",
     "没有真实执行器的类型标为 Design-only，不得伪称可执行。",
     "ControlFlow、DataFlow、EventFlow、ErrorFlow 等不得混淆。",
-    "GWF-IR 是规范化中间格式，不得把第三方画布快照当作唯一的工作流真相。"
+    "GWF-IR 是规范化中间格式，不得把第三方画布快照当作唯一的工作流真相。",
+    "6D 必须明确定义哪些节点是 agentic、deterministic 或 human-gated，并对每条执行边定义路由、状态投影与约束。",
+    "所有执行状态具有版本化 schema；边上传递的是结构化状态/事件，跨重启的持久化由明确检查点和存储层负责。",
+    "可恢复运行需要 runId、workflowVersion、checkpointId 和幂等策略；断点恢复时拒绝不兼容的工作流版本。"
   ],
   "workflowFields": [
     "workflowId",
@@ -474,6 +679,12 @@
     "errorPolicy",
     "permissions",
     "evidenceIds",
-    "metadata"
+    "metadata",
+    "executionGraph",
+    "stateSchemaVersion",
+    "checkpointPolicy",
+    "approvalPolicies",
+    "executionCapabilities",
+    "runSecurityPolicy"
   ]
 }

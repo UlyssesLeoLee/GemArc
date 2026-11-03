@@ -2,7 +2,7 @@
 
 本文是 Atlas 工具集的接口契约：每个工具的输入、输出、体积上限和安全注解。实现在 `src/gemarc_mcp/atlas_tools.py`（绑定）和 `src/gemarc_mcp/atlas/tools.py`（纯函数）。`tests/atlas/test_atlas_tool_surface.py` 逐项核对本文与真实的 `tools/list`：工具缺章节、注解对不上、引用了不存在的工具名，测试都会失败。
 
-Atlas 是 v1 工具集旁边的另一套工具：AI 只写紧凑的、经校验的事实文本（切片），固定且经过测试的代码推导并检查其余一切。atlas 的工作没有改动 v1 的工具面（`tests/atlas/test_atlas_v1_frozen.py` 钉住）；v1 自身后来在 ADR-012 里刻意新增了 `gemarc_5d_guide`（让服务器自己发出 5D 工作流），那是 v1 的决定，与 atlas 无关。
+Atlas 是 v1 工具集旁边的另一套工具：AI 只写紧凑的、经校验的事实文本（切片），固定且经过测试的代码推导并检查其余一切。atlas 的工作没有改动 v1 的工具面（`tests/atlas/test_atlas_v1_frozen.py` 钉住）；v1 自身后来在 ADR-012 里刻意新增了「让服务器自己发出工作流正文」的引导工具，那是 v1 的决定，与 atlas 无关。
 
 ## 1. 两个工具集
 
@@ -15,7 +15,7 @@ Atlas 是 v1 工具集旁边的另一套工具：AI 只写紧凑的、经校验�
 
 `atlas` 工具集共 13 个工具：设计表 4.1 的 12 个，加上附录 A1 的自审工具 `gemarc_atlas_review`。
 
-`atlas` 和 `atlas_remote` 各自还带一个 MCP 提示 `gemarc-atlas-create`（第 5 节），v1 的两个工具集没有它；Atlas 工具集不带 v1 的资源和 `gemarc-design` 提示。
+`atlas` 和 `atlas_remote` 各自还带一个 MCP 提示 `gemarc-atlas-create`（第 5 节），v1 的两个工具集没有它；Atlas 工具集不带 v1 的资源和 `gemarc-media-doc` 提示。
 
 远程部署说明：`atlas_remote` 经 `api/index.py` 用 `GEMARC_TOOLSET=atlas_remote` 即可启动（测试用 `build_app(toolset="atlas_remote")` 验证过）。当前 `.vercelignore` 排除了 `/src/gemarc_mcp/atlas`，所以现在的 Vercel 部署里没有 Atlas 代码，该工具集在 Vercel 上不可用，直到出处文件 `src/gemarc_mcp/atlas/PROVENANCE.md` 的发布授权被用户放行并去掉这条排除。
 

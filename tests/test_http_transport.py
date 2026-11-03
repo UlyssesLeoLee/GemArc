@@ -39,7 +39,7 @@ for candidate in (str(REPO_ROOT / "src"), str(REPO_ROOT)):
 
 FUNCTION_NAME = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 STATELESS_TOOLS = {
-    "gemarc_5d_guide", "gemarc_brief", "gemarc_contracts", "gemarc_assets", "gemarc_new_model",
+    "gemarc_media_doc_guide", "gemarc_brief", "gemarc_contracts", "gemarc_assets", "gemarc_new_model",
     "gemarc_validate", "gemarc_simulate", "gemarc_diff", "gemarc_render",
 }
 WRITE_TOOLS = {"gemarc_build", "gemarc_export", "gemarc_init", "gemarc_model", "gemarc_scaffold"}
@@ -292,9 +292,9 @@ class RemoteDefaultTests(unittest.TestCase):
         for name in out["tools"]:
             self.assertRegex(name, FUNCTION_NAME)
         self.assertEqual(out["resources"], ["gemarc://registry", "gemarc://schema/model",
-                                            "gemarc://skill/gemarc-5d-design",
-                                            "gemarc://skill/gemarc-5d-design/references/assemble-site.md"])
-        self.assertEqual(out["prompts"], ["gemarc-design"])
+                                            "gemarc://skill/gemarc-media-doc",
+                                            "gemarc://skill/gemarc-media-doc/references/assemble-site.md"])
+        self.assertEqual(out["prompts"], ["gemarc-media-doc"])
 
     def test_write_and_workspace_tools_are_absent(self):
         out = drive(self.mcp())
@@ -719,9 +719,9 @@ class FullToolsetTests(unittest.TestCase):
         for name in ("gemarc_scaffold", "gemarc_contracts", "gemarc_brief", "gemarc_render", "gemarc_new_model"):
             self.assertIn(name, out["tools"])
         self.assertEqual(out["resources"], ["gemarc://registry", "gemarc://schema/model",
-                                            "gemarc://skill/gemarc-5d-design",
-                                            "gemarc://skill/gemarc-5d-design/references/assemble-site.md"])
-        self.assertEqual(out["prompts"], ["gemarc-design"])
+                                            "gemarc://skill/gemarc-media-doc",
+                                            "gemarc://skill/gemarc-media-doc/references/assemble-site.md"])
+        self.assertEqual(out["prompts"], ["gemarc-media-doc"])
 
     def test_read_tools_work_against_the_seeded_project(self):
         out = drive(self.live.url("/mcp"), {

@@ -36,6 +36,12 @@ DERIVED_SCHEMA_VERSION = "0.2.0"
 
 #: §17 node types that have no real executor in this delivery. They must be
 #: marked Design-only: claiming they run would be a false statement.
+#:
+#: The authoritative list lives in the vocabulary
+#: (``workflow-kinds.json`` -> ``gwfIr.designOnlyNodeTypes``); this tuple is
+#: only the fallback for a vocabulary that does not declare one. A hard-coded
+#: copy drifted once already: the 6D types were added to the vocabulary and
+#: the GWF-IR still reported them as executable.
 DESIGN_ONLY_NODE_TYPES = ("Agent", "HumanApproval")
 
 #: Legacy node kinds that have no unambiguous §17 counterpart. The GWF-IR
@@ -109,10 +115,22 @@ def evidence_index(model: dict) -> dict:
     """
     evidence = [item for item in _as_array(model.get("evidence")) if isinstance(item, dict)]
     cites: dict[str, list[str]] = {}
-    for entity in _as_array(model.get("nodes")) + _as_array(model.get("edges")):
+    # Every entity that can cite evidence counts: nodes, edges, workflow nodes
+    # and edges, and cases. Leaving the last two out made the file claim that
+    # evidence used by a workflow or a case was "not cited by anything".
+    citing_entities = list(_as_array(model.get("nodes"))) + list(_as_array(model.get("edges")))
+    for workflow in _as_array(model.get("workflows")):
+        if not isinstance(workflow, dict):
+            continue
+        citing_entities.extend(_as_array(workflow.get("nodes")))
+        citing_entities.extend(_as_array(workflow.get("edges")))
+    citing_entities.extend(_as_array(model.get("cases")))
+    for entity in citing_entities:
         if not isinstance(entity, dict):
             continue
         ident = entity.get("id")
+        if not isinstance(ident, str):
+            continue
         for ref in _as_array(entity.get("evidenceIds")):
             if isinstance(ref, str):
                 cites.setdefault(ref, []).append(ident)
@@ -124,6 +142,8 @@ def evidence_index(model: dict) -> dict:
         ident = record.get("id")
         level = record.get("level") or record.get("verification") or "Unknown"
         kind = record.get("kind")
+        if not isinstance(level, str):
+            level = "Unknown"
         if isinstance(ident, str):
             by_level.setdefault(level, []).append(ident)
             if isinstance(kind, str):
@@ -141,7 +161,7 @@ def evidence_index(model: dict) -> dict:
             "endLine": source.get("endLine"),
             "symbol": source.get("symbol"),
             "observedAt": record.get("observedAt"),
-            "citedBy": sorted(cites.get(ident, [])),
+            "citedBy": sorted(cites.get(ident, [])) if isinstance(ident, str) else [],
         })
     return {
         "schemaVersion": DERIVED_SCHEMA_VERSION,
@@ -149,125 +169,246 @@ def evidence_index(model: dict) -> dict:
         "groupedByLevel": by_level,
         "groupedByKind": by_kind,
         "items": items,
-        "uncited": sorted(item["id"] for item in items if not item["citedBy"]),
+        "uncited": sorted(item["id"] for item in items
+                          if isinstance(item["id"], str) and not item["citedBy"]),
         "note": "uncited 表示没有实体引用它；未删除，但界面不得把它当作某项事实的依据。",
     }
 
 
 # --- diagram catalogue ------------------------------------------------------
 
-def _has_attr_field(nodes, field, truthy=False) -> bool:
-    for node in nodes:
-        for attribute in _as_array(node.get("attributes")):
-            if not isinstance(attribute, dict):
+
+#: How to decide whether the model can supply one fidelity element of a diagram
+#: type. This table is the **mirror** of ``FIDELITY_RULES`` in
+#: ``runtime/view/view-router.js``: same tokens, same scope, same paths, same
+#: predicates. The browser runtime is the authority (it is what actually draws
+#: the diagram); this table only predicts it, so a mismatch would make the
+#: catalogue say "present" while the site says "missing".
+#:
+#: A rule reads a dotted path on the node or the edge (``paths``), or uses a
+#: predicate for the cases that need to look inside a collection (``check``).
+#: ``scope`` says which side of the selection is inspected.
+def _attr_check(field, truthy=False):
+    """A predicate over the node's attributes.
+
+    The predicate is called as ``check(entity, context)``, like every other
+    rule in the table, so it takes the context as an optional second
+    argument. A one-argument predicate raised ``TypeError`` here, the call
+    site swallowed it, and the rule silently answered "not satisfied" for
+    every node - the catalogue then claimed a view was missing a primary key
+    the site was about to draw.
+    """
+    def check(node, _context=None):
+        for item in _as_array(node.get("attributes")):
+            if not isinstance(item, dict):
                 continue
-            value = attribute.get(field)
+            value = item.get(field)
             if value is None:
                 continue
             if truthy and not value:
                 continue
             return True
+        return False
+    return check
+
+
+def _method_check(field):
+    """A predicate over the node's methods."""
+    def check(node, _context=None):
+        for item in _as_array(node.get("methods")):
+            if isinstance(item, dict) and item.get(field) is not None:
+                return True
+        return False
+    return check
+
+
+def _any_item_check(field):
+    """A predicate over the node's attributes *and* methods."""
+    def check(node, _context=None):
+        items = list(_as_array(node.get("attributes"))) + list(_as_array(node.get("methods")))
+        return any(isinstance(item, dict) and item.get(field) for item in items)
+    return check
+
+
+_FIDELITY_RULES = {
+    "attributes": {"scope": "node", "paths": ["attributes"]},
+    "attribute": {"scope": "node", "paths": ["attributes"]},
+    "methods": {"scope": "node", "paths": ["methods"]},
+    "visibility": {"scope": "node", "check": _any_item_check("visibility")},
+    "multiplicity": {"scope": "edge", "paths": ["multiplicity", "properties.multiplicity"]},
+    "cardinality": {"scope": "edge", "paths": ["cardinality", "properties.cardinality"]},
+    "primaryKey": {"scope": "node", "check": _attr_check("primaryKey", truthy=True)},
+    "foreignKey": {"scope": "node", "check": _attr_check("foreignKey", truthy=True)},
+    "ports": {"scope": "node", "paths": ["ports", "properties.ports"]},
+    "interfaces": {"scope": "node", "paths": ["interfaces", "properties.interfaces"]},
+    "nesting": {"scope": "node", "check": lambda node, ctx: node.get("parentId") in ctx["nodeIds"]},
+    "lifeline": {"scope": "node", "paths": ["lifeline", "properties.lifeline"]},
+    "message": {"scope": "edge", "paths": ["message", "properties.message"]},
+    "activation": {"scope": "edge", "paths": ["activation", "properties.activation"]},
+    "guard": {"scope": "edge", "paths": ["guard", "properties.guard"],
+              "check": lambda edge, ctx: bool(edge.get("condition"))},
+    "initial": {"scope": "node", "paths": ["initial", "properties.initial"]},
+    "final": {"scope": "node", "paths": ["final", "properties.final"]},
+    "state": {"scope": "node", "paths": ["state", "properties.state"]},
+    "decision": {"scope": "node", "paths": ["decision", "properties.decision"]},
+    "merge": {"scope": "node", "paths": ["merge", "properties.merge"]},
+    "fork": {"scope": "node", "paths": ["fork", "properties.fork"]},
+    "join": {"scope": "node", "paths": ["join", "properties.join"]},
+    "systemBoundary": {"scope": "node", "paths": ["systemBoundary", "properties.systemBoundary"]},
+    "include": {"scope": "edge", "paths": ["include", "properties.include"]},
+    "extend": {"scope": "edge", "paths": ["extend", "properties.extend"]},
+    "externalEntity": {"scope": "node", "paths": ["externalEntity", "properties.externalEntity"]},
+    "dataStore": {"scope": "node", "paths": ["dataStore", "properties.dataStore"]},
+    "process": {"scope": "node", "paths": ["process", "properties.process"]},
+    "node": {"scope": "node", "paths": ["node", "properties.node"]},
+    "executionEnvironment": {"scope": "node", "paths": ["executionEnvironment", "properties.executionEnvironment"]},
+    "artifact": {"scope": "node", "paths": ["artifact", "properties.artifact"]},
+    "building": {"scope": "node", "paths": ["spaceRef.buildingId"]},
+    "floor": {"scope": "node", "paths": ["spaceRef.floorId"]},
+    "room": {"scope": "node", "paths": ["spaceRef.roomId"]},
+    "trustBoundary": {"scope": "edge",
+                      "check": lambda edge, ctx: edge.get("trustBoundary") is not None},
+    "principal": {"scope": "node", "paths": ["principal", "properties.principal"]},
+    "slo": {"scope": "node", "paths": ["slo", "properties.slo"]},
+    "healthCheck": {"scope": "node", "paths": ["healthCheck", "properties.healthCheck"]},
+    "counterfactual": {"scope": "node", "paths": ["counterfactual", "properties.counterfactual"]},
+    "column": {"scope": "node", "check": _attr_check("name")},
+    "dataType": {"scope": "node", "check": _attr_check("type")},
+    "eventPayload": {"scope": "both", "paths": ["payload", "properties.payload"]},
+    "deliveryGuarantee": {"scope": "edge", "paths": ["deliveryGuarantee", "properties.deliveryGuarantee"]},
+    "ordering": {"scope": "edge", "paths": ["ordering", "properties.ordering"]},
+}
+
+#: Backwards-compatible alias: the rules *are* the probes.
+_FIDELITY_PROBES = _FIDELITY_RULES
+
+
+def _read_model_path(entity, path):
+    """Read a dotted path from a plain object (``None`` when absent)."""
+    cursor = entity
+    for part in path.split("."):
+        if not isinstance(cursor, dict):
+            return None
+        cursor = cursor.get(part)
+        if cursor is None:
+            return None
+    return cursor
+
+
+def _satisfies_fidelity(entity, rule) -> bool:
+    """Whether one entity carries what the rule asks for.
+
+    Mirrors ``satisfiesFidelity`` in the runtime: ``undefined``/``null``/``false``
+    and empty collections do not count; anything else does.
+    """
+    for path in rule.get("paths") or []:
+        value = _read_model_path(entity, path)
+        if value is None or value is False:
+            continue
+        if isinstance(value, (list, tuple, dict, set)):
+            if len(value) == 0:
+                continue
+            return True
+        return True
     return False
 
 
-def _has_method_field(nodes, field) -> bool:
-    for node in nodes:
-        for method in _as_array(node.get("methods")):
-            if isinstance(method, dict) and method.get(field) is not None:
+def _check_fidelity(token, context) -> bool:
+    """Whether the selection satisfies one fidelity element.
+
+    Mirrors ``checkFidelity`` in ``runtime/view/view-router.js``: the predicate
+    is tried first, then the paths; nodes are inspected before edges.
+    """
+    rule = _FIDELITY_RULES.get(token)
+    if rule is None:
+        return False
+    check = rule.get("check")
+    scope = rule.get("scope", "both")
+
+    def matches(entity) -> bool:
+        if check is not None:
+            try:
+                if check(entity, context):
+                    return True
+            except Exception:  # a predicate must never break the derivation
+                pass
+        return _satisfies_fidelity(entity, rule)
+
+    if scope in ("node", "both"):
+        for node in context.get("nodes") or []:
+            if isinstance(node, dict) and matches(node):
+                return True
+    if scope in ("edge", "both"):
+        for edge in context.get("edges") or []:
+            if isinstance(edge, dict) and matches(edge):
                 return True
     return False
-
-
-def _node_prop(nodes, key) -> bool:
-    return any(isinstance(node.get("properties"), dict) and key in node["properties"] for node in nodes)
-
-
-def _edge_prop(edges, key) -> bool:
-    return any(isinstance(edge.get("properties"), dict) and key in edge["properties"] for edge in edges)
-
-
-def _node_kind(nodes, kind) -> bool:
-    return any(node.get("kind") == kind for node in nodes)
-
-
-def _edge_type(edges, *types) -> bool:
-    return any(edge.get("type") in types for edge in edges)
-
-
-#: How to decide whether the model can supply one fidelity element of a diagram
-#: type. A probe that cannot answer says "missing": the front end then shows
-#: the gap instead of a fabricated diagram element.
-_FIDELITY_PROBES = {
-    "attributes": lambda ctx: _has_attr_field(ctx["nodes"], "name"),
-    "attribute": lambda ctx: _has_attr_field(ctx["nodes"], "name"),
-    "column": lambda ctx: _has_attr_field(ctx["nodes"], "name"),
-    "methods": lambda ctx: _has_method_field(ctx["nodes"], "name"),
-    "visibility": lambda ctx: (_has_attr_field(ctx["nodes"], "visibility")
-                               or _has_method_field(ctx["nodes"], "visibility")),
-    "multiplicity": lambda ctx: _edge_prop(ctx["edges"], "multiplicity"),
-    "cardinality": lambda ctx: _edge_prop(ctx["edges"], "cardinality"),
-    "primaryKey": lambda ctx: _has_attr_field(ctx["nodes"], "primaryKey", truthy=True),
-    "foreignKey": lambda ctx: _has_attr_field(ctx["nodes"], "foreignKey"),
-    "dataType": lambda ctx: _has_attr_field(ctx["nodes"], "type"),
-    "ports": lambda ctx: any(_as_array(node.get("ports")) for node in ctx["nodes"]),
-    "interfaces": lambda ctx: (_node_kind(ctx["nodes"], "Interface")
-                               or _node_prop(ctx["nodes"], "interfaces")),
-    "nesting": lambda ctx: any(node.get("parentId") for node in ctx["nodes"]),
-    "lifeline": lambda ctx: _node_prop(ctx["nodes"], "lifeline"),
-    "message": lambda ctx: (_edge_prop(ctx["edges"], "message")
-                             or _edge_type(ctx["edges"], "sends", "receives", "calls", "publishes")),
-    "activation": lambda ctx: _node_prop(ctx["nodes"], "activation"),
-    "guard": lambda ctx: any(edge.get("condition") for edge in ctx["edges"]),
-    "initial": lambda ctx: _node_prop(ctx["nodes"], "initial"),
-    "final": lambda ctx: _node_prop(ctx["nodes"], "final"),
-    "state": lambda ctx: (_node_kind(ctx["nodes"], "State")
-                          or any(node.get("state") for node in ctx["nodes"])),
-    "decision": lambda ctx: _node_kind(ctx["nodes"], "Decision"),
-    "merge": lambda ctx: _node_prop(ctx["nodes"], "merge"),
-    "fork": lambda ctx: _node_prop(ctx["nodes"], "fork"),
-    "join": lambda ctx: _node_prop(ctx["nodes"], "join"),
-    "node": lambda ctx: _node_prop(ctx["nodes"], "node"),
-    "executionEnvironment": lambda ctx: _node_prop(ctx["nodes"], "executionEnvironment"),
-    "artifact": lambda ctx: _node_prop(ctx["nodes"], "artifact"),
-    "systemBoundary": lambda ctx: _node_prop(ctx["nodes"], "systemBoundary"),
-    "include": lambda ctx: _edge_prop(ctx["edges"], "include"),
-    "extend": lambda ctx: _edge_prop(ctx["edges"], "extend"),
-    "externalEntity": lambda ctx: (_node_kind(ctx["nodes"], "Actor")
-                                   or _node_prop(ctx["nodes"], "externalEntity")),
-    "dataStore": lambda ctx: (_node_kind(ctx["nodes"], "Table")
-                              or _node_kind(ctx["nodes"], "Entity")
-                              or _node_prop(ctx["nodes"], "dataStore")),
-    "process": lambda ctx: (_node_kind(ctx["nodes"], "Service")
-                            or _node_prop(ctx["nodes"], "process")),
-    "building": lambda ctx: bool(ctx["space"].get("buildings")),
-    "floor": lambda ctx: bool(ctx["space"].get("floors")),
-    "room": lambda ctx: bool(ctx["space"].get("rooms")),
-    "trustBoundary": lambda ctx: any(edge.get("trustBoundary") is True for edge in ctx["edges"]),
-    "principal": lambda ctx: _node_prop(ctx["nodes"], "principal"),
-    "slo": lambda ctx: _node_prop(ctx["nodes"], "slo"),
-    "healthCheck": lambda ctx: _node_prop(ctx["nodes"], "healthCheck"),
-    "counterfactual": lambda ctx: bool(ctx["scenarios"]),
-    "eventPayload": lambda ctx: _node_prop(ctx["nodes"], "payload"),
-    "deliveryGuarantee": lambda ctx: _edge_prop(ctx["edges"], "deliveryGuarantee"),
-    "ordering": lambda ctx: _edge_prop(ctx["edges"], "ordering"),
-}
 
 
 def _missing_fidelity(fidelity, context) -> list[str]:
     """The fidelity elements the model cannot supply for this view."""
     missing = []
     for token in fidelity or []:
-        probe = _FIDELITY_PROBES.get(token)
-        if probe is None:
-            missing.append(token)  # unknown probe: never claim it is satisfied
-            continue
-        try:
-            satisfied = bool(probe(context))
-        except Exception:  # a probe must never break the derivation
-            satisfied = False
-        if not satisfied:
-            missing.append(token)
+        if not _check_fidelity(token, context):
+            missing.append(token)  # unknown token or unsatisfied: never claim it is present
     return missing
+
+
+def _resolve_view_selection(view, spec, model, nodes_by_id, edges_by_id):
+    """Resolve one view into a selection, with the runtime's rules.
+
+    This is the Python mirror of ``ViewRouter.resolve`` in
+    ``runtime/view/view-router.js``. The rules, in order:
+
+    1. a node is kept only if the diagram type allows its kind;
+    2. without explicit ``edgeIds`` the candidates are the edges whose *both*
+       endpoints are in the view's node set - not every edge of the type in the
+       whole model;
+    3. an edge is kept only if the diagram type allows its kind, the view's
+       ``edgeKinds`` does not exclude it, and both endpoints are in the view.
+
+    Keeping this identical to the runtime matters: the catalogue tells the front
+    end what the diagram will contain, and a second, looser rule would make it
+    list edges the site refuses to draw.
+    """
+    requested_node_ids = [item for item in _as_array(view.get("nodeIds")) if isinstance(item, str)]
+    requested_edge_ids = [item for item in _as_array(view.get("edgeIds")) if isinstance(item, str)]
+    view_edge_kinds = {item for item in _as_array(view.get("edgeKinds")) if isinstance(item, str)}
+    allowed_node_kinds = set(spec.get("nodeKinds") or [])
+    allowed_edge_kinds = set(spec.get("edgeKinds") or [])
+
+    node_ids = []
+    for ident in requested_node_ids:
+        node = nodes_by_id.get(ident)
+        if node is None:
+            continue  # the view references a node that does not exist
+        if node.get("kind") not in allowed_node_kinds:
+            continue  # the diagram type does not allow this kind of node
+        node_ids.append(ident)
+    node_set = set(node_ids)
+
+    candidates = []
+    for ident in requested_edge_ids:
+        edge = edges_by_id.get(ident)
+        if edge is not None:
+            candidates.append(edge)
+    if not requested_edge_ids:
+        candidates = [edge for edge in _as_array(model.get("edges"))
+                      if isinstance(edge, dict)
+                      and edge.get("sourceId") in node_set and edge.get("targetId") in node_set]
+
+    selected_edges = []
+    for edge in candidates:
+        if edge.get("type") not in allowed_edge_kinds:
+            continue
+        if view_edge_kinds and edge.get("type") not in view_edge_kinds:
+            continue
+        if edge.get("sourceId") not in node_set or edge.get("targetId") not in node_set:
+            continue
+        selected_edges.append(edge)
+
+    selected_nodes = [nodes_by_id[ident] for ident in node_ids]
+    return node_ids, selected_nodes, selected_edges
 
 
 def diagrams(model: dict) -> dict:
@@ -281,24 +422,24 @@ def diagrams(model: dict) -> dict:
 
     catalog = []
     unregistered = []
+    undeclared = []
     for view in _as_array(model.get("views")):
         if not isinstance(view, dict):
             continue
         diagram_type = view.get("diagramType")
+        if not diagram_type:
+            # A view without a diagram type is not an *unregistered* type: it
+            # simply never declared one. The two cases must not share a bucket.
+            undeclared.append(view.get("id"))
+            continue
         spec = specs.get(diagram_type)
         if spec is None:
             unregistered.append(view.get("id"))
             continue
-        node_ids = [item for item in _as_array(view.get("nodeIds")) if isinstance(item, str)]
-        edge_ids = [item for item in _as_array(view.get("edgeIds")) if isinstance(item, str)]
-        selected_nodes = [nodes_by_id[item] for item in node_ids if item in nodes_by_id]
-        selected_edges = [edges_by_id[item] for item in edge_ids if item in edges_by_id]
-        if not selected_edges:
-            allowed = set(spec.get("edgeKinds") or [])
-            selected_edges = [edge for edge in _as_array(model.get("edges"))
-                              if isinstance(edge, dict) and edge.get("type") in allowed]
+        node_ids, selected_nodes, selected_edges = _resolve_view_selection(
+            view, spec, model, nodes_by_id, edges_by_id)
         context = {"nodes": selected_nodes, "edges": selected_edges,
-                   "space": space, "scenarios": scenarios}
+                   "nodeIds": node_ids, "space": space, "scenarios": scenarios}
         fidelity = list(spec.get("fidelity") or [])
         missing = _missing_fidelity(fidelity, context)
         catalog.append({
@@ -327,8 +468,11 @@ def diagrams(model: dict) -> dict:
         "count": len(catalog),
         "catalog": catalog,
         "unregistered": unregistered,
+        "undeclared": undeclared,
         "families": vocabulary.get("specFamilies", {}),
-        "note": "missing 列出该图示类型要求、但模型无法提供的保真元素；界面必须标注为缺失，不得伪造。",
+        "note": ("missing 列出该图示类型要求、但模型无法提供的保真元素；界面必须标注为缺失，不得伪造。"
+                 "nodeIds / edgeIds 是按运行时同一套规则解析出来的实际选择。"
+                 "unregistered 是声明了未登记的图示类型；undeclared 是没有声明图示类型。"),
     }
 
 
@@ -422,10 +566,176 @@ def _edge_type_map() -> dict:
     return mapping
 
 
+def _node_kind_meta() -> dict:
+    """The canonical id -> the vocabulary entry, so executorClass comes from one place."""
+    return {item["id"]: item for item in _workflow_vocab().get("nodeKinds", [])}
+
+
+def _design_only_types() -> tuple:
+    """The §17 node types that have no real executor.
+
+    Read from the vocabulary so the GWF-IR cannot drift away from it: a type
+    the vocabulary calls Design-only must not be reported as executable.
+    """
+    declared = _workflow_vocab().get("gwfIr", {}).get("designOnlyNodeTypes")
+    if isinstance(declared, list) and declared:
+        return tuple(str(item) for item in declared)
+    return DESIGN_ONLY_NODE_TYPES
+
+
+#: Node kinds that only exist in the 6D execution graph (v6.0 §17 / §25).
+_EXECUTION_NODE_KINDS = frozenset({
+    "deterministic-program", "agent-loop", "tool-call", "policy-gate",
+    "checkpoint", "resume", "manual-review", "escalation", "audit-event",
+})
+#: Edge kinds that only exist in the 6D execution graph.
+_EXECUTION_EDGE_KINDS = frozenset({
+    "state-transition", "approval-transition", "tool-result",
+    "retry-transition", "timeout-transition", "resume-transition",
+})
+#: Workflow-level fields only the 6D contract declares.
+_EXECUTION_WORKFLOW_FIELDS = (
+    "executionGraph", "stateSchemaVersion", "checkpointPolicy",
+    "approvalPolicies", "executionCapabilities", "runSecurityPolicy",
+)
+#: Node-level fields only the 6D contract declares.
+_EXECUTION_NODE_FIELDS = (
+    "executorKind", "authorityScope", "executionMode", "inputStateSchema",
+    "outputStateSchema", "stateWritePolicy", "checkpointBefore", "checkpointAfter",
+    "budgetPolicy", "iterationLimit", "approvalPolicyRef", "toolContractRef",
+)
+#: Edge-level fields only the 6D contract declares.
+_EXECUTION_EDGE_FIELDS = (
+    "stateSchemaRef", "stateProjection", "stateMergePolicy", "routingExpression",
+    "deliverySemantics", "resumeBehavior", "policyRef",
+)
+
+
+def _declares_execution(workflow: dict) -> bool:
+    """Whether this workflow claims to be an execution graph rather than a canvas.
+
+    The 6D gates only apply to execution graphs. A design-only workflow (no
+    6D field, no 6D node or edge kind) is not one, and rejecting it would
+    break every model that predates the 6D contract.
+    """
+    if any(workflow.get(field) is not None for field in _EXECUTION_WORKFLOW_FIELDS):
+        return True
+    for node in _as_array(workflow.get("nodes")):
+        if not isinstance(node, dict):
+            continue
+        if node.get("kind") in _EXECUTION_NODE_KINDS:
+            return True
+        if any(node.get(field) is not None for field in _EXECUTION_NODE_FIELDS):
+            return True
+    for edge in _as_array(workflow.get("edges")):
+        if not isinstance(edge, dict):
+            continue
+        if edge.get("kind") in _EXECUTION_EDGE_KINDS:
+            return True
+        if any(edge.get(field) is not None for field in _EXECUTION_EDGE_FIELDS):
+            return True
+    return False
+
+
+def _execution_gates(workflow: dict) -> list[dict]:
+    """The v6.0 ``quality_gates_6d`` verdict for one workflow.
+
+    One entry per hit: ``{"gate", "targets", "message"}``. An empty list means
+    the workflow declares an execution graph and passes every gate - or that it
+    is not an execution graph at all (see :func:`_declares_execution`).
+    """
+    if not isinstance(workflow, dict) or not _declares_execution(workflow):
+        return []
+    nodes = [item for item in _as_array(workflow.get("nodes")) if isinstance(item, dict)]
+    edges = [item for item in _as_array(workflow.get("edges")) if isinstance(item, dict)]
+    state_version = workflow.get("stateSchemaVersion")
+    hits: list[dict] = []
+
+    def hit(gate, targets, message):
+        hits.append({"gate": gate, "targets": sorted(targets), "message": message})
+
+    unbounded = [str(node.get("id")) for node in nodes
+                 if node.get("kind") == "agent-loop" and not node.get("iterationLimit")]
+    if unbounded:
+        hit("unbounded_agent_loop", unbounded,
+            "Agent 循环节点必须声明 iterationLimit；没有上限就是无界循环。")
+
+    bypassed = [str(node.get("id")) for node in nodes
+                if node.get("kind") in ("human-approval", "manual-review")
+                and not node.get("approvalPolicyRef")]
+    if bypassed:
+        hit("human_approval_bypass", bypassed,
+            "人工审批节点必须引用 approvalPolicyRef；没有策略就没有可审计的审批边界。")
+
+    uses_state = [str(node.get("id")) for node in nodes
+                  if node.get("inputStateSchema") or node.get("outputStateSchema")]
+    uses_state += [str(edge.get("id")) for edge in edges if edge.get("stateSchemaRef")]
+    if uses_state and not state_version:
+        hit("unvalidated_state_schema", uses_state,
+            "工作流传递状态却没有 stateSchemaVersion：状态不可校验，也不可恢复。")
+
+    unguarded = [str(edge.get("id")) for edge in edges
+                 if edge.get("policyRef")
+                 and not (edge.get("condition") or edge.get("routingExpression"))]
+    if unguarded:
+        hit("missing_route_guard", unguarded,
+            "带策略的边必须声明可判断的路由条件；否则路由无法被静态校验。")
+
+    replayable = [str(node.get("id")) for node in nodes
+                  if _as_array(node.get("sideEffects"))
+                  and not (node.get("idempotency") or node.get("idempotencyKeyStrategy"))]
+    if replayable:
+        hit("unsafe_side_effect_replay", replayable,
+            "有副作用的节点必须声明幂等要求；否则重放可能重复产生外部效果。")
+
+    checkpoints = [str(node.get("id")) for node in nodes
+                   if node.get("kind") == "checkpoint"
+                   or node.get("checkpointBefore") or node.get("checkpointAfter")]
+    if checkpoints and not state_version:
+        hit("checkpoint_without_state_integrity", checkpoints,
+            "检查点没有 stateSchemaVersion：恢复时无法校验状态完整性。")
+
+    fake = [str(node.get("id")) for node in nodes
+            if node.get("executionMode") == "real"
+            and not (node.get("authorityScope") and (node.get("implementationRef")
+                                                      or node.get("executorRef")))]
+    if fake:
+        hit("fake_production_execution", fake,
+            "声明真实执行的节点必须给出权限范围与执行器引用；否则不得声称会真实执行。")
+
+    untraceable = [str(node.get("id")) for node in nodes
+                   if node.get("kind") == "policy-gate" and not node.get("policyRef")]
+    untraceable += [str(node.get("id")) for node in nodes
+                    if node.get("kind") == "decision"
+                    and not node.get("policyRef")
+                    and not _as_array(node.get("evidenceIds"))]
+    if untraceable:
+        hit("untraceable_decision", untraceable,
+            "策略闸门必须引用 policyRef；判定节点必须能追溯到策略或证据。")
+
+    return hits
+
+
+def execution_gates(model: dict) -> dict:
+    """The 6D quality-gate verdict of every workflow in the model."""
+    workflows = [item for item in _as_array(model.get("workflows")) if isinstance(item, dict)]
+    per_workflow = {str(item.get("id")): _execution_gates(item) for item in workflows}
+    rejected = sorted(workflow_id for workflow_id, hits in per_workflow.items() if hits)
+    return {
+        "schemaVersion": DERIVED_SCHEMA_VERSION,
+        "rejectOn": list(_workflow_vocab().get("qualityGates", {}).get("rejectOn") or []),
+        "byWorkflow": per_workflow,
+        "rejectedWorkflowIds": rejected,
+        "note": ("命中的门表示该执行图不得放行。门只对声明了执行图的工作流生效："
+                 "纯设计画布不是执行图，不受 6D 门禁约束。"),
+    }
+
+
 def workflow_ir(model: dict) -> dict:
     """The versioned GWF-IR of every workflow, in the §17 field names."""
     node_types = _node_type_map()
     edge_types = _edge_type_map()
+    node_meta = _node_kind_meta()
     workflows = []
     for workflow in _as_array(model.get("workflows")):
         if not isinstance(workflow, dict):
@@ -436,6 +746,7 @@ def workflow_ir(model: dict) -> dict:
                 continue
             kind = node.get("kind")
             spec_type = node_types.get(kind)
+            node_kind = node_meta.get(kind) or {}
             ports = []
             for port in _as_array(node.get("ports")):
                 if not isinstance(port, dict):
@@ -451,7 +762,7 @@ def workflow_ir(model: dict) -> dict:
                                       if isinstance(item, str)],
                     "name": port.get("name"),
                 })
-            design_only = spec_type in DESIGN_ONLY_NODE_TYPES
+            design_only = spec_type in _design_only_types()
             implementation = node.get("implementationRef")
             legacy_note = LEGACY_NODE_KIND_NOTES.get(kind)
             nodes.append({
@@ -478,6 +789,19 @@ def workflow_ir(model: dict) -> dict:
                                 if isinstance(item, str)],
                 "verification": node.get("verification"),
                 "canonicalNodeId": node.get("canonicalNodeId"),
+                # --- v6.0 §17 GWF-IR 6D: the execution contract of the node ---
+                "executorKind": node.get("executorKind") or node_kind.get("executorClass"),
+                "authorityScope": node.get("authorityScope"),
+                "executionMode": node.get("executionMode"),
+                "inputStateSchema": node.get("inputStateSchema"),
+                "outputStateSchema": node.get("outputStateSchema"),
+                "stateWritePolicy": node.get("stateWritePolicy"),
+                "checkpointBefore": node.get("checkpointBefore"),
+                "checkpointAfter": node.get("checkpointAfter"),
+                "budgetPolicy": node.get("budgetPolicy"),
+                "iterationLimit": node.get("iterationLimit"),
+                "approvalPolicyRef": node.get("approvalPolicyRef"),
+                "toolContractRef": node.get("toolContractRef"),
                 "designOnly": design_only,
                 "executable": bool(implementation) and not design_only,
                 **({"legacyKind": kind, "note": legacy_note} if legacy_note else {}),
@@ -495,7 +819,8 @@ def workflow_ir(model: dict) -> dict:
                 "targetNodeId": edge.get("targetId"),
                 "targetPortId": edge.get("targetPortId"),
                 "edgeType": edge_types.get(kind),
-                "direction": "source-to-target" if edge.get("directed", True) else "both",
+                "direction": (edge.get("direction")
+                              or ("source-to-target" if edge.get("directed", True) else "both")),
                 "guard": edge.get("condition"),
                 "dataMapping": edge.get("dataMapping"),
                 "priority": edge.get("priority"),
@@ -503,12 +828,25 @@ def workflow_ir(model: dict) -> dict:
                 "verification": edge.get("verification"),
                 "evidenceIds": [item for item in _as_array(edge.get("evidenceIds"))
                                 if isinstance(item, str)],
+                # --- v6.0 §17 GWF-IR 6D: routing, state projection and constraints ---
+                "stateSchemaRef": edge.get("stateSchemaRef"),
+                "stateProjection": edge.get("stateProjection"),
+                "stateMergePolicy": edge.get("stateMergePolicy"),
+                "routingExpression": edge.get("routingExpression"),
+                "deliverySemantics": edge.get("deliverySemantics"),
+                "resumeBehavior": edge.get("resumeBehavior"),
+                "policyRef": edge.get("policyRef"),
                 **({"legacyKind": kind, "note": legacy_note} if legacy_note else {}),
             })
         entry_points = [item for item in _as_array(workflow.get("entryPoints"))
                         if isinstance(item, str)]
         if not entry_points:
-            entry_points = [node.get("id") for node in nodes if node.get("nodeType") == "Start"]
+            # Fall back to the Start node. The derived nodes carry "nodeId",
+            # not "id": reading "id" here produced a list of nulls, which then
+            # looked like a filled entry-point list and silenced the missing
+            # signal below.
+            entry_points = [node.get("nodeId") for node in nodes
+                            if node.get("nodeType") == "Start" and node.get("nodeId")]
         missing = []
         if not workflow.get("version"):
             missing.append("version")
@@ -540,8 +878,17 @@ def workflow_ir(model: dict) -> dict:
             "evidenceIds": [item for item in _as_array(workflow.get("evidenceIds"))
                             if isinstance(item, str)],
             "metadata": _as_dict(workflow.get("metadata")),
+            # --- v6.0 §17 GWF-IR 6D: the execution contract of the workflow ---
+            "executionGraph": workflow.get("executionGraph"),
+            "stateSchemaVersion": workflow.get("stateSchemaVersion"),
+            "checkpointPolicy": workflow.get("checkpointPolicy"),
+            "approvalPolicies": _as_array(workflow.get("approvalPolicies")),
+            "executionCapabilities": [item for item in _as_array(workflow.get("executionCapabilities"))
+                                      if isinstance(item, str)],
+            "runSecurityPolicy": workflow.get("runSecurityPolicy"),
             "missing": missing,
             "issues": issues,
+            "gates": _execution_gates(workflow),
             "gwfIrValid": not issues and not missing,
             "designOnlyNodeIds": [node["nodeId"] for node in nodes if node["designOnly"]],
         })
@@ -550,8 +897,10 @@ def workflow_ir(model: dict) -> dict:
         "gwfVersion": _workflow_vocab().get("gwfIr", {}).get("version", DERIVED_SCHEMA_VERSION),
         "count": len(workflows),
         "workflows": workflows,
+        "gates": execution_gates(model),
         "note": ("designOnly 的节点没有真实执行器；executable=false 表示未声明实现引用。"
-                 "missing 列出 GWF-IR 必填但未给出的字段。"),
+                 "missing 列出 GWF-IR 必填但未给出的字段。"
+                 "gates 是 v6.0 quality_gates_6d 的判定结果：命中的门表示该执行图不得放行。"),
     }
 
 
@@ -600,6 +949,13 @@ def workflow_schema() -> dict:
             "permissions": string_array,
             "evidenceIds": string_array,
             "metadata": {"type": "object"},
+            # --- v6.0 §17 GWF-IR 6D ---
+            "executionGraph": nullable_object,
+            "stateSchemaVersion": _ir_property(["string", "null"]),
+            "checkpointPolicy": nullable_object,
+            "approvalPolicies": object_array,
+            "executionCapabilities": string_array,
+            "runSecurityPolicy": nullable_object,
         },
         "$defs": {
             "node": {
@@ -625,6 +981,18 @@ def workflow_schema() -> dict:
                     "implementationRef": _ir_property(["string", "null"]),
                     "evidenceIds": string_array,
                     "verification": _ir_property(["string", "null"]),
+                    "executorKind": _ir_property(["string", "null"]),
+                    "authorityScope": _ir_property(["string", "null"]),
+                    "executionMode": _ir_property(["string", "null"]),
+                    "inputStateSchema": _ir_property(["string", "null"]),
+                    "outputStateSchema": _ir_property(["string", "null"]),
+                    "stateWritePolicy": _ir_property(["string", "null"]),
+                    "checkpointBefore": _ir_property(["boolean", "null"]),
+                    "checkpointAfter": _ir_property(["boolean", "null"]),
+                    "budgetPolicy": nullable_object,
+                    "iterationLimit": _ir_property(["integer", "null"]),
+                    "approvalPolicyRef": _ir_property(["string", "null"]),
+                    "toolContractRef": _ir_property(["string", "null"]),
                     "designOnly": _ir_property("boolean"),
                     "executable": _ir_property("boolean"),
                 },
@@ -647,6 +1015,13 @@ def workflow_schema() -> dict:
                     "errorRoute": _ir_property(["string", "null"]),
                     "verification": _ir_property(["string", "null"]),
                     "evidenceIds": string_array,
+                    "stateSchemaRef": _ir_property(["string", "null"]),
+                    "stateProjection": nullable_object,
+                    "stateMergePolicy": _ir_property(["string", "null"]),
+                    "routingExpression": _ir_property(["string", "null"]),
+                    "deliverySemantics": _ir_property(["string", "null"]),
+                    "resumeBehavior": _ir_property(["string", "null"]),
+                    "policyRef": _ir_property(["string", "null"]),
                 },
             },
             "port": {
@@ -684,6 +1059,29 @@ def workflow_schema() -> dict:
     }
 
 
+# --- 6D execution graph contract (v6.0 §25) ---------------------------------
+
+def execution_graph_schema() -> dict:
+    """The 6D execution graph IR contract.
+
+    A contract file, not a derivation: it depends on the vocabulary and the
+    specification, not on the model, so it travels inside the fixed site kit.
+    """
+    path = CONTRACTS_DIR / "execution-graph.schema.json"
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def execution_graph_example() -> dict:
+    """A compliant example of the 6D execution graph.
+
+    It is **example data**: every evidence list is empty and every
+    verification level is Hypothetical. The example must never be presented as
+    a fact about a target project.
+    """
+    path = CONTRACTS_DIR / "execution-graph.example.json"
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
 # --- case library -----------------------------------------------------------
 
 def case_library(model: dict) -> dict:
@@ -711,8 +1109,8 @@ def case_library(model: dict) -> dict:
         if isinstance(case_type, str):
             type_counts[case_type] = type_counts.get(case_type, 0) + 1
         cases.append({
-            "caseId": case.get("id"),
-            "name": case.get("title"),
+            "caseId": case.get("id") or case.get("caseId"),
+            "name": case.get("title") or case.get("name"),
             "description": case.get("description"),
             "category": category,
             "categoryLabel": labels.get(category),

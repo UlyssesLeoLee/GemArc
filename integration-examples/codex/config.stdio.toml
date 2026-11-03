@@ -14,7 +14,7 @@ tool_timeout_sec = 120
 # exposed; add gemarc_scaffold, gemarc_init, gemarc_model, gemarc_build, gemarc_export together with
 # GEMARC_ALLOW_WRITE = "1" below when you want the model to write into <workspace>.
 enabled_tools = [
-  "gemarc_5d_guide",
+  "gemarc_media_doc_guide",
   "gemarc_brief", "gemarc_contracts", "gemarc_assets", "gemarc_new_model",
   "gemarc_validate", "gemarc_simulate", "gemarc_diff", "gemarc_render",
   "gemarc_inspect", "gemarc_plan", "gemarc_verify",

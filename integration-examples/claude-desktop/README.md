@@ -38,5 +38,5 @@ claude.ai 和 Desktop 的远程 connector 只支持三种认证 **[DOCS]**：OAu
 
 ## prompt、资源与 skill
 
-- 提示词 `gemarc-design`、资源 `gemarc://registry`、`gemarc://schema/model`、`gemarc://skill/gemarc-5d-design` 在 Desktop 里的呈现方式没有验证 **[UNVERIFIED]**。让模型先调用 `gemarc_5d_guide`（工具，Desktop 一定会给模型）或 `gemarc_brief` 是不依赖 prompt 与资源的做法。
-- `skills/gemarc-5d-design` 在 Desktop / claude.ai 里的安装方式没有验证 **[UNVERIFIED]**；不过工作流本身已经由服务器随包发布，**不装这个 skill 也已经具备制作 5D 设计的能力**（工具 `gemarc_5d_guide`）。
+- 提示词 `gemarc-media-doc`、资源 `gemarc://registry`、`gemarc://schema/model`、`gemarc://skill/gemarc-media-doc` 在 Desktop 里的呈现方式没有验证 **[UNVERIFIED]**。让模型先调用 `gemarc_media_doc_guide`（工具，Desktop 一定会给模型）或 `gemarc_brief` 是不依赖 prompt 与资源的做法。
+- `skills/gemarc-media-doc` 在 Desktop / claude.ai 里的安装方式没有验证 **[UNVERIFIED]**；不过工作流本身已经由服务器随包发布，**不装这个 skill 也已经具备制作多媒体文档的能力**（工具 `gemarc_media_doc_guide`）。

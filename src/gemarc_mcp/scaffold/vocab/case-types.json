@@ -1,8 +1,8 @@
 {
   "schemaVersion": "0.2.0",
   "id": "case-types",
-  "title": "5D Case 分析类型（v5.0 §13 case_types）",
-  "description": "v5.0 提示词 §13：第五维必须以正常、异常、边界、并发与组合 Case 为基本分析单位，不局限于固定的 A/B 预制动画。本词表登记 §13 列出的全部 14 种分析类型。cases[].category 是分诊轴（见 case-categories 词表），cases[].caseType 是本词表的分析类型：两个字段互补，不互相替代。",
+  "title": "5D Case 分析类型（v6.0 §13 case_types / §14 动画语法）",
+  "description": "v6.0 提示词 §13：第五维必须以正常、异常、边界、并发与组合 Case 为基本分析单位，不局限于固定的 A/B 预制动画。本词表登记 §13 列出的全部 14 种分析类型。cases[].category 是分诊轴（见 case-categories 词表），cases[].caseType 是本词表的分析类型：两个字段互补，不互相替代。§14 的动画原语、终态、组合方式与示例组合也登记在本词表内。",
   "types": [
     {"id": "Normal", "label": "正常", "assertion": "正常业务执行", "requiresIntervention": false, "category": "normal", "primitives": ["Propagation", "StateTransition", "Parallel", "Convergence"]},
     {"id": "Boundary", "label": "边界", "assertion": "边界值与极限条件", "requiresIntervention": true, "category": "boundary", "primitives": ["Propagation", "Blocking", "OutcomeComparison"]},
@@ -27,6 +27,20 @@
     "note": "§14 animation_primitives。原语只消费计算轨迹，不得反过来创造业务事件或因果关系。",
     "ids": ["Propagation", "Branching", "Parallel", "Waiting", "Timeout", "Retry", "Blocking", "FailurePropagation", "Recovery", "Compensation", "FeedbackLoop", "Convergence", "StateTransition", "DataTransformation", "Escalation", "Cancellation", "Rollback", "OutcomeComparison"],
     "terminalStates": ["Completed", "Failed"]
+  },
+  "compositionModes": {
+    "note": "§14 composition_modes：动画组合方式。组合方式只决定呈现，不得改变计算轨迹的因果顺序。",
+    "ids": ["Sequential", "Parallel", "Conditional", "Nested", "Repeated", "Interrupted", "ReversibleVisualReplay", "Synchronized", "Branched", "Converged"]
+  },
+  "illustrativeCompositions": {
+    "note": "§14 illustrative_compositions。规格明确标注这些只是动画语法示例，不属于目标仓库自动存在的真实事件轨迹，必须由实际 Case 计算生成。示例里既可能出现原语，也可能出现终态或 Case 类型名，因此本表逐项记录原样，不做归并。",
+    "entries": [
+      {"caseType": "Normal", "sequence": ["Propagation", "StateTransition", "Parallel", "Convergence", "Completed"], "terminalState": "Completed"},
+      {"caseType": "Timeout", "sequence": ["Propagation", "Waiting", "Timeout", "Retry", "Failed"], "terminalState": "Failed"},
+      {"caseType": "Recovery", "sequence": ["Propagation", "FailurePropagation", "Retry", "Recovery", "Completed"], "terminalState": "Completed"},
+      {"caseType": "CascadingFailure", "sequence": ["FailurePropagation", "Propagation", "Blocking", "Escalation", "OutcomeComparison"], "terminalState": null},
+      {"caseType": "Compensation", "sequence": ["Propagation", "PartialFailure", "Compensation", "Recovery", "OutcomeComparison"], "terminalState": null}
+    ]
   },
   "rules": [
     "cases[].caseType 取自本词表；cases[].category 取自 case-categories 词表。",

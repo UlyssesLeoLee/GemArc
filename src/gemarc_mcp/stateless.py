@@ -142,6 +142,9 @@ def render(model: dict, profile: str = "static") -> dict:
     artefacts.update(derive.derived_files(canonical))
     encoded = {path: encode_json(value) for path, value in artefacts.items()}
     total = sum(len(raw) for raw in encoded.values())
+    derived_total = sum(len(raw) for path, raw in encoded.items()
+                        if path not in ("data/architecture.json", "data/scenarios.json",
+                                        "data/capabilities.json"))
     # Inline file by file: a small model gets everything, a large one keeps
     # the whole manifest and as much content as the budget allows.
     files = []
@@ -155,6 +158,7 @@ def render(model: dict, profile: str = "static") -> dict:
         else:
             inline = False
         files.append(entry)
+    without_content = [item["path"] for item in files if "content" not in item]
     kit = site_kit(profile)
     payload = {
         "status": "ok",
@@ -167,17 +171,24 @@ def render(model: dict, profile: str = "static") -> dict:
                      f"然后 {kit['run']}"),
     }
     if not inline:
-        payload["notice"] = (f"派生文件合计 {total} 字节，超过内联上限 {RENDER_INLINE_LIMIT}；"
-                             "此处只给出清单与摘要。请在本地运行 `gemarc build <project> --profile "
-                             f"{profile}` 取得完整产物。")
+        payload["notice"] = (
+            f"共 {len(files)} 个文件、合计 {total} 字节，超过内联上限 {RENDER_INLINE_LIMIT}；"
+            f"其中 {len(without_content)} 个文件只给出清单与摘要"
+            f"（{'、'.join(without_content)}），其余仍带完整内容。"
+            f"派生文件合计 {derived_total} 字节。"
+            "请在本地运行 `gemarc build <project> --profile "
+            f"{profile}` 取得完整产物。")
     return payload
 
 
 # --- site kit -----------------------------------------------------------------
 
-#: The one file under ``data/`` that does not depend on the model: the GWF-IR
-#: schema follows the vocabulary, so it travels inside the fixed site kit.
-KIT_DATA_FILES = ("data/workflow-schema.json",)
+#: The files under ``data/`` that do not depend on the model: the GWF-IR
+#: schema follows the vocabulary, and the 6D execution graph contract follows
+#: the specification. Both travel inside the fixed site kit.
+KIT_DATA_FILES = ("data/execution-graph.example.json",
+                  "data/execution-graph.schema.json",
+                  "data/workflow-schema.json")
 
 
 @lru_cache(maxsize=None)

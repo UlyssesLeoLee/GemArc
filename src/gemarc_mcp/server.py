@@ -34,11 +34,12 @@ WRITE_TOOLS: set[str] = set()
 REGISTERED_TOOLS: list[str] = []
 
 INSTRUCTIONS = (
-    "GemArc turns facts about a software system into a reviewable 0D-5D architecture site. "
-    "This server ships the whole workflow: when the user asks to make a 5D design "
-    "(制作5D设计、创建5D设计、做5D架构站点、5D架构模型) or to validate, simulate, diff or render "
-    "such a model, call gemarc_5d_guide first and follow it; the same text is the resource "
-    "gemarc://skill/gemarc-5d-design. No separate skill has to be installed. "
+    "GemArc turns facts about a software system into a reviewable 0D-6D multimedia architecture document. "
+    "This server ships the whole workflow: when the user asks to make a multimedia document "
+    "(制作多媒体文档、创建多媒体文档、做多媒体架构站点、多媒体架构模型；旧说法同样受理：制作5D设计、5D架构模型) "
+    "or to validate, simulate, diff or render "
+    "such a model, call gemarc_media_doc_guide first and follow it; the same text is the resource "
+    "gemarc://skill/gemarc-media-doc. No separate skill has to be installed. "
     "Start with gemarc_brief: it is the complete work order (slots, rules, allowed vocabulary). "
     "Never invent facts: every node and edge must point at evidence, otherwise mark it Unknown. "
     "Simulation output is only as strong as the evidence class of its scenario. "
@@ -157,9 +158,9 @@ def create_server(toolset: str | None = None):
 
     # ---- tools that work in every deployment ---------------------------------------
 
-    @tool("gemarc_5d_guide", "5D design workflow", stateless_ok=True)
+    @tool("gemarc_media_doc_guide", "Multimedia document workflow", stateless_ok=True)
     def guide(topic: str = ""):
-        """The complete 5D design workflow, served by this server. Call it first when the user asks to make a 5D design (制作5D设计、创建5D设计、做5D架构站点、5D架构模型) or to validate, simulate, diff or render such a model: it states the procedure, the hard rules and the tool sequence to use. `topic` is "" or "workflow" for the full workflow, "assemble" for the step-by-step commands that put the downloaded site together. The same text is the MCP resource gemarc://skill/gemarc-5d-design; no separate skill has to be installed."""
+        """The complete multimedia document workflow, served by this server. Call it first when the user asks to make a multimedia architecture document (制作多媒体文档、做多媒体文档、生成多媒体架构站点) or to validate, simulate, diff or render such a model: it states the procedure, the hard rules and the tool sequence to use. The older wording (制作5D设计、5D架构模型) is accepted too: the model covers 0D-6D and the command name is no longer bound to a dimension. `topic` is "" or "workflow" for the full workflow, "assemble" for the step-by-step commands that put the downloaded site together. The same text is the MCP resource gemarc://skill/gemarc-media-doc; no separate skill has to be installed."""
         return run(lambda: service.guide(topic))
 
     @tool("gemarc_brief", "Work order for the model", stateless_ok=True)
@@ -215,7 +216,7 @@ def create_server(toolset: str | None = None):
 
     @tool("gemarc_render", "Render site data from a model", stateless_ok=True)
     def render(model: dict, profile: str = "static"):
-        """Validate a model and return the files that depend on it: data/architecture.json, scenarios.json, capabilities.json, evidence-index.json, diagram-catalog.json, spatial-layout.json, workflow-ir.json and case-library.json, plus a description of the fixed site kit and where to download it. The kit carries the site shell, the shared runtime and data/workflow-schema.json (the GWF-IR schema, which follows the vocabulary and not the model). Kit + these files is the complete 5D site; nothing is stored on the server. `profile` is static (default; zero-build ESM) or vite (npm project)."""
+        """Validate a model and return the files that depend on it: data/architecture.json, scenarios.json, capabilities.json, evidence-index.json, diagram-catalog.json, spatial-layout.json, workflow-ir.json and case-library.json, plus a description of the fixed site kit and where to download it. The kit carries the site shell, the shared runtime and data/workflow-schema.json (the GWF-IR schema, which follows the vocabulary and not the model). Kit + these files is the complete multimedia document site; nothing is stored on the server. `profile` is static (default; zero-build ESM) or vite (npm project)."""
         return run(lambda: stateless.render(model, profile))
 
     # ---- tools that need a workspace (local servers) ------------------------------
@@ -283,37 +284,40 @@ def create_server(toolset: str | None = None):
         path = builder.CONTRACTS_DIR / "canonical-model.schema.json"
         return path.read_text(encoding="utf-8")
 
-    @app.resource("gemarc://skill/gemarc-5d-design")
+    @app.resource("gemarc://skill/gemarc-media-doc")
     def skill_workflow() -> str:
-        """The complete 5D design workflow shipped with this server: the same text as the gemarc_5d_guide tool, so a client that can read resources needs no separate skill."""
+        """The complete multimedia document workflow shipped with this server: the same text as the gemarc_media_doc_guide tool, so a client that can read resources needs no separate skill."""
         from .scaffold import skillpack
         return skillpack.read_text("SKILL.md")
 
-    @app.resource("gemarc://skill/gemarc-5d-design/references/assemble-site.md")
+    @app.resource("gemarc://skill/gemarc-media-doc/references/assemble-site.md")
     def skill_assemble() -> str:
         """Step-by-step commands that put the downloaded site kit together into a working site."""
         from .scaffold import skillpack
         return skillpack.read_text("references/assemble-site.md")
 
-    @app.prompt(name="gemarc-design")
+    @app.prompt(name="gemarc-media-doc")
     def design_prompt(project: str = "") -> str:
-        """Generate verified 5D architecture data while reusing the fixed scaffold."""
+        """Generate verified multimedia architecture data while reusing the fixed scaffold."""
         target = f"针对 {project}：" if project else ""
-        lead = ("先调用 gemarc_5d_guide 取得服务器自带的完整 5D 设计工作流"
-                "（也可读资源 gemarc://skill/gemarc-5d-design），按它执行；")
+        lead = ("先调用 gemarc_media_doc_guide 取得服务器自带的完整制作流程"
+                "（也可读资源 gemarc://skill/gemarc-media-doc），按它执行；")
         if remote:
             return (f"{target}{lead}再调用 gemarc_brief 取得工作指令、槽位清单与词表，不要自行发明字段名、证据等级说法或引擎。"
                     "用 gemarc_new_model 取得空骨架，再用你自己对用户仓库的访问能力读取真实证据来填写；"
                     "未确定的事实标为 Unknown。反复调用 gemarc_validate(model=…) 直到 0 个 error；"
                     "只有要宣称“已确认”时才加 strict=true（strict 下 Unknown/Hypothetical 必然不过，不要为此改证据等级）。"
-                    "4D 仅使用真实事件或显式假设场景；5D 只能根据确认的规则做计算（gemarc_simulate）。"
-                    "最后调用 gemarc_render 取得 data/*.json 与固定件下载地址，并说明哪些浏览器能力未经测试。")
+                    "4D 仅使用真实事件或显式假设场景；5D 只能根据确认的规则做计算（gemarc_simulate）；"
+                    "6D 的执行图只写契约与门禁，不要声称会真的执行。"
+                    "最后调用 gemarc_render 取得 data/*.json 与固定件下载地址，"
+                    "按流程里的 UI/UX 基线复核一遍主内容与窗格，并说明哪些浏览器能力未经测试。")
         return (f"{target}{lead}再调用 gemarc_brief 取得精简工作指令、槽位清单与词表，"
                 "不要自行发明字段名、证据等级说法或引擎。"
                 "然后调用 gemarc_inspect 与 gemarc_assets，读取原始设计证据，"
                 "建立一个统一 Architecture Model，未确定事实标为 unknown/assumed；调用 gemarc_validate。"
                 "禁止重写现成 Viewer 共通代码；4D 仅使用真实事件或显式假设场景；5D 只能根据确认的规则做计算。"
-                "生成后运行 gemarc_build、gemarc_verify，审查未测试的浏览器能力并说明限制。")
+                "生成后运行 gemarc_build、gemarc_verify，按流程里的 UI/UX 基线复核一遍主内容与窗格，"
+                "审查未测试的浏览器能力并说明限制。")
 
     return app
 

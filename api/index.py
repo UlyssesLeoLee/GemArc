@@ -7,8 +7,8 @@ It serves, from one function:
   POST /mcp      MCP Streamable HTTP endpoint (optionally behind a bearer token)
   /healthz       health and deployment-state probe (public, leaks no paths)
   /              the MCP console (public static shell, no secrets)
-  /site/*        the 5D architecture static site (public, built on first use)
-  /kit/<p>.zip   the fixed part of a 5D site, one deterministic archive (public)
+  /site/*        the multimedia architecture document site (public, built on first use)
+  /kit/<p>.zip   the fixed part of a multimedia document site, one deterministic archive (public)
   /kit/atlas.zip LOCAL OPT-IN only (GEMARC_ATLAS_KIT=1, off by default and unreachable on the Vercel upload): the atlas kit
 
 The default tool set of a remote deployment is ``stateless``: the model travels

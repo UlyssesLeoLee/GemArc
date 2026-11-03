@@ -20,7 +20,7 @@
 | `full` | 17 | 本地 stdio | 项目工具读写工作区；写工具需 `GEMARC_ALLOW_WRITE=1` |
 | `stateless` | 9 | 远程（Vercel） | 模型随调用内联传入，服务端不保存任何东西，没有写工具（ADR-009） |
 
-`stateless` 的 9 个工具是 `gemarc_5d_guide`、`gemarc_brief`、`gemarc_contracts`、`gemarc_assets`、`gemarc_new_model`、`gemarc_validate`、`gemarc_simulate`、`gemarc_diff`、`gemarc_render`；其余 8 个只在 `full` 中注册。`gemarc_brief` 在 `stateless` 下返回的 `procedure` 与 `commands` 只会提到该工具集里存在的工具。
+`stateless` 的 9 个工具是 `gemarc_media_doc_guide`、`gemarc_brief`、`gemarc_contracts`、`gemarc_assets`、`gemarc_new_model`、`gemarc_validate`、`gemarc_simulate`、`gemarc_diff`、`gemarc_render`；其余 8 个只在 `full` 中注册。`gemarc_brief` 在 `stateless` 下返回的 `procedure` 与 `commands` 只会提到该工具集里存在的工具。
 
 ## `project` 与 `model` 二选一
 
@@ -32,7 +32,7 @@
 
 | Tool | 集 | 参数 | 主要输出字段 | 执行约束 |
 |---|---|---|---|---|
-| `gemarc_5d_guide` | S | `topic=""` | topic, title, content, bytes, sha256, source, sections[], notice | 只读；`topic` 为 `""`/`workflow`（完整工作流）或 `assemble`（组装站点的逐步命令），其它值 `GEMARC_GUIDE_001`；返回随包发布的工作流文本，客户端无需另装 skill |
+| `gemarc_media_doc_guide` | S | `topic=""` | topic, title, content, bytes, sha256, source, sections[], notice | 只读；`topic` 为 `""`/`workflow`（完整工作流）或 `assemble`（组装站点的逐步命令），其它值 `GEMARC_GUIDE_001`；返回随包发布的完整流程正文，客户端无需另装 skill |
 | `gemarc_brief` | S | `project=""`, `section=""` | purpose, procedure, rules, slots, vocabulary, commands, alreadyDone, vocabDigest；带 `section` 时为 `{status, section, content, vocabDigest}` | 只读；`section` 取上述任一键，未知值 `GEMARC_BRIEF_001`；`stateless` 下 procedure/commands 只含该工具集里的工具 |
 | `gemarc_contracts` | S | `query=""` | contracts[], vocabularies[], profiles[], slots[]；带 `query`（文件名）时多一个 `document` | 只读；`query` 只能是 `contracts[]` / `vocabularies[]` 里出现的文件名，路径、`..` 与不在列表里的名字一律 `GEMARC_CONTRACT_001` |
 | `gemarc_assets` | S | `query=""` | name, licensePolicy, components[] | 只读；`planned` 状态的组件尚未实现 |
@@ -61,7 +61,7 @@
 
 | Tool | title | readOnlyHint | destructiveHint | idempotentHint | openWorldHint | `stateless` |
 |---|---|---|---|---|---|---|
-| `gemarc_5d_guide` | 5D design workflow | true | — | — | false | 是 |
+| `gemarc_media_doc_guide` | Multimedia document workflow | true | — | — | false | 是 |
 | `gemarc_brief` | Work order for the model | true | — | — | false | 是 |
 | `gemarc_contracts` | Contracts and vocabularies | true | — | — | false | 是 |
 | `gemarc_assets` | Reusable components | true | — | — | false | 是 |
@@ -122,7 +122,7 @@
 | `GEMARC_IO_001` / `GEMARC_IO_002` | 文件不存在或超过 4 MiB / 项目目录已存在，拒绝覆盖 |
 | `GEMARC_MODEL_001` / `GEMARC_MODEL_002` / `GEMARC_MODEL_020` | JSON 读取失败或模型不是对象 / 模型超过 4 MiB / 模型校验失败，不可模拟 |
 | `GEMARC_BRIEF_001`、`GEMARC_CONTRACT_001` | 未知分段、未找到契约文件 |
-| `GEMARC_GUIDE_001` / `GEMARC_GUIDE_002` | `gemarc_5d_guide` 的分段名未知 / 工作流文件缺失 |
+| `GEMARC_GUIDE_001` / `GEMARC_GUIDE_002` | `gemarc_media_doc_guide` 的分段名未知 / 流程正文缺失 |
 | `GEMARC_SCAFFOLD_001` / `GEMARC_SCAFFOLD_002` | 未知 profile / 脚手架已存在 |
 | `GEMARC_CONFLICT_001` | `expected_sha256` 与当前模型不一致 |
 | `GEMARC_BUILD_001`–`005` | `legacy_dist` 不合法 / 超 50 MiB / 目标目录非 GemArc 生成 / 含符号链接 / 未知 profile |
@@ -147,12 +147,12 @@
 |---|---|---|
 | Resource | `gemarc://registry` | 可复用组件注册表（同 `gemarc_assets()`） |
 | Resource | `gemarc://schema/model` | 规范架构模型的 JSON Schema（语义规则另由 `gemarc_validate` 检查） |
-| Resource | `gemarc://skill/gemarc-5d-design` | 随包发布的完整 5D 设计工作流（与 `gemarc_5d_guide` 同一份文本） |
-| Resource | `gemarc://skill/gemarc-5d-design/references/assemble-site.md` | 组装站点的逐步命令（bash 与 PowerShell） |
-| Prompt | `gemarc-design`（参数 `project=""`） | 设计任务引导；`full` 下引导 inspect → validate → build → verify，`stateless` 下引导 new_model → validate → simulate → render；两个版本都只引用该工具集里存在的工具名，并以 `gemarc_5d_guide` 开头 |
+| Resource | `gemarc://skill/gemarc-media-doc` | 随包发布的完整 多媒体文档制作流程（与 `gemarc_media_doc_guide` 同一份文本） |
+| Resource | `gemarc://skill/gemarc-media-doc/references/assemble-site.md` | 组装站点的逐步命令（bash 与 PowerShell） |
+| Prompt | `gemarc-media-doc`（参数 `project=""`） | 设计任务引导；`full` 下引导 inspect → validate → build → verify，`stateless` 下引导 new_model → validate → simulate → render；两个版本都只引用该工具集里存在的工具名，并以 `gemarc_media_doc_guide` 开头 |
 
-提示词是引导，不隐式写文件，操作仍经工具授权。不是每个客户端都用得上 resources 与 prompts（以下是对客户端文档与源码的调研结论，未真机验证）：Codex 忽略 prompt，只能通过内置的 list/read resource 工具读资源；Claude API 的 MCP connector 只支持 tools。因此**核心流程不依赖它们**：工作流本身由工具 `gemarc_5d_guide` 提供（工具是所有客户端都会交给模型的那条通道），`gemarc_brief` 再给出槽位、规则与词表。资源读取不允许任意文件访问，只返回上表的固定内容。
+提示词是引导，不隐式写文件，操作仍经工具授权。不是每个客户端都用得上 resources 与 prompts（以下是对客户端文档与源码的调研结论，未真机验证）：Codex 忽略 prompt，只能通过内置的 list/read resource 工具读资源；Claude API 的 MCP connector 只支持 tools。因此**核心流程不依赖它们**：工作流本身由工具 `gemarc_media_doc_guide` 提供（工具是所有客户端都会交给模型的那条通道），`gemarc_brief` 再给出槽位、规则与词表。资源读取不允许任意文件访问，只返回上表的固定内容。
 
-工作流文本的来源是仓库里的 `skills/gemarc-5d-design/`，随包复制到 `src/gemarc_mcp/scaffold/skills/`（ADR-012）；`tests/test_skill_pack.py` 断言两者不会漂移，且 package-data 声明覆盖每一个打包文件。
+这份流程正文的来源是仓库里的 `skills/gemarc-media-doc/`，随包复制到 `src/gemarc_mcp/scaffold/skills/`（ADR-012）；`tests/test_skill_pack.py` 断言两者不会漂移，且 package-data 声明覆盖每一个打包文件。
 
 [工具调用序列图](../06_图表/03_mcp_operation_sequence.mmd)

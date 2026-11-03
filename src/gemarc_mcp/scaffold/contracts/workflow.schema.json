@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://gemarc.dev/schemas/0.2.0/workflow.schema.json",
   "title": "Canonical Workflow（GWF-IR）",
-  "description": "v5.0 提示词 §2.7 与 §17 GWF-IR。工作流必须具有机器可读语义：节点、端口、关系、条件、异常、输入、输出、执行约束都要可被程序及大模型理解。画布坐标不承载执行语义。所有新增字段都是可选的：旧模型继续有效。",
+  "description": "v6.0 提示词 §2.7 与 §17 GWF-IR 6D 扩展。工作流必须具有机器可读语义：节点、端口、关系、条件、异常、输入、输出、执行约束都要可被程序及大模型理解。画布坐标不承载执行语义。所有新增字段都是可选的：旧模型继续有效。6D 字段描述执行契约（执行器、权限、状态、检查点、审批、路由），不构成执行能力：真实执行必须另有获授权的后端。",
   "type": "object",
   "required": ["id", "name", "nodes", "edges"],
   "additionalProperties": true,
@@ -20,7 +20,8 @@
       "enum": ["task", "decision", "gateway", "start", "end", "subprocess", "event", "data",
                "input", "output", "parallel-fork", "parallel-join", "timer", "wait", "agent",
                "human-approval", "api-call", "data-transform", "subflow", "error-handler",
-               "retry", "compensation"],
+               "retry", "compensation", "deterministic-program", "agent-loop", "tool-call",
+               "policy-gate", "checkpoint", "resume", "manual-review", "escalation", "audit-event"],
       "description": "流程类型，取值见 vocab/workflow-kinds.json nodeKinds"
     },
     "version": {
@@ -67,6 +68,38 @@
       "default": {},
       "description": "自由元数据。已登记的键必须来自 model-contract 的保留词表。"
     },
+    "executionGraph": {
+      "type": ["object", "null"],
+      "default": null,
+      "description": "6D 执行图引用：指向 execution-graph IR 契约（execution-graph.schema.json）。缺失表示该流程没有可执行图。"
+    },
+    "stateSchemaVersion": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "6D 共享状态的 schema 版本。所有执行状态必须有版本化 schema；缺失时任何依赖状态的执行都必须被拒绝。"
+    },
+    "checkpointPolicy": {
+      "type": ["object", "null"],
+      "default": null,
+      "description": "6D 检查点策略：边界、持久化位置与状态完整性要求。缺失时按未声明处理，不得宣称可恢复。"
+    },
+    "approvalPolicies": {
+      "type": "array",
+      "default": [],
+      "items": {"type": "object"},
+      "description": "6D 审批策略目录：审批人角色、超时处理与退回路径。人工审批节点必须引用其中一条。"
+    },
+    "executionCapabilities": {
+      "type": "array",
+      "default": [],
+      "items": {"type": "string"},
+      "description": "6D 声明该流程需要的能力（如 Agent 循环、工具调用、审批）。用于与执行器能力匹配。"
+    },
+    "runSecurityPolicy": {
+      "type": ["object", "null"],
+      "default": null,
+      "description": "6D 运行安全策略：授权范围、允许的副作用、审计要求。"
+    },
     "nodes": {
       "type": "array",
       "default": [],
@@ -86,7 +119,8 @@
             "enum": ["task", "decision", "gateway", "start", "end", "subprocess", "event", "data",
                      "input", "output", "parallel-fork", "parallel-join", "timer", "wait", "agent",
                      "human-approval", "api-call", "data-transform", "subflow", "error-handler",
-                     "retry", "compensation"],
+                     "retry", "compensation", "deterministic-program", "agent-loop", "tool-call",
+                     "policy-gate", "checkpoint", "resume", "manual-review", "escalation", "audit-event"],
             "description": "取值见 vocab/workflow-kinds.json nodeKinds"
           },
           "nodeType": {
@@ -254,6 +288,69 @@
               "height": {"type": ["number", "null"], "default": null}
             },
             "additionalProperties": false
+          },
+          "executorKind": {
+            "type": ["string", "null"],
+            "default": null,
+            "enum": ["agentic", "deterministic", "human-gated", "external", "routing", "snapshot", "record", "composite", "none", null],
+            "description": "6D 执行器类别。§17 要求明确区分 agentic / deterministic / human-gated。"
+          },
+          "authorityScope": {
+            "type": ["string", "null"],
+            "default": null,
+            "description": "6D 权限范围：该节点被允许触达的外部系统或数据域。"
+          },
+          "executionMode": {
+            "type": ["string", "null"],
+            "default": null,
+            "enum": ["simulation", "dry-run", "real", null],
+            "description": "6D 执行模式。默认 simulation；real 必须存在获授权的执行后端，否则拒绝。"
+          },
+          "inputStateSchema": {
+            "type": ["string", "null"],
+            "default": null,
+            "description": "6D 读取状态的 schema 引用。"
+          },
+          "outputStateSchema": {
+            "type": ["string", "null"],
+            "default": null,
+            "description": "6D 写出状态的 schema 引用。"
+          },
+          "stateWritePolicy": {
+            "type": ["string", "null"],
+            "default": null,
+            "description": "6D 状态写入策略：只允许写哪些字段、冲突如何处理。"
+          },
+          "checkpointBefore": {
+            "type": ["boolean", "null"],
+            "default": null,
+            "description": "6D 是否在该节点执行前提交检查点。"
+          },
+          "checkpointAfter": {
+            "type": ["boolean", "null"],
+            "default": null,
+            "description": "6D 是否在该节点执行后提交检查点。"
+          },
+          "budgetPolicy": {
+            "type": ["object", "null"],
+            "default": null,
+            "description": "6D 预算策略：Agent 循环的 token / 时间 / 调用次数上限。"
+          },
+          "iterationLimit": {
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "default": null,
+            "description": "6D Agent 循环的最大迭代次数。缺失即判为无界循环，必须被拒绝。"
+          },
+          "approvalPolicyRef": {
+            "type": ["string", "null"],
+            "default": null,
+            "description": "6D 审批策略引用，指向工作流的 approvalPolicies。"
+          },
+          "toolContractRef": {
+            "type": ["string", "null"],
+            "default": null,
+            "description": "6D 工具契约引用。工具调用节点必须声明，否则不得发起真实调用。"
           }
         }
       }
@@ -288,6 +385,8 @@
             "type": "string",
             "enum": ["control-flow", "data-flow", "event-flow", "error-flow", "conditional-flow",
                      "compensation-flow", "dependency",
+                     "state-transition", "approval-transition", "tool-result", "retry-transition",
+                     "timeout-transition", "resume-transition",
                      "sequence", "conditional", "message", "association"],
             "description": "取值见 vocab/workflow-kinds.json edgeKinds；旧写法保留兼容读取。"
           },
@@ -344,6 +443,41 @@
             "type": ["object", "null"],
             "default": null,
             "properties": {"points": {"type": "array", "items": {"type": "object"}}}
+          },
+          "stateSchemaRef": {
+            "type": ["string", "null"],
+            "default": null,
+            "description": "6D 该边传递的状态 schema 引用。传递状态的边必须声明，否则视为未校验状态。"
+          },
+          "stateProjection": {
+            "type": ["object", "null"],
+            "default": null,
+            "description": "6D 状态投影：源状态如何映射到目标可见的状态字段。"
+          },
+          "stateMergePolicy": {
+            "type": ["string", "null"],
+            "default": null,
+            "description": "6D 状态归并策略。并发分支必须声明，否则无法检测归并冲突。"
+          },
+          "routingExpression": {
+            "type": ["string", "null"],
+            "default": null,
+            "description": "6D 路由表达式：按什么条件选择这条边。条件边必须声明。"
+          },
+          "deliverySemantics": {
+            "type": ["string", "null"],
+            "default": null,
+            "description": "6D 投递语义，例如 at-most-once / at-least-once / exactly-once。"
+          },
+          "resumeBehavior": {
+            "type": ["string", "null"],
+            "default": null,
+            "description": "6D 从检查点恢复时经过这条边的行为。"
+          },
+          "policyRef": {
+            "type": ["string", "null"],
+            "default": null,
+            "description": "6D 策略引用：决定该边是否允许或需要审批。"
           }
         }
       }

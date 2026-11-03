@@ -70,7 +70,7 @@ claude mcp add gemarc --scope user --transport stdio -e GEMARC_WORKSPACE_ROOT='<
 
 ## 提示与资源
 
-- 提示词 `gemarc-design` 在会话里显示为 `/mcp__gemarc__gemarc-design` **[DOCS]**。
+- 提示词 `gemarc-media-doc` 在会话里显示为 `/mcp__gemarc__gemarc-media-doc` **[DOCS]**。
 - 资源 `gemarc://registry`、`gemarc://schema/model`：输入 `@gemarc:gemarc://registry` 引用 **[DOCS]**。
 - 输出上限：超过 10k token 告警，`MAX_MCP_OUTPUT_TOKENS` 默认 25k；服务端 instructions 与工具描述在 4096 字符处截断 **[DOCS]**。实测 `gemarc_render` 对示例模型返回约 10 KB，`gemarc_brief()` 约 10 KB（见 `scripts/verify_stdio.py` 输出）。
 
@@ -79,7 +79,7 @@ claude mcp add gemarc --scope user --transport stdio -e GEMARC_WORKSPACE_ROOT='<
 - **[RAN]** `claude -p ... --mcp-config integration-examples/claude-code/.mcp.json --strict-mcp-config` 在干净目录里：Claude Code 展开了 `${GEMARC_WORKSPACE_ROOT:-…}`，启动了 `gemarc_local`（stdio），并成功调用 `mcp__gemarc_local__gemarc_new_model`（`status` = `ok`，无权限拒绝）。
 - **[RAN]** 缺少 `GEMARC_MCP_TOKEN` 时 `claude mcp list` 只对 `gemarc` 条目报 `Missing environment variables: GEMARC_MCP_TOKEN` 警告，`gemarc_local` 不受影响。
 - **[UNVERIFIED]** 用 Claude Code 连接真实的 Vercel 远程端点（端点已部署，官方 `mcp` 客户端库的握手已实测，见 `docs/09_部署/01_Vercel部署.md` 第 12 节；Claude Code 本身没有连过）。
-- **[UNVERIFIED]** Skill 安装位置：本机存在 `~/.claude/skills/` 目录，但我没验证 Claude Code 如何发现 `skills/gemarc-5d-design`。
+- **[UNVERIFIED]** Skill 安装位置：本机存在 `~/.claude/skills/` 目录，但我没验证 Claude Code 如何发现 `skills/gemarc-media-doc`。
 
 ## claude.ai 与 Claude Desktop（远程）
 

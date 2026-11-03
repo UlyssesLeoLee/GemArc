@@ -235,7 +235,7 @@ class V1UntouchedTests(Base):
             app, tools, registered, _ = self.live(toolset)
             self.assertEqual(len(tools), count)
             self.assertFalse([n for n in registered if "atlas" in n])
-            self.assertEqual([p.name for p in asyncio.run(app.list_prompts())], ["gemarc-design"])
+            self.assertEqual([p.name for p in asyncio.run(app.list_prompts())], ["gemarc-media-doc"])
             self.assertEqual(len(asyncio.run(app.list_resources())), 4)
 
     def test_atlas_sets_expose_no_v1_tool_resource_or_prompt(self):

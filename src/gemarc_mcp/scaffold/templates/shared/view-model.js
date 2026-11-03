@@ -403,6 +403,30 @@ export function buildWorkflowView(model) {
       field('节点数', (workflow.nodes || []).length),
       field('边数', (workflow.edges || []).length),
     ];
+    // 6D: a workflow that declares an execution graph says so on the card.
+    // The reader must see the mode, the state contract and the gates.
+    const graph = workflow.executionGraph;
+    if (graph || workflow.executionMode || workflow.stateSchemaVersion) {
+      children.push(field('执行模式', workflow.executionMode));
+      children.push(field('执行图', graph && (graph.executionGraphId || graph.id)));
+      children.push(field('状态契约版本', workflow.stateSchemaVersion));
+      children.push(field('检查点策略', workflow.checkpointPolicy));
+    }
+    const executionNodes = (workflow.nodes || []).filter((node) =>
+      node.executorKind || node.iterationLimit || node.approvalPolicyRef
+      || node.toolContractRef || node.authorityScope || node.executionMode);
+    if (executionNodes.length) {
+      children.push(element('ul', '', executionNodes.map((node) => {
+        const parts = [node.kind || node.nodeType || '节点'];
+        if (node.executorKind) parts.push(`执行器 ${node.executorKind}`);
+        if (node.executionMode) parts.push(node.executionMode);
+        if (node.iterationLimit) parts.push(`上限 ${node.iterationLimit}`);
+        if (node.approvalPolicyRef) parts.push(`审批 ${node.approvalPolicyRef}`);
+        if (node.toolContractRef) parts.push(`工具契约 ${node.toolContractRef}`);
+        if (node.authorityScope) parts.push(`权限 ${node.authorityScope}`);
+        return textNode('li', '', parts.join(' · '));
+      })));
+    }
     const report = validateWorkflow(workflow);
     const issues = report.issues || report.errors || [];
     if (issues.length) {

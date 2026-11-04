@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import re
 import sys
+import tempfile
 import tomllib
 import unittest
 from pathlib import Path
@@ -114,6 +115,24 @@ class PackedCopyTests(unittest.TestCase):
         self.assertEqual(before, after)
 
 
+def stale_staging_files(staging: Path, package_root: Path) -> list[str]:
+    """The files a staging directory holds that the package does not.
+
+    The rule is a pure function so that it can be tested against a synthetic
+    staging directory. A guard that can only run against a directory that
+    happens to exist is a guard that silently does nothing.
+    """
+    if not staging.is_dir():
+        return []
+    expected = {p.relative_to(package_root).as_posix()
+                for p in package_root.rglob("*")
+                if p.is_file() and "__pycache__" not in p.parts}
+    actual = {p.relative_to(staging).as_posix()
+              for p in staging.rglob("*")
+              if p.is_file() and "__pycache__" not in p.parts}
+    return sorted(actual - expected)
+
+
 class PackageContentTests(unittest.TestCase):
     """What the package actually ships must match what the source holds.
 
@@ -128,15 +147,28 @@ class PackageContentTests(unittest.TestCase):
         staging = REPO_ROOT / "build" / "lib" / "gemarc_mcp"
         if not staging.is_dir():
             self.skipTest("no build staging directory (nothing was built here)")
-        expected = {p.relative_to(PACKAGE_ROOT).as_posix()
-                    for p in PACKAGE_ROOT.rglob("*")
-                    if p.is_file() and "__pycache__" not in p.parts}
-        actual = {p.relative_to(staging).as_posix()
-                  for p in staging.rglob("*")
-                  if p.is_file() and "__pycache__" not in p.parts}
-        self.assertEqual(sorted(actual - expected), [],
+        stale = stale_staging_files(staging, PACKAGE_ROOT)
+        self.assertEqual(stale, [],
                          "the build staging directory holds files the package does not: "
                          "they would be packaged and uploaded")
+
+    def test_a_stale_staging_directory_is_detected(self):
+        """The guard has to be able to fail, even on a clean checkout."""
+        with tempfile.TemporaryDirectory() as workspace:
+            root = Path(workspace)
+            package = root / "gemarc_mcp"
+            staging = root / "build" / "lib" / "gemarc_mcp"
+            (package / "scaffold").mkdir(parents=True)
+            (package / "scaffold" / "keep.json").write_text("{}", encoding="utf-8")
+            staging.mkdir(parents=True)
+            (staging / "scaffold").mkdir()
+            (staging / "scaffold" / "keep.json").write_text("{}", encoding="utf-8")
+            # The renamed skill: the source is gone, the staging copy is not.
+            (staging / "scaffold" / "gemarc-5d-design").mkdir()
+            (staging / "scaffold" / "gemarc-5d-design" / "SKILL.md").write_text(
+                "old", encoding="utf-8")
+            self.assertEqual(stale_staging_files(staging, package),
+                             ["scaffold/gemarc-5d-design/SKILL.md"])
 
     def test_the_package_ships_exactly_one_skill_directory(self):
         roots = [PACKAGE_ROOT / "scaffold" / "skills"]
@@ -156,6 +188,21 @@ class PackageContentTests(unittest.TestCase):
             self.assertIn(pattern, text.splitlines(),
                           f"{pattern} must be in .vercelignore: a stale staging directory "
                           "would otherwise be uploaded and packaged")
+
+    def test_the_deploy_ignore_list_is_not_reversed(self):
+        """A ``!`` rule would bring the staging directory back."""
+        text = (REPO_ROOT / ".vercelignore").read_text(encoding="utf-8")
+        for number, line in enumerate(text.splitlines(), start=1):
+            stripped = line.strip()
+            if not stripped.startswith("!"):
+                continue
+            target = stripped[1:].strip().lstrip("/")
+            with self.subTest(line=number):
+                self.assertFalse(
+                    target == "build" or target.startswith("build/")
+                    or target == "dist" or target.startswith("dist/"),
+                    f".vercelignore line {number} re-includes {stripped}: the staging "
+                    "directory would be uploaded again")
 
 
 class WorkflowContentTests(unittest.TestCase):

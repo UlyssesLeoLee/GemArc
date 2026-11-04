@@ -101,12 +101,18 @@ function clickAt(canvas, clientX, clientY) {
 function buildRenderer(view = VIEW) {
   const THREE = createStubThree();
   const container = createStubContainer();
-  const picked = { nodes: [], edges: [] };
+  const picked = { nodes: [], edges: [], modes: [] };
   const renderer = createThreeAxisRenderer(THREE, {
     container,
     view,
-    onSelectNode: (id) => picked.nodes.push(id),
-    onSelectEdge: (id) => picked.edges.push(id),
+    onSelectNode: (id, selection) => {
+      picked.nodes.push(id);
+      picked.modes.push(selection ? selection.mode : 'replace');
+    },
+    onSelectEdge: (id, selection) => {
+      picked.edges.push(id);
+      picked.modes.push(selection ? selection.mode : 'replace');
+    },
   });
   return { THREE, container, renderer, picked };
 }
@@ -224,6 +230,36 @@ test('clicking a relation selects the relation, never an entity', () => {
   clickAt(renderer.canvas, point.clientX, point.clientY);
   assert.deepEqual(picked.edges, ['e-1']);
   assert.deepEqual(picked.nodes, [], 'an entity was not selected by accident');
+  renderer.dispose();
+});
+
+test('a drag on empty space selects everything the rectangle covers', () => {
+  const { renderer, picked } = buildRenderer();
+  const alpha = findById(renderer.layout.nodes, 'n-a');
+  const point = projectToClient(renderer.camera, alpha.position);
+  // The press starts far away from everything, so the drag is a marquee and
+  // not a drag of one entity.
+  renderer.canvas.dispatch('pointerdown', { button: 0, clientX: 5, clientY: 5, pointerId: 1 });
+  renderer.canvas.dispatch('pointermove', { clientX: point.clientX, clientY: point.clientY });
+  renderer.canvas.dispatch('pointerup', {
+    button: 0, clientX: point.clientX, clientY: point.clientY, pointerId: 1,
+  });
+  assert.deepEqual(picked.nodes, ['n-a'], 'the entity inside the rectangle was selected');
+  assert.deepEqual(picked.modes, ['add'], 'a marquee adds to the selection');
+  renderer.dispose();
+});
+
+test('a drag that starts on an entity selects nothing', () => {
+  const { renderer, picked } = buildRenderer();
+  const alpha = findById(renderer.layout.nodes, 'n-a');
+  const point = projectToClient(renderer.camera, alpha.position);
+  renderer.canvas.dispatch('pointerdown', { button: 0, clientX: point.clientX, clientY: point.clientY, pointerId: 1 });
+  renderer.canvas.dispatch('pointermove', { clientX: point.clientX + 40, clientY: point.clientY + 30 });
+  renderer.canvas.dispatch('pointerup', {
+    button: 0, clientX: point.clientX + 40, clientY: point.clientY + 30, pointerId: 1,
+  });
+  assert.deepEqual(picked.nodes, [], 'a drag on an entity selects nothing');
+  assert.deepEqual(picked.edges, [], 'a drag on an entity selects no relation');
   renderer.dispose();
 });
 

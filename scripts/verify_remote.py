@@ -369,9 +369,15 @@ def run_checks(probe: Probe) -> None:
     probe.check("gemarc_simulate (probe scenario) delivers 3 events", delivered == 3, f"delivered={delivered}")
     _, payload, is_error = probe.call_tool("gemarc_render", {"model": model, "profile": "static"})
     kit = (payload or {}).get("kit") or {}
+    # The file list is compared, not counted: a count drifts the moment a
+    # deliverable is added, and the drift is invisible until it fails.
+    rendered = sorted(item.get("path") for item in (payload or {}).get("files", [])
+                      if isinstance(item, dict))
     probe.check("gemarc_render (probe model) -> ok with files and a kit",
-                bool(payload) and payload.get("status") == "ok" and len(payload.get("files", [])) == 8 and bool(kit.get("path"))
-                and not is_error, f"status={(payload or {}).get('status')} kit.path={kit.get('path')}")
+                bool(payload) and payload.get("status") == "ok"
+                and rendered == sorted(RENDERED_FILES) and bool(kit.get("path"))
+                and not is_error,
+                f"status={(payload or {}).get('status')} files={rendered} kit.path={kit.get('path')}")
     if not kit.get("path"):
         return
 
@@ -406,6 +412,20 @@ def run_checks(probe: Probe) -> None:
 # --- the optional atlas checks (--atlas) -------------------------------------------------------------
 
 ATLAS_REMOTE_TOOLS = ("gemarc_atlas_brief", "gemarc_atlas_check")
+#: The files a static render must deliver. The list is the contract: a
+#: deliverable that disappears, or one that appears without being written
+#: down, has to be noticed here.
+RENDERED_FILES = (
+    "data/architecture.json",
+    "data/scenarios.json",
+    "data/capabilities.json",
+    "data/evidence-index.json",
+    "data/diagram-catalog.json",
+    "data/spatial-layout.json",
+    "data/workflow-ir.json",
+    "data/case-library.json",
+    "data/three-d.json",
+)
 #: A small valid slice (grammar and references inside the slice); synthetic.
 ATLAS_PROBE_SLICE = (
     "#atlas 1\n// a synthetic probe slice, not a real system\n## buildings: id | name | opts\nzone.lib | Library system | trust=internal\n"

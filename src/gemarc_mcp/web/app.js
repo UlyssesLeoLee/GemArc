@@ -19,7 +19,8 @@ function head(title,kicker){$('#headline').textContent=title;$('#kicker').textCo
 function showTab(tab){state.tab=tab;document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab));
  const el=clear($('#content'));clear($('#view-actions'));
  if(tab==='1d')render1D(el);if(tab==='2d')render2D(el);if(tab==='3d')render3D(el);
- if(tab==='4d')render4D(el);if(tab==='5d')render5D(el);if(tab==='prototype')renderPrototype(el);
+ if(tab==='4d')render4D(el);if(tab==='5d')render5D(el);if(tab==='workflow')renderWorkflow(el);
+ if(tab==='prototype')renderPrototype(el);
  renderInspector();location.hash=tab;
 }
 function current(){return state.model;}
@@ -131,8 +132,56 @@ function render5D(el){clear(el);head('模块组合与因果干预','5D / CAUSAL 
  const result=panel(el,'模型结果差异');text(result,'未达事件',lost.join('、')||'无');text(result,'新增事件',gained.join('、')||'无');text(result,'证据类型',sc.evidenceClass||'hypothetical');
  hint(el,'反事实输出只来自显式事件规则和所选干预，不能推断真实世界因果强度或未建模的反馈。');
 }
-function renderPrototype(el){clear(el);head('交互式页面原型','UI / MULTI-TAB PROTOTYPE');const pages=current().prototypes||[];
- if(!pages.length){hint(el,'模型未定义 prototypes；默认不编造业务界面。');return;}
+/* 6D = WBS × 执行图: the work breakdown says what work the graph performs, the
+   execution nodes say which capability does it, and the nodeIds bind the two. */
+function wbsRows(workflow){const g=workflow&&workflow.executionGraph;return (g&&Array.isArray(g.workPackages)?g.workPackages:[]).filter(p=>p&&p.packageId);}
+/* The execution nodes the site LISTS. The rule is the one the static shell
+   already uses for its list, so both shells show the same rows. */
+function executionNodes(workflow){return (workflow.nodes||[]).filter(n=>n.executorKind||n.iterationLimit||n.approvalPolicyRef||n.toolContractRef||n.authorityScope||n.executionMode);}
+/* The execution nodes the coverage COUNTS, by the rule the derivation uses: a
+   node that carries an execution capability, in the canvas or in the standalone
+   execution graph. The coverage number must not depend on which shell renders
+   it, so this mirrors the derivation rule exactly. */
+const EXECUTION_NODE_KINDS=['deterministic-program','agent-loop','tool-call','policy-gate','checkpoint','resume','manual-review','escalation','audit-event'];
+const EXECUTION_NODE_FIELDS=['executorKind','authorityScope','executionMode','inputStateSchema','outputStateSchema','stateWritePolicy','checkpointBefore','checkpointAfter','budgetPolicy','iterationLimit','approvalPolicyRef','toolContractRef'];
+function countedExecutionNodes(workflow){const canvas=(workflow.nodes||[]).filter(n=>EXECUTION_NODE_KINDS.indexOf(n.kind||n.legacyKind)>=0||EXECUTION_NODE_FIELDS.some(f=>n[f]!==undefined&&n[f]!==null));const g=workflow&&workflow.executionGraph;return canvas.concat(g&&Array.isArray(g.nodes)?g.nodes:[]);}
+function renderWbsTree(parent,rows,knownIds){
+ const known=new Set(rows.map(r=>r.packageId));const byParent=new Map();
+ rows.forEach(r=>{const k=r.parentPackageId||'';if(!byParent.has(k))byParent.set(k,[]);byParent.get(k).push(r)});
+ const label={phase:'阶段','work-package':'工作包',task:'任务'};
+ const draw=row=>{
+  const item=node('li','wbs-item',parent);const line=node('p','small',item);
+  node('b','',line,(label[row.kind]||row.kind||'工作包')+' ');node('span','',line,row.title||row.packageId);node('span','muted',line,' · '+row.packageId);
+  const bound=(row.nodeIds||[]).filter(id=>!knownIds||knownIds.has(id));
+  const detail=node('ul','wbs-detail',item);
+  node('li','',detail,'交付物：'+(row.deliverable||'未提供'));node('li','',detail,'完成条件：'+(row.completionCriteria||'未提供'));node('li','',detail,'归属执行节点：'+bound.length);
+  const kids=byParent.get(row.packageId)||[];if(kids.length){const sub=node('ul','wbs',item);kids.forEach(draw)}
+ };
+ rows.filter(r=>!r.parentPackageId||!known.has(r.parentPackageId)).forEach(draw);
+}
+function renderWorkflow(el){
+ clear(el);head('工作流与工作分解','6D / WBS × EXECUTION GRAPH');
+ const workflows=current().workflows||[];if(!workflows.length){hint(el,'模型没有登记工作流。');return}
+ workflows.forEach(wf=>{
+  const p=panel(el,wf.name||wf.id);const g=wf.executionGraph;
+  if(g||wf.executionMode||wf.stateSchemaVersion){text(p,'执行模式',wf.executionMode);text(p,'执行图',g&&(g.executionGraphId||g.id));text(p,'状态契约版本',wf.stateSchemaVersion);text(p,'检查点策略',wf.checkpointPolicy)}
+  const rows=wbsRows(wf);const nodes=executionNodes(wf);const counted=countedExecutionNodes(wf);
+  const knownIds=new Set(counted.map(n=>n.id||n.nodeId||'').filter(Boolean));
+  if(rows.length){
+   const assigned=new Set();rows.forEach(r=>(r.nodeIds||[]).forEach(id=>{if(knownIds.has(id))assigned.add(id)}));
+   const uncovered=[...knownIds].filter(id=>!assigned.has(id));
+   text(p,'工作分解（WBS）',rows.length+' 个工作包');text(p,'执行节点归属',assigned.size+' / '+counted.length);
+   if(uncovered.length)text(p,'未归属执行节点',uncovered.join('、'));
+   const tree=node('ul','wbs',p);renderWbsTree(tree,rows,knownIds);
+   const ex=panel(p,'执行节点');nodes.forEach(n=>{const owner=rows.filter(r=>(r.nodeIds||[]).includes(n.id)).map(r=>r.packageId).join('、');
+    node('p','small',ex,[n.kind||'节点',n.name||n.id,n.executorKind?'执行器 '+n.executorKind:'',n.executionMode||'',n.iterationLimit?'上限 '+n.iterationLimit:'',n.approvalPolicyRef?'审批 '+n.approvalPolicyRef:'',owner?'归属 '+owner:''].filter(Boolean).join(' · '))});
+  } else if(nodes.length){
+   const ex=panel(p,'执行节点');nodes.forEach(n=>node('p','small',ex,[n.kind||'节点',n.name||n.id,n.executorKind?'执行器 '+n.executorKind:'',n.executionMode||'',n.iterationLimit?'上限 '+n.iterationLimit:''].filter(Boolean).join(' · ')));
+  }
+  hint(p,'工作分解说明做什么、交付什么、何时算完成；执行节点说明由谁以什么能力去做。未登记的工作包不会被编造。');
+ });
+}
+function renderPrototype(el){clear(el);head('交互式页面原型','UI / MULTI-TAB PROTOTYPE');const pages=current().prototypes||[]; if(!pages.length){hint(el,'模型未定义 prototypes；默认不编造业务界面。');return;}
  const p=panel(el,'页面与操作');const tabs=node('div','tabs',p);pages.forEach((pg,i)=>{const b=button(tabs,pg.title||pg.id,()=>{state.prototype=i;renderPrototype(el)});b.classList.toggle('active',state.prototype===i)});
  const pg=pages[state.prototype]||pages[0];const content=node('div','protopage',p);node('h2','',content,pg.title);node('p','muted',content,pg.description||'暂无描述');
  const feedback=node('p','small',content,'可选择下列交互热点，当前为轻量原型组件，不包含 Konva 可视化编辑器。');

@@ -81,6 +81,22 @@ class ViewModelStructureTests(unittest.TestCase):
             "python -m gemarc_mcp.scaffold.viewmodel_baseline --write")
 
     @unittest.skipUnless(NODE, "node is not available")
+    def test_the_showcase_fixture_reports_no_workflow_diagnostic(self):
+        """The committed fixture must be clean.
+
+        The baseline test only compares text: a diagnostic that the fixture
+        produces would be locked into the baseline as if it were intended.
+        The fixture is the showcase of the site, so it must pass the site's own
+        workflow validation - start node, end node, no dangling reference.
+        """
+        actual = current_baseline(self.site)
+        body = json.dumps(actual, ensure_ascii=False)
+        self.assertNotIn(
+            "GEMARC_WORKFLOW_", body,
+            "The fixture produces workflow diagnostics. A showcase fixture that "
+            "does not validate is a defect, not a baseline to keep.")
+
+    @unittest.skipUnless(NODE, "node is not available")
     def test_every_dimension_is_present(self):
         actual = current_baseline(self.site)
         for key in ("facts", "graph", "space", "timeline", "causal", "views", "workflow"):

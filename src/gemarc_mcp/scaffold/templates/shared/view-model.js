@@ -423,6 +423,77 @@ export function buildViewsView(model) {
   };
 }
 
+/* ------------------------------------------------------------- 6D work breakdown */
+
+// The execution nodes of a workflow, by the rule the derivation uses: a node
+// that carries an execution capability, in the canvas or in the standalone
+// execution graph. The coverage number must not depend on which shell renders
+// it, so this mirrors the derivation rule exactly.
+const EXECUTION_NODE_KINDS = new Set([
+  'deterministic-program', 'agent-loop', 'tool-call', 'policy-gate',
+  'checkpoint', 'resume', 'manual-review', 'escalation', 'audit-event',
+]);
+const EXECUTION_NODE_FIELDS = [
+  'executorKind', 'authorityScope', 'executionMode', 'inputStateSchema',
+  'outputStateSchema', 'stateWritePolicy', 'checkpointBefore', 'checkpointAfter',
+  'budgetPolicy', 'iterationLimit', 'approvalPolicyRef', 'toolContractRef',
+];
+
+function executionNodeId(node) {
+  return node.id || node.nodeId || '';
+}
+
+export function executionNodesOf(workflow) {
+  const canvas = (workflow.nodes || []).filter((node) =>
+    EXECUTION_NODE_KINDS.has(node.kind || node.legacyKind)
+    || EXECUTION_NODE_FIELDS.some((field) => node[field] !== undefined && node[field] !== null));
+  const graph = workflow.executionGraph || {};
+  const contract = Array.isArray(graph.nodes) ? graph.nodes : [];
+  return canvas.concat(contract);
+}
+
+/**
+ * The work breakdown of one execution graph: 阶段 → 工作包 → 任务.
+ *
+ * The execution graph says how a run is wired; the WBS says what work that
+ * run performs, what each level delivers and when it counts as done. A
+ * breakdown without deliverables and done criteria is not a breakdown, so the
+ * missing ones are shown as missing instead of being invented.
+ */
+export function buildWbsView(packages, knownIds) {
+  const rows = (Array.isArray(packages) ? packages : []).filter((item) => item && item.packageId);
+  if (!rows.length) return null;
+  const known = new Set(rows.map((row) => row.packageId));
+  const childrenOf = new Map();
+  for (const row of rows) {
+    const parent = row.parentPackageId || '';
+    if (!childrenOf.has(parent)) childrenOf.set(parent, []);
+    childrenOf.get(parent).push(row);
+  }
+  const kindLabel = { phase: '阶段', 'work-package': '工作包', task: '任务' };
+  const render = (row) => {
+    const children = (childrenOf.get(row.packageId) || []).map(render);
+    const bound = (row.nodeIds || []).filter((id) => !knownIds || knownIds.has(id));
+    const detail = element('ul', 'wbs-detail', [
+      textNode('li', '', `交付物：${row.deliverable || '未提供'}`),
+      textNode('li', '', `完成条件：${row.completionCriteria || '未提供'}`),
+      textNode('li', '', `归属执行节点：${bound.length}`),
+    ]);
+    const inner = [
+      element('p', 'small', [
+        textNode('b', '', `${kindLabel[row.kind] || row.kind || '工作包'} `),
+        textNode('span', '', row.title || row.packageId),
+        textNode('span', 'muted', ` · ${row.packageId}`),
+      ]),
+      detail,
+    ];
+    if (children.length) inner.push(element('ul', 'wbs', children));
+    return element('li', 'wbs-item', inner);
+  };
+  const roots = rows.filter((row) => !row.parentPackageId || !known.has(row.parentPackageId));
+  return element('ul', 'wbs', roots.map(render));
+}
+
 /* -------------------------------------------------------------- workflow */
 
 export function buildWorkflowView(model) {
@@ -463,6 +534,31 @@ export function buildWorkflowView(model) {
         if (node.authorityScope) parts.push(`权限 ${node.authorityScope}`);
         return textNode('li', '', parts.join(' · '));
       })));
+    }
+    // 6D = WBS × 执行图: the work breakdown says what work the graph performs,
+    // the execution nodes say which capability does it. Both are shown so the
+    // reader can see whether the two halves actually meet.
+    const packages = (graph && graph.workPackages) || [];
+    // The coverage counts the execution nodes of THIS workflow, by the same
+    // rule the derivation uses, so the site and workflow-ir.json cannot
+    // disagree about how many nodes the breakdown has to account for.
+    const nodes = executionNodesOf(workflow);
+    const knownNodeIds = new Set(nodes.map(executionNodeId));
+    const assigned = new Set();
+    for (const row of packages) {
+      for (const nodeId of row.nodeIds || []) {
+        if (knownNodeIds.has(nodeId)) assigned.add(nodeId);
+      }
+    }
+    const wbs = buildWbsView(packages, knownNodeIds);
+    if (wbs) {
+      const uncovered = [...knownNodeIds].filter((id) => id && !assigned.has(id));
+      children.push(field('工作分解（WBS）', `${packages.length} 个工作包`));
+      children.push(field('执行节点归属', `${assigned.size} / ${nodes.length}`));
+      if (uncovered.length) {
+        children.push(field('未归属执行节点', uncovered.join('、')));
+      }
+      children.push(wbs);
     }
     const report = validateWorkflow(workflow);
     const issues = report.issues || report.errors || [];

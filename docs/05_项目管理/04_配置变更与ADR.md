@@ -96,6 +96,22 @@
   - 随包发布的预览站按真实构建路径重新生成（`gemarc build --profile mvp`），`tests/test_generated_artifacts.py` 逐字节比对。
   - ADR-008 的约定继续适用：旧名只允许出现在记录改名的这一条里。
 
+### ADR-015 6D 的定义是「WBS × 执行图」，不是只有执行图
+
+- **背景**：ADR-014 采纳的 6D 执行图层只有**执行图**这一半——节点承担能力、边规定路由与依赖、结构化状态沿边传递、关键边界持久化。2026 年 7 月起业界用 **Graph Engineering** 描述这一层（见 `00_管理/03_引用标准及适用声明.md` 第 6 条）：把 Agent 循环、确定性程序与人工审批组织成显式的执行图，其中「工作图」是一次任务如何完成，「改进图」是系统如何长期调整。Graph Engineering 的工作图只讲**怎么跑**，不讲**做什么工作、分解到哪一级、交付什么**——后者正是 WBS 的职责。
+- **决策**：**6D = WBS 分解层 × 执行图层**。两者在同一份执行图里，靠 `nodeIds` 绑定：
+  - **WBS 层**（新增，`executionGraph.workPackages[]`）：`kind` 为 `phase` / `work-package` / `task` 三级；每个包必须声明 `deliverable`（交付物）与 `completionCriteria`（完成条件）；`parentPackageId` 构成**有且只有一个根**的树，不得成环；`dependsOn` 声明跨包依赖。
+  - **执行图层**（既有）：节点承担具体能力（`agent-loop` / `deterministic-program` / `human-approval` / `tool-call` / `policy-gate` / `checkpoint` …），边规定路由与依赖，状态沿边传递并在检查点持久化。
+  - **绑定规则**：执行节点必须归属至少一个工作包；**叶子**工作包必须至少归属一个执行节点（有子包的层级节点只做汇总，不要求自己挂节点）。
+- **原因**：只做执行图，6D 就只能回答「怎么跑」，回答不了「这次要交付什么、做到哪一步算完」；而交付物与完成条件是 WBS 的定义要素，没有它们的工作包不构成 WBS。把 WBS 放进同一个契约，派生层才能算出**覆盖率**（多少执行节点被工作分解覆盖），读者也才能一眼看出分解与执行是否对得上。
+- **后果**：
+  - 词表 `workflow-kinds` 增 `workPackageKinds` / `workPackageFields` / `wbsContract`；`qualityGates.rejectOn` 由 8 条增至 12 条（新增 `wbs_orphan_node` / `wbs_broken_hierarchy` / `wbs_missing_deliverable` / `wbs_unbound_package`，错误码 `GEMARC_EXEC_009`…`012`）。
+  - 契约 `execution-graph.schema.json` 增 `workPackages`；示例 `execution-graph.example.json` 增一棵三层工作分解。
+  - 派生 `data/workflow-ir.json` 增 `workPackages`（含 `childPackageIds` / `nodeCount`）与 `wbs`（`rootPackageId` / `coverageRatio` / `kinds`）。
+  - 站点两个外壳都读这一层：`static` / `vite` 的工作流视图渲染 WBS 树，`mvp` 预览新增「06 工作流 / WBS + Execution」标签页。
+  - 词表变动 ⇒ `tests/atlas/test_atlas_v1_frozen.py` 的 pin 按同文件自述的通道在同一提交内更新。
+  - **不在本轮范围**：Graph Engineering 的「改进图」（指标、评估、策略、审计、人工决策构成的系统长期调整层）。GemArc 的 6D 仍然只做工作图。
+
 ## 变更流程
 
 提交 CR→影响分析 FR/NFR/Schema/View/测试→设计变更评审→实现和测试→QA 审查→基线发布。凡变动稳定 ID 与 Schema major，需要迁移方案与回滚计划。变更决议与审批记在台账，未经审批不改成“已采用”。

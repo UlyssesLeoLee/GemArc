@@ -1291,6 +1291,349 @@
             ],
             "class": "fact",
             "tag": "div"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "h3",
+                "text": "交付流程"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "类型："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "task"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "节点数："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "4"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "边数："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "3"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "执行模式："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "未提供"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "执行图："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "eg-delivery"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "状态契约版本："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "state-v1"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "检查点策略："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "未提供"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "li",
+                    "text": "agent-loop · simulation · 上限 4 · 权限 read-only"
+                  },
+                  {
+                    "class": "",
+                    "tag": "li",
+                    "text": "human-approval · simulation · 审批 approval.default · 权限 approver"
+                  }
+                ],
+                "class": "",
+                "tag": "ul"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "工作分解（WBS）："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "3 个工作包"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "执行节点归属："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "2 / 2"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "class": "",
+                            "tag": "b",
+                            "text": "阶段 "
+                          },
+                          {
+                            "class": "",
+                            "tag": "span",
+                            "text": "交付阶段"
+                          },
+                          {
+                            "class": "muted",
+                            "tag": "span",
+                            "text": " · wp-delivery"
+                          }
+                        ],
+                        "class": "small",
+                        "tag": "p"
+                      },
+                      {
+                        "children": [
+                          {
+                            "class": "",
+                            "tag": "li",
+                            "text": "交付物：一份可审查的架构文档"
+                          },
+                          {
+                            "class": "",
+                            "tag": "li",
+                            "text": "完成条件：检查点通过且审批通过"
+                          },
+                          {
+                            "class": "",
+                            "tag": "li",
+                            "text": "归属执行节点：0"
+                          }
+                        ],
+                        "class": "wbs-detail",
+                        "tag": "ul"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "class": "",
+                                    "tag": "b",
+                                    "text": "工作包 "
+                                  },
+                                  {
+                                    "class": "",
+                                    "tag": "span",
+                                    "text": "现状调查"
+                                  },
+                                  {
+                                    "class": "muted",
+                                    "tag": "span",
+                                    "text": " · wp-survey"
+                                  }
+                                ],
+                                "class": "small",
+                                "tag": "p"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "class": "",
+                                    "tag": "li",
+                                    "text": "交付物：带来源的现状清单"
+                                  },
+                                  {
+                                    "class": "",
+                                    "tag": "li",
+                                    "text": "完成条件：每条结论都能指回来源"
+                                  },
+                                  {
+                                    "class": "",
+                                    "tag": "li",
+                                    "text": "归属执行节点：1"
+                                  }
+                                ],
+                                "class": "wbs-detail",
+                                "tag": "ul"
+                              }
+                            ],
+                            "class": "wbs-item",
+                            "tag": "li"
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "class": "",
+                                    "tag": "b",
+                                    "text": "任务 "
+                                  },
+                                  {
+                                    "class": "",
+                                    "tag": "span",
+                                    "text": "交付审批"
+                                  },
+                                  {
+                                    "class": "muted",
+                                    "tag": "span",
+                                    "text": " · wp-approve"
+                                  }
+                                ],
+                                "class": "small",
+                                "tag": "p"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "class": "",
+                                    "tag": "li",
+                                    "text": "交付物：可审计的审批结论"
+                                  },
+                                  {
+                                    "class": "",
+                                    "tag": "li",
+                                    "text": "完成条件：审批决定已记录"
+                                  },
+                                  {
+                                    "class": "",
+                                    "tag": "li",
+                                    "text": "归属执行节点：1"
+                                  }
+                                ],
+                                "class": "wbs-detail",
+                                "tag": "ul"
+                              }
+                            ],
+                            "class": "wbs-item",
+                            "tag": "li"
+                          }
+                        ],
+                        "class": "wbs",
+                        "tag": "ul"
+                      }
+                    ],
+                    "class": "wbs-item",
+                    "tag": "li"
+                  }
+                ],
+                "class": "wbs",
+                "tag": "ul"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "语义校验："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "通过"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              }
+            ],
+            "class": "fact",
+            "tag": "div"
           }
         ],
         "class": "panel",

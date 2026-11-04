@@ -49,6 +49,12 @@
       "default": [],
       "items": {"$ref": "#/$defs/executionEdge"}
     },
+    "workPackages": {
+      "type": "array",
+      "default": [],
+      "items": {"$ref": "#/$defs/workPackage"},
+      "description": "WBS 分解层（6D = WBS × 执行图）。工作包说明做什么、产出什么、何时算完成；nodeIds 把工作包绑定到本图的执行节点。"
+    },
     "runs": {
       "type": "array",
       "default": [],
@@ -214,6 +220,53 @@
         },
         "policyRef": {"type": ["string", "null"], "default": null},
         "evidenceIds": {"$ref": "#/$defs/evidenceRefs"}
+      }
+    },
+    "workPackage": {
+      "type": "object",
+      "required": ["packageId", "kind"],
+      "additionalProperties": true,
+      "properties": {
+        "packageId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$",
+          "description": "工作包稳定 ID。"
+        },
+        "parentPackageId": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "父工作包 ID。顶层阶段为 null。有且只有一个根，且不得成环。"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["phase", "work-package", "task"],
+          "description": "WBS 层级：阶段 / 工作包 / 任务。"
+        },
+        "title": {"type": ["string", "null"], "default": null},
+        "deliverable": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "交付物。这一层产出什么。缺失即不构成 WBS（wbs_missing_deliverable）。"
+        },
+        "completionCriteria": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "完成条件。何时算做完。缺失即不构成 WBS（wbs_missing_deliverable）。"
+        },
+        "nodeIds": {
+          "type": "array",
+          "default": [],
+          "items": {"type": "string"},
+          "description": "归属的执行节点 ID（指向本图 nodes[].nodeId）。空包即不构成 WBS（wbs_unbound_package）。"
+        },
+        "dependsOn": {
+          "type": "array",
+          "default": [],
+          "items": {"type": "string"},
+          "description": "跨包依赖的工作包 ID。依赖与执行边是两件事，不得互相替代。"
+        },
+        "evidenceIds": {"$ref": "#/$defs/evidenceRefs"},
+        "verification": {"$ref": "#/$defs/verification"}
       }
     },
     "run": {

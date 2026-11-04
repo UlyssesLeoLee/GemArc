@@ -97,13 +97,14 @@ GemArc 把「可被写死的东西」（字段名、词表、校验规则、模�
 | 视图 | `diagramType` 可取 `data-dependency`、`event-flow` | 用 `gemarc_brief(section="vocabulary")` 里的 `diagramTypes` 确认允许的实体与关系 |
 | Case | `caseType`（14 种分析类型）、`reality`（`Observed`/`ImplementedModel`/`DesignedModel`/`Hypothetical`）、`initialState`、`inputEvents`、`preconditions`、`executionRules`、`expectedOutcomes`、`terminationConditions`、`assertions`、`assumptions` | `category` 是分诊轴（5 类），`caseType` 是分析类型，两者互补；没有真实运行证据时 `reality` 不要写 `Observed` |
 | 工作流 | `version`、`entryPoints`、`dataSchemas`、`executionPolicy`、`errorPolicy`、`permissions`；节点侧的 `inputs`/`outputs`/`preconditions`/`postconditions`/`stateTransitions`/`timeoutPolicy`/`retryPolicy`/`errorHandlers`/`sideEffects`/`idempotency`/`implementationRef`；边侧的 `dataMapping`/`priority`/`errorRoute`；端口侧的 `direction`/`cardinality`/`required`/`acceptedTypes` | 条件流必须给可被程序判断的 `condition`；没有真实执行器的节点（agent、human-approval、manual-review）会被标成 Design-only，不要假装它能跑 |
-| 6D 执行图（工作流级） | `executionGraph`、`executionMode`、`stateSchemaVersion`、`checkpointPolicy`、`approvalPolicies`、`executionCapabilities`、`runSecurityPolicy` | 这些字段一填，这个工作流就**声明自己是执行图**，8 条 6D 质量门开始对它生效 |
+| 6D 执行图（工作流级） | `executionGraph`、`executionMode`、`stateSchemaVersion`、`checkpointPolicy`、`approvalPolicies`、`executionCapabilities`、`runSecurityPolicy` | 这些字段一填，这个工作流就**声明自己是执行图**，12 条 6D 质量门开始对它生效 |
 | 6D 执行图（节点级） | `executorKind`、`authorityScope`、`inputStateSchema`、`outputStateSchema`、`stateWritePolicy`、`checkpointBefore`/`checkpointAfter`、`budgetPolicy`、`iterationLimit`、`approvalPolicyRef`、`toolContractRef` | agent-loop 必须给 `iterationLimit`（否则是无界循环）；声明真实执行要同时给权限范围与执行器引用 |
 | 6D 执行图（边级） | `stateSchemaRef`、`stateProjection`、`stateMergePolicy`、`routingExpression`、`deliverySemantics`、`resumeBehavior`、`policyRef` | 带 `policyRef` 的边必须给可判断的路由条件 |
+| 6D 工作分解（`executionGraph.workPackages`） | `packageId`、`parentPackageId`、`kind`（`phase`/`work-package`/`task`）、`title`、`deliverable`、`completionCriteria`、`nodeIds`、`dependsOn` | 6D = 工作分解 × 执行图：每个包要写清**交付什么**与**何时算完成**，每个执行节点要归属至少一个包；叶子包必须挂执行节点。填了 `workPackages` 就多 4 条 WBS 门（`GEMARC_EXEC_009`…`012`）生效 |
 
 规格的字段拼写与正本拼写都接受（节点的 `type`/`label`、边的 `direction`、工作流的 `nodeType`/`edgeType`/`guard`/`portId`、`caseId`），服务端会归一到正本拼写。写入时用正本拼写更稳。
 
-6D 的责任边界要讲清楚：MCP 负责**模型、契约、校验与派生**；执行器、检查点持久化、审批界面、适配器属于目标工程。声明 `executionMode: "real"` 不等于会真的执行——真实执行需要用户授权的后端。
+6D 的责任边界要讲清楚：MCP 负责**模型、契约、校验与派生**；执行器、检查点持久化、审批界面、适配器属于目标工程。声明 `executionMode: "real"` 不等于会真的执行——真实执行需要用户授权的后端。6D 的两半是**工作分解**（做什么、交付什么、何时算完成）与**执行图层**（谁来做、怎么路由、状态怎么交接），两者靠 `workPackages[].nodeIds` 绑定：只写执行图就回答不了「交付什么」，只写工作包就只是甘特图。
 
 ## 结果与错误
 

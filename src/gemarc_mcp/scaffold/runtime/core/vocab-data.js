@@ -2,14 +2,14 @@
  * GENERATED FILE - DO NOT EDIT.
  *
  * Source: src/gemarc_mcp/scaffold/vocab/*.json
- * Digest: 529286ca5f53bd7201fe035f6367d45392d951e6313cc00c86aa9f5b26873ed8
+ * Digest: 0a4fd57abef4f60bc3c7f4d4ba87fabb159cad937c0808665481c56ab8634fae
  * Regenerate: python -m gemarc_mcp.scaffold.sync
  *
  * The vocabulary is the single source of truth shared by the prompt, the
  * Python validator and this runtime. A drift test asserts that this file
  * still matches the JSON sources.
  */
-export const VOCAB_DIGEST = '529286ca5f53bd7201fe035f6367d45392d951e6313cc00c86aa9f5b26873ed8';
+export const VOCAB_DIGEST = '0a4fd57abef4f60bc3c7f4d4ba87fabb159cad937c0808665481c56ab8634fae';
 
 export const VOCAB = Object.freeze({
   "case-categories": {
@@ -2066,6 +2066,30 @@ export const VOCAB = Object.freeze({
         "执行边传递类型化消息或状态投影；节点只能修改自己获准的状态字段，状态合并冲突必须可检测。",
         "并行分支必须定义 fan-out、join 条件、状态归并策略及冲突检测，不允许无条件覆盖对方结果。",
         "状态提交在明确的持久化边界发生，不因“边上有状态”就自动宣称可恢复。"
+      ],
+      "wbsContract": [
+        "6D = WBS 分解层 × 执行图层：工作包说明做什么、产出什么、何时算完成；执行节点说明由谁以什么能力去做；两者靠 nodeIds 绑定。",
+        "工作包树有且只有一个根（kind=phase），parentPackageId 必须指向存在的包且不得成环；层级是阶段 → 工作包 → 任务。",
+        "每个工作包必须声明 deliverable（交付物）与 completionCriteria（完成条件）：没有交付物与完成条件的包不构成 WBS。",
+        "执行节点必须归属至少一个工作包；叶子工作包必须至少归属一个执行节点，否则分解与执行各说各话（有子包的层级节点只做汇总）。",
+        "跨包依赖用 dependsOn 声明；依赖与执行边是两件事，不得互相替代。"
+      ],
+      "workPackageFields": [
+        "packageId",
+        "parentPackageId",
+        "kind",
+        "title",
+        "deliverable",
+        "completionCriteria",
+        "nodeIds",
+        "dependsOn",
+        "evidenceIds",
+        "verification"
+      ],
+      "workPackageKinds": [
+        "phase",
+        "work-package",
+        "task"
       ]
     },
     "executionKinds": [
@@ -2598,7 +2622,11 @@ export const VOCAB = Object.freeze({
         "unsafe_side_effect_replay",
         "checkpoint_without_state_integrity",
         "fake_production_execution",
-        "untraceable_decision"
+        "untraceable_decision",
+        "wbs_orphan_node",
+        "wbs_broken_hierarchy",
+        "wbs_missing_deliverable",
+        "wbs_unbound_package"
       ]
     },
     "rules": [
@@ -2609,7 +2637,8 @@ export const VOCAB = Object.freeze({
       "没有真实执行器的节点类型（agent / human-approval / manual-review / agent-loop / tool-call）必须标为 Design-only，不得声称可执行。",
       "端口必须声明 direction 与 cardinality；跨节点连线必须连到具体的端口（sourcePortId / targetPortId）。",
       "6D：默认运行模式是模拟；真实执行必须存在获授权的执行后端，否则拒绝。",
-      "6D：Agent 循环必须声明 iterationLimit 与 budgetPolicy；人工审批必须有 approvalPolicyRef；工具调用必须有 toolContractRef 与 authorityScope。"
+      "6D：Agent 循环必须声明 iterationLimit 与 budgetPolicy；人工审批必须有 approvalPolicyRef；工具调用必须有 toolContractRef 与 authorityScope。",
+      "6D：WBS 与执行图必须绑定——每个执行节点归属至少一个工作包，每个叶子工作包归属至少一个执行节点；工作包必须写明交付物与完成条件。"
     ],
     "schemaVersion": "0.2.0",
     "title": "工作流语义模型词表（GWF-IR）"

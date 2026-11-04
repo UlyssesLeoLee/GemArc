@@ -468,6 +468,84 @@
           "kind"
         ],
         "type": "object"
+      },
+      "workPackage": {
+        "additionalProperties": true,
+        "properties": {
+          "childPackageIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "completionCriteria": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "deliverable": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dependsOn": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "evidenceIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "phase",
+              "work-package",
+              "task"
+            ],
+            "type": "string"
+          },
+          "nodeCount": {
+            "type": "integer"
+          },
+          "nodeIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "packageId": {
+            "type": "string"
+          },
+          "parentPackageId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "verification": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "packageId",
+          "kind"
+        ],
+        "type": "object"
       }
     },
     "$id": "https://gemarc.dev/gwf-ir/0.3.0/workflow-ir.schema.json",
@@ -570,6 +648,18 @@
           "string",
           "null"
         ]
+      },
+      "wbs": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "workPackages": {
+        "items": {
+          "$ref": "#/$defs/workPackage"
+        },
+        "type": "array"
       },
       "workflowId": {
         "type": "string"

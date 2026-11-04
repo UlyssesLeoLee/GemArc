@@ -225,6 +225,56 @@
       "evidenceIds": []
     }
   ],
+  "workPackages": [
+    {
+      "packageId": "wp-delivery",
+      "parentPackageId": null,
+      "kind": "phase",
+      "title": "交付阶段",
+      "deliverable": "一次可审计的结构化交付",
+      "completionCriteria": "运行进入 completed 状态，且检查点已提交",
+      "nodeIds": [],
+      "dependsOn": [],
+      "evidenceIds": [],
+      "verification": "Hypothetical"
+    },
+    {
+      "packageId": "wp-collect",
+      "parentPackageId": "wp-delivery",
+      "kind": "work-package",
+      "title": "收集与校验",
+      "deliverable": "结构化发现与校验结论",
+      "completionCriteria": "findings 已通过校验，program.valid 为真",
+      "nodeIds": ["n-agent", "n-program"],
+      "dependsOn": [],
+      "evidenceIds": [],
+      "verification": "Hypothetical"
+    },
+    {
+      "packageId": "wp-approve",
+      "parentPackageId": "wp-delivery",
+      "kind": "work-package",
+      "title": "审批与固化",
+      "deliverable": "审批结论与检查点",
+      "completionCriteria": "审批决定已记录，检查点已提交并可恢复",
+      "nodeIds": ["n-approve", "n-checkpoint", "n-resume"],
+      "dependsOn": ["wp-collect"],
+      "evidenceIds": [],
+      "verification": "Hypothetical"
+    },
+    {
+      "packageId": "wp-fallback",
+      "parentPackageId": "wp-delivery",
+      "kind": "task",
+      "title": "异常终止",
+      "deliverable": "终止原因与可追溯的失败记录",
+      "completionCriteria": "运行进入 failed 状态并写明原因",
+      "nodeIds": ["n-error"],
+      "dependsOn": ["wp-collect"],
+      "evidenceIds": [],
+      "verification": "Hypothetical"
+    }
+  ],
   "runs": [
     {
       "runId": "run-example-1",

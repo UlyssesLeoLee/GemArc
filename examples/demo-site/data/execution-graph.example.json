@@ -331,5 +331,68 @@
   ],
   "stateSchemaVersion": "state-v1",
   "version": "0.3.0",
+  "workPackages": [
+    {
+      "completionCriteria": "运行进入 completed 状态，且检查点已提交",
+      "deliverable": "一次可审计的结构化交付",
+      "dependsOn": [],
+      "evidenceIds": [],
+      "kind": "phase",
+      "nodeIds": [],
+      "packageId": "wp-delivery",
+      "parentPackageId": null,
+      "title": "交付阶段",
+      "verification": "Hypothetical"
+    },
+    {
+      "completionCriteria": "findings 已通过校验，program.valid 为真",
+      "deliverable": "结构化发现与校验结论",
+      "dependsOn": [],
+      "evidenceIds": [],
+      "kind": "work-package",
+      "nodeIds": [
+        "n-agent",
+        "n-program"
+      ],
+      "packageId": "wp-collect",
+      "parentPackageId": "wp-delivery",
+      "title": "收集与校验",
+      "verification": "Hypothetical"
+    },
+    {
+      "completionCriteria": "审批决定已记录，检查点已提交并可恢复",
+      "deliverable": "审批结论与检查点",
+      "dependsOn": [
+        "wp-collect"
+      ],
+      "evidenceIds": [],
+      "kind": "work-package",
+      "nodeIds": [
+        "n-approve",
+        "n-checkpoint",
+        "n-resume"
+      ],
+      "packageId": "wp-approve",
+      "parentPackageId": "wp-delivery",
+      "title": "审批与固化",
+      "verification": "Hypothetical"
+    },
+    {
+      "completionCriteria": "运行进入 failed 状态并写明原因",
+      "deliverable": "终止原因与可追溯的失败记录",
+      "dependsOn": [
+        "wp-collect"
+      ],
+      "evidenceIds": [],
+      "kind": "task",
+      "nodeIds": [
+        "n-error"
+      ],
+      "packageId": "wp-fallback",
+      "parentPackageId": "wp-delivery",
+      "title": "异常终止",
+      "verification": "Hypothetical"
+    }
+  ],
   "workflowId": "example-workflow"
 }

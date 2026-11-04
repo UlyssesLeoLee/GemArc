@@ -713,7 +713,205 @@ def _execution_gates(workflow: dict) -> list[dict]:
         hit("untraceable_decision", untraceable,
             "策略闸门必须引用 policyRef；判定节点必须能追溯到策略或证据。")
 
+    hits.extend(_wbs_gates(workflow))
     return hits
+
+
+#: The WBS levels of the 6D execution graph: 阶段 → 工作包 → 任务.
+WORK_PACKAGE_KINDS = ("phase", "work-package", "task")
+
+
+def _work_packages(workflow: dict) -> list[dict]:
+    """The normalised WBS packages of one workflow (empty when it declares none).
+
+    The WBS layer belongs to the execution graph: the work graph says *how* a
+    run is wired, the work breakdown says *what* work that run performs, what
+    each level delivers and when it counts as done.
+    """
+    graph = workflow.get("executionGraph")
+    if not isinstance(graph, dict):
+        return []
+    packages = []
+    for item in _as_array(graph.get("workPackages")):
+        if not isinstance(item, dict):
+            continue
+        packages.append({
+            "packageId": item.get("packageId"),
+            "parentPackageId": item.get("parentPackageId"),
+            "kind": item.get("kind"),
+            "title": item.get("title"),
+            "deliverable": item.get("deliverable"),
+            "completionCriteria": item.get("completionCriteria"),
+            "nodeIds": [value for value in _as_array(item.get("nodeIds")) if isinstance(value, str)],
+            "dependsOn": [value for value in _as_array(item.get("dependsOn")) if isinstance(value, str)],
+            "evidenceIds": [value for value in _as_array(item.get("evidenceIds")) if isinstance(value, str)],
+            "verification": item.get("verification"),
+        })
+    return packages
+
+
+def _execution_nodes(workflow: dict) -> list[dict]:
+    """Every node that plays an execution role in this workflow.
+
+    The model layer keeps the execution nodes inside ``workflows[].nodes`` (the
+    canvas the site draws); the standalone contract keeps its own
+    ``executionGraph.nodes``. Both are nodes that carry a capability, and both
+    are valid targets of a work package.
+    """
+    nodes = []
+    for node in _as_array(workflow.get("nodes")):
+        if not isinstance(node, dict):
+            continue
+        if node.get("kind") in _EXECUTION_NODE_KINDS or any(
+                node.get(field) is not None for field in _EXECUTION_NODE_FIELDS):
+            nodes.append(node)
+    graph = workflow.get("executionGraph")
+    if isinstance(graph, dict):
+        for node in _as_array(graph.get("nodes")):
+            if isinstance(node, dict):
+                nodes.append(node)
+    return nodes
+
+
+def _node_identity(node: dict) -> str:
+    """The id of an execution node, whichever spelling it uses."""
+    for key in ("id", "nodeId"):
+        value = node.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return ""
+
+
+def _wbs_gates(workflow: dict) -> list[dict]:
+    """The WBS gates of one workflow.
+
+    They only fire when the workflow declares a work breakdown: a workflow
+    without one is a plain 5D canvas and stays untouched.
+    """
+    packages = _work_packages(workflow)
+    if not packages:
+        return []
+    execution_nodes = _execution_nodes(workflow)
+    known_nodes = {_node_identity(node) for node in execution_nodes}
+    known_nodes.discard("")
+    hits: list[dict] = []
+
+    def hit(gate, targets, message):
+        hits.append({"gate": gate, "targets": sorted(targets), "message": message})
+
+    ids = [str(package.get("packageId") or "") for package in packages]
+    known_packages = set(ids)
+    broken = []
+    if len(set(ids)) != len(ids):
+        broken.extend(sorted({value for value in ids if ids.count(value) > 1}))
+    roots = [package for package in packages if not package.get("parentPackageId")]
+    if len(roots) != 1:
+        # More than one root, or none at all: the tree is not a tree.
+        broken.extend(str(package.get("packageId") or "") for package in (roots or packages))
+    for package in packages:
+        parent = package.get("parentPackageId")
+        if parent and parent not in known_packages:
+            broken.append(str(package.get("packageId") or ""))
+    for package in packages:
+        seen = set()
+        current = package
+        while current is not None:
+            current_id = str(current.get("packageId") or "")
+            if current_id in seen:
+                broken.append(str(package.get("packageId") or ""))
+                break
+            seen.add(current_id)
+            parent = current.get("parentPackageId")
+            current = next((item for item in packages if item.get("packageId") == parent), None) if parent else None
+    dangling = []
+    for package in packages:
+        for node_id in package.get("nodeIds") or []:
+            if node_id not in known_nodes:
+                dangling.append(str(package.get("packageId") or ""))
+    if broken or dangling:
+        hit("wbs_broken_hierarchy",
+            set(broken) | set(dangling),
+            "工作包树必须恰好有一个根、父包必须存在且不得成环，工作包只能引用本图存在的执行节点。")
+
+    incomplete = [str(package.get("packageId") or "") for package in packages
+                  if not package.get("deliverable") or not package.get("completionCriteria")]
+    if incomplete:
+        hit("wbs_missing_deliverable", incomplete,
+            "每个工作包必须声明 deliverable（交付物）与 completionCriteria（完成条件）；没有这两项就不构成 WBS。")
+
+    empty = [str(package.get("packageId") or "") for package in packages
+             if not package.get("nodeIds")
+             and not any(child.get("parentPackageId") == package.get("packageId") for child in packages)]
+    if empty:
+        hit("wbs_unbound_package", empty,
+            "叶子工作包必须至少归属一个执行节点；否则分解与执行各说各话。有子包的层级节点只做汇总，不要求自己挂节点。")
+
+    assigned = set()
+    for package in packages:
+        for node_id in package.get("nodeIds") or []:
+            if node_id in known_nodes:
+                assigned.add(node_id)
+    orphans = [identity for identity in sorted(known_nodes) if identity not in assigned]
+    if orphans:
+        hit("wbs_orphan_node", orphans,
+            "执行节点必须归属至少一个工作包；没有归属的节点不在任何工作分解里。")
+
+    return hits
+
+
+def work_breakdown(workflow: dict) -> dict:
+    """The WBS layer of one workflow: the packages, their rollup and the coverage.
+
+    ``coverage`` is the number that says whether the two halves of the 6D
+    contract actually meet: how many execution nodes a work package accounts
+    for.
+    """
+    packages = _work_packages(workflow)
+    execution_nodes = _execution_nodes(workflow)
+    node_ids = {_node_identity(node) for node in execution_nodes}
+    node_ids.discard("")
+    children: dict[str, list[str]] = {}
+    for package in packages:
+        parent = package.get("parentPackageId")
+        if parent:
+            children.setdefault(str(parent), []).append(str(package.get("packageId") or ""))
+    assigned: set[str] = set()
+    for package in packages:
+        for node_id in package.get("nodeIds") or []:
+            if node_id in node_ids:
+                assigned.add(node_id)
+    roots = [package for package in packages if not package.get("parentPackageId")]
+    kinds: dict[str, int] = {}
+    rows = []
+    for package in packages:
+        package_id = str(package.get("packageId") or "")
+        kind = str(package.get("kind") or "")
+        kinds[kind] = kinds.get(kind, 0) + 1
+        own_nodes = [node_id for node_id in package.get("nodeIds") or [] if node_id in node_ids]
+        rows.append({
+            "packageId": package_id,
+            "parentPackageId": package.get("parentPackageId"),
+            "kind": kind,
+            "title": package.get("title"),
+            "deliverable": package.get("deliverable"),
+            "completionCriteria": package.get("completionCriteria"),
+            "nodeIds": own_nodes,
+            "childPackageIds": sorted(children.get(package_id, [])),
+            "dependsOn": list(package.get("dependsOn") or []),
+            "nodeCount": len(own_nodes),
+            "evidenceIds": list(package.get("evidenceIds") or []),
+            "verification": package.get("verification"),
+        })
+    return {
+        "declared": bool(packages),
+        "rootPackageId": str(roots[0].get("packageId") or "") if len(roots) == 1 else None,
+        "packageCount": len(packages),
+        "nodeCount": len(node_ids),
+        "assignedNodeCount": len(assigned),
+        "coverageRatio": (round(len(assigned) / len(node_ids), 4) if node_ids else None),
+        "kinds": kinds,
+        "packages": rows,
+    }
 
 
 def execution_gates(model: dict) -> dict:
@@ -863,6 +1061,7 @@ def workflow_ir(model: dict) -> dict:
             if edge.get("edgeType") is None:
                 issues.append({"target": edge.get("edgeId"), "kind": edge.get("legacyKind"),
                                "message": edge.get("note", "未登记的 §17 边类型")})
+        breakdown = work_breakdown(workflow)
         workflows.append({
             "workflowId": workflow.get("id"),
             "name": workflow.get("name"),
@@ -886,6 +1085,13 @@ def workflow_ir(model: dict) -> dict:
             "executionCapabilities": [item for item in _as_array(workflow.get("executionCapabilities"))
                                       if isinstance(item, str)],
             "runSecurityPolicy": workflow.get("runSecurityPolicy"),
+            # --- 6D = WBS × 执行图: what work the graph performs, and how much of it is bound ---
+            # Only a workflow that declares a breakdown carries the layer. An empty
+            # block on every workflow would tax the inline payload of every model
+            # that does not use it - the increment has to stay an increment.
+            **({"workPackages": breakdown["packages"],
+                "wbs": {key: value for key, value in breakdown.items() if key != "packages"}}
+               if breakdown["declared"] else {}),
             "missing": missing,
             "issues": issues,
             "gates": _execution_gates(workflow),
@@ -956,8 +1162,30 @@ def workflow_schema() -> dict:
             "approvalPolicies": object_array,
             "executionCapabilities": string_array,
             "runSecurityPolicy": nullable_object,
+            # --- 6D = WBS × 执行图 ---
+            "workPackages": {"type": "array", "items": {"$ref": "#/$defs/workPackage"}},
+            "wbs": nullable_object,
         },
         "$defs": {
+            "workPackage": {
+                "type": "object",
+                "required": ["packageId", "kind"],
+                "additionalProperties": True,
+                "properties": {
+                    "packageId": _ir_property("string"),
+                    "parentPackageId": _ir_property(["string", "null"]),
+                    "kind": _ir_property("string", {"enum": list(WORK_PACKAGE_KINDS)}),
+                    "title": _ir_property(["string", "null"]),
+                    "deliverable": _ir_property(["string", "null"]),
+                    "completionCriteria": _ir_property(["string", "null"]),
+                    "nodeIds": string_array,
+                    "childPackageIds": string_array,
+                    "dependsOn": string_array,
+                    "nodeCount": _ir_property("integer"),
+                    "evidenceIds": string_array,
+                    "verification": _ir_property(["string", "null"]),
+                },
+            },
             "node": {
                 "type": "object",
                 "required": ["nodeId", "nodeType", "name"],

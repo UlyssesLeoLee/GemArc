@@ -177,7 +177,32 @@ def _normalize_workflow(workflow) -> dict:
             record["directed"] = bool(directed)
         edges.append(record)
     item["edges"] = edges
+    # 6D: the WBS layer of an execution graph. The canonical spellings are the
+    # contract's ("packageId" / "parentPackageId" / "nodeIds"); the model layer
+    # also accepts the short forms.
+    if item.get("executionGraph") is not None:
+        graph = _as_dict(item.get("executionGraph"))
+        graph["workPackages"] = [_normalize_work_package(package)
+                                 for package in _as_array(graph.get("workPackages"))]
+        item["executionGraph"] = graph
     return item
+
+
+def _normalize_work_package(package) -> dict:
+    """Accept the WBS field spellings of the execution-graph contract.
+
+    ``packageId`` / ``parentPackageId`` / ``nodeIds`` are canonical; ``id`` /
+    ``parentId`` / ``nodes`` are the model-layer spellings.
+    """
+    record = _as_dict(package)
+    if not record.get("packageId") and isinstance(record.get("id"), str):
+        record["packageId"] = record["id"]
+    if not record.get("parentPackageId"):
+        parent = record.get("parentId")
+        record["parentPackageId"] = parent if isinstance(parent, str) else None
+    if not _as_array(record.get("nodeIds")) and isinstance(record.get("nodes"), list):
+        record["nodeIds"] = [item for item in record["nodes"] if isinstance(item, str)]
+    return record
 
 
 def _normalize_port(port) -> dict:
@@ -524,6 +549,10 @@ EXECUTION_GATE_CODES = {
     "checkpoint_without_state_integrity": "GEMARC_EXEC_006",
     "fake_production_execution": "GEMARC_EXEC_007",
     "untraceable_decision": "GEMARC_EXEC_008",
+    "wbs_orphan_node": "GEMARC_EXEC_009",
+    "wbs_broken_hierarchy": "GEMARC_EXEC_010",
+    "wbs_missing_deliverable": "GEMARC_EXEC_011",
+    "wbs_unbound_package": "GEMARC_EXEC_012",
 }
 
 

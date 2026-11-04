@@ -261,6 +261,15 @@ h4 { margin: 8px 0 4px; font-size: 13px; color: var(--gem-muted); }
 .timeline { margin: 0; padding-left: 18px; }
 .timeline .event { margin-bottom: 4px; }
 .timeline .time { display: inline-block; min-width: 72px; color: var(--gem-muted); font-size: 12px; }
+
+/* The WBS tree sits under the 6D card: a nested list, one indent per level, so
+   the reader can see which work package a node belongs to. */
+.wbs { list-style: none; margin: 6px 0 0; padding-left: 16px; }
+.wbs .wbs { border-left: 1px solid var(--gem-rim); margin-left: 4px; }
+.wbs-item { margin: 6px 0; }
+.wbs-item > p { margin: 0; }
+.wbs-detail { list-style: none; margin: 2px 0 2px 8px; padding-left: 10px; }
+.wbs-detail li { color: var(--gem-muted); font-size: 12px; line-height: 1.7; }
 .timeline .module { display: inline-block; min-width: 96px; font-size: 12px; }
 .timeline .name { display: inline-block; min-width: 120px; }
 .timeline .state { font-size: 11px; }

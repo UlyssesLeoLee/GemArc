@@ -11,7 +11,11 @@
       "unsafe_side_effect_replay",
       "checkpoint_without_state_integrity",
       "fake_production_execution",
-      "untraceable_decision"
+      "untraceable_decision",
+      "wbs_orphan_node",
+      "wbs_broken_hierarchy",
+      "wbs_missing_deliverable",
+      "wbs_unbound_package"
     ],
     "rejectedWorkflowIds": [],
     "schemaVersion": "0.2.0"

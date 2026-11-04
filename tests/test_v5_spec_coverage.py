@@ -192,11 +192,12 @@ SPEC_RUN_FIELDS = [
     "correlationId", "traceId",
 ]
 
-#: v6.0 quality_gates_6d.reject_on
+#: v6.0 quality_gates_6d.reject_on, plus the four WBS gates of ADR-015 (6D = WBS × execution graph)
 SPEC_QUALITY_GATES = [
     "unbounded_agent_loop", "human_approval_bypass", "unvalidated_state_schema",
     "missing_route_guard", "unsafe_side_effect_replay", "checkpoint_without_state_integrity",
     "fake_production_execution", "untraceable_decision",
+    "wbs_orphan_node", "wbs_broken_hierarchy", "wbs_missing_deliverable", "wbs_unbound_package",
 ]
 
 #: v6.0 §32 the deliverable files of the target project, as this repository

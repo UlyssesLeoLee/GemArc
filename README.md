@@ -14,10 +14,11 @@
 | 3D | **实现** | 自带 Three.js 适配器（Building–Floor–Room 真实渲染 + 节点/关系各自可拾取 + 跨维选择同步）；亦可复用用户自行构建的原仓库 `dist/` |
 | 4D | 实现 MVP | 离散事件、步进时间轴、确定性规则传播；无动画流体场景 |
 | 5D | 实现 MVP | 显式规则与模块屏蔽反事实对照；非一般性因果识别引擎 |
+| 6D 工作流（WBS × 执行图层） | 实现 MVP | 工作分解三级树 + 「执行节点归属 X / Y」覆盖率；执行图契约由模型登记，缺失不编造 |
 | 增量编译与缓存 | 未完成 | `diff` 提供影响分析，build 仍全量重建 |
 | Graphology / Dagre / Dexie | 可选适配器 | 运行时**零第三方硬依赖**：这些库一律工厂函数注入 + 内置兜底；不装也能跑 |
 | 浏览器自动化、视觉回归 | 部分 | 有 view-model 结构快照门禁（跑在**构建产物**上）；**像素级视觉回归仍未实现** |
-| 远程 MCP 端点（Vercel） | 实现，**已部署并公网实测** | 无状态：模型随调用传入，服务端不保存项目；可选 Bearer 令牌（`GEMARC_MCP_TOKEN`）；`GET /mcp` 返回 405；固定件经 `/kit/<profile>.zip` 下载。`scripts/verify_remote.py` 对公网域名 25/25 通过。详见 `docs/09_部署/01_Vercel部署.md` |
+| 远程 MCP 端点（Vercel） | 实现，**已部署并公网实测** | 无状态：模型随调用传入，服务端不保存项目；可选 Bearer 令牌（`GEMARC_MCP_TOKEN`）；`GET /mcp` 返回 405；固定件经 `/kit/<profile>.zip` 下载。`scripts/verify_remote.py` 对公网域名 27/27 通过。详见 `docs/09_部署/01_Vercel部署.md` |
 | 安装时完全离线 | 不保证 | Python MCP SDK 需 pip 获取；生成的基础站点不使用 CDN |
 
 ## Windows 11 安装 / PowerShell
@@ -97,7 +98,7 @@ Claude Code、Codex、Hermes 的配置容器键名各不相同，下一节与 `i
 | 层 | 内容 | 位置 |
 |---|---|---|
 | 契约层 | 9 份 JSON Schema（Canonical Model / Node / Edge / Evidence / Space / View / Scenario / Workflow / 6D 执行图）+ 1 份执行图示例 | `src/gemarc_mcp/scaffold/contracts/` |
-| 词表层 | 6 级证据等级、21 种实体类型、21 种关系类型、21 种图示类型、相关性分级、空间层级、Case 分类（5 类分诊轴 + 14 种分析类型）、工作流语义（GWF-IR） | `src/gemarc_mcp/scaffold/vocab/` |
+| 词表层 | 6 级证据等级、20 种实体类型、20 种关系类型、21 种图示类型、相关性分级、空间层级、Case 分类（5 类分诊轴 + 14 种分析类型）、工作流语义（GWF-IR） | `src/gemarc_mcp/scaffold/vocab/` |
 | 运行层 | 图引擎、Focus 退避、3D 空间、4D/5D 仿真、跨视图状态、工作流语义、互操作适配器 | `src/gemarc_mcp/scaffold/runtime/` |
 
 词表是**提示词、Python 校验器、浏览器运行时三方共用的唯一事实源**；
@@ -127,7 +128,7 @@ E:\GemArc\.venv\Scripts\python.exe -m gemarc_mcp.cli build demo --profile static
 与 `gemarc_contracts`（读取契约与词表内容）。
 
 `gemarc_brief` 一次性返回：目标、五步流程、六条硬规则、12 个槽位（带 JSON Pointer 与规则）、
-全部允许词值（6 级证据 / 21 实体类型 / 21 关系类型 / 21 图示类型 / Case 分类 / 空间层级）、
+全部允许词值（6 级证据 / 20 实体类型 / 20 关系类型 / 21 图示类型 / Case 分类 / 空间层级）、
 构建命令，以及「哪些固定件已经写好、不要重写」的清单。**实测约 10 KB**，
 用来替掉原先 13323 字节的提示词规格。
 

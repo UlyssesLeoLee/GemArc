@@ -18,6 +18,7 @@ import {
   buildFactsView,
   buildGraphView,
   buildInspector,
+  buildPrototypeView,
   buildSpaceView,
   buildTimelineView,
   buildViewsView,
@@ -36,6 +37,8 @@ const state = {
   scenario: null,
   disabled: [],
   step: 0,
+  prototypePage: 0,
+  prototypeFeedback: null,
   spaceRenderer: null,
   axisRenderer: null,
 };
@@ -158,6 +161,15 @@ function dispatch(payload) {
       state.viewState.setFilters({ viewId: payload.id });
       showTab('2d');
       break;
+    case 'prototype-page':
+      state.prototypePage = payload.index;
+      state.prototypeFeedback = null;
+      showTab(state.tab);
+      break;
+    case 'prototype-action':
+      state.prototypeFeedback = payload.label;
+      showTab(state.tab);
+      break;
     default:
       break;
   }
@@ -174,6 +186,10 @@ function currentView() {
     case '5d': return buildCausalView(state.model, state.scenario, state.disabled);
     case 'views': return buildViewsView(state.model);
     case 'workflow': return buildWorkflowView(state.model);
+    case 'prototype': return buildPrototypeView(state.model, {
+      page: state.prototypePage,
+      feedback: state.prototypeFeedback,
+    });
     default: return buildFactsView(state.model, state.store);
   }
 }

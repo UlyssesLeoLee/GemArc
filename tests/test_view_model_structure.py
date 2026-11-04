@@ -99,13 +99,26 @@ class ViewModelStructureTests(unittest.TestCase):
     @unittest.skipUnless(NODE, "node is not available")
     def test_every_dimension_is_present(self):
         actual = current_baseline(self.site)
-        for key in ("facts", "graph", "space", "timeline", "causal", "views", "workflow"):
+        for key in ("facts", "graph", "space", "timeline", "causal", "views", "workflow", "prototype"):
             self.assertIn(key, actual)
             self.assertTrue(actual[key].get("headline"), key)
             self.assertTrue(actual[key].get("body"), key)
         # The inspector is a side panel, not a tab, so it has no headline.
         self.assertIn("inspector", actual)
         self.assertTrue(actual["inspector"].get("body"))
+
+    @unittest.skipUnless(NODE, "node is not available")
+    def test_the_prototype_tab_shows_the_registered_pages(self):
+        """A tab that renders an empty list is not a showcase.
+
+        The fixture registers prototype pages; the page must show them. An
+        empty panel would still satisfy every headline/body assertion above.
+        """
+        actual = current_baseline(self.site)
+        body = json.dumps(actual["prototype"], ensure_ascii=False)
+        self.assertIn("overview", body)
+        self.assertIn("settings", body)
+        self.assertIn("查看详情", body)
 
     @unittest.skipUnless(NODE, "node is not available")
     def test_timeline_reports_the_computed_events(self):

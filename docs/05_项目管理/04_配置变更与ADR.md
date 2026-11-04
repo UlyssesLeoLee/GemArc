@@ -108,7 +108,9 @@
   - 词表 `workflow-kinds` 增 `workPackageKinds` / `workPackageFields` / `wbsContract`；`qualityGates.rejectOn` 由 8 条增至 12 条（新增 `wbs_orphan_node` / `wbs_broken_hierarchy` / `wbs_missing_deliverable` / `wbs_unbound_package`，错误码 `GEMARC_EXEC_009`…`012`）。
   - 契约 `execution-graph.schema.json` 增 `workPackages`；示例 `execution-graph.example.json` 增一棵三层工作分解。
   - 派生 `data/workflow-ir.json` 增 `workPackages`（含 `childPackageIds` / `nodeCount`）与 `wbs`（`rootPackageId` / `coverageRatio` / `kinds`）。
-  - 站点两个外壳都读这一层：`static` / `vite` 的工作流视图渲染 WBS 树，`mvp` 预览新增「06 工作流 / WBS + Execution」标签页。
+  - 站点两个外壳都读这一层：`static` / `vite` 的工作流视图渲染 WBS 树。
+  - **导航口径统一**：三个外壳（`static` / `vite` / `mvp`）的导航现在一致：**01–05 维度 → 06 工作流（WBS × 执行图层）→ 07 图示登记 → UI 原型**。工作流是第六维度，所以占 `06`；原型不是维度，占 `UI` 槽；图示登记让位到 `07`，功能不丢。此前 `static` 把图示登记编为 `06`、工作流放 `UI` 槽，`mvp` 则把工作流编为 `06` 而没有图示页——同一份模型在两个站点上的入口位置不一样。`tests/test_site_navigation.py` 钉住三壳一致。
+  - **两个外壳各补一页**：共享外壳新增**原型页**（`buildPrototypeView`，显示模型登记的原型页面、说明与可点动作；动作为演示，不提交业务数据），`mvp` 预览补上**图示页**（`renderViews`）。两边的页面集合从此相同。
   - **执行节点口径统一**：执行节点 = 画布上承担执行能力的节点 ∪ 执行图契约自带的节点（按 9 种 6D 执行节点种类与 13 个执行字段认定）。站点的「执行节点」列表与「执行节点归属 X / Y」覆盖率都按这一条算，与派生层的 `wbs` 同口径；同一模型在卡片上和在产物里只有一个分母。
   - **发布示例模型带 6D**：`examples/demo-site/data/architecture.json` 的示例工作流声明一棵三层工作分解（阶段 → 工作包 → 任务），示例站点因此能展示 WBS 树。
   - **内联上限由 24 KiB 抬到 35 KiB**（`stateless.RENDER_INLINE_LIMIT`）：GWF-IR 逐字段陈述 §18 的每个节点字段，一个工作流因此要几 KB 派生数据；发布示例带 6D 后实测响应 40,865 字节 / 11,732 token（cl100k_base），仍在 Codex 约 12k token 的上限之内。**代价**：示例模型已经越过 Claude Code 在 10k token 处的告警线；`tests/test_stateless.py` 钉住这个上限，超了就红。

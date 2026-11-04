@@ -52,6 +52,7 @@ const output = {
   causal: models.buildCausalView(model, scenario, disabled),
   views: models.buildViewsView(model),
   workflow: models.buildWorkflowView(model),
+  prototype: models.buildPrototypeView(model, { page: 0, feedback: null }),
   inspector: models.buildInspector(model, store, query, { nodeIds: [], edgeIds: [] }),
 };
 

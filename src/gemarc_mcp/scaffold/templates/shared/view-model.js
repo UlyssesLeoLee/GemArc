@@ -579,6 +579,62 @@ export function buildWorkflowView(model) {
   };
 }
 
+/* ------------------------------------------------------------- prototype */
+
+/**
+ * The prototype pages the model registers.
+ *
+ * The prototype is model-driven: it shows the pages, their descriptions and
+ * their declared actions, and nothing else. The actions are demonstrations -
+ * the site never submits anything, so the feedback says so.
+ *
+ * @param {object} model the canonical model
+ * @param {{page?: number, feedback?: string|null}} [ui] the prototype state
+ * @returns {object} the view
+ */
+export function buildPrototypeView(model, ui) {
+  const pages = model.prototypes || [];
+  if (!pages.length) {
+    return {
+      headline: '界面原型',
+      kicker: 'UI / MULTI-TAB PROTOTYPE',
+      body: [panel('页面与操作', [hint('模型没有登记 prototypes；默认不编造业务界面。')])],
+    };
+  }
+  const state = ui || {};
+  const index = Math.min(Math.max(Number(state.page) || 0, 0), pages.length - 1);
+  const current = pages[index];
+  const tabs = element('div', 'tabs', pages.map((page, position) => ({
+    tag: 'button',
+    class: position === index ? 'action active' : 'action',
+    text: page.title || page.id,
+    attrs: { 'data-page': page.id || '' },
+    action: { type: 'prototype-page', index: position },
+  })));
+  const actions = (current.actions || []).map((label) => ({
+    tag: 'button',
+    class: 'action',
+    text: label,
+    action: { type: 'prototype-action', label },
+  }));
+  const feedback = state.feedback
+    ? hint(`已触发原型动作：${state.feedback}（演示，不提交实际业务数据）`)
+    : null;
+  const card = element('div', 'fact', [
+    textNode('h3', '', current.title || current.id),
+    textNode('small', '', current.id),
+    field('说明', current.description),
+    field('页面数', pages.length),
+    ...actions,
+    feedback,
+  ].filter(Boolean));
+  return {
+    headline: '界面原型',
+    kicker: 'UI / MULTI-TAB PROTOTYPE',
+    body: [panel('页面与操作', [tabs, card])],
+  };
+}
+
 /* ------------------------------------------------------------- inspector */
 
 export function buildInspector(model, store, query, selection) {

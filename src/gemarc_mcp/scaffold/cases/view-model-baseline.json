@@ -742,6 +742,119 @@
       }
     ]
   },
+  "prototype": {
+    "body": [
+      {
+        "children": [
+          {
+            "class": "",
+            "tag": "h2",
+            "text": "页面与操作"
+          },
+          {
+            "children": [
+              {
+                "action": {
+                  "index": 0,
+                  "type": "prototype-page"
+                },
+                "attrs": {
+                  "data-page": "overview"
+                },
+                "class": "action active",
+                "tag": "button",
+                "text": "系统概览"
+              },
+              {
+                "action": {
+                  "index": 1,
+                  "type": "prototype-page"
+                },
+                "attrs": {
+                  "data-page": "settings"
+                },
+                "class": "action",
+                "tag": "button",
+                "text": "设置"
+              }
+            ],
+            "class": "tabs",
+            "tag": "div"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "h3",
+                "text": "系统概览"
+              },
+              {
+                "class": "",
+                "tag": "small",
+                "text": "overview"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "说明："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "演示状态查看"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "页面数："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "2"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "action": {
+                  "label": "查看详情",
+                  "type": "prototype-action"
+                },
+                "class": "action",
+                "tag": "button",
+                "text": "查看详情"
+              },
+              {
+                "action": {
+                  "label": "查看历史",
+                  "type": "prototype-action"
+                },
+                "class": "action",
+                "tag": "button",
+                "text": "查看历史"
+              }
+            ],
+            "class": "fact",
+            "tag": "div"
+          }
+        ],
+        "class": "panel",
+        "tag": "section"
+      }
+    ],
+    "headline": "界面原型",
+    "kicker": "UI / MULTI-TAB PROTOTYPE"
+  },
   "space": {
     "body": [
       {

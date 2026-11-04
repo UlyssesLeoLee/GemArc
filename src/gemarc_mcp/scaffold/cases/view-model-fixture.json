@@ -325,5 +325,23 @@
       }
     }
   ],
-  "prototypes": []
+  "prototypes": [
+    {
+      "id": "overview",
+      "title": "系统概览",
+      "description": "演示状态查看",
+      "actions": [
+        "查看详情",
+        "查看历史"
+      ]
+    },
+    {
+      "id": "settings",
+      "title": "设置",
+      "description": "示例原型页面",
+      "actions": [
+        "保存配置"
+      ]
+    }
+  ]
 }

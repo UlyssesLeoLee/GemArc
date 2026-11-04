@@ -20,6 +20,7 @@ function showTab(tab){state.tab=tab;document.querySelectorAll('#nav button').for
  const el=clear($('#content'));clear($('#view-actions'));
  if(tab==='1d')render1D(el);if(tab==='2d')render2D(el);if(tab==='3d')render3D(el);
  if(tab==='4d')render4D(el);if(tab==='5d')render5D(el);if(tab==='workflow')renderWorkflow(el);
+ if(tab==='views')renderViews(el);
  if(tab==='prototype')renderPrototype(el);
  renderInspector();location.hash=tab;
 }
@@ -156,6 +157,12 @@ function renderWbsTree(parent,rows,knownIds){
  };
  rows.filter(r=>!r.parentPackageId||!known.has(r.parentPackageId)).forEach(draw);
 }
+function renderViews(el){clear(el);head('图示定义','VIEWS / DIAGRAM TYPES');const views=current().views||[];if(!views.length){hint(el,'模型没有登记任何图示。');return}
+ const p=panel(el,'模型中登记的图示');
+ views.forEach(v=>{const card=node('div','fact',p);node('h3','',card,v.title||v.id);node('small','',card,v.id);
+  text(card,'图示类型',v.diagramType);text(card,'维度',v.dimension);text(card,'关注点',(v.concerns||[]).join('、')||null);text(card,'节点数',(v.nodeIds||[]).length);
+  if((v.missing||[]).length)text(card,'保真缺失',v.missing.join('、'));});
+}
 function renderWorkflow(el){
  clear(el);head('工作流与工作分解','6D / WBS × EXECUTION GRAPH');
  const workflows=current().workflows||[];if(!workflows.length){hint(el,'模型没有登记工作流。');return}
@@ -178,7 +185,7 @@ function renderWorkflow(el){
   hint(p,'工作分解说明做什么、交付什么、何时算完成；执行节点说明由谁以什么能力去做。未登记的工作包不会被编造。');
  });
 }
-function renderPrototype(el){clear(el);head('交互式页面原型','UI / MULTI-TAB PROTOTYPE');const pages=current().prototypes||[]; if(!pages.length){hint(el,'模型未定义 prototypes；默认不编造业务界面。');return;}
+function renderPrototype(el){clear(el);head('界面原型','UI / MULTI-TAB PROTOTYPE');const pages=current().prototypes||[]; if(!pages.length){hint(el,'模型未定义 prototypes；默认不编造业务界面。');return;}
  const p=panel(el,'页面与操作');const tabs=node('div','tabs',p);pages.forEach((pg,i)=>{const b=button(tabs,pg.title||pg.id,()=>{state.prototype=i;renderPrototype(el)});b.classList.toggle('active',state.prototype===i)});
  const pg=pages[state.prototype]||pages[0];const content=node('div','protopage',p);node('h2','',content,pg.title);node('p','muted',content,pg.description||'暂无描述');
  const feedback=node('p','small',content,'可选择下列交互热点，当前为轻量原型组件，不包含 Konva 可视化编辑器。');

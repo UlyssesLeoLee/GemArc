@@ -118,7 +118,7 @@ GemArc 把「可被写死的东西」（字段名、词表、校验规则、模�
 ## 大小与限额
 
 - 模型内联传入，**每次**调用都会占用你的上下文；硬上限 4 MiB（`GEMARC_MODEL_002`）。节点 id 用短而稳定的名字，别在模型里塞大段原文。
-- `gemarc_render` 的内联上限约 24 KiB（24576 字节，三十来个节点的模型就会到这个量级），按**累计字节逐文件**判定：放得下的文件给内容，放不下的只给清单。**任何一项缺 `content` 就不能组装**，这时改走本地流程 B，用 `gemarc build <project> --profile <profile>`。
+- `gemarc_render` 的内联上限约 35 KiB（35840 字节；发布示例模型带 6D 工作流，响应实测约 11.7k token），按**累计字节逐文件**判定：放得下的文件给内容，放不下的只给清单。**任何一项缺 `content` 就不能组装**，这时改走本地流程 B，用 `gemarc build <project> --profile <profile>`。
 - 客户端对单次工具输出有上限（Claude Code 在 10k token 告警、默认 25k 截断；Codex 约 10k token）。少用不带 `section` 的 `gemarc_brief()`，不要把整个模型反复打印回聊天里。
 - 远程端点可能要求 Bearer token：这是用户的连接配置，不是你要处理的东西。收到 401 就告诉用户检查 `GEMARC_MCP_TOKEN`。
 

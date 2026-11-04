@@ -35,7 +35,7 @@
 
 ### ADR-009 远程使用无状态工具集
 
-- **决策**：`server.create_server(toolset)` 提供 `full`（17 个，本地默认）与 `stateless`（9 个，远程默认，由 `GEMARC_TOOLSET` 选择）。`stateless` 只含不依赖工作区的工具，模型作为参数内联传入，新增 `gemarc_new_model` 与 `gemarc_render`。站点的固定件（约 620 KB）不进工具结果，由 `/kit/<profile>.zip` 提供；`gemarc_render` 只返回随模型变化的 `data/*.json`，合计不超过 24 KiB 时内联。（工具数原为 16/8，ADR-012 之后为 17/9。）
+- **决策**：`server.create_server(toolset)` 提供 `full`（17 个，本地默认）与 `stateless`（9 个，远程默认，由 `GEMARC_TOOLSET` 选择）。`stateless` 只含不依赖工作区的工具，模型作为参数内联传入，新增 `gemarc_new_model` 与 `gemarc_render`。站点的固定件（约 620 KB）不进工具结果，由 `/kit/<profile>.zip` 提供；`gemarc_render` 只返回随模型变化的 `data/*.json`，合计不超过内联上限时内联（初版 24 KiB，后由 ADR-015 抬到 35 KiB）。（工具数原为 16/8，ADR-012 之后为 17/9。）
 - **原因**：Vercel 没有持久文件系统，也没有调用者身份；把工作区放进 `/tmp` 既不跨实例共享，也无法把项目归属到调用者。把完整站点放进工具结果没有任何客户端接受得了（Claude Code 在 10k token 告警，Codex 约 10k token 截断）。
 - **后果**：服务端不保存任何项目，没有写工具，因此不需要写授权；填写事实靠调用方 agent 用自己的文件访问能力读用户的仓库；模型大于内联上限时改走本地工具集。
 
@@ -92,7 +92,7 @@
 - **原因**：命令名是用户看到的第一眼信息，绑在一个已经走完的维度上会持续误导；6D 的执行图必须能被表达、被校验，否则「按 v6.0 实现」只是口号；而「做得出来」不等于「读得下去」——主内容被两侧窗格挤成一条窄缝时，再准的事实也没人看。
 - **后果**：
   - 工具面与词表变动 ⇒ `tests/atlas/test_atlas_v1_frozen.py` 的 pin（工具名、词表哈希与摘要）按同文件自述的通道在同一提交内更新。
-  - 覆盖由 `tests/test_v5_spec_coverage.py` 钉住：6D 字段、8 条质量门、Python 与浏览器运行时的对拍、文档数字绑定各有断言。
+  - 覆盖由 `tests/test_v5_spec_coverage.py` 钉住：6D 字段、质量门（ADR-014 时 8 条，ADR-015 后 12 条）、Python 与浏览器运行时的对拍、文档数字绑定各有断言。
   - 随包发布的预览站按真实构建路径重新生成（`gemarc build --profile mvp`），`tests/test_generated_artifacts.py` 逐字节比对。
   - ADR-008 的约定继续适用：旧名只允许出现在记录改名的这一条里。
 
@@ -109,6 +109,9 @@
   - 契约 `execution-graph.schema.json` 增 `workPackages`；示例 `execution-graph.example.json` 增一棵三层工作分解。
   - 派生 `data/workflow-ir.json` 增 `workPackages`（含 `childPackageIds` / `nodeCount`）与 `wbs`（`rootPackageId` / `coverageRatio` / `kinds`）。
   - 站点两个外壳都读这一层：`static` / `vite` 的工作流视图渲染 WBS 树，`mvp` 预览新增「06 工作流 / WBS + Execution」标签页。
+  - **执行节点口径统一**：执行节点 = 画布上承担执行能力的节点 ∪ 执行图契约自带的节点（按 9 种 6D 执行节点种类与 13 个执行字段认定）。站点的「执行节点」列表与「执行节点归属 X / Y」覆盖率都按这一条算，与派生层的 `wbs` 同口径；同一模型在卡片上和在产物里只有一个分母。
+  - **发布示例模型带 6D**：`examples/demo-site/data/architecture.json` 的示例工作流声明一棵三层工作分解（阶段 → 工作包 → 任务），示例站点因此能展示 WBS 树。
+  - **内联上限由 24 KiB 抬到 35 KiB**（`stateless.RENDER_INLINE_LIMIT`）：GWF-IR 逐字段陈述 §18 的每个节点字段，一个工作流因此要几 KB 派生数据；发布示例带 6D 后实测响应 40,865 字节 / 11,732 token（cl100k_base），仍在 Codex 约 12k token 的上限之内。**代价**：示例模型已经越过 Claude Code 在 10k token 处的告警线；`tests/test_stateless.py` 钉住这个上限，超了就红。
   - 词表变动 ⇒ `tests/atlas/test_atlas_v1_frozen.py` 的 pin 按同文件自述的通道在同一提交内更新。
   - **不在本轮范围**：Graph Engineering 的「改进图」（指标、评估、策略、审计、人工决策构成的系统长期调整层）。GemArc 的 6D 仍然只做工作图。
 

@@ -29,10 +29,14 @@ from .scaffold import derive
 #: Profiles that produce a standalone site (``mvp`` is the tiny local viewer).
 SITE_PROFILES = ("static", "vite")
 
-#: Largest ``render`` payload returned inline. Codex shows the model at most
-#: ~12k tokens (10k x 1.2) and Claude Code warns above 10k; JSON runs about
-#: 3 bytes per token, so keep the derived files under ~8k tokens.
-RENDER_INLINE_LIMIT = 24 * 1024
+#: Largest ``render`` payload returned inline. Codex caps what the model sees
+#: at ~12k tokens and Claude Code warns above 10k. The published example model
+#: now carries a 6D workflow, and the GWF-IR states every §18 field of every
+#: node, so its files measure 34,491 bytes and its response 40,865 bytes /
+#: 11,732 tokens (cl100k_base) - under the Codex ceiling, over the Claude Code
+#: warning line. JSON runs about 3 bytes per token for CJK-heavy content, which
+#: is why the byte ceiling sits well above the token count.
+RENDER_INLINE_LIMIT = 35 * 1024
 
 #: Warnings that ``render`` echoes back. The data files are held to RENDER_INLINE_LIMIT, but one warning per
 #: evidence-less node or edge would otherwise grow the rest of the result without bound.

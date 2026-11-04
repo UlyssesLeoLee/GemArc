@@ -135,16 +135,13 @@ function render5D(el){clear(el);head('模块组合与因果干预','5D / CAUSAL 
 /* 6D = WBS × 执行图: the work breakdown says what work the graph performs, the
    execution nodes say which capability does it, and the nodeIds bind the two. */
 function wbsRows(workflow){const g=workflow&&workflow.executionGraph;return (g&&Array.isArray(g.workPackages)?g.workPackages:[]).filter(p=>p&&p.packageId);}
-/* The execution nodes the site LISTS. The rule is the one the static shell
-   already uses for its list, so both shells show the same rows. */
-function executionNodes(workflow){return (workflow.nodes||[]).filter(n=>n.executorKind||n.iterationLimit||n.approvalPolicyRef||n.toolContractRef||n.authorityScope||n.executionMode);}
-/* The execution nodes the coverage COUNTS, by the rule the derivation uses: a
-   node that carries an execution capability, in the canvas or in the standalone
-   execution graph. The coverage number must not depend on which shell renders
-   it, so this mirrors the derivation rule exactly. */
+/* The execution nodes of a workflow, by the rule the derivation uses: a node
+   that carries an execution capability, in the canvas or in the standalone
+   execution graph. The list and the coverage must not count different things,
+   and the site must not disagree with workflow-ir.json either. */
 const EXECUTION_NODE_KINDS=['deterministic-program','agent-loop','tool-call','policy-gate','checkpoint','resume','manual-review','escalation','audit-event'];
 const EXECUTION_NODE_FIELDS=['executorKind','authorityScope','executionMode','inputStateSchema','outputStateSchema','stateWritePolicy','checkpointBefore','checkpointAfter','budgetPolicy','iterationLimit','approvalPolicyRef','toolContractRef'];
-function countedExecutionNodes(workflow){const canvas=(workflow.nodes||[]).filter(n=>EXECUTION_NODE_KINDS.indexOf(n.kind||n.legacyKind)>=0||EXECUTION_NODE_FIELDS.some(f=>n[f]!==undefined&&n[f]!==null));const g=workflow&&workflow.executionGraph;return canvas.concat(g&&Array.isArray(g.nodes)?g.nodes:[]);}
+function executionNodes(workflow){const canvas=(workflow.nodes||[]).filter(n=>EXECUTION_NODE_KINDS.indexOf(n.kind||n.legacyKind)>=0||EXECUTION_NODE_FIELDS.some(f=>n[f]!==undefined&&n[f]!==null));const g=workflow&&workflow.executionGraph;return canvas.concat(g&&Array.isArray(g.nodes)?g.nodes:[]);}
 function renderWbsTree(parent,rows,knownIds){
  const known=new Set(rows.map(r=>r.packageId));const byParent=new Map();
  rows.forEach(r=>{const k=r.parentPackageId||'';if(!byParent.has(k))byParent.set(k,[]);byParent.get(k).push(r)});
@@ -165,12 +162,12 @@ function renderWorkflow(el){
  workflows.forEach(wf=>{
   const p=panel(el,wf.name||wf.id);const g=wf.executionGraph;
   if(g||wf.executionMode||wf.stateSchemaVersion){text(p,'执行模式',wf.executionMode);text(p,'执行图',g&&(g.executionGraphId||g.id));text(p,'状态契约版本',wf.stateSchemaVersion);text(p,'检查点策略',wf.checkpointPolicy)}
-  const rows=wbsRows(wf);const nodes=executionNodes(wf);const counted=countedExecutionNodes(wf);
-  const knownIds=new Set(counted.map(n=>n.id||n.nodeId||'').filter(Boolean));
+  const rows=wbsRows(wf);const nodes=executionNodes(wf);
+  const knownIds=new Set(nodes.map(n=>n.id||n.nodeId||'').filter(Boolean));
   if(rows.length){
    const assigned=new Set();rows.forEach(r=>(r.nodeIds||[]).forEach(id=>{if(knownIds.has(id))assigned.add(id)}));
    const uncovered=[...knownIds].filter(id=>!assigned.has(id));
-   text(p,'工作分解（WBS）',rows.length+' 个工作包');text(p,'执行节点归属',assigned.size+' / '+counted.length);
+   text(p,'工作分解（WBS）',rows.length+' 个工作包');text(p,'执行节点归属',assigned.size+' / '+nodes.length);
    if(uncovered.length)text(p,'未归属执行节点',uncovered.join('、'));
    const tree=node('ul','wbs',p);renderWbsTree(tree,rows,knownIds);
    const ex=panel(p,'执行节点');nodes.forEach(n=>{const owner=rows.filter(r=>(r.nodeIds||[]).includes(n.id)).map(r=>r.packageId).join('、');

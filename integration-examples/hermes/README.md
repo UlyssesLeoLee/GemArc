@@ -50,7 +50,7 @@ hermes mcp remove gemarc
 - **不要给同一个工具暴露两个别名**。Hermes 把工具名里不属于 `[A-Za-z0-9_]` 的字符改成 `_`，规范化后重名的工具**两个都会被丢弃**，超过 64 字符会截断加哈希 **[SOURCE]**。本服务器的工具名本来就是下划线名（最长 `mcp__gemarc__gemarc_new_model`，29 字符），不会冲突；但**不要**同时注册两个规范化后同名的服务器（例如 `gemarc.local` 与 `gemarc_local`），也不要在本服务器前再套一层改名代理。这也是工具名从点号改成下划线、且不保留旧别名的原因（见 `docs/05_项目管理/04_配置变更与ADR.md` 的 ADR-008）。
 - 工具报错（`isError`）会变成 `tool_error`，形似凭证的文本（`token=…`、`Bearer …`）会被打码 **[SOURCE]**；本服务器的错误 JSON 里不放这类文本。
 - 服务器同时返回 `content` 与 `structuredContent` 时 Hermes 会去重，并忽略 `outputSchema` **[SOURCE]**；本服务器不返回 `structuredContent`，也没有 `outputSchema`。
-- 单次结果超过 50 000 字符会被写入文件 **[SOURCE]**。`gemarc_render` 对示例模型约 10 KB；内联上限是 24 KiB，按此上限转义后通常仍低于 50 000 字符，所以一般不会触发写文件 **[UNVERIFIED]**（没装 Hermes，未实测）。
+- 单次结果超过 50 000 字符会被写入文件 **[SOURCE]**。`gemarc_render` 对示例模型返回 40,865 字节（约 3.5 万字符）；内联上限是 35 KiB，按此上限转义后通常仍低于 50 000 字符，所以一般不会触发写文件 **[UNVERIFIED]**（没装 Hermes，未实测）。
 - Hermes 会对可空 `anyOf` 做清理 **[SOURCE]**；本服务器的输入 schema 没有 `null` 分支（`verify_stdio.py` 检查 **[RAN]**）。
 - `hermes-agent[mcp]` 固定 `mcp==2.3.0` **[SOURCE]**，与本仓库的 SDK 版本一致（`.venv` 里是 2.3.0 **[RAN]**）。
 

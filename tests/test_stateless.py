@@ -243,8 +243,15 @@ class RenderTests(unittest.TestCase):
 
     def test_inline_render_stays_well_under_client_output_caps(self):
         out = stateless.render(DEMO_MODEL)
-        # Codex caps what the model sees at ~12k tokens (~36 KB of JSON).
-        self.assertLess(len(json.dumps(out, ensure_ascii=False).encode("utf-8")), 32 * 1024)
+        # Codex caps what the model sees at ~12k tokens. The example model now
+        # carries a 6D workflow, whose GWF-IR states every §18 field of every
+        # node, so the response measures 40,865 bytes / 11,732 tokens
+        # (cl100k_base). The ceiling below keeps a margin under the Codex
+        # line; the inline limit keeps every file whole.
+        raw = json.dumps(out, ensure_ascii=False).encode("utf-8")
+        self.assertLess(len(raw), 43 * 1024)
+        self.assertTrue(out["inline"], "the published example must stay fully inline")
+        self.assertLess(len(raw), stateless.RENDER_INLINE_LIMIT * 5 // 4)
 
 
 class SiteKitTests(unittest.TestCase):

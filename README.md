@@ -210,7 +210,7 @@ npx vercel@65.8.0 deploy --prod
 
 **远程形态与本地的区别**：远程默认是 `stateless` 工具集（`gemarc_brief / contracts / assets / new_model / validate / simulate / diff / render`），
 模型随每次调用传入，服务端不保存任何项目，因此没有跨调用状态丢失的问题，也没有写工具。
-`gemarc_render` 只返回随模型变化的 `data/*.json`（内联上限 24 KB，按累计字节逐文件判定：放不下的文件只给清单与摘要）；固定件通过 `/kit/<profile>.zip` 下载。
+`gemarc_render` 只返回随模型变化的 `data/*.json`（内联上限 35 KB，按累计字节逐文件判定：放不下的文件只给清单与摘要）；固定件通过 `/kit/<profile>.zip` 下载。
 需要工作区、扫描本地仓库、`build/export` 时用本地 stdio 模式。
 
 **鉴权**：设置环境变量 `GEMARC_MCP_TOKEN`（可逗号分隔多个，便于轮换）后，`POST /mcp` 必须带 `Authorization: Bearer <token>`；

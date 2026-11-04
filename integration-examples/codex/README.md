@@ -42,7 +42,7 @@ codex mcp add gemarc --url 'https://<project>.vercel.app/mcp' --bearer-token-env
 
 - 工具以命名空间 `mcp__gemarc` 加裸工具名暴露；名字里不属于 `[A-Za-z0-9_]` 的字符会被改成 `_`（冲突时加 sha1 后缀），合计上限 128 **[SOURCE]**。本服务器的名字已是纯下划线，不会被改写，也不会冲突。
 - 结果里若带 `structuredContent`，模型看到的是它而不是 `content` **[SOURCE]**。本服务器**不返回** `structuredContent`（`scripts/verify_stdio.py` 逐次断言 **[RAN]**），所以模型看到的就是 JSON 文本。
-- 单次输出约 10k token 上限（再乘 1.2）**[SOURCE]**。`gemarc_render` 对示例模型约 10 KB；内联上限 24 KiB（约 8k token）低于这个输出上限，更大的模型 `inline` 为 `false`、只返回清单（改用本地 `gemarc build`），所以通常不需要 `output_token_limit`。
+- 单次输出约 10k token 上限（再乘 1.2）**[SOURCE]**。`gemarc_render` 对示例模型返回 40,865 字节（11,732 token，cl100k_base）；内联上限 35 KiB 让示例模型的文件全部内联，响应仍在 Codex 约 12k token 的上限之内，更大的模型 `inline` 为 `false`、只返回清单（改用本地 `gemarc build`），所以通常不需要 `output_token_limit`。
 - Codex 忽略 prompt（所以别指望 `gemarc-media-doc` 提示词），只能通过内置的 list/read resource 工具访问资源；服务器的 `instructions` 作为命名空间描述 **[SOURCE]**。让模型先调 `gemarc_brief`。
 - Codex 会丢掉 schema 里的 `title`/`default` **[SOURCE]**，不影响本服务器：所有参数都有默认值或必填，且没有 `null` 分支（`verify_stdio.py` 检查 **[RAN]**）。
 

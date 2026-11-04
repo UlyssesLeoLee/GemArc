@@ -21,12 +21,14 @@ from pathlib import Path
 
 from gemarc_mcp import model as gemarc_model
 from gemarc_mcp import service
+from gemarc_mcp import stateless
 from gemarc_mcp.paths import Workspace
 from gemarc_mcp.scaffold import derive
 
 SCAFFOLD = Path(__file__).resolve().parent.parent / "src" / "gemarc_mcp" / "scaffold"
 CONTRACT = SCAFFOLD / "contracts" / "execution-graph.schema.json"
 EXAMPLE = SCAFFOLD / "contracts" / "execution-graph.example.json"
+EXAMPLE_MODEL = Path(__file__).resolve().parent.parent / "examples" / "demo-site" / "data" / "architecture.json"
 DUMP_TOOL = SCAFFOLD / "runtime" / "tools" / "dump-view-model.mjs"
 NODE = shutil.which("node")
 
@@ -395,6 +397,47 @@ class SiteRenderingTests(unittest.TestCase):
         sheet = (self.site / "style.css").read_text(encoding="utf-8")
         for name in (".wbs", ".wbs-item", ".wbs-detail"):
             self.assertIn(name, sheet)
+
+
+class PublishedExampleTests(unittest.TestCase):
+    """The published example carries the 6D layer - and still fits inline.
+
+    The example is what every new reader sees first, so it has to show the
+    work breakdown. It is also the model the MCP tool is called with, so it
+    has to stay inside the inline budget: every file must arrive with its
+    content, otherwise the site cannot be assembled from the answer.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.model = json.loads(EXAMPLE_MODEL.read_text(encoding="utf-8"))
+
+    def test_the_example_declares_a_three_level_breakdown(self):
+        workflows = self.model.get("workflows") or []
+        self.assertEqual(len(workflows), 1)
+        packages = workflows[0]["executionGraph"]["workPackages"]
+        self.assertEqual([package["kind"] for package in packages],
+                         ["phase", "work-package", "task"])
+        for package in packages:
+            self.assertTrue(package["deliverable"])
+            self.assertTrue(package["completionCriteria"])
+
+    def test_the_example_passes_the_quality_gates(self):
+        result = gemarc_model.validate(self.model, strict=False)
+        self.assertEqual(result["status"], "ok", result.get("errors"))
+
+    def test_the_example_breakdown_binds_every_execution_node(self):
+        entry = derive.workflow_ir({"workflows": self.model["workflows"]})["workflows"][0]
+        self.assertEqual(entry["gates"], [])
+        self.assertEqual(entry["wbs"]["coverageRatio"], 1.0)
+        self.assertEqual(entry["wbs"]["assignedNodeCount"], entry["wbs"]["nodeCount"])
+
+    def test_the_example_stays_fully_inline(self):
+        out = stateless.render(self.model)
+        self.assertTrue(out["inline"], out.get("notice"))
+        for item in out["files"]:
+            self.assertIn("content", item, f"{item['path']} arrived without content")
+        self.assertEqual(len(out["files"]), 9)
 
 
 if __name__ == "__main__":

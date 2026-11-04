@@ -27,7 +27,7 @@
 
 1. **在自己的机器上、仓库就在磁盘上、需要把模型写进工作区** → 本地 stdio，`full` 工具集（17 个）。Claude Code / Codex / Hermes 都行。写工具默认关，`GEMARC_ALLOW_WRITE=1` 才开。
 2. **不想在每台机器装环境、只做「读仓库 → 填模型 → 校验 → 模拟 → 取回站点数据」** → 远程 `stateless` 工具集（9 个，全只读，没有工作区）。Claude Code / Codex / Hermes 用 Bearer token；claude.ai / Desktop 需要部署**不设** token（见 `claude-desktop/README.md` 的取舍）。
-3. **模型很大**（`gemarc_render` 派生文件合计超过约 24 KiB，或单次输出超过客户端上限）→ 走本地：`gemarc_build`，或命令行 `gemarc build <project> --profile static`。
+3. **模型很大**（`gemarc_render` 派生文件合计超过约 35 KiB，或单次输出超过客户端上限）→ 走本地：`gemarc_build`，或命令行 `gemarc build <project> --profile static`。
 4. **只想试一下** → 本地 stdio，`GEMARC_ALLOW_WRITE=0`，只用只读工具。
 
 ## 占位符（全部在这里）

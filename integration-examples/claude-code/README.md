@@ -72,7 +72,7 @@ claude mcp add gemarc --scope user --transport stdio -e GEMARC_WORKSPACE_ROOT='<
 
 - 提示词 `gemarc-media-doc` 在会话里显示为 `/mcp__gemarc__gemarc-media-doc` **[DOCS]**。
 - 资源 `gemarc://registry`、`gemarc://schema/model`：输入 `@gemarc:gemarc://registry` 引用 **[DOCS]**。
-- 输出上限：超过 10k token 告警，`MAX_MCP_OUTPUT_TOKENS` 默认 25k；服务端 instructions 与工具描述在 4096 字符处截断 **[DOCS]**。实测 `gemarc_render` 对示例模型返回约 10 KB，`gemarc_brief()` 约 10 KB（见 `scripts/verify_stdio.py` 输出）。
+- 输出上限：超过 10k token 告警，`MAX_MCP_OUTPUT_TOKENS` 默认 25k；服务端 instructions 与工具描述在 4096 字符处截断 **[DOCS]**。实测 `gemarc_render` 对示例模型返回 40,865 字节（11,732 token），`gemarc_brief()` 约 10 KB（见 `scripts/verify_stdio.py` 输出）。
 
 ## 已验证到哪一步
 

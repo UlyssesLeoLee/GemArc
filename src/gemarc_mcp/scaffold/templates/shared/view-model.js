@@ -520,9 +520,11 @@ export function buildWorkflowView(model) {
       children.push(field('状态契约版本', workflow.stateSchemaVersion));
       children.push(field('检查点策略', workflow.checkpointPolicy));
     }
-    const executionNodes = (workflow.nodes || []).filter((node) =>
-      node.executorKind || node.iterationLimit || node.approvalPolicyRef
-      || node.toolContractRef || node.authorityScope || node.executionMode);
+    // The execution nodes of this workflow: the ones that carry an execution
+    // capability, in the canvas or in the standalone execution graph. Same
+    // rule as the derivation, so the list and the coverage below cannot
+    // disagree about what counts as an execution node.
+    const executionNodes = executionNodesOf(workflow);
     if (executionNodes.length) {
       children.push(element('ul', '', executionNodes.map((node) => {
         const parts = [node.kind || node.nodeType || '节点'];

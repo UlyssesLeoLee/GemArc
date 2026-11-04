@@ -114,6 +114,50 @@ class PackedCopyTests(unittest.TestCase):
         self.assertEqual(before, after)
 
 
+class PackageContentTests(unittest.TestCase):
+    """What the package actually ships must match what the source holds.
+
+    ``setuptools`` reuses ``build/lib`` when it builds the wheel: a directory
+    that was renamed away can still be packaged from the stale staging copy.
+    The old skill directory shipped that way once - the source was gone, the
+    wheel still carried it - and the deployment would have uploaded the same
+    staging directory to Vercel.
+    """
+
+    def test_the_build_staging_directory_holds_no_file_the_package_does_not(self):
+        staging = REPO_ROOT / "build" / "lib" / "gemarc_mcp"
+        if not staging.is_dir():
+            self.skipTest("no build staging directory (nothing was built here)")
+        expected = {p.relative_to(PACKAGE_ROOT).as_posix()
+                    for p in PACKAGE_ROOT.rglob("*")
+                    if p.is_file() and "__pycache__" not in p.parts}
+        actual = {p.relative_to(staging).as_posix()
+                  for p in staging.rglob("*")
+                  if p.is_file() and "__pycache__" not in p.parts}
+        self.assertEqual(sorted(actual - expected), [],
+                         "the build staging directory holds files the package does not: "
+                         "they would be packaged and uploaded")
+
+    def test_the_package_ships_exactly_one_skill_directory(self):
+        roots = [PACKAGE_ROOT / "scaffold" / "skills"]
+        staging = REPO_ROOT / "build" / "lib" / "gemarc_mcp" / "scaffold" / "skills"
+        if staging.is_dir():
+            roots.append(staging)
+        for root in roots:
+            with self.subTest(root=root.as_posix()):
+                names = sorted(p.name for p in root.iterdir() if p.is_dir())
+                self.assertEqual(names, [skillpack.SKILL_NAME],
+                                 f"{root} holds a directory other than the current skill")
+
+    def test_the_deploy_ignore_list_excludes_the_build_directories(self):
+        """``.vercelignore`` replaces ``.gitignore``, so it has to say it itself."""
+        text = (REPO_ROOT / ".vercelignore").read_text(encoding="utf-8")
+        for pattern in ("/build", "/dist"):
+            self.assertIn(pattern, text.splitlines(),
+                          f"{pattern} must be in .vercelignore: a stale staging directory "
+                          "would otherwise be uploaded and packaged")
+
+
 class WorkflowContentTests(unittest.TestCase):
     """The workflow must be real, non-empty text that only names real tools."""
 

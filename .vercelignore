@@ -19,3 +19,9 @@ install.ps1
 /tools
 # The atlas kit (tools/make_kit.py writes dist-kit/atlas-kit.zip, the whole atlas package in one archive) is a local artefact: never uploaded.
 /dist-kit
+# Build staging directories. setuptools reuses build/lib/ when it builds the
+# wheel, so a stale copy there is packaged even though the source is gone (the
+# renamed skill shipped this way once). .vercelignore replaces .gitignore, so
+# these must be listed here explicitly.
+/build
+/dist

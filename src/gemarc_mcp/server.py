@@ -216,7 +216,7 @@ def create_server(toolset: str | None = None):
 
     @tool("gemarc_render", "Render site data from a model", stateless_ok=True)
     def render(model: dict, profile: str = "static"):
-        """Validate a model and return the files that depend on it: data/architecture.json, scenarios.json, capabilities.json, evidence-index.json, diagram-catalog.json, spatial-layout.json, workflow-ir.json and case-library.json, plus a description of the fixed site kit and where to download it. The kit carries the site shell, the shared runtime and data/workflow-schema.json (the GWF-IR schema, which follows the vocabulary and not the model). Kit + these files is the complete multimedia document site; nothing is stored on the server. `profile` is static (default; zero-build ESM) or vite (npm project)."""
+        """Validate a model and return the files that depend on it: data/architecture.json, scenarios.json, capabilities.json, evidence-index.json, diagram-catalog.json, spatial-layout.json, three-d.json, workflow-ir.json and case-library.json, plus a description of the fixed site kit and where to download it. The kit carries the site shell, the shared runtime and data/workflow-schema.json (the GWF-IR schema, which follows the vocabulary and not the model). Kit + these files is the complete multimedia document site; nothing is stored on the server. `profile` is static (default; zero-build ESM) or vite (npm project)."""
         return run(lambda: stateless.render(model, profile))
 
     # ---- tools that need a workspace (local servers) ------------------------------

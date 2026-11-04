@@ -473,5 +473,61 @@ class DiffImpactTests(unittest.TestCase):
         self.assertEqual(answers, {("X", "Y")})
 
 
+class DocumentedRenderFileListTests(unittest.TestCase):
+    """Every place that shows the rendered file list must show the real one.
+
+    A count goes stale silently: the 3D round added ``data/three-d.json`` and
+    the tool description, the skill reference and the contract document all
+    still said eight files, while the payload carried nine. This test compares
+    the paths, so a new derived file has to be written down before the suite is
+    green again.
+    """
+
+    def _rendered_paths(self):
+        payload = stateless.render(DEMO_MODEL, "static")
+        self.assertEqual(payload.get("status"), "ok")
+        return sorted(f["path"] for f in payload.get("files", []))
+
+    def _tool_description(self):
+        app = server.create_server("stateless")
+        tools = asyncio.run(app.list_tools())
+        for tool in tools:
+            if tool.name == "gemarc_render":
+                return tool.model_dump(by_alias=True, exclude_none=True).get("description", "")
+        self.fail("the tool list has no gemarc_render")
+
+    def test_the_documented_lists_name_every_rendered_file(self):
+        paths = self._rendered_paths()
+        self.assertTrue(paths)
+        # The tool description names the first file with its full path and the
+        # others by name; the two documents use the full path throughout.
+        sources = {
+            "tool description": (self._tool_description(), False),
+            "skill reference": ((REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "skills"
+                                 / "gemarc-media-doc" / "references" / "assemble-site.md")
+                                .read_text(encoding="utf-8"), True),
+            "contract document": ((REPO_ROOT / "docs" / "03_详细设计"
+                                   / "02_MCP工具详细契约.md").read_text(encoding="utf-8"), True),
+        }
+        for name, (text, full_path) in sources.items():
+            for path in paths:
+                needle = path if full_path else path.split("/")[-1]
+                self.assertIn(needle, text, f"{name} does not mention {needle}")
+
+    def test_the_documented_lists_do_not_claim_a_stale_count(self):
+        """The lists must not repeat a number that the payload can contradict."""
+        paths = self._rendered_paths()
+        sources = {
+            "skill reference": (REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "skills"
+                                / "gemarc-media-doc" / "references" / "assemble-site.md")
+            .read_text(encoding="utf-8"),
+            "contract document": (REPO_ROOT / "docs" / "03_详细设计"
+                                  / "02_MCP工具详细契约.md").read_text(encoding="utf-8"),
+        }
+        for name, text in sources.items():
+            for wrong in (f"{len(paths) - 1} 个文件", f"{len(paths) + 1} 个文件"):
+                self.assertNotIn(wrong, text, f"{name} still says {wrong}")
+
+
 if __name__ == "__main__":
     unittest.main()

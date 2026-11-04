@@ -53,6 +53,22 @@ STATELESS_TOOLS = {"gemarc_media_doc_guide", "gemarc_brief", "gemarc_contracts",
 WRITE_TOOLS = {"gemarc_scaffold", "gemarc_init", "gemarc_model", "gemarc_build", "gemarc_export"}
 FULL_TOOLS = STATELESS_TOOLS | WRITE_TOOLS | {"gemarc_inspect", "gemarc_plan", "gemarc_verify"}
 
+#: The files ``gemarc_render`` returns for a model. The check compares this
+#: **list**, not a count: a count goes stale the moment a derived file is added
+#: (the 3D round added ``data/three-d.json`` and this check kept saying eight).
+#: Comparing the paths names the file that drifted.
+EXPECTED_RENDER_FILES = [
+    "data/architecture.json",
+    "data/capabilities.json",
+    "data/case-library.json",
+    "data/diagram-catalog.json",
+    "data/evidence-index.json",
+    "data/scenarios.json",
+    "data/spatial-layout.json",
+    "data/three-d.json",
+    "data/workflow-ir.json",
+]
+
 # Same shape as examples/demo-site/data/architecture.json (illustrative, all Hypothetical).
 DEMO_MODEL = {
     "meta": {"system": "demo", "schemaVersion": "0.1.0", "version": "0.1.0", "language": "zh-CN",
@@ -217,10 +233,11 @@ async def run_checks(session, init, report: Report, args, workspace: Path):
     result, payload, size = await call("gemarc_render", model=DEMO_MODEL)
     files = payload.get("files", [])
     parsed = all(json.loads(f["content"]) is not None for f in files) if payload.get("inline") else False
-    report.check("gemarc_render(model) -> ok, 8 data files inline and parseable, kit.path /kit/static.zip",
-                 not result.is_error and payload.get("status") == "ok" and len(files) == 8 and parsed
+    paths = sorted(f["path"] for f in files)
+    report.check("gemarc_render(model) -> ok, the 9 data files inline and parseable, kit.path /kit/static.zip",
+                 not result.is_error and payload.get("status") == "ok" and paths == EXPECTED_RENDER_FILES and parsed
                  and payload.get("kit", {}).get("path") == "/kit/static.zip",
-                 f"payload {size} bytes; kit.url={payload.get('kit', {}).get('url')!r}")
+                 f"payload {size} bytes; files={paths}; kit.url={payload.get('kit', {}).get('url')!r}")
     result, payload, _ = await call("gemarc_render", model=DEMO_MODEL, profile="nope")
     report.check("gemarc_render(profile='nope') -> isError, GEMARC_BUILD_005",
                  bool(result.is_error) and "GEMARC_BUILD_005" in diagnostic_ids(payload))

@@ -53,7 +53,7 @@
 ### 与远程部署相关的两个工具
 
 - `gemarc_new_model` 返回空模型与槽位清单，模型自己填写；服务端不读用户的仓库，填写事实用的是调用方 agent 自己的文件访问能力。
-- `gemarc_render` 返回随模型变化的 8 个文件：`data/architecture.json`、`data/scenarios.json`、`data/capabilities.json`、`data/evidence-index.json`、`data/diagram-catalog.json`、`data/spatial-layout.json`、`data/workflow-ir.json`、`data/case-library.json`（ADR-013，规格 §3 / §25）。固定件的描述 `kit`（`path` 为 `/kit/<profile>.zip`，`url` 仅在服务端知道自己的公开地址时有值，另有 `archiveSha256` 与 `run`）另计：固定件 + 这 8 个文件即完整站点；固定件体积约 620 KB，不会放进任何工具结果。`data/workflow-schema.json`（GWF-IR 的 JSON Schema）只依赖词表，因此随**固定件**发布而不随模型重复传输。内联上限为 `stateless.RENDER_INLINE_LIMIT`（35 KiB）。发布示例模型带 6D 工作流，其 GWF-IR 逐字段陈述 §18 的每个字段，响应实测 40,865 字节 / 11,732 token（cl100k_base）：低于 Codex 约 12k token 的上限，超过 Claude Code 在 10k token 处的告警线——真实用户的模型通常更小。内联按累计字节逐文件判定，放不下的文件只给清单。
+- `gemarc_render` 返回随模型变化的 9 个文件：`data/architecture.json`、`data/scenarios.json`、`data/capabilities.json`、`data/evidence-index.json`、`data/diagram-catalog.json`、`data/spatial-layout.json`、`data/three-d.json`、`data/workflow-ir.json`、`data/case-library.json`（ADR-013，规格 §3 / §25）。固定件的描述 `kit`（`path` 为 `/kit/<profile>.zip`，`url` 仅在服务端知道自己的公开地址时有值，另有 `archiveSha256` 与 `run`）另计：固定件 + 这 9 个文件即完整站点；固定件体积约 620 KB，不会放进任何工具结果。`data/workflow-schema.json`（GWF-IR 的 JSON Schema）只依赖词表，因此随**固定件**发布而不随模型重复传输。内联上限为 `stateless.RENDER_INLINE_LIMIT`（35 KiB）。发布示例模型带 6D 工作流，其 GWF-IR 逐字段陈述 §18 的每个字段，响应实测 40,865 字节 / 11,732 token（cl100k_base）：低于 Codex 约 12k token 的上限，超过 Claude Code 在 10k token 处的告警线——真实用户的模型通常更小。内联按累计字节逐文件判定，放不下的文件只给清单。
 
 ### 注解（annotations）
 

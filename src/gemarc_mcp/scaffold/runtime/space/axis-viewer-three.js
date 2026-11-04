@@ -13,8 +13,9 @@
  *
  *   1. **No third-party import.** `three` is injected by the caller (an
  *      import map for the static profile, `node_modules` for the vite
- *      profile, a CDN for the preview profile). The module imports nothing
- *      at all, so it can travel to a profile that ships a single file.
+ *      profile, a CDN for the preview profile). The only import is the
+ *      sibling module that holds the shared gestures, so a profile that
+ *      ships the fewest files has to ship that one as well.
  *   2. **No silent degradation.** When the WebGL context cannot be created the
  *      renderer throws `GEMARC_AXIS_010`. It never falls back to a picture.
  *   3. **The axes come from the model.** A value the model does not carry is
@@ -28,9 +29,17 @@
  *   6. **An axis that carries no information is visible as such.** An axis
  *      whose entities all share one value is drawn, but the layout reports it
  *      as not independent instead of pretending it separates anything.
+ *   7. **The gestures are Unity's.** The camera and the selection follow the
+ *      Unity 2022.3 scene view: Alt + left drag orbits, the middle drag pans,
+ *      the right drag flies, the wheel dollies, the left click selects,
+ *      Ctrl + left click adds, a drag on empty space marquees, Esc clears and
+ *      F frames. The mapping lives in `unity-controls.js`, so the two scenes
+ *      cannot disagree about it.
  *
  * @module axis-viewer-three
  */
+
+import { UnityControls, boundsOfPoints } from './unity-controls.js';
 
 /**
  * The diagnostic codes this module raises.
@@ -420,151 +429,6 @@ function placeCylinder(THREE, mesh, a, b) {
 }
 
 /**
- * A small, dependency-free orbit camera.
- *
- * A mouse drag rotates, the wheel zooms, a right drag or a shift drag pans.
- * `three/addons` is not portable across the profiles, so the controller lives
- * here.
- */
-class AxisCameraController {
-  /**
-   * @param {object} camera the camera
-   * @param {object} element the element that receives the pointer events
-   */
-  constructor(camera, element) {
-    this.camera = camera;
-    this.element = element;
-    this.target = { x: 0, y: 0, z: 0 };
-    this.distance = 120;
-    this.theta = Math.PI * 0.25;
-    this.phi = Math.PI * 0.32;
-    this.minDistance = 8;
-    this.maxDistance = 4000;
-    this.dragging = null;
-    this.moved = 0;
-    this.listeners = [];
-    this._bind();
-  }
-
-  _bind() {
-    const element = this.element;
-    if (!element || typeof element.addEventListener !== 'function') return;
-    const on = (type, handler, options) => {
-      element.addEventListener(type, handler, options);
-      this.listeners.push([type, handler, options]);
-    };
-    on('pointerdown', (event) => this._onDown(event));
-    on('pointermove', (event) => this._onMove(event));
-    on('pointerup', (event) => this._onUp(event));
-    on('pointercancel', () => this._endDrag());
-    on('wheel', (event) => this._onWheel(event), { passive: false });
-    on('contextmenu', (event) => event.preventDefault());
-  }
-
-  _onDown(event) {
-    if (!event || typeof event.button !== 'number') return;
-    const pan = event.button === 2 || event.button === 1 || event.shiftKey === true;
-    this.dragging = {
-      mode: pan ? 'pan' : 'rotate',
-      x: event.clientX ?? 0,
-      y: event.clientY ?? 0,
-    };
-    this.moved = 0;
-    if (typeof this.element.setPointerCapture === 'function' && event.pointerId !== undefined) {
-      try {
-        this.element.setPointerCapture(event.pointerId);
-      } catch {
-        // A stub element may not support pointer capture.
-      }
-    }
-  }
-
-  _onMove(event) {
-    if (!this.dragging) return;
-    const dx = (event.clientX ?? 0) - this.dragging.x;
-    const dy = (event.clientY ?? 0) - this.dragging.y;
-    this.dragging.x = event.clientX ?? 0;
-    this.dragging.y = event.clientY ?? 0;
-    this.moved += Math.abs(dx) + Math.abs(dy);
-    if (this.dragging.mode === 'rotate') {
-      this.theta -= dx * 0.006;
-      this.phi = Math.max(0.05, Math.min(Math.PI - 0.05, this.phi - dy * 0.006));
-    } else {
-      this._pan(dx, dy);
-    }
-    this.apply();
-  }
-
-  _onWheel(event) {
-    if (!event) return;
-    if (typeof event.preventDefault === 'function') event.preventDefault();
-    const delta = event.deltaY ?? 0;
-    const factor = Math.exp(delta * 0.0012);
-    this.distance = Math.max(
-      this.minDistance,
-      Math.min(this.maxDistance, this.distance * factor),
-    );
-    this.apply();
-  }
-
-  _endDrag() {
-    this.dragging = null;
-  }
-
-  _onUp(event) {
-    const wasDragging = Boolean(this.dragging);
-    const moved = this.moved;
-    this._endDrag();
-    if (wasDragging && moved < 5 && typeof this.onClick === 'function') {
-      this.onClick(event);
-    }
-  }
-
-  _pan(dx, dy) {
-    const scale = this.distance * 0.0016;
-    const cos = Math.cos(this.theta);
-    const sin = Math.sin(this.theta);
-    this.target.x -= (dx * cos) * scale;
-    this.target.z += (dx * sin) * scale;
-    this.target.y += dy * scale;
-  }
-
-  /**
-   * Point the camera at the centre of the scene from a readable angle.
-   * @param {{center: object, radius: number}} bounds the bounds of the scene
-   */
-  frame(bounds) {
-    this.target = { ...bounds.center };
-    // The scene has to fill the frame without touching its edges: twice the
-    // radius would leave the crystals in the middle of a dark room.
-    this.distance = Math.max(this.minDistance, bounds.radius * 1.85);
-    this.apply();
-  }
-
-  apply() {
-    const sinPhi = Math.sin(this.phi);
-    this.camera.position.set(
-      this.target.x + this.distance * sinPhi * Math.sin(this.theta),
-      this.target.y + this.distance * Math.cos(this.phi),
-      this.target.z + this.distance * sinPhi * Math.cos(this.theta),
-    );
-    this.camera.lookAt(this.target.x, this.target.y, this.target.z);
-    if (typeof this.camera.updateProjectionMatrix === 'function') {
-      this.camera.updateProjectionMatrix();
-    }
-  }
-
-  dispose() {
-    for (const [type, handler, options] of this.listeners) {
-      if (typeof this.element.removeEventListener === 'function') {
-        this.element.removeEventListener(type, handler, options);
-      }
-    }
-    this.listeners = [];
-  }
-}
-
-/**
  * The distance from a point to a segment, in screen space.
  * @param {number} px the x of the point
  * @param {number} py the y of the point
@@ -589,6 +453,7 @@ export function screenDistanceToSegment(px, py, ax, ay, bx, by) {
  * @param {object} THREE the injected three namespace
  * @param {{container: object, view?: object, layout?: object,
  *          onSelectNode?: Function|null, onSelectEdge?: Function|null,
+ *          onClearSelection?: Function|null,
  *          onHover?: Function|null}} options
  * @returns {object} the renderer api
  */
@@ -599,6 +464,7 @@ export function createThreeAxisRenderer(THREE, options = {}) {
     layout: givenLayout = null,
     onSelectNode = null,
     onSelectEdge = null,
+    onClearSelection = null,
     onHover = null,
   } = options || {};
 
@@ -650,7 +516,23 @@ export function createThreeAxisRenderer(THREE, options = {}) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x06090e);
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 6000);
-  const controls = new AxisCameraController(camera, canvas);
+  // The camera and the selection follow the Unity gestures. The mapping is
+  // shared with the space scene, so the two can never disagree.
+  const controls = new UnityControls(camera, canvas, {
+    distance: 120,
+    minDistance: 8,
+    pick: (event) => pick(event),
+    pickInRect: (rect) => pickInRect(rect),
+    onSelect: (hit, selection) => {
+      if (hit.kind === 'node' && onSelectNode) onSelectNode(hit.id, selection);
+      if (hit.kind === 'edge' && onSelectEdge) onSelectEdge(hit.id, selection);
+    },
+    onClear: () => {
+      if (onClearSelection) onClearSelection();
+    },
+    getBounds: () => layout.bounds,
+    getSelectionBounds: () => selectionBounds(),
+  });
 
   const ambient = new THREE.AmbientLight(0xffffff, 0.66);
   scene.add(ambient);
@@ -895,6 +777,49 @@ export function createThreeAxisRenderer(THREE, options = {}) {
     return best;
   }
 
+  /**
+   * Everything the marquee rectangle covers.
+   *
+   * An entity is inside the rectangle when its own position is. A relation is
+   * inside when both of its ends are: half a relation is not a relation.
+   * @param {{left: number, top: number, right: number, bottom: number}} rect
+   *   the rectangle in client coordinates
+   * @returns {Array<{kind: string, id: string}>} the hits
+   */
+  function pickInRect(rect) {
+    const canvasRect = typeof canvas.getBoundingClientRect === 'function'
+      ? canvas.getBoundingClientRect()
+      : { left: 0, top: 0, width: canvas.clientWidth || 1, height: canvas.clientHeight || 1 };
+    const inside = (point) => point
+      && point.x >= rect.left && point.x <= rect.right
+      && point.y >= rect.top && point.y <= rect.bottom;
+    const hits = [];
+    const covered = new Set();
+    for (const node of layout.nodes) {
+      const point = projectToScreen(node.position, canvasRect);
+      if (!inside(point)) continue;
+      covered.add(node.id);
+      hits.push({ kind: 'node', id: node.id });
+    }
+    for (const edge of layout.edges) {
+      if (!covered.has(edge.sourceId) || !covered.has(edge.targetId)) continue;
+      hits.push({ kind: 'edge', id: edge.id });
+    }
+    return hits;
+  }
+
+  /**
+   * The bounds of the selected entities, so that F can frame them.
+   * @returns {{center: object, radius: number}|null} the bounds
+   */
+  function selectionBounds() {
+    const points = [];
+    for (const node of layout.nodes) {
+      if (highlight.nodeIds.has(node.id)) points.push(node.position);
+    }
+    return boundsOfPoints(points);
+  }
+
   const onPointerMove = (event) => {
     const hit = pick(event);
     const changed = (hit && hover ? `${hit.kind}:${hit.id}` : '')
@@ -904,14 +829,6 @@ export function createThreeAxisRenderer(THREE, options = {}) {
     if (changed && canvas.style) canvas.style.cursor = hit ? 'pointer' : 'default';
   };
 
-  const onClick = (event) => {
-    const hit = pick(event);
-    if (!hit) return;
-    if (hit.kind === 'node' && typeof onSelectNode === 'function') onSelectNode(hit.id);
-    if (hit.kind === 'edge' && typeof onSelectEdge === 'function') onSelectEdge(hit.id);
-  };
-
-  controls.onClick = onClick;
   if (typeof canvas.addEventListener === 'function') {
     canvas.addEventListener('pointermove', onPointerMove);
   }
@@ -957,6 +874,8 @@ export function createThreeAxisRenderer(THREE, options = {}) {
   }
 
   function loop() {
+    // The fly keys move the camera only while the right button is held.
+    controls.tick();
     draw();
     if (typeof requestAnimationFrame === 'function') {
       frame = requestAnimationFrame(loop);

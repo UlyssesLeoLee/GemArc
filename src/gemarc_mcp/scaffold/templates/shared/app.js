@@ -84,15 +84,52 @@ function clear(node) {
 
 /* ------------------------------------------------------------- interactions */
 
+/**
+ * Apply the selection mode of a three-dimensional click.
+ *
+ * The modes are the ones Unity uses: a plain click replaces the selection,
+ * a click with the modifier adds to it or takes it out again, and a marquee
+ * adds the whole rectangle.
+ * @param {string[]} current the ids that are selected now
+ * @param {string} id the id the reader pointed at
+ * @param {string} [mode] one of replace, add, toggle
+ * @returns {string[]} the ids that are selected afterwards
+ */
+function applySelectionMode(current, id, mode) {
+  if (mode === 'toggle') {
+    return current.includes(id)
+      ? current.filter((item) => item !== id)
+      : [...current, id];
+  }
+  if (mode === 'add') return current.includes(id) ? current : [...current, id];
+  return [id];
+}
+
 function dispatch(payload) {
   switch (payload.type) {
-    case 'select-node':
-      state.viewState.setSelection([payload.id], []);
+    case 'select-node': {
+      const snapshot = state.viewState.snapshot();
+      const nodes = applySelectionMode(snapshot.selectedNodeIds, payload.id, payload.mode);
+      // A plain click replaces the whole selection, the way a click in a
+      // three-dimensional scene replaces it. An additive click only touches
+      // the entities.
+      const edges = payload.mode === 'replace' ? [] : snapshot.selectedEdgeIds;
+      state.viewState.setSelection(nodes, edges);
       renderInspector();
       syncSpaceHighlight();
       break;
-    case 'select-edge':
-      state.viewState.setSelection([], [payload.id]);
+    }
+    case 'select-edge': {
+      const snapshot = state.viewState.snapshot();
+      const edges = applySelectionMode(snapshot.selectedEdgeIds, payload.id, payload.mode);
+      const nodes = payload.mode === 'replace' ? [] : snapshot.selectedNodeIds;
+      state.viewState.setSelection(nodes, edges);
+      renderInspector();
+      syncSpaceHighlight();
+      break;
+    }
+    case 'clear-selection':
+      state.viewState.setSelection([], []);
       renderInspector();
       syncSpaceHighlight();
       break;
@@ -188,6 +225,22 @@ function showTab(tab) {
 /* ------------------------------------------------------------------- 3D */
 
 /**
+ * The line that tells the reader how the three-dimensional scene is driven.
+ *
+ * The list comes from the shared module, so the page and the code cannot
+ * disagree about the gestures.
+ * @param {Array<{action: string, shortcut: string}>} map the gesture table
+ * @returns {object} the line
+ */
+function unityGestureHint(map) {
+  const line = document.createElement('p');
+  line.className = 'hint unity-hint';
+  const rows = map.map((row) => `${row.action} ${row.shortcut}`);
+  line.textContent = `三维操作与 Unity 一致：${rows.join('，')}。`;
+  return line;
+}
+
+/**
  * Mirror the current selection into the 3D scenes. The selection lives in one
  * place - the view state - so the dimensions never disagree about what is
  * selected.
@@ -232,6 +285,7 @@ async function mountAxis(root) {
   try {
     const THREE = await import('three');
     const { createThreeAxisRenderer } = await import('./runtime/space/axis-viewer-three.js');
+    const { UNITY_CONTROL_MAP } = await import('./runtime/space/unity-controls.js');
     if (state.axisRenderer) {
       state.axisRenderer.dispose();
       state.axisRenderer = null;
@@ -240,11 +294,17 @@ async function mountAxis(root) {
     status.className = 'hint axis-3d-status';
     status.textContent = '将指针移到实体或关系上可查看拾取目标。';
     holder.after(status);
+    holder.after(unityGestureHint(UNITY_CONTROL_MAP));
     state.axisRenderer = createThreeAxisRenderer(THREE, {
       container: holder,
       view: views[0],
-      onSelectNode: (id) => dispatch({ type: 'select-node', id }),
-      onSelectEdge: (id) => dispatch({ type: 'select-edge', id }),
+      onSelectNode: (id, selection) => dispatch({
+        type: 'select-node', id, mode: selection ? selection.mode : 'replace',
+      }),
+      onSelectEdge: (id, selection) => dispatch({
+        type: 'select-edge', id, mode: selection ? selection.mode : 'replace',
+      }),
+      onClearSelection: () => dispatch({ type: 'clear-selection' }),
       onHover: (hit) => {
         status.textContent = describeAxisHit(hit);
       },
@@ -287,6 +347,7 @@ async function mountSpace(root) {
   try {
     const THREE = await import('three');
     const { createThreeSpaceRenderer } = await import('./runtime/space/space-viewer-three.js');
+    const { UNITY_CONTROL_MAP } = await import('./runtime/space/unity-controls.js');
     if (state.spaceRenderer) {
       state.spaceRenderer.dispose();
       state.spaceRenderer = null;
@@ -298,13 +359,19 @@ async function mountSpace(root) {
     status.className = 'hint space-3d-status';
     status.textContent = '将指针移到节点或关系上可查看拾取目标。';
     holder.after(status);
+    holder.after(unityGestureHint(UNITY_CONTROL_MAP));
     state.spaceRenderer = createThreeSpaceRenderer(THREE, {
       container: holder,
       model: state.model,
       space: state.model.space,
       store: state.store,
-      onSelectNode: (id) => dispatch({ type: 'select-node', id }),
-      onSelectEdge: (id) => dispatch({ type: 'select-edge', id }),
+      onSelectNode: (id, selection) => dispatch({
+        type: 'select-node', id, mode: selection ? selection.mode : 'replace',
+      }),
+      onSelectEdge: (id, selection) => dispatch({
+        type: 'select-edge', id, mode: selection ? selection.mode : 'replace',
+      }),
+      onClearSelection: () => dispatch({ type: 'clear-selection' }),
       onHover: (hit) => {
         status.textContent = describeSpaceHit(hit);
       },

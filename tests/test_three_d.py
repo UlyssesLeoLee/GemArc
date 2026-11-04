@@ -28,6 +28,10 @@ from gemarc_mcp.scaffold import derive, three_d  # noqa: E402
 STYLE_POLICY = REPO_ROOT / "docs" / "02_基本设计" / "10_UI风格方针.md"
 SHARED_CSS = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "templates" / "shared" / "style.css"
 AXIS_VIEWER = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space" / "axis-viewer-three.js"
+SPACE_VIEWER = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space" / "space-viewer-three.js"
+UNITY_CONTROLS = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space" / "unity-controls.js"
+SHARED_SHELL = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "templates" / "shared" / "app.js"
+PREVIEW_SHELL = REPO_ROOT / "src" / "gemarc_mcp" / "web" / "app.js"
 
 
 def _without_comments(source: str) -> str:
@@ -218,6 +222,113 @@ class StylePolicyBindingTests(unittest.TestCase):
                 self.assertNotIn("Math.random", _without_comments(source),
                                  f"{name} randomises the scene: the same model must "
                                  "always produce the same picture")
+
+
+class UnityGesturePolicyTests(unittest.TestCase):
+    """The Unity gestures of the three-dimensional scenes.
+
+    The policy (BD-010 section 9) says that every operation on a three
+    dimensional model follows Unity. The mapping lives in one module; this
+    test makes sure the document, the module and the two scenes keep telling
+    the same story.
+    """
+
+    #: The row of the gesture table, as the module writes it.
+    _ENTRY = re.compile(
+        r"id:\s*'(?P<id>[^']+)',\s*"
+        r"action:\s*'(?P<action>[^']+)',\s*"
+        r"shortcut:\s*'(?P<shortcut>[^']+)',\s*"
+        r"effect:\s*'(?P<effect>[^']+)',\s*"
+        r"unity:\s*'(?P<unity>[^']+)'",
+        re.S,
+    )
+
+    def _module_rows(self):
+        source = UNITY_CONTROLS.read_text(encoding="utf-8")
+        rows = []
+        for match in self._ENTRY.finditer(source):
+            row = match.groupdict()
+            rows.append((row["id"], row["action"], row["shortcut"], row["effect"], row["unity"]))
+        return rows
+
+    def _policy_rows(self):
+        policy = STYLE_POLICY.read_text(encoding="utf-8")
+        table = re.search(r"### 9\.1 映射表（唯一口径）(.*?)(?:\n### |\n## |\Z)", policy, re.S)
+        self.assertIsNotNone(table, "the policy does not carry the Unity gesture table")
+        rows = []
+        for line in table.group(1).splitlines():
+            if not line.strip().startswith("|"):
+                continue
+            cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+            if len(cells) != 4:
+                continue
+            if set(cells[0]) <= {"-", ":"} or cells[0] == "操作":
+                continue
+            rows.append(tuple(cells))
+        return rows
+
+    def test_the_policy_and_the_module_state_the_same_gestures(self):
+        module = self._module_rows()
+        policy = self._policy_rows()
+        self.assertEqual(len(module), 9, "the gesture table must carry the nine gestures")
+        self.assertEqual(len(policy), len(module),
+                         "the policy and the module disagree about how many gestures there are")
+        for (id_, action, shortcut, effect, unity), cells in zip(module, policy):
+            with self.subTest(gesture=id_):
+                self.assertEqual(cells, (action, shortcut, effect, unity))
+
+    def test_the_policy_names_the_unity_shortcuts(self):
+        mouse_gestures = {"orbit", "pan", "fly", "dolly", "select", "add", "marquee", "clear"}
+        for row in self._module_rows():
+            with self.subTest(gesture=row[0]):
+                self.assertTrue(row[4].strip(), f"{row[0]} names no Unity shortcut")
+                if row[0] in mouse_gestures:
+                    self.assertIn("Mouse", row[4], f"{row[0]} names no Unity mouse shortcut")
+                else:
+                    self.assertIn("Frame Selected", row[4],
+                                  f"{row[0]} names no Unity keyboard shortcut")
+
+    def test_both_scenes_use_the_one_shared_controller(self):
+        for name, path in (("axis viewer", AXIS_VIEWER), ("space viewer", SPACE_VIEWER)):
+            with self.subTest(renderer=name):
+                source = path.read_text(encoding="utf-8")
+                self.assertIn("unity-controls.js", source,
+                              f"{name} does not use the shared gesture mapping")
+                self.assertIn("UnityControls", source)
+
+    def test_neither_scene_keeps_a_second_gesture_mapping(self):
+        """One mapping, or none at all: a second one would drift."""
+        for name, path in (("axis viewer", AXIS_VIEWER), ("space viewer", SPACE_VIEWER)):
+            with self.subTest(renderer=name):
+                code = _without_comments(path.read_text(encoding="utf-8"))
+                self.assertNotIn("event.button ===", code,
+                                 f"{name} reads the mouse button itself: the gestures "
+                                 "live in one module")
+                self.assertNotIn("class AxisCameraController", code)
+                self.assertNotIn("class SpaceCameraController", code)
+
+    def test_the_shells_take_the_gesture_list_from_the_module(self):
+        for name, path in (("shared shell", SHARED_SHELL), ("preview shell", PREVIEW_SHELL)):
+            with self.subTest(shell=name):
+                source = path.read_text(encoding="utf-8")
+                self.assertIn("unity-controls.js", source,
+                              f"{name} does not read the gesture list from the module")
+                self.assertIn("UNITY_CONTROL_MAP", source)
+
+    def test_the_shells_know_the_three_selection_modes(self):
+        for name, path in (("shared shell", SHARED_SHELL), ("preview shell", PREVIEW_SHELL)):
+            with self.subTest(shell=name):
+                source = path.read_text(encoding="utf-8")
+                for mode in ("replace", "toggle", "add"):
+                    self.assertIn(f"'{mode}'", source,
+                                  f"{name} does not handle the {mode} selection mode")
+
+    def test_the_drag_threshold_of_the_policy_is_the_one_of_the_code(self):
+        policy = STYLE_POLICY.read_text(encoding="utf-8")
+        source = UNITY_CONTROLS.read_text(encoding="utf-8")
+        self.assertIn("5 像素", policy, "the policy does not state the drag threshold")
+        self.assertIn("dragThresholdPx: 5", source,
+                      "the drag threshold of the code is not the one of the policy")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 /* GemArc static 5D viewer MVP. Model content is rendered using textContent, not innerHTML. */
 'use strict';
-const state = {model:null,capabilities:null,scenarioData:null,threeD:null,axisRenderer:null,selected:null,tab:'1d',step:0,scenario:null,disabled:new Set(),prototype:0};
+const state = {model:null,capabilities:null,scenarioData:null,threeD:null,axisRenderer:null,selected:null,selectedIds:new Set(),tab:'1d',step:0,scenario:null,disabled:new Set(),prototype:0};
 const $ = s => document.querySelector(s);
 const svgNS = 'http://www.w3.org/2000/svg';
 /* Canonical field accessors. 0.2.0 uses sourceId/targetId/type; 0.1.x models
@@ -31,7 +31,7 @@ function renderInspector(){const area=clear($('#detail'));let n=current().nodes.
  node('p','section-title',area,'RELATIONS');for(const e of neighbors)text(area,e.id,(esrc(e)+' → '+etgt(e)));
 }
 function render1D(el){head(current().meta.system,'1D / LINEAR FACTS');const about=panel(el,'系统资料');text(about,'系统名称',current().meta.system);text(about,'说明',current().meta.description);text(about,'事实状态',current().meta.evidenceState);
- const cards=node('div','facts',el);current().nodes.forEach(n=>{const div=node('div','fact',cards);node('h3','',div,n.name);node('small','',div,n.id+' · '+(n.kind||'未知类型'));text(div,'证据',n.evidence||'未提供');button(div,'定位关系',()=>{state.selected=n.id;showTab('2d')})});
+ const cards=node('div','facts',el);current().nodes.forEach(n=>{const div=node('div','fact',cards);node('h3','',div,n.name);node('small','',div,n.id+' · '+(n.kind||'未知类型'));text(div,'证据',n.evidence||'未提供');button(div,'定位关系',()=>{state.selectedIds=new Set([n.id]);state.selected=n.id;showTab('2d')})});
  const views=panel(el,'架构 View / 关注点');current().views.forEach(v=>{text(views,v.title||v.id,(v.concerns||[]).join('、')||'尚未定义')});
 }
 function graphLayout(nodes,edges){const ranks=new Map(nodes.map(n=>[n.id,0]));const edgeset=edges.filter(e=>ranks.has(esrc(e))&&ranks.has(etgt(e)));
@@ -48,12 +48,12 @@ function render2D(el){head('节点与依赖关系','2D / GRAPH VIEW');const wrap
  function draw(){clear(holder);const view=views.find(v=>v.id===select.value)||views[0];const nodes=current().nodes.filter(n=>!view.nodeIds||view.nodeIds.includes(n.id));const edges=current().edges.filter(e=>nodes.some(n=>n.id===esrc(e))&&nodes.some(n=>n.id===etgt(e))&&(!view.edgeKinds||view.edgeKinds.includes(etype(e))));
  const {pos,width,height}=graphLayout(nodes,edges);const root=svg('svg',holder,{viewBox:`0 0 ${width} ${height}`,class:'chart',role:'img','aria-label':'架构节点依赖图'});
  const defs=svg('defs',root);const marker=svg('marker',defs,{id:'arr',markerWidth:10,markerHeight:8,refX:10,refY:4,orient:'auto'});svg('path',marker,{d:'M0,0 L10,4 L0,8 Z',fill:'#5b9bb8'});
- edges.forEach(e=>{const a=pos[esrc(e)],b=pos[etgt(e)];if(!a||!b)return;const focus=state.selected&&(esrc(e)===state.selected||etgt(e)===state.selected);const route=a.x===b.x?`M${a.x+46} ${a.y+15} L${b.x+46} ${b.y-18}`:`M${a.x+74} ${a.y} C${a.x+115} ${a.y} ${b.x-115} ${b.y} ${b.x-74} ${b.y}`;
+ edges.forEach(e=>{const a=pos[esrc(e)],b=pos[etgt(e)];if(!a||!b)return;const focus=state.selectedIds.has(esrc(e))||state.selectedIds.has(etgt(e));const route=a.x===b.x?`M${a.x+46} ${a.y+15} L${b.x+46} ${b.y-18}`:`M${a.x+74} ${a.y} C${a.x+115} ${a.y} ${b.x-115} ${b.y} ${b.x-74} ${b.y}`;
  svg('path',root,{d:route,class:'edge'+(focus?' focus':''),'marker-end':'url(#arr)'});
  let x=(a.x+b.x)/2,y=(a.y+b.y)/2-10;svg('text',root,{x,y,class:'edge-label','text-anchor':'middle'},e.description||etype(e)||e.id);
  });
- nodes.forEach(n=>{const p=pos[n.id],g=svg('g',root,{class:'node'+(state.selected===n.id?' selected':''),tabindex:0,role:'button','aria-label':n.name});svg('rect',g,{x:p.x-74,y:p.y-28,width:148,height:57,rx:10});svg('text',g,{x:p.x,y:p.y-1,'text-anchor':'middle'},n.name.length>12?n.name.slice(0,11)+'…':n.name);svg('text',g,{x:p.x,y:p.y+17,'text-anchor':'middle',fill:'#9baec9','font-size':10},n.id.length>20?n.id.slice(0,19)+'…':n.id);
- const selectNode=()=>{state.selected=n.id;draw();renderInspector()};g.addEventListener('click',selectNode);g.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();selectNode()}})});
+ nodes.forEach(n=>{const p=pos[n.id],g=svg('g',root,{class:'node'+(state.selectedIds.has(n.id)?' selected':''),tabindex:0,role:'button','aria-label':n.name});svg('rect',g,{x:p.x-74,y:p.y-28,width:148,height:57,rx:10});svg('text',g,{x:p.x,y:p.y-1,'text-anchor':'middle'},n.name.length>12?n.name.slice(0,11)+'…':n.name);svg('text',g,{x:p.x,y:p.y+17,'text-anchor':'middle',fill:'#9baec9','font-size':10},n.id.length>20?n.id.slice(0,19)+'…':n.id);
+ const selectNode=()=>{state.selectedIds=new Set([n.id]);state.selected=n.id;draw();renderInspector()};g.addEventListener('click',selectNode);g.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();selectNode()}})});
  node('p','muted small',holder,`节点 ${nodes.length} · 关系 ${edges.length} · 单击实体可在不同维度保持选中 ID`);
  }
  select.addEventListener('change',draw);draw();
@@ -68,8 +68,7 @@ function render3D(el){head('3D 语义与空间','3D / WEBGL');
   const holder=node('div','axis-3d',p);
   const status=node('p','hint axis-3d-status',el,'将指针移到实体或关系上可查看拾取目标。');
   mountAxisScene(holder,status);
-  return;}
- if(state.capabilities.viewer3D==='not_available'){
+  return;} if(state.capabilities.viewer3D==='not_available'){
   const p=panel(el,'三维语义轴未建立');hint(p,'模型没有声明带取值的三根坐标轴，坐标轴是类别而不是度量，因此这里不生成一个没有来源的三维结构。请在模型中为视图声明 axes.x / axes.y / axes.z 并给出真实取值。');
   text(p,'Viewer 状态','未安装，页面明确降级');return;}
  const p=panel(el,'已接入项目现有 3D Viewer');hint(p,'下方是单独构建的现有 GemArc Three.js Viewer；当前 MVP 未完成新旧 View 之间的选中状态双向同步。');
@@ -82,10 +81,16 @@ async function mountAxisScene(holder,status){
  try{
   const THREE=await import('three');
   const {createThreeAxisRenderer}=await import('./runtime/space/axis-viewer-three.js');
+  const {UNITY_CONTROL_MAP}=await import('./runtime/space/unity-controls.js');
   const views=state.threeD.views;
+  /* The gestures are the ones Unity uses. The list is read from the shared
+     module, so the page and the code cannot disagree about them. */
+  holder.after(node('p','hint unity-hint',holder.parentNode,
+   '三维操作与 Unity 一致：'+UNITY_CONTROL_MAP.map(row=>row.action+' '+row.shortcut).join('，')+'。'));
   state.axisRenderer=createThreeAxisRenderer(THREE,{container:holder,view:views[0],
-   onSelectNode:id=>{state.selected=id;showTab(state.tab)},
-   onSelectEdge:id=>{state.selected=id;showTab(state.tab)},
+   onSelectNode:(id,selection)=>selectInScene(id,selection?selection.mode:'replace'),
+   onSelectEdge:(id,selection)=>selectInScene(id,selection?selection.mode:'replace'),
+   onClearSelection:()=>clearSceneSelection(),
    onHover:hit=>{status.textContent=hit?(hit.kind==='node'?'拾取目标：实体 '+hit.id:'拾取目标：关系 '+hit.id):'指针下没有可拾取的实体或关系。'}});
   state.axisRenderer.render();
  }catch(err){
@@ -93,6 +98,15 @@ async function mountAxisScene(holder,status){
   holder.appendChild(node('p','hint',holder,'三维语义渲染未能启动：'+reason+'。三维拾取需要真实的 WebGL 渲染，此处不提供任何替代视图；坐标轴语义仍如实列在上方。'));
  }
 }
+/* The selection modes are Unity's: a plain click replaces the selection, a
+   click with the modifier adds to it or takes it out again. */
+function selectInScene(id,mode){
+ if(mode==='toggle'){state.selectedIds.has(id)?state.selectedIds.delete(id):state.selectedIds.add(id)}
+ else if(mode==='add'){state.selectedIds.add(id)}
+ else{state.selectedIds=new Set([id])}
+ state.selected=state.selectedIds.size?[...state.selectedIds][state.selectedIds.size-1]:null;
+ showTab(state.tab)}
+function clearSceneSelection(){state.selectedIds=new Set();state.selected=null;showTab(state.tab)}
 function scenarioPicker(parent,onChange){const sel=node('select','',parent);for(const scenario of current().scenarios){const opt=node('option','',sel,scenario.name||scenario.id);opt.value=scenario.id}sel.value=state.scenario||current().scenarios[0]?.id||'';sel.addEventListener('change',()=>{state.scenario=sel.value;state.step=0;onChange()});return sel}
 function render4D(el){clear(el);head('动态流程与时间轴','4D / EVENT TIME');if(!current().scenarios.length){hint(el,'缺少状态或事件模型，不能生成真实 4D 行为。');return;}
  const controls=panel(el,'选择模拟 Case');const r=node('div','control',controls);scenarioPicker(r,()=>render4D(el));

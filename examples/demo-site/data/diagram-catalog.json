@@ -14,17 +14,15 @@
         "Entity"
       ],
       "concerns": [
-        "事件依赖"
+        "实体落在哪一层、哪个信任域、哪个环境"
       ],
       "diagramType": "logical-view",
-      "dimension": "2D",
+      "dimension": "3D",
       "edgeIds": [],
-      "edgeKinds": [
-        "sends"
-      ],
+      "edgeKinds": [],
       "evidenceIds": [],
       "fidelity": [],
-      "id": "logical",
+      "id": "semantic-3d",
       "label": "逻辑视图",
       "missing": [],
       "nodeIds": [
@@ -37,7 +35,7 @@
       "stakeholders": [
         "架构师"
       ],
-      "title": "逻辑架构"
+      "title": "语义视图"
     }
   ],
   "count": 1,

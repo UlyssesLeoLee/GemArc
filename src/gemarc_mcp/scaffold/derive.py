@@ -1206,10 +1206,13 @@ def derived_files(model: dict) -> dict:
     ``data/workflow-schema.json`` is deliberately not here: it depends on the
     vocabulary, not on the model, so it belongs to the fixed site kit.
     """
+    from . import three_d
+
     return {
         "data/evidence-index.json": evidence_index(model),
         "data/diagram-catalog.json": diagrams(model),
         "data/spatial-layout.json": spatial_layout(model),
         "data/workflow-ir.json": workflow_ir(model),
         "data/case-library.json": case_library(model),
+        "data/three-d.json": three_d.three_d_dataset(model),
     }

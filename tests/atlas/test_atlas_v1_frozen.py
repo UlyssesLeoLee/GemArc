@@ -63,12 +63,13 @@ VOCAB_FILE_SHA256 = {
     "evidence-levels.json": "68d073f5b1f0d257b3dd9488659e3002b319b581e1e6af6bf5868996f06fc6da",
     "relation-classes.json": "ece00f119702565e50ceacbab1e331c9c505d874c5be6e0fabdbec122af4b1f9",
     "space-levels.json": "af9f12817abdb7f7377c063ebd8b40199d2c00a857c605d5e11c6744d605ff23",
+    "three-d-contract.json": "ef8a236c2ea2a25780261ee89fd6518c8e37c809aabcba6bbd9982d9907711d6",
     "workflow-kinds.json": "943a15b894e31b4ed5e3c12cf497fb75f153c5adaf9ce6d62b9eade3c1139f14",
 }
 #: sha256 over ``name\n<LF-normalised bytes>\n`` of every vocab file in name order.
-VOCAB_BYTES_DIGEST = "c96a48aec03b4b1bb80c4ff7fe0d8344d2c2cdb76242899ad4ebaabd44668186"
+VOCAB_BYTES_DIGEST = "de91c0cc55323810cf97686a53c1d48520d3d9de10fef1c27522810adb0dae89"
 #: ``gemarc_mcp.scaffold.sync.vocab_digest()``: parse-level digest the generated JS vocabulary also embeds.
-VOCAB_SYNC_DIGEST = "10b92f6520eeb7fdf7793a9891c1edd300d9e1e9ba8773a981d75cd8cf12b935"
+VOCAB_SYNC_DIGEST = "529286ca5f53bd7201fe035f6367d45392d951e6313cc00c86aa9f5b26873ed8"
 
 UPDATE_HINT = (
     " A v1 artifact is frozen while the atlas is built. If v1 was changed on purpose by its maintainers, run "

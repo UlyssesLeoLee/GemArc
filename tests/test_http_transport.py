@@ -354,7 +354,7 @@ class RemoteDefaultTests(unittest.TestCase):
         self.assertEqual(paths, ["data/architecture.json", "data/scenarios.json", "data/capabilities.json",
                                  "data/evidence-index.json", "data/diagram-catalog.json",
                                  "data/spatial-layout.json", "data/workflow-ir.json",
-                                 "data/case-library.json"])
+                                 "data/case-library.json", "data/three-d.json"])
         self.assertEqual(second["render"]["kit"]["path"], "/kit/static.zip")
         self.assertEqual(second["render_probe"]["kit"]["path"], "/kit/vite.zip")
         self.assertTrue(second["render"]["inline"])

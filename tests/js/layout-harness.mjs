@@ -7,7 +7,12 @@
  * without a pointerup (the pointer leaves the window, the gesture is
  * cancelled), is the width they chose still remembered?  A shell that only
  * persists on pointerup loses it: the pane is painted at the new width, but
- * the next focus toggle or reload falls back to the old width.
+ * the next focus toggle or reload jumps it back.
+ *
+ * Every scenario runs in a fresh sandbox, and the expected numbers come from
+ * the shell's own defaults - never from a number shared by both shells: a
+ * threshold that happens to sit below one shell's default would make that
+ * shell's check pass while its drag is completely broken.
  *
  * Output: JSON on stdout, exit code 1 when a shell misbehaves.
  */
@@ -30,7 +35,9 @@ function extractLayout(source) {
     if (at > start && (end < 0 || at < end)) end = at;
   }
   if (end < 0) throw new Error('no end marker found');
-  return source.slice(start, end);
+  // The epilogue exposes the module constants to the test: the expected
+  // numbers must come from the shell under test, not from a copy here.
+  return `${source.slice(start, end)}\nglobalThis.__probe={LAYOUT_DEFAULTS,PANE_LIMITS,MAIN_MIN,GUTTER,KEY_STEP};\n`;
 }
 
 /** A DOM stub with just enough surface for the layout block. */
@@ -38,6 +45,7 @@ function makeSandbox() {
   const store = new Map();
   const painted = new Map();
   const listeners = new Map();
+  const state = { width: 1280 };
 
   const splitter = (pane) => ({
     dataset: { pane, label: `调整${pane}宽度` },
@@ -50,10 +58,10 @@ function makeSandbox() {
     releasePointerCapture() {},
   });
 
-  const paneHandles = [splitter('sidebar'), splitter('inspector')];
+  const dividers = [splitter('sidebar'), splitter('inspector')];
   const main = {
     classList: { toggle() {} },
-    getBoundingClientRect: () => ({ left: 0, right: 1280, width: 1280 }),
+    getBoundingClientRect: () => ({ left: 0, right: state.width, width: state.width }),
   };
   const toggle = {
     textContent: '',
@@ -69,7 +77,7 @@ function makeSandbox() {
         getItem: (key) => (store.has(key) ? store.get(key) : null),
         setItem: (key, value) => store.set(key, value),
       },
-      addEventListener() {},
+      addEventListener(type, handler) { listeners.set(`window:${type}`, handler); },
     },
     document: {
       documentElement: { style: { setProperty: (name, value) => painted.set(name, value) } },
@@ -79,7 +87,7 @@ function makeSandbox() {
         return null;
       },
       querySelectorAll(selector) {
-        return selector === '.splitter' ? paneHandles : [];
+        return selector === '.splitter' ? dividers : [];
       },
     },
     console,
@@ -87,30 +95,126 @@ function makeSandbox() {
   sandbox.__store = store;
   sandbox.__painted = painted;
   sandbox.__listeners = listeners;
+  sandbox.__state = state;
   return sandbox;
 }
 
-/** Drag the sidebar splitter to the right, then stop - no pointerup. */
-function dragWithoutPointerUp(source) {
-  const sandbox = makeSandbox();
-  runInNewContext(extractLayout(source), sandbox);
+function run(sandbox) {
+  runInNewContext(sandbox.__source, sandbox);
   sandbox.setupLayout();
+  return sandbox;
+}
 
-  const down = sandbox.__listeners.get('sidebar:pointerdown');
-  const move = sandbox.__listeners.get('sidebar:pointermove');
-  if (!down || !move) throw new Error('the shell does not wire the splitter');
-
-  down({ clientX: 236, clientY: 300, pointerId: 1, preventDefault() {} });
-  // 100 px to the right of the starting point.
-  move({ clientX: 336, clientY: 300, pointerId: 1 });
-
+function stored(sandbox) {
   const raw = sandbox.__store.get(LAYOUT_KEY);
-  const stored = raw ? JSON.parse(raw) : null;
-  return {
-    stored,
-    painted: sandbox.__painted.get('--sidebar-w') || null,
-    ariaLabel: sandbox.__listeners ? null : null,
-  };
+  return raw ? JSON.parse(raw) : null;
+}
+
+function paintedWidth(sandbox) {
+  const value = sandbox.__painted.get('--sidebar-w');
+  return value ? Number.parseInt(value, 10) : null;
+}
+
+/** A fresh sandbox running the given shell source. */
+function boot(source) {
+  const sandbox = makeSandbox();
+  sandbox.__source = extractLayout(source);
+  return run(sandbox);
+}
+
+const DRAG = 100;
+
+function scenarios(source) {
+  const out = {};
+
+  // 1. The drag that matters: it ends without a pointerup.
+  {
+    const box = boot(source);
+    const { LAYOUT_DEFAULTS } = box.__probe;
+    const start = LAYOUT_DEFAULTS.sidebar + 4;
+    box.__listeners.get('sidebar:pointerdown')({ clientX: start, clientY: 300, pointerId: 1, preventDefault() {} });
+    box.__listeners.get('sidebar:pointermove')({ clientX: start + DRAG, clientY: 300, pointerId: 1 });
+    out.dragWithoutPointerUp = {
+      expected: LAYOUT_DEFAULTS.sidebar + DRAG,
+      stored: stored(box) ? stored(box).sidebar : null,
+      painted: paintedWidth(box),
+    };
+  }
+
+  // 2. The three ways a drag can end: each writes the final value once.
+  for (const [name, event] of [['pointerup', 'pointerup'], ['pointercancel', 'pointercancel'],
+                                ['lostpointercapture', 'lostpointercapture']]) {
+    const box = boot(source);
+    const { LAYOUT_DEFAULTS } = box.__probe;
+    const start = LAYOUT_DEFAULTS.sidebar + 4;
+    box.__listeners.get('sidebar:pointerdown')({ clientX: start, clientY: 300, pointerId: 1, preventDefault() {} });
+    box.__listeners.get('sidebar:pointermove')({ clientX: start + DRAG, clientY: 300, pointerId: 1 });
+    box.__listeners.get(`sidebar:${event}`)({ clientX: start + DRAG, clientY: 300, pointerId: 1 });
+    out[`drag${name}`] = {
+      expected: LAYOUT_DEFAULTS.sidebar + DRAG,
+      stored: stored(box) ? stored(box).sidebar : null,
+      painted: paintedWidth(box),
+    };
+  }
+
+  // 3. The keyboard nudge.
+  {
+    const box = boot(source);
+    const { LAYOUT_DEFAULTS, KEY_STEP } = box.__probe;
+    box.__listeners.get('sidebar:keydown')({ key: ['Arrow','Right'].join(''), shiftKey: false, preventDefault() {} });
+    out.keyboard = {
+      expected: LAYOUT_DEFAULTS.sidebar + KEY_STEP,
+      stored: stored(box) ? stored(box).sidebar : null,
+      painted: paintedWidth(box),
+    };
+  }
+
+  // 4. The double click resets the pane.
+  {
+    const box = boot(source);
+    const { LAYOUT_DEFAULTS } = box.__probe;
+    box.__listeners.get('sidebar:dblclick')({});
+    out.doubleClick = {
+      expected: LAYOUT_DEFAULTS.sidebar,
+      stored: stored(box) ? stored(box).sidebar : null,
+      painted: paintedWidth(box),
+    };
+  }
+
+  // 5. The inspector pane, which measures from the other edge.
+  {
+    const box = boot(source);
+    const { LAYOUT_DEFAULTS } = box.__probe;
+    const start = 1280 - 4 - LAYOUT_DEFAULTS.inspector;
+    box.__listeners.get('inspector:pointerdown')({ clientX: start, clientY: 300, pointerId: 2, preventDefault() {} });
+    box.__listeners.get('inspector:pointermove')({ clientX: start - 60, clientY: 300, pointerId: 2 });
+    const value = stored(box);
+    out.inspector = {
+      expected: LAYOUT_DEFAULTS.inspector + 60,
+      stored: value ? value.inspector : null,
+      painted: Number.parseInt(sandboxPaint(box), 10),
+    };
+  }
+
+  // 6. A narrower window gives the room back to the main column.
+  {
+    const box = boot(source);
+    const { PANE_LIMITS } = box.__probe;
+    box.__state.width = 600;
+    box.__listeners.get('window:resize')({});
+    const value = stored(box);
+    out.resize = {
+      expected: PANE_LIMITS.sidebar.min,
+      stored: value ? value.sidebar : null,
+      painted: paintedWidth(box),
+    };
+  }
+
+  return out;
+}
+
+function sandboxPaint(box) {
+  return box.__painted.get('--inspector-w') || '';
 }
 
 const shells = {
@@ -121,19 +225,20 @@ const shells = {
 const report = {};
 let failed = false;
 for (const [name, source] of Object.entries(shells)) {
-  const result = dragWithoutPointerUp(source);
-  const storedWidth = result.stored ? result.stored.sidebar : null;
-  const paintedWidth = Number.parseInt(String(result.painted || ''), 10);
-  const ok = storedWidth !== null
-    && storedWidth > 232
-    && paintedWidth === storedWidth;
-  report[name] = { ...result, ok };
-  if (!ok) failed = true;
+  const results = scenarios(source);
+  const broken = [];
+  for (const [scenario, result] of Object.entries(results)) {
+    const ok = result.stored === result.expected
+      && (scenario === 'resize' ? result.stored === result.expected : result.painted === result.expected);
+    if (!ok) broken.push(scenario);
+  }
+  report[name] = { results, broken, ok: broken.length === 0 };
+  if (broken.length) failed = true;
 }
 
 process.stdout.write(JSON.stringify(report, null, 2));
 process.stdout.write('\n');
 if (failed) {
-  process.stderr.write('a shell does not persist the width chosen by a drag that ends without pointerup\n');
+  process.stderr.write('a shell does not keep the layout the reader chose\n');
   process.exit(1);
 }

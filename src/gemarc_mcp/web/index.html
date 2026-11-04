@@ -6,6 +6,18 @@
   <meta name="color-scheme" content="dark">
   <title>GemArc · 多媒体架构文档</title>
   <link rel="stylesheet" href="./style.css">
+  <!--
+    The semantic-axis scene is drawn by the Three.js renderer that travels
+    with the site. The runtime has no hard dependency on the library: when
+    the import map cannot be reached, the page says so instead of pretending.
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://esm.sh/three@0.180.0"
+    }
+  }
+  </script>
 </head>
 <body>
   <header class="top">
@@ -22,7 +34,7 @@
       <nav id="nav">
         <button data-tab="1d" class="active"><span>01</span> 1D 文字 / Facts</button>
         <button data-tab="2d"><span>02</span> 2D 图论 / Graph</button>
-        <button data-tab="3d"><span>03</span> 3D 空间 / Space</button>
+        <button data-tab="3d"><span>03</span> 3D 语义与空间 / Space</button>
         <button data-tab="4d"><span>04</span> 4D 动态 / Time</button>
         <button data-tab="5d"><span>05</span> 5D 因果 / Causality</button>
         <button data-tab="prototype"><span>UI</span> 多标签页原型</button>

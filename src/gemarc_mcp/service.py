@@ -407,6 +407,13 @@ def build(ws: Workspace, name: str, legacy_dist: str | None = None, profile: str
             source = resources.files("gemarc_mcp").joinpath("web")
             for filename in ("index.html", "app.js", "style.css"):
                 stage.joinpath(filename).write_bytes(source.joinpath(filename).read_bytes())
+            # The semantic-axis renderer travels with the site. The module has
+            # no imports at all, so the preview profile needs exactly one file
+            # to draw the crystal scene of the model.
+            renderer = resources.files("gemarc_mcp").joinpath(
+                "scaffold/runtime/space/axis-viewer-three.js")
+            stage.joinpath("runtime/space").mkdir(parents=True, exist_ok=True)
+            stage.joinpath("runtime/space/axis-viewer-three.js").write_bytes(renderer.read_bytes())
             (stage / "data").mkdir()
             atomic_json(stage / "data" / "architecture.json", canonical)
             atomic_json(stage / "data" / "scenarios.json", precomputed)

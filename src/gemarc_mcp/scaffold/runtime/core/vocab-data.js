@@ -2,14 +2,14 @@
  * GENERATED FILE - DO NOT EDIT.
  *
  * Source: src/gemarc_mcp/scaffold/vocab/*.json
- * Digest: 10b92f6520eeb7fdf7793a9891c1edd300d9e1e9ba8773a981d75cd8cf12b935
+ * Digest: 529286ca5f53bd7201fe035f6367d45392d951e6313cc00c86aa9f5b26873ed8
  * Regenerate: python -m gemarc_mcp.scaffold.sync
  *
  * The vocabulary is the single source of truth shared by the prompt, the
  * Python validator and this runtime. A drift test asserts that this file
  * still matches the JSON sources.
  */
-export const VOCAB_DIGEST = '10b92f6520eeb7fdf7793a9891c1edd300d9e1e9ba8773a981d75cd8cf12b935';
+export const VOCAB_DIGEST = '529286ca5f53bd7201fe035f6367d45392d951e6313cc00c86aa9f5b26873ed8';
 
 export const VOCAB = Object.freeze({
   "case-categories": {
@@ -1558,6 +1558,304 @@ export const VOCAB = Object.freeze({
     ],
     "schemaVersion": "0.2.0",
     "title": "Building–Floor–Room 空间层级"
+  },
+  "three-d-contract": {
+    "axisFields": [
+      "boundary",
+      "layer",
+      "repo",
+      "runtime",
+      "environment",
+      "dataZone",
+      "trustZone",
+      "opsLayer",
+      "integrationLayer",
+      "extensionLayer",
+      "failureDomain",
+      "domain",
+      "owner"
+    ],
+    "axisSources": [
+      {
+        "axis": "layer",
+        "note": "部署层级",
+        "path": "properties.layer"
+      },
+      {
+        "axis": "runtime",
+        "note": "运行时",
+        "path": "properties.runtime"
+      },
+      {
+        "axis": "environment",
+        "note": "环境",
+        "path": "properties.environment"
+      },
+      {
+        "axis": "trustZone",
+        "note": "信任域",
+        "path": "properties.trustZone"
+      },
+      {
+        "axis": "dataZone",
+        "note": "数据域",
+        "path": "properties.dataZone"
+      },
+      {
+        "axis": "boundary",
+        "note": "边界",
+        "path": "properties.boundary"
+      },
+      {
+        "axis": "repo",
+        "note": "仓库",
+        "path": "properties.repo"
+      },
+      {
+        "axis": "opsLayer",
+        "note": "运维层",
+        "path": "properties.opsLayer"
+      },
+      {
+        "axis": "integrationLayer",
+        "note": "集成层",
+        "path": "properties.integrationLayer"
+      },
+      {
+        "axis": "extensionLayer",
+        "note": "扩展层",
+        "path": "properties.extensionLayer"
+      },
+      {
+        "axis": "failureDomain",
+        "note": "故障域",
+        "path": "properties.failureDomain"
+      },
+      {
+        "axis": "owner",
+        "note": "责任方",
+        "path": "properties.owner"
+      },
+      {
+        "axis": "domain",
+        "note": "业务域用节点的 domainId，派生时归一到 domain",
+        "path": "domainId"
+      }
+    ],
+    "description": "MCP 模型与 Three.js 多视图架构站（ipa-architecture-3d 契约）之间的映射表。映射不是猜测：每一条都写明依据；无法无损映射的，保留原始类型供审阅。坐标轴字段是「类别」而非度量，站点据此计算空间信息增量。",
+    "edgeKinds": [
+      {
+        "mcp": "contains",
+        "note": "包含",
+        "threeD": "contains"
+      },
+      {
+        "mcp": "belongsTo",
+        "note": "归属即反向包含",
+        "threeD": "contains"
+      },
+      {
+        "mcp": "composes",
+        "note": "组合即包含",
+        "threeD": "contains"
+      },
+      {
+        "mcp": "aggregates",
+        "note": "聚合即包含",
+        "threeD": "contains"
+      },
+      {
+        "mcp": "dependsOn",
+        "note": "依赖",
+        "threeD": "depends"
+      },
+      {
+        "mcp": "calls",
+        "note": "调用",
+        "threeD": "calls"
+      },
+      {
+        "mcp": "implements",
+        "note": "实现即扩展",
+        "threeD": "extends"
+      },
+      {
+        "mcp": "inherits",
+        "note": "继承即扩展",
+        "threeD": "extends"
+      },
+      {
+        "mcp": "transitions",
+        "note": "状态迁移是一次事件交换",
+        "threeD": "exchanges"
+      },
+      {
+        "mcp": "triggers",
+        "note": "触发是一次事件交换",
+        "threeD": "exchanges"
+      },
+      {
+        "mcp": "reads",
+        "note": "读取",
+        "threeD": "reads"
+      },
+      {
+        "mcp": "writes",
+        "note": "写入",
+        "threeD": "writes"
+      },
+      {
+        "mcp": "owns",
+        "note": "所有权即控制权",
+        "threeD": "controls"
+      },
+      {
+        "mcp": "publishes",
+        "note": "发布",
+        "threeD": "publishes"
+      },
+      {
+        "mcp": "subscribes",
+        "note": "订阅是一次事件交换",
+        "threeD": "exchanges"
+      },
+      {
+        "mcp": "sends",
+        "note": "发送是一次事件交换",
+        "threeD": "exchanges"
+      },
+      {
+        "mcp": "receives",
+        "note": "接收是一次事件交换",
+        "threeD": "exchanges"
+      },
+      {
+        "mcp": "constrains",
+        "note": "约束即控制",
+        "threeD": "controls"
+      },
+      {
+        "mcp": "evidences",
+        "note": "佐证关系不是该契约的一类，按使用关系呈现",
+        "threeD": "uses"
+      },
+      {
+        "mcp": "derivesFrom",
+        "note": "派生即依赖",
+        "threeD": "depends"
+      }
+    ],
+    "id": "three-d-contract",
+    "nodeKinds": [
+      {
+        "mcp": "System",
+        "note": "系统边界",
+        "threeD": "system"
+      },
+      {
+        "mcp": "Subsystem",
+        "note": "该契约没有子系统这一类，按系统呈现，并在派生结果里保留 mcpKind",
+        "threeD": "system"
+      },
+      {
+        "mcp": "Module",
+        "note": "模块",
+        "threeD": "module"
+      },
+      {
+        "mcp": "Component",
+        "note": "该契约没有构件这一类，按模块呈现",
+        "threeD": "module"
+      },
+      {
+        "mcp": "Service",
+        "note": "服务",
+        "threeD": "service"
+      },
+      {
+        "mcp": "Class",
+        "note": "该契约没有类这一类，代码内结构按模块呈现",
+        "threeD": "module"
+      },
+      {
+        "mcp": "Interface",
+        "note": "同上",
+        "threeD": "module"
+      },
+      {
+        "mcp": "Method",
+        "note": "同上",
+        "threeD": "module"
+      },
+      {
+        "mcp": "Entity",
+        "note": "业务实体属数据",
+        "threeD": "data"
+      },
+      {
+        "mcp": "Table",
+        "note": "表是数据库对象",
+        "threeD": "database"
+      },
+      {
+        "mcp": "Attribute",
+        "note": "属性属数据",
+        "threeD": "data"
+      },
+      {
+        "mcp": "Actor",
+        "note": "参与者",
+        "threeD": "actor"
+      },
+      {
+        "mcp": "Event",
+        "note": "事件是运行时过程",
+        "threeD": "process"
+      },
+      {
+        "mcp": "State",
+        "note": "状态是运行时过程",
+        "threeD": "process"
+      },
+      {
+        "mcp": "Transition",
+        "note": "迁移是运行时过程",
+        "threeD": "process"
+      },
+      {
+        "mcp": "Constraint",
+        "note": "约束是规则型事实",
+        "threeD": "data"
+      },
+      {
+        "mcp": "Relationship",
+        "note": "关系本身是事实",
+        "threeD": "data"
+      },
+      {
+        "mcp": "Evidence",
+        "note": "证据是事实",
+        "threeD": "data"
+      },
+      {
+        "mcp": "Scenario",
+        "note": "场景是运行时过程",
+        "threeD": "process"
+      },
+      {
+        "mcp": "CausalRule",
+        "note": "因果规则是规则型事实",
+        "threeD": "data"
+      }
+    ],
+    "rules": [
+      "坐标轴字段是类别，不是度量：不得把风险级别之类的排序伪装成可比较数值。",
+      "一根视图的三根轴必须指向三个不同的类别字段，且每个字段在该视图的节点上至少有两个取值，否则这根轴不提供独立信息。",
+      "映射表里的每条对应都是显式登记的：没有登记的类型不被悄悄塞进某一类，派生结果会把它列进 unmapped。",
+      "派生结果保留节点的原始类型（mcpKind）与边的原始类型（mcpType），映射关系可被逐条复核。"
+    ],
+    "schemaVersion": "0.3.0",
+    "title": "Three.js 多视图架构站：类型与坐标轴映射"
   },
   "workflow-kinds": {
     "description": "v6.0 提示词 §2.7 与 §17 GWF-IR 6D 扩展：工作流不能只是一组可以拖动的框和箭头。每个节点、端口、关系、条件、异常、输入、输出和执行约束必须可被程序及大模型明确理解。nodeKinds / edgeKinds 覆盖 §17 列出的全部 28 种节点类型与 13 种边类型；execution* 覆盖 §25 的 6D 执行图 IR 契约；legacy* 词表登记旧写法，新写入必须使用规范 id。",

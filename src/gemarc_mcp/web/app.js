@@ -1,6 +1,6 @@
 /* GemArc static 5D viewer MVP. Model content is rendered using textContent, not innerHTML. */
 'use strict';
-const state = {model:null,capabilities:null,scenarioData:null,selected:null,tab:'1d',step:0,scenario:null,disabled:new Set(),prototype:0};
+const state = {model:null,capabilities:null,scenarioData:null,threeD:null,axisRenderer:null,selected:null,tab:'1d',step:0,scenario:null,disabled:new Set(),prototype:0};
 const $ = s => document.querySelector(s);
 const svgNS = 'http://www.w3.org/2000/svg';
 /* Canonical field accessors. 0.2.0 uses sourceId/targetId/type; 0.1.x models
@@ -58,11 +58,40 @@ function render2D(el){head('节点与依赖关系','2D / GRAPH VIEW');const wrap
  }
  select.addEventListener('change',draw);draw();
 }
-function render3D(el){head('3D 空间与分类','3D / WEBGL');if(state.capabilities.viewer3D==='not_available'){
- const p=panel(el,'未绑定现有 Three.js 构建产物');hint(p,'此 MVP 不使用 CSS 伪 3D。请先从 GemArc 原仓库构建真正 Three.js Viewer，再在 gemarc_build 指定 --legacy-dist，输出即可接入 3D。');
- text(p,'Viewer 状态','未安装，页面明确降级');return;}
+function render3D(el){head('3D 语义与空间','3D / WEBGL');
+ /* The semantic axes of the model are rendered by the MCP itself: the agent
+    fills the facts, the fixed part draws the crystal scene. */
+ const axisViews=state.threeD&&state.threeD.present&&Array.isArray(state.threeD.views)?state.threeD.views:[];
+ if(axisViews.length){const p=panel(el,'三维语义轴');
+  const legend=node('div','axis-legend',p);
+  Object.values(axisViews[0].axes||{}).forEach(axis=>{const row=node('p','small',legend);node('b','',row,(axis.label||axis.field)+'：');node('span','muted',row,(axis.values||[]).join('、')||'未提供')});
+  const holder=node('div','axis-3d',p);
+  const status=node('p','hint axis-3d-status',el,'将指针移到实体或关系上可查看拾取目标。');
+  mountAxisScene(holder,status);
+  return;}
+ if(state.capabilities.viewer3D==='not_available'){
+  const p=panel(el,'三维语义轴未建立');hint(p,'模型没有声明带取值的三根坐标轴，坐标轴是类别而不是度量，因此这里不生成一个没有来源的三维结构。请在模型中为视图声明 axes.x / axes.y / axes.z 并给出真实取值。');
+  text(p,'Viewer 状态','未安装，页面明确降级');return;}
  const p=panel(el,'已接入项目现有 3D Viewer');hint(p,'下方是单独构建的现有 GemArc Three.js Viewer；当前 MVP 未完成新旧 View 之间的选中状态双向同步。');
  const frame=node('iframe','',p);frame.title='GemArc 3D Legacy Viewer';frame.src='./legacy-3d/index.html';frame.setAttribute('sandbox','allow-scripts allow-same-origin');
+}
+/* Mount the semantic-axis crystal scene. A WebGL failure is stated, never
+   faked with a picture. */
+async function mountAxisScene(holder,status){
+ if(state.axisRenderer){state.axisRenderer.dispose();state.axisRenderer=null}
+ try{
+  const THREE=await import('three');
+  const {createThreeAxisRenderer}=await import('./runtime/space/axis-viewer-three.js');
+  const views=state.threeD.views;
+  state.axisRenderer=createThreeAxisRenderer(THREE,{container:holder,view:views[0],
+   onSelectNode:id=>{state.selected=id;showTab(state.tab)},
+   onSelectEdge:id=>{state.selected=id;showTab(state.tab)},
+   onHover:hit=>{status.textContent=hit?(hit.kind==='node'?'拾取目标：实体 '+hit.id:'拾取目标：关系 '+hit.id):'指针下没有可拾取的实体或关系。'}});
+  state.axisRenderer.render();
+ }catch(err){
+  const reason=err&&err.code==='GEMARC_AXIS_010'?'浏览器没有可用的 WebGL 上下文':(err&&err.message?err.message:'未知原因');
+  holder.appendChild(node('p','hint',holder,'三维语义渲染未能启动：'+reason+'。三维拾取需要真实的 WebGL 渲染，此处不提供任何替代视图；坐标轴语义仍如实列在上方。'));
+ }
 }
 function scenarioPicker(parent,onChange){const sel=node('select','',parent);for(const scenario of current().scenarios){const opt=node('option','',sel,scenario.name||scenario.id);opt.value=scenario.id}sel.value=state.scenario||current().scenarios[0]?.id||'';sel.addEventListener('change',()=>{state.scenario=sel.value;state.step=0;onChange()});return sel}
 function render4D(el){clear(el);head('动态流程与时间轴','4D / EVENT TIME');if(!current().scenarios.length){hint(el,'缺少状态或事件模型，不能生成真实 4D 行为。');return;}
@@ -107,6 +136,11 @@ function readLayout(){try{const raw=window.localStorage.getItem(LAYOUT_KEY);if(!
  const p=JSON.parse(raw);return{sidebar:Number.isFinite(p.sidebar)?p.sidebar:LAYOUT_DEFAULTS.sidebar,inspector:Number.isFinite(p.inspector)?p.inspector:LAYOUT_DEFAULTS.inspector,focus:Boolean(p.focus)};}
  catch(err){return Object.assign({},LAYOUT_DEFAULTS)}}
 function writeLayout(l){try{window.localStorage.setItem(LAYOUT_KEY,JSON.stringify(l))}catch(err){/* storage refused: the page still works */}}
+// The layout in flight lives here, not in localStorage: reading the store on
+// every pointer move is wasteful, and the store can lag behind what is
+// painted. One in-memory state keeps the splitter, the focus toggle and the
+// resize handler talking about the same numbers.
+let layoutState=readLayout();
 function paintLayout(l){const root=document.documentElement;
  root.style.setProperty('--sidebar-w',l.sidebar+'px');root.style.setProperty('--inspector-w',l.inspector+'px');
  const main=document.querySelector('main');if(main)main.classList.toggle('focus',Boolean(l.focus));
@@ -116,32 +150,39 @@ function mainWidth(){const main=document.querySelector('main');return main?main.
 function clampPane(pane,value,layout,width){const limits=PANE_LIMITS[pane];const other=pane==='sidebar'?layout.inspector:layout.sidebar;
  const room=width-MAIN_MIN-other-GUTTER*2;const max=Math.max(limits.min,Math.min(limits.max,room));
  return Math.round(Math.min(Math.max(value,limits.min),max))}
-function setPaneWidth(pane,value,layout){const base=layout||readLayout();const next=Object.assign({},base);next[pane]=clampPane(pane,value,base,mainWidth());paintLayout(next);return next}
-function wireSplitter(sp,pane){let dragging=false;let current=readLayout();
- sp.addEventListener('pointerdown',ev=>{dragging=true;current=readLayout();sp.classList.add('dragging');sp.setPointerCapture(ev.pointerId);ev.preventDefault()});
+function setPaneWidth(pane,value,layout){const base=layout||layoutState;const next=Object.assign({},base);next[pane]=clampPane(pane,value,base,mainWidth());paintLayout(next);return next}
+function wireSplitter(sp,pane){let dragging=false;
+ sp.addEventListener('pointerdown',ev=>{dragging=true;sp.classList.add('dragging');sp.setPointerCapture(ev.pointerId);ev.preventDefault()});
  sp.addEventListener('pointermove',ev=>{if(!dragging)return;const rect=document.querySelector('main').getBoundingClientRect();
-  const raw=pane==='sidebar'?ev.clientX-rect.left-GUTTER/2:rect.right-ev.clientX-GUTTER/2;current=setPaneWidth(pane,raw,current);
-  writeLayout(current)});
- const stop=ev=>{if(!dragging)return;dragging=false;sp.classList.remove('dragging');try{sp.releasePointerCapture(ev.pointerId)}catch(err){/* already released */}writeLayout(current)};
+  const raw=pane==='sidebar'?ev.clientX-rect.left-GUTTER/2:rect.right-ev.clientX-GUTTER/2;layoutState=setPaneWidth(pane,raw,layoutState);
+  // Persist on every move, not only on pointerup: a drag that ends without a
+  // pointerup must not lose the width the reader just chose. The write is
+  // synchronous on purpose: the stored state must never lag behind the
+  // painted one.
+  writeLayout(layoutState)});
+ const stop=ev=>{if(!dragging)return;dragging=false;sp.classList.remove('dragging');try{sp.releasePointerCapture(ev.pointerId)}catch(err){/* already released */}writeLayout(layoutState)};
  sp.addEventListener('pointerup',stop);sp.addEventListener('pointercancel',stop);sp.addEventListener('lostpointercapture',stop);
- sp.addEventListener('dblclick',()=>{const next=Object.assign({},readLayout());next[pane]=LAYOUT_DEFAULTS[pane];paintLayout(next);writeLayout(next)});
- sp.addEventListener('keydown',ev=>{const step=ev.shiftKey?KEY_STEP*3:KEY_STEP;const current=readLayout()[pane];let next=null;
+ sp.addEventListener('dblclick',()=>{layoutState=Object.assign({},layoutState);layoutState[pane]=LAYOUT_DEFAULTS[pane];paintLayout(layoutState);writeLayout(layoutState)});
+ sp.addEventListener('keydown',ev=>{const step=ev.shiftKey?KEY_STEP*3:KEY_STEP;const current=layoutState[pane];let next=null;
   if(ev.key.startsWith('Arrow')&&ev.key.endsWith('Left'))next=current-step;else if(ev.key.startsWith('Arrow')&&ev.key.endsWith('Right'))next=current+step;
   else if(ev.key==='Home')next=PANE_LIMITS[pane].min;else if(ev.key==='End')next=PANE_LIMITS[pane].max;
   else if(ev.key==='Enter'||ev.key===' ')next=LAYOUT_DEFAULTS[pane];
-  if(next===null)return;ev.preventDefault();writeLayout(setPaneWidth(pane,next))})}
-function setupLayout(){paintLayout(readLayout());
+  if(next===null)return;ev.preventDefault();layoutState=setPaneWidth(pane,next,layoutState);writeLayout(layoutState)})}
+function setupLayout(){layoutState=readLayout();paintLayout(layoutState);
  document.querySelectorAll('.splitter').forEach(sp=>wireSplitter(sp,sp.dataset.pane));
  const toggle=document.querySelector('#focus-toggle');
- if(toggle)toggle.addEventListener('click',()=>{const cur=readLayout();const next=Object.assign({},cur,{focus:!cur.focus});paintLayout(next);writeLayout(next)});
- window.addEventListener('resize',()=>{const cur=readLayout();const width=mainWidth();if(!width)return;
+ if(toggle)toggle.addEventListener('click',()=>{layoutState=Object.assign({},layoutState,{focus:!layoutState.focus});paintLayout(layoutState);writeLayout(layoutState)});
+ window.addEventListener('resize',()=>{const cur=layoutState;const width=mainWidth();if(!width)return;
   let sidebar=cur.sidebar,inspector=cur.inspector;const room=width-MAIN_MIN-GUTTER*2;
   if(sidebar+inspector>room){const total=sidebar+inspector;const share=total?room/total:0.5;sidebar=Math.round(sidebar*share);inspector=Math.round(inspector*share)}
   const next=Object.assign({},cur,{sidebar:clampPane('sidebar',sidebar,Object.assign({},cur,{inspector}),width),inspector:clampPane('inspector',inspector,Object.assign({},cur,{sidebar}),width)});
-  paintLayout(next);writeLayout(next)})}
+  layoutState=next;paintLayout(layoutState);writeLayout(layoutState)})}
 async function main(){try{
  const [m,c,s]=await Promise.all(['architecture.json','capabilities.json','scenarios.json'].map(x=>fetch('./data/'+x,{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error(x);return r.json()})));
  state.model=m;state.capabilities=c;state.scenarioData=s;
+ /* The derived 3D dataset is optional: without it the site still runs, it
+    simply has no semantic axes to show. */
+ try{const r=await fetch('./data/three-d.json',{cache:'no-store'});state.threeD=r.ok?await r.json():null}catch(err){state.threeD=null}
  const evidence=(m.meta||{}).evidenceState||'unknown';$('#evidence').textContent='EVIDENCE · '+evidence.toUpperCase();
  $('#footer').textContent=`GemArc MVP | 模型事实等级: ${evidence} | 3D: ${c.viewer3D} | 4D: ${c.dynamic4D} | 5D: ${c.causal5D}`;
  document.querySelectorAll('#nav button').forEach(btn=>btn.addEventListener('click',()=>showTab(btn.dataset.tab)));

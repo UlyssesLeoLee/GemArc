@@ -13,6 +13,7 @@ import { ViewState } from './runtime/view/view-state.js';
 import { ViewRouter } from './runtime/view/view-router.js';
 import { SpaceModel } from './runtime/space/space-model.js';
 import {
+  buildAxisView,
   buildCausalView,
   buildFactsView,
   buildGraphView,
@@ -30,11 +31,13 @@ const state = {
   viewState: null,
   router: null,
   spaceModel: null,
+  threeD: null,
   tab: '1d',
   scenario: null,
   disabled: [],
   step: 0,
   spaceRenderer: null,
+  axisRenderer: null,
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -129,7 +132,7 @@ function currentView() {
   switch (state.tab) {
     case '1d': return buildFactsView(state.model, state.store);
     case '2d': return buildGraphView(state.model, state.viewState);
-    case '3d': return buildSpaceView(state.model, state.spaceModel);
+    case '3d': return buildThreeDView();
     case '4d': return buildTimelineView(state.model, state.scenario, state.disabled, state.step);
     case '5d': return buildCausalView(state.model, state.scenario, state.disabled);
     case 'views': return buildViewsView(state.model);
@@ -138,12 +141,36 @@ function currentView() {
   }
 }
 
+/**
+ * The 3D tab: the semantic axes of the model, and the engineering space when
+ * the model declares one. Both are optional and both say so when they are
+ * missing.
+ * @returns {object} the view
+ */
+function buildThreeDView() {
+  const axis = buildAxisView(state.threeD);
+  const space = buildSpaceView(state.model, state.spaceModel);
+  const body = [...axis.body, ...space.body];
+  return {
+    headline: '3D 语义与空间',
+    kicker: '3D / AXES · BUILDING · FLOOR · ROOM',
+    body,
+    mount: 'semantic3d',
+  };
+}
+
 function showTab(tab) {
-  // Leaving the 3D tab releases the WebGL renderer. Without this the render
+  // Leaving the 3D tab releases the WebGL renderers. Without this the render
   // loop of a removed canvas would keep running.
-  if (state.tab === '3d' && tab !== '3d' && state.spaceRenderer) {
-    state.spaceRenderer.dispose();
-    state.spaceRenderer = null;
+  if (state.tab === '3d' && tab !== '3d') {
+    if (state.spaceRenderer) {
+      state.spaceRenderer.dispose();
+      state.spaceRenderer = null;
+    }
+    if (state.axisRenderer) {
+      state.axisRenderer.dispose();
+      state.axisRenderer = null;
+    }
   }
   state.tab = tab;
   document.querySelectorAll('#nav button').forEach((button) => {
@@ -154,24 +181,104 @@ function showTab(tab) {
   $('#headline').textContent = view.headline;
   $('#kicker').textContent = view.kicker;
   for (const spec of view.body) renderTree(spec, root);
-  if (view.mount === 'space3d') mountSpace(root);
+  if (view.mount === 'semantic3d') mountScenes(root);
   renderInspector();
 }
 
 /* ------------------------------------------------------------------- 3D */
 
 /**
- * Mirror the current selection into the 3D scene. The selection lives in one
+ * Mirror the current selection into the 3D scenes. The selection lives in one
  * place - the view state - so the dimensions never disagree about what is
  * selected.
  */
 function syncSpaceHighlight() {
-  if (!state.spaceRenderer) return;
   const snapshot = state.viewState.snapshot();
-  state.spaceRenderer.setHighlight({
-    nodeIds: snapshot.selectedNodeIds,
-    edgeIds: snapshot.selectedEdgeIds,
-  });
+  if (state.spaceRenderer) {
+    state.spaceRenderer.setHighlight({
+      nodeIds: snapshot.selectedNodeIds,
+      edgeIds: snapshot.selectedEdgeIds,
+    });
+  }
+  if (state.axisRenderer) {
+    state.axisRenderer.setHighlight({
+      nodeIds: snapshot.selectedNodeIds,
+      edgeIds: snapshot.selectedEdgeIds,
+    });
+  }
+}
+
+/**
+ * Mount both 3D scenes of the tab: the semantic axes of the model and the
+ * engineering space it declares.
+ * @param {object} root the content root
+ */
+async function mountScenes(root) {
+  await mountAxis(root);
+  await mountSpace(root);
+}
+
+/**
+ * Mount the semantic-axis scene. The dataset is derived from the model, so
+ * the scene never invents an axis.
+ * @param {object} root the content root
+ */
+async function mountAxis(root) {
+  const holder = root.querySelector('.axis-3d');
+  if (!holder) return;
+  const dataset = state.threeD;
+  const views = dataset && dataset.present && Array.isArray(dataset.views) ? dataset.views : [];
+  if (!views.length) return;
+  try {
+    const THREE = await import('three');
+    const { createThreeAxisRenderer } = await import('./runtime/space/axis-viewer-three.js');
+    if (state.axisRenderer) {
+      state.axisRenderer.dispose();
+      state.axisRenderer = null;
+    }
+    const status = document.createElement('p');
+    status.className = 'hint axis-3d-status';
+    status.textContent = '将指针移到实体或关系上可查看拾取目标。';
+    holder.after(status);
+    state.axisRenderer = createThreeAxisRenderer(THREE, {
+      container: holder,
+      view: views[0],
+      onSelectNode: (id) => dispatch({ type: 'select-node', id }),
+      onSelectEdge: (id) => dispatch({ type: 'select-edge', id }),
+      onHover: (hit) => {
+        status.textContent = describeAxisHit(hit);
+      },
+    });
+    state.axisRenderer.render();
+    syncSpaceHighlight();
+  } catch (error) {
+    const reason = error && error.code === 'GEMARC_AXIS_010'
+      ? '浏览器没有可用的 WebGL 上下文'
+      : (error && error.message ? error.message : '未知原因');
+    const notice = document.createElement('p');
+    notice.className = 'hint';
+    notice.textContent = `三维语义渲染未能启动：${reason}`
+      + '。三维拾取需要真实的 WebGL 渲染，此处不提供任何替代视图；'
+      + '坐标轴语义仍如实列在左侧。';
+    holder.appendChild(notice);
+  }
+}
+
+/**
+ * Describe what the semantic scene reports under the pointer.
+ * @param {{kind: string, id: string}|null} hit the pick result
+ * @returns {string}
+ */
+function describeAxisHit(hit) {
+  if (!hit) return '指针下没有可拾取的实体或关系。';
+  const node = hit.kind === 'node' ? state.store.getNode(hit.id) : null;
+  if (node) {
+    const name = node && node.name ? node.name : hit.id;
+    return `拾取目标：实体 ${name}（${hit.id}）`;
+  }
+  const edge = state.store.getEdge(hit.id);
+  const name = edge && edge.description ? edge.description : hit.id;
+  return `拾取目标：关系 ${name}（${hit.id}）`;
 }
 
 async function mountSpace(root) {
@@ -291,6 +398,12 @@ function writeLayout(layout) {
   }
 }
 
+// The layout in flight lives here, not in localStorage: reading the store on
+// every pointer move is wasteful, and the store can lag behind what is
+// painted. One in-memory state keeps the splitter, the focus toggle and the
+// resize handler talking about the same numbers.
+let layoutState = readLayout();
+
 function paintLayout(layout) {
   const root = document.documentElement;
   root.style.setProperty('--sidebar-w', `${layout.sidebar}px`);
@@ -334,14 +447,9 @@ function setPaneWidth(pane, value, layout) {
 
 function wireSplitter(splitter, pane) {
   let dragging = false;
-  // The layout in flight lives here, not in localStorage: reading the store
-  // on every pointermove is both wasteful and wrong, because the store can lag
-  // behind what is painted.
-  let current = readLayout();
 
   splitter.addEventListener('pointerdown', (event) => {
     dragging = true;
-    current = readLayout();
     splitter.classList.add('dragging');
     splitter.setPointerCapture(event.pointerId);
     event.preventDefault();
@@ -352,32 +460,33 @@ function wireSplitter(splitter, pane) {
     const raw = pane === 'sidebar'
       ? event.clientX - rect.left - GUTTER / 2
       : rect.right - event.clientX - GUTTER / 2;
-    current = setPaneWidth(pane, raw, current);
+    layoutState = setPaneWidth(pane, raw, layoutState);
     // Persist on every move, not only on pointerup: a drag that ends without
     // a pointerup (the pointer leaves the window, the gesture is cancelled)
-    // must not lose the width the reader just chose.
-    writeLayout(current);
+    // must not lose the width the reader just chose. The write is synchronous
+    // on purpose: the stored state must never lag behind the painted one.
+    writeLayout(layoutState);
   });
   const stop = (event) => {
     if (!dragging) return;
     dragging = false;
     splitter.classList.remove('dragging');
     try { splitter.releasePointerCapture(event.pointerId); } catch (error) { /* already released */ }
-    writeLayout(current);
+    writeLayout(layoutState);
   };
   splitter.addEventListener('pointerup', stop);
   splitter.addEventListener('pointercancel', stop);
   splitter.addEventListener('lostpointercapture', stop);
 
   splitter.addEventListener('dblclick', () => {
-    const next = { ...readLayout(), [pane]: LAYOUT_DEFAULTS[pane] };
-    paintLayout(next);
-    writeLayout(next);
+    layoutState = { ...layoutState, [pane]: LAYOUT_DEFAULTS[pane] };
+    paintLayout(layoutState);
+    writeLayout(layoutState);
   });
 
   splitter.addEventListener('keydown', (event) => {
     const step = event.shiftKey ? KEY_STEP * 3 : KEY_STEP;
-    const current = readLayout()[pane];
+    const current = layoutState[pane];
     let next = null;
     if (event.key.startsWith('Arrow') && event.key.endsWith('Left')) next = current - step;
     else if (event.key.startsWith('Arrow') && event.key.endsWith('Right')) next = current + step;
@@ -386,14 +495,14 @@ function wireSplitter(splitter, pane) {
     else if (event.key === 'Enter' || event.key === ' ') next = LAYOUT_DEFAULTS[pane];
     if (next === null) return;
     event.preventDefault();
-    const nextLayout = setPaneWidth(pane, next, readLayout());
-    writeLayout(nextLayout);
+    layoutState = setPaneWidth(pane, next, layoutState);
+    writeLayout(layoutState);
   });
 }
 
 function setupLayout() {
-  const layout = readLayout();
-  paintLayout(layout);
+  layoutState = readLayout();
+  paintLayout(layoutState);
 
   document.querySelectorAll('.splitter').forEach((splitter) => {
     wireSplitter(splitter, splitter.dataset.pane);
@@ -402,16 +511,16 @@ function setupLayout() {
   const toggle = document.querySelector('#focus-toggle');
   if (toggle) {
     toggle.addEventListener('click', () => {
-      const next = { ...readLayout(), focus: !readLayout().focus };
-      paintLayout(next);
-      writeLayout(next);
+      layoutState = { ...layoutState, focus: !layoutState.focus };
+      paintLayout(layoutState);
+      writeLayout(layoutState);
     });
   }
 
   // A narrower window cannot hold the same three panes: give the room back
   // to the main column instead of letting the layout overflow.
   window.addEventListener('resize', () => {
-    const current = readLayout();
+    const current = layoutState;
     const width = mainWidth();
     if (!width) return;
     let sidebar = current.sidebar;
@@ -428,8 +537,11 @@ function setupLayout() {
       sidebar: clampPane('sidebar', sidebar, { ...current, inspector }, width),
       inspector: clampPane('inspector', inspector, { ...current, sidebar }, width),
     };
-    paintLayout(next);
-    writeLayout(next);
+    // The in-flight state is updated too, so a resize that happens during a
+    // drag is not overwritten by the next pointer move.
+    layoutState = next;
+    paintLayout(layoutState);
+    writeLayout(layoutState);
   });
 }
 
@@ -447,6 +559,14 @@ async function load() {
   state.viewState.attachStore(state.store);
   state.router = new ViewRouter({ store: state.store, query: state.query, viewState: state.viewState });
   state.spaceModel = new SpaceModel(state.model);
+  // The derived 3D dataset is optional: a site without it still runs, it
+  // simply has no semantic axes to show.
+  try {
+    const derived = await fetch('./data/three-d.json', { cache: 'no-store' });
+    state.threeD = derived.ok ? await derived.json() : null;
+  } catch {
+    state.threeD = null;
+  }
   const scenarios = state.model.scenarios || [];
   state.scenario = scenarios.length ? scenarios[0].id : null;
 }

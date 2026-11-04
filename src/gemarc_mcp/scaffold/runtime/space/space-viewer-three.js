@@ -74,23 +74,31 @@ export const LAYOUT_CONSTANTS = Object.freeze({
  * visually distinct from an ordinary edge.
  */
 const EDGE_COLORS = Object.freeze({
-  'same-room': 0x5a7288,
+  'same-room': 0x7f8fa6,
   'cross-room': 0x6bd68a,
-  'cross-floor': 0x4cc2ff,
-  'cross-building': 0xb48ead,
-  'unassigned': 0x8fa3b8,
-  'trust-boundary': 0xffb454,
+  'cross-floor': 0x6fe3ff,
+  'cross-building': 0xb78cff,
+  'unassigned': 0x93a6bd,
+  'trust-boundary': 0xffc46b,
 });
 
-const NODE_COLOR = 0x4cc2ff;
-const NODE_COLOR_HIGHLIGHT = 0xffb454;
-const CONTAINER_COLOR = 0x22303f;
-const CONTAINER_COLOR_VIRTUAL = 0x3a4353;
+const NODE_COLOR = 0x6fe3ff;
+const NODE_COLOR_HIGHLIGHT = 0xffc46b;
+const CONTAINER_COLOR = 0x2c3d52;
+const CONTAINER_COLOR_VIRTUAL = 0x44536b;
+/**
+ * The body of a crystal is never fully opaque (BD-010 section 4.2). The
+ * retreat still decides how strong the emphasis is; it only scales this
+ * value, so the body keeps its translucency in every state.
+ */
+const CRYSTAL_BODY_OPACITY = 0.62;
 const OUTLINE_STRENGTH = Object.freeze({
   strong: { opacity: 1, scale: 1.42 },
   normal: { opacity: 0.8, scale: 1.22 },
   weak: { opacity: 0.35, scale: 1.1 },
-  none: { opacity: 0, scale: 1 },
+  // A crystal keeps a hint of its edge even when it steps back: without the
+  // edge it stops being a crystal and becomes a colored blob.
+  none: { opacity: 0.18, scale: 1 },
 });
 
 const LINE_WEIGHT_SCALE = Object.freeze({
@@ -964,7 +972,7 @@ class SpaceCameraController {
  */
 function createLabel(THREE, text, options = {}) {
   if (typeof document === 'undefined' || typeof document.createElement !== 'function') return null;
-  const color = options.color || '#dbe6f0';
+  const color = options.color || '#e6eef7';
   const background = options.background || 'rgba(11,15,20,0.82)';
   const fontSize = 44;
   const canvas = document.createElement('canvas');
@@ -1070,7 +1078,7 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
   renderer.setPixelRatio(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0b0f14);
+  scene.background = new THREE.Color(0x06090e);
 
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 6000);
   const controls = new SpaceCameraController(camera, canvas);
@@ -1221,7 +1229,7 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
     // explicitly, so a virtual organisation never masquerades as a real one.
     const suffix = virtual ? '（未声明语义来源）' : '';
     const label = createLabel(THREE, `${record.name}${suffix}`, {
-      color: virtual ? '#8fa3b8' : '#dbe6f0',
+      color: virtual ? '#93a6bd' : '#e6eef7',
       height: record.level === 'Room' ? 3.0 : 4.2,
     });
     if (label) {
@@ -1250,18 +1258,20 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
   };
 
   const buildNode = (node, parent, localPosition) => {
-    const geometry = new THREE.BoxGeometry(
-      LAYOUT_CONSTANTS.nodeSize,
-      LAYOUT_CONSTANTS.nodeSize,
-      LAYOUT_CONSTANTS.nodeSize,
+    // A crystal is a cut polyhedron, not a ball: the cut planes are what
+    // catch the light (BD-010 section 4.1).
+    const geometry = new THREE.OctahedronGeometry(
+      LAYOUT_CONSTANTS.nodeSize * 0.74,
+      0,
     );
     track(geometry);
     const material = new THREE.MeshStandardMaterial({
       color: NODE_COLOR,
       transparent: true,
-      opacity: 1,
-      roughness: 0.55,
-      metalness: 0.15,
+      opacity: CRYSTAL_BODY_OPACITY,
+      roughness: 0.16,
+      metalness: 0.04,
+      flatShading: true,
     });
     track(material);
     const mesh = new THREE.Mesh(geometry, material);
@@ -1270,7 +1280,7 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
     const outlineGeometry = new THREE.EdgesGeometry(geometry);
     track(outlineGeometry);
     const outlineMaterial = new THREE.LineBasicMaterial({
-      color: 0xdbe6f0,
+      color: 0xe6eef7,
       transparent: true,
       opacity: 0,
     });
@@ -1508,8 +1518,10 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
       const treatment = treatments[nodeId] || null;
       const isHighlighted = highlight.nodeIds.has(nodeId);
       const opacity = treatment?.opacity ?? 1;
-      record.material.opacity = opacity;
-      record.material.transparent = opacity < 1;
+      // The retreat scales the translucency of the body; it never makes the
+      // crystal opaque again.
+      record.material.opacity = opacity * CRYSTAL_BODY_OPACITY;
+      record.material.transparent = true;
       record.material.color.setHex(isHighlighted ? NODE_COLOR_HIGHLIGHT : NODE_COLOR);
 
       const outlineName = treatment?.outline

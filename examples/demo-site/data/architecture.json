@@ -71,7 +71,11 @@
       "methods": [],
       "name": "事件源",
       "parentId": null,
-      "properties": {},
+      "properties": {
+        "environment": "生产环境",
+        "owner": "示例团队",
+        "trustZone": "外部域"
+      },
       "role": null,
       "spaceRef": null,
       "verification": "Hypothetical"
@@ -87,7 +91,11 @@
       "methods": [],
       "name": "消息队列",
       "parentId": null,
-      "properties": {},
+      "properties": {
+        "environment": "生产环境",
+        "owner": "示例团队",
+        "trustZone": "内部域"
+      },
       "role": null,
       "spaceRef": null,
       "verification": "Hypothetical"
@@ -103,7 +111,11 @@
       "methods": [],
       "name": "规则引擎",
       "parentId": null,
-      "properties": {},
+      "properties": {
+        "environment": "生产环境",
+        "owner": "示例团队",
+        "trustZone": "内部域"
+      },
       "role": null,
       "spaceRef": null,
       "verification": "Hypothetical"
@@ -119,7 +131,11 @@
       "methods": [],
       "name": "通知服务",
       "parentId": null,
-      "properties": {},
+      "properties": {
+        "environment": "生产环境",
+        "owner": "示例团队",
+        "trustZone": "外部域"
+      },
       "role": null,
       "spaceRef": null,
       "verification": "Hypothetical"
@@ -184,25 +200,53 @@
   "space": null,
   "views": [
     {
+      "axes": {
+        "x": {
+          "field": "layer",
+          "label": "部署层",
+          "values": [
+            "设备层",
+            "中间件层",
+            "应用层"
+          ]
+        },
+        "y": {
+          "field": "properties.trustZone",
+          "label": "信任域"
+        },
+        "z": {
+          "field": "properties.environment",
+          "label": "环境"
+        }
+      },
+      "caseIds": [],
       "concerns": [
-        "事件依赖"
+        "实体落在哪一层、哪个信任域、哪个环境"
       ],
       "diagramType": "logical-view",
-      "edgeKinds": [
-        "sends"
+      "dimension": "3D",
+      "edgeIds": [
+        "e1",
+        "e2",
+        "e3"
       ],
-      "id": "logical",
+      "id": "semantic-3d",
+      "legend": null,
+      "missing": [],
       "nodeIds": [
         "sensor",
         "queue",
         "rule",
         "notify"
       ],
-      "reviewIntent": "识别单点故障",
+      "reviewQuestions": [
+        "跨信任域的调用是否都标了出来？"
+      ],
+      "scenarioId": null,
       "stakeholders": [
         "架构师"
       ],
-      "title": "逻辑架构"
+      "title": "语义视图"
     }
   ],
   "workflows": []

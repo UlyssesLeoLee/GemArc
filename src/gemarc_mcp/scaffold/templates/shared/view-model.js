@@ -196,6 +196,43 @@ export function buildGraphView(model, viewState) {
 
 /* ------------------------------------------------------------------- 3D */
 
+/**
+ * The semantic-axis scene: three categorical axes taken from the model
+ * itself. The dataset is derived from the model, so nothing here invents an
+ * axis. A model without axes says so instead of drawing an arbitrary cube.
+ * @param {object|null} threeD the derived 3D dataset
+ * @returns {object} the view body
+ */
+export function buildAxisView(threeD) {
+  const body = [];
+  const views = threeD && threeD.present && Array.isArray(threeD.views) ? threeD.views : [];
+  if (!views.length) {
+    body.push(panel('三维语义轴', [
+      hint('模型没有声明带取值的三根坐标轴。坐标轴是类别而不是度量，'
+        + '因此这里不生成一个没有来源的三维结构。'),
+    ]));
+    return { body, mount: 'semantic3d', hasAxis: false };
+  }
+  for (const view of views) {
+    const axisFields = Object.values(view.axes || {}).map((axis) => ({
+      key: axis.field,
+      label: axis.label || axis.field,
+      values: (axis.values || []).join('、') || '未提供',
+      independent: axis.independent !== false,
+      count: axis.valueCount,
+    }));
+    body.push(panel(`三维语义轴 · ${view.title || view.viewId || ''}`, [
+      element('div', 'axis-legend', axisFields.map((axis) => element('p', 'small', [
+        textNode('b', '', `${axis.label}：`),
+        textNode('span', 'muted', axis.values),
+        textNode('span', 'muted', axis.independent ? '' : '（该轴不提供独立信息）'),
+      ]))),
+      element('div', 'axis-3d', []),
+    ]));
+  }
+  return { body, mount: 'semantic3d', hasAxis: true };
+}
+
 export function buildSpaceView(model, spaceModel) {
   const body = [];
   const space = model.space;

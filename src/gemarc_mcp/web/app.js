@@ -116,13 +116,14 @@ function mainWidth(){const main=document.querySelector('main');return main?main.
 function clampPane(pane,value,layout,width){const limits=PANE_LIMITS[pane];const other=pane==='sidebar'?layout.inspector:layout.sidebar;
  const room=width-MAIN_MIN-other-GUTTER*2;const max=Math.max(limits.min,Math.min(limits.max,room));
  return Math.round(Math.min(Math.max(value,limits.min),max))}
-function setPaneWidth(pane,value){const layout=readLayout();const next=Object.assign({},layout);next[pane]=clampPane(pane,value,layout,mainWidth());paintLayout(next);return next}
-function wireSplitter(sp,pane){let dragging=false;
- sp.addEventListener('pointerdown',ev=>{dragging=true;sp.classList.add('dragging');sp.setPointerCapture(ev.pointerId);ev.preventDefault()});
+function setPaneWidth(pane,value,layout){const base=layout||readLayout();const next=Object.assign({},base);next[pane]=clampPane(pane,value,base,mainWidth());paintLayout(next);return next}
+function wireSplitter(sp,pane){let dragging=false;let current=readLayout();
+ sp.addEventListener('pointerdown',ev=>{dragging=true;current=readLayout();sp.classList.add('dragging');sp.setPointerCapture(ev.pointerId);ev.preventDefault()});
  sp.addEventListener('pointermove',ev=>{if(!dragging)return;const rect=document.querySelector('main').getBoundingClientRect();
-  const raw=pane==='sidebar'?ev.clientX-rect.left-GUTTER/2:rect.right-ev.clientX-GUTTER/2;setPaneWidth(pane,raw)});
- const stop=ev=>{if(!dragging)return;dragging=false;sp.classList.remove('dragging');try{sp.releasePointerCapture(ev.pointerId)}catch(err){/* already released */}writeLayout(readLayout())};
- sp.addEventListener('pointerup',stop);sp.addEventListener('pointercancel',stop);
+  const raw=pane==='sidebar'?ev.clientX-rect.left-GUTTER/2:rect.right-ev.clientX-GUTTER/2;current=setPaneWidth(pane,raw,current);
+  writeLayout(current)});
+ const stop=ev=>{if(!dragging)return;dragging=false;sp.classList.remove('dragging');try{sp.releasePointerCapture(ev.pointerId)}catch(err){/* already released */}writeLayout(current)};
+ sp.addEventListener('pointerup',stop);sp.addEventListener('pointercancel',stop);sp.addEventListener('lostpointercapture',stop);
  sp.addEventListener('dblclick',()=>{const next=Object.assign({},readLayout());next[pane]=LAYOUT_DEFAULTS[pane];paintLayout(next);writeLayout(next)});
  sp.addEventListener('keydown',ev=>{const step=ev.shiftKey?KEY_STEP*3:KEY_STEP;const current=readLayout()[pane];let next=null;
   if(ev.key.startsWith('Arrow')&&ev.key.endsWith('Left'))next=current-step;else if(ev.key.startsWith('Arrow')&&ev.key.endsWith('Right'))next=current+step;

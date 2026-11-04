@@ -333,11 +333,15 @@ function setPaneWidth(pane, value, layout) {
 }
 
 function wireSplitter(splitter, pane) {
-  const layout = readLayout();
   let dragging = false;
+  // The layout in flight lives here, not in localStorage: reading the store
+  // on every pointermove is both wasteful and wrong, because the store can lag
+  // behind what is painted.
+  let current = readLayout();
 
   splitter.addEventListener('pointerdown', (event) => {
     dragging = true;
+    current = readLayout();
     splitter.classList.add('dragging');
     splitter.setPointerCapture(event.pointerId);
     event.preventDefault();
@@ -348,17 +352,22 @@ function wireSplitter(splitter, pane) {
     const raw = pane === 'sidebar'
       ? event.clientX - rect.left - GUTTER / 2
       : rect.right - event.clientX - GUTTER / 2;
-    setPaneWidth(pane, raw, readLayout());
+    current = setPaneWidth(pane, raw, current);
+    // Persist on every move, not only on pointerup: a drag that ends without
+    // a pointerup (the pointer leaves the window, the gesture is cancelled)
+    // must not lose the width the reader just chose.
+    writeLayout(current);
   });
   const stop = (event) => {
     if (!dragging) return;
     dragging = false;
     splitter.classList.remove('dragging');
     try { splitter.releasePointerCapture(event.pointerId); } catch (error) { /* already released */ }
-    writeLayout(readLayout());
+    writeLayout(current);
   };
   splitter.addEventListener('pointerup', stop);
   splitter.addEventListener('pointercancel', stop);
+  splitter.addEventListener('lostpointercapture', stop);
 
   splitter.addEventListener('dblclick', () => {
     const next = { ...readLayout(), [pane]: LAYOUT_DEFAULTS[pane] };

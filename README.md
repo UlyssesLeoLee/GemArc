@@ -155,6 +155,9 @@ const renderer = createThreeSpaceRenderer(THREE, { container, model, space, stor
   世界半径不是目标大小——同一条边近处 1px、远处 10px，细管在斜视角下几乎打不中。
 - **取景按视锥精确贴合包围盒**（`fitDistanceToBox()`），不用包围球半径——工程空间通常扁长。
 - **WebGL 不可用时显式降级并说明原因**（`GEMARC_SPACE_010`），绝不用静态图或 2D 伪装三维。
+- **三维操作与 Unity 一致**：Alt + 左键环绕、中键平移、右键飞行（W/A/S/D 与 Q/E）、滚轮推拉、
+  左键选择、Ctrl + 左键加选、空白处拖动框选、Esc 清空、F 聚焦。映射表只有一份，在
+  `runtime/space/unity-controls.js`；两个三维场景共用它，不会各说各话。
 
 设计细节与决策理由见 `docs/02_基本设计/09_脚手架与共用运行时设计.md` §6.4。
 

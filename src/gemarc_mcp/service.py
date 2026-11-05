@@ -408,12 +408,13 @@ def build(ws: Workspace, name: str, legacy_dist: str | None = None, profile: str
             for filename in ("index.html", "app.js", "style.css"):
                 stage.joinpath(filename).write_bytes(source.joinpath(filename).read_bytes())
             # The semantic-axis renderer travels with the site. The renderer
-            # imports nothing but its own sibling, so the preview profile
-            # needs exactly two files to draw the crystal scene of the model
-            # and to drive it the way Unity drives a scene.
+            # imports nothing but its own siblings, so the preview profile
+            # needs exactly three files to draw the crystal scene of the model
+            # with the shared toon material and to drive it the way Unity
+            # drives a scene.
             runtime = resources.files("gemarc_mcp").joinpath("scaffold/runtime/space")
             stage.joinpath("runtime/space").mkdir(parents=True, exist_ok=True)
-            for name in ("axis-viewer-three.js", "unity-controls.js"):
+            for name in ("axis-viewer-three.js", "toon-material.js", "unity-controls.js"):
                 stage.joinpath(f"runtime/space/{name}").write_bytes(
                     runtime.joinpath(name).read_bytes())
             (stage / "data").mkdir()

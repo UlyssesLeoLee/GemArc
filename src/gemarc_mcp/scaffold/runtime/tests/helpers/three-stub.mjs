@@ -390,6 +390,7 @@ class MeshBasicMaterial {
   }
 }
 class MeshStandardMaterial extends MeshBasicMaterial {}
+class MeshToonMaterial extends MeshBasicMaterial {}
 class LineBasicMaterial extends MeshBasicMaterial {}
 class SpriteMaterial {
   constructor(parameters = {}) {
@@ -400,6 +401,22 @@ class CanvasTexture {
   constructor(image = null) {
     this.image = image;
     this.isCanvasTexture = true;
+  }
+}
+class DataTexture {
+  constructor(data = null, width = 1, height = 1, format = null) {
+    this.data = data;
+    this.width = width;
+    this.height = height;
+    this.format = format;
+    this.isDataTexture = true;
+    this.needsUpdate = false;
+    this.generateMipmaps = true;
+    this.magFilter = null;
+    this.minFilter = null;
+  }
+  dispose() {
+    this.disposed = true;
   }
 }
 
@@ -643,6 +660,8 @@ export class Raycaster {
 
 export const DoubleSide = 2;
 export const FrontSide = 0;
+export const RedFormat = 1023;
+export const NearestFilter = 1003;
 
 /**
  * Build the stub three namespace.
@@ -668,13 +687,17 @@ export function createStubThree() {
     OctahedronGeometry,
     MeshBasicMaterial,
     MeshStandardMaterial,
+    MeshToonMaterial,
     LineBasicMaterial,
     SpriteMaterial,
     CanvasTexture,
+    DataTexture,
     WebGLRenderer,
     Raycaster,
     DoubleSide,
     FrontSide,
+    RedFormat,
+    NearestFilter,
   };
 }
 

@@ -40,6 +40,7 @@
  */
 
 import { UnityControls, boundsOfPoints } from './unity-controls.js';
+import { createToonGradient, createToonMaterial } from './toon-material.js';
 
 /**
  * The diagnostic codes this module raises.
@@ -634,19 +635,21 @@ export function createThreeAxisRenderer(THREE, options = {}) {
   /** @type {object[]} the meshes the raycaster tests */
   const nodePickTargets = [];
 
+  // One gradient map for the whole scene (BD-010 section 13): the light is
+  // banded into three steps on the cut faces, and the map never changes, so
+  // the same model renders the same pixels twice.
+  const toonGradient = track(createToonGradient(THREE));
+
   for (const node of layout.nodes) {
     const color = kindColor(node.kind);
     // A crystal is a cut polyhedron, not a ball: the cut planes are what
     // catch the light, and the bright edge is what makes it read as a gem.
     const geometry = new THREE.OctahedronGeometry(constants.nodeSize * 0.74, 0);
     track(geometry);
-    const material = new THREE.MeshStandardMaterial({
+    const material = createToonMaterial(THREE, {
       color,
-      roughness: 0.16,
-      metalness: 0.04,
-      transparent: true,
       opacity: 0.62,
-      flatShading: true,
+      gradient: toonGradient,
     });
     track(material);
     const mesh = new THREE.Mesh(geometry, material);

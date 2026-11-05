@@ -37,6 +37,7 @@ import { RELATION_CLASS_IDS, relationClassSpec } from '../core/vocab.js';
 import { treatmentForRelationClass } from '../focus/retreat-animation.js';
 import { SpaceModel } from './space-model.js';
 import { UnityControls, boundsOfPoints } from './unity-controls.js';
+import { createToonGradient, createToonMaterial } from './toon-material.js';
 
 /**
  * The diagnostic codes this module raises.
@@ -1132,6 +1133,11 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
     return group;
   };
 
+  // One gradient map for the whole scene (BD-010 section 13): the light is
+  // banded into three steps on the cut faces, and the map never changes, so
+  // the same model renders the same pixels twice.
+  const toonGradient = track(createToonGradient(THREE));
+
   const buildNode = (node, parent, localPosition) => {
     // A crystal is a cut polyhedron, not a ball: the cut planes are what
     // catch the light (BD-010 section 4.1).
@@ -1140,13 +1146,10 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
       0,
     );
     track(geometry);
-    const material = new THREE.MeshStandardMaterial({
+    const material = createToonMaterial(THREE, {
       color: NODE_COLOR,
-      transparent: true,
       opacity: CRYSTAL_BODY_OPACITY,
-      roughness: 0.16,
-      metalness: 0.04,
-      flatShading: true,
+      gradient: toonGradient,
     });
     track(material);
     const mesh = new THREE.Mesh(geometry, material);

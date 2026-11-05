@@ -393,6 +393,23 @@ python scripts/verify_remote.py https://<project>.vercel.app --token <T>   # 4. 
 
 环境变量：
 
+### 8.0 生产别名会被 Git 推送改写（2026-11-05 实测，必读）
+
+本项目的 Vercel 项目**绑定了 GitHub 仓库**，所以：
+
+- 推 `origin/main` ⇒ Vercel 自动做一次生产部署，并把 **`gem-arc.vercel.app` 改指到那次部署**；
+- 推 `origin/dev` ⇒ 只产生预览部署（别名形如 `gem-arc-git-dev-<team>.vercel.app`），**不改**生产别名。
+
+而本仓库的 `main` 落后 `dev` 很多（实测 655 个文件），所以「推 main ⇒ 别名落到没有新功能的旧代码」会让生产**看起来像功能被关掉**（实测：`/` 不再 303、`/healthz` 里连 `accounts` 键都没有）。
+
+规矩：
+
+1. 日常部署走 `vercel deploy --prod --skip-domain --yes`，然后**手工**把生产别名改指过去：
+   `npx vercel@65.8.0 alias set <部署地址> gem-arc.vercel.app`；
+2. **不要**在没合并 `dev → main` 之前往 `main` 推；推了就要重新指别名，并用
+   `scripts/verify_remote.py https://gem-arc.vercel.app --local` 复核；
+3. 每次改完生产别名后，核对一次 `/healthz` 里有没有 `accounts` 键（账号功能开启时必有）。
+
 | 变量 | 必需 | 默认 | 说明 |
 |---|---|---|---|
 | `GEMARC_MCP_TOKEN` | 否 | 空（authless） | Bearer 令牌，可逗号分隔多个；**不要**用 `ANTHROPIC_` 开头的名字 |

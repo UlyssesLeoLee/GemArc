@@ -45,7 +45,9 @@ const scenario = scenarios.length ? scenarios[0].id : null;
 const disabled = [];
 // A second causal view with one module switched off: the focus of 5D must
 // follow the intervention, and only an intervened view proves it.
-const intervened = model.nodes && model.nodes.length ? [model.nodes[1].id] : [];
+const intervened = model.nodes && model.nodes.length
+  ? [model.nodes[Math.min(1, model.nodes.length - 1)].id]
+  : [];
 
 // The derived 3D dataset decides whether a dimension of change carries the
 // scene. It is optional: a site without it still runs, and the dump then pins

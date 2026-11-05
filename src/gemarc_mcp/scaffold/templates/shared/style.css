@@ -210,6 +210,11 @@ h4 { margin: 8px 0 4px; font-size: 13px; color: var(--gem-muted); }
 .action:hover { border-color: var(--gem-aqua); color: var(--gem-aqua); }
 .action:active { background: var(--gem-facet); }
 .action:focus-visible { outline: 2px solid var(--gem-aqua); outline-offset: 1px; }
+/* The in-document links: a link must read as a link, also inside the muted
+   WBS detail where the plain anchor colour would be overridden. */
+a.link { color: var(--gem-aqua); text-decoration: none; border-bottom: 1px dotted var(--gem-aqua); }
+a.link:hover { border-bottom-style: solid; }
+.wbs-detail li a.link, .small a.link { color: var(--gem-aqua); }
 /* The prototype page tabs: the selected page keeps the accent colour. */
 .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 .tabs .action { margin-top: 0; }

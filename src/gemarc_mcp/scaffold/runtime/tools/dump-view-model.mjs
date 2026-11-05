@@ -43,13 +43,27 @@ const spaceModel = new SpaceModel(model);
 const scenarios = model.scenarios || [];
 const scenario = scenarios.length ? scenarios[0].id : null;
 const disabled = [];
+// A second causal view with one module switched off: the focus of 5D must
+// follow the intervention, and only an intervened view proves it.
+const intervened = model.nodes && model.nodes.length ? [model.nodes[1].id] : [];
+
+// The derived 3D dataset decides whether a dimension of change carries the
+// scene. It is optional: a site without it still runs, and the dump then pins
+// the honest fallback instead of an invented scene.
+let threeD = null;
+try {
+  threeD = JSON.parse(await readFile(resolve(root, 'data/three-d.json'), 'utf8'));
+} catch {
+  threeD = null;
+}
 
 const output = {
   facts: models.buildFactsView(model, store),
   graph: models.buildGraphView(model, viewState),
   space: models.buildSpaceView(model, spaceModel),
-  timeline: models.buildTimelineView(model, scenario, disabled, 0),
-  causal: models.buildCausalView(model, scenario, disabled),
+  timeline: models.buildTimelineView(model, scenario, disabled, 0, threeD),
+  causal: models.buildCausalView(model, scenario, disabled, threeD),
+  causalIntervened: models.buildCausalView(model, scenario, intervened, threeD),
   views: models.buildViewsView(model),
   workflow: models.buildWorkflowView(model),
   prototype: models.buildPrototypeView(model, { page: 0, feedback: null }),

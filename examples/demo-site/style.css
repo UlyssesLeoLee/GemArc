@@ -8,6 +8,11 @@ main{display:grid;grid-template-columns:var(--sidebar-w) var(--gutter) minmax(va
 .axis-3d .gemarc-axis-canvas{display:block;width:100%;height:100%}
 .axis-legend{margin-bottom:10px}
 .axis-legend p{margin:2px 0}
+/* The in-document links: a link must read as a link, also inside the muted
+   WBS detail where the plain anchor colour would be overridden. */
+a.link{color:#6fe3ff;text-decoration:none;border-bottom:1px dotted #6fe3ff}
+a.link:hover{color:#a9f0ff;border-bottom-style:solid}
+.wbs-detail li a.link,.small a.link{color:#6fe3ff}
 /* The WBS tree sits under the 6D workflow card: one indent per level, so the
    reader can see which work package a node belongs to. */
 .wbs{list-style:none;margin:6px 0 0;padding-left:16px}

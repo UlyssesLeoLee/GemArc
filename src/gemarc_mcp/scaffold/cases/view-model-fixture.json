@@ -20,7 +20,12 @@
       "kind": "Component",
       "layer": "设备层",
       "verification": "illustrative",
-      "evidence": "示例"
+      "evidence": "示例",
+      "properties": {
+        "environment": "生产环境",
+        "owner": "示例团队",
+        "trustZone": "外部域"
+      }
     },
     {
       "id": "queue",
@@ -28,7 +33,12 @@
       "kind": "Service",
       "layer": "中间件层",
       "verification": "illustrative",
-      "evidence": "示例"
+      "evidence": "示例",
+      "properties": {
+        "environment": "生产环境",
+        "owner": "示例团队",
+        "trustZone": "内部域"
+      }
     },
     {
       "id": "rule",
@@ -36,7 +46,12 @@
       "kind": "Service",
       "layer": "应用层",
       "verification": "illustrative",
-      "evidence": "示例"
+      "evidence": "示例",
+      "properties": {
+        "environment": "生产环境",
+        "owner": "示例团队",
+        "trustZone": "内部域"
+      }
     },
     {
       "id": "notify",
@@ -44,7 +59,12 @@
       "kind": "Service",
       "layer": "应用层",
       "verification": "illustrative",
-      "evidence": "示例"
+      "evidence": "示例",
+      "properties": {
+        "environment": "生产环境",
+        "owner": "示例团队",
+        "trustZone": "外部域"
+      }
     }
   ],
   "edges": [
@@ -133,6 +153,55 @@
       "edgeKinds": [
         "sends"
       ]
+    },
+    {
+      "id": "semantic-3d",
+      "title": "语义视图",
+      "diagramType": "logical-view",
+      "dimension": "3D",
+      "concerns": [
+        "实体落在哪一层、哪个信任域、哪个环境"
+      ],
+      "nodeIds": [
+        "sensor",
+        "queue",
+        "rule",
+        "notify"
+      ],
+      "edgeIds": [
+        "e1",
+        "e2",
+        "e3"
+      ],
+      "axes": {
+        "x": {
+          "field": "layer",
+          "label": "部署层",
+          "values": [
+            "设备层",
+            "中间件层",
+            "应用层"
+          ]
+        },
+        "y": {
+          "field": "properties.trustZone",
+          "label": "信任域"
+        },
+        "z": {
+          "field": "properties.environment",
+          "label": "环境"
+        }
+      },
+      "stakeholders": [
+        "架构师"
+      ],
+      "reviewQuestions": [
+        "跨信任域的调用是否都标了出来？"
+      ],
+      "caseIds": [],
+      "missing": [],
+      "scenarioId": null,
+      "legend": null
     }
   ],
   "scenarios": [
@@ -241,7 +310,8 @@
           "iterationLimit": 4,
           "executionMode": "simulation",
           "authorityScope": "read-only",
-          "verification": "illustrative"
+          "verification": "illustrative",
+          "canonicalNodeId": "sensor"
         },
         {
           "id": "wf-n-approve",
@@ -250,7 +320,8 @@
           "approvalPolicyRef": "approval.default",
           "executionMode": "simulation",
           "authorityScope": "approver",
-          "verification": "illustrative"
+          "verification": "illustrative",
+          "canonicalNodeId": "rule"
         },
         {
           "id": "wf-n-end",

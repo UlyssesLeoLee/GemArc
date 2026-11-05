@@ -1,6 +1,6 @@
 /* GemArc static 5D viewer MVP. Model content is rendered using textContent, not innerHTML. */
 'use strict';
-const state = {model:null,capabilities:null,scenarioData:null,threeD:null,axisRenderer:null,selected:null,selectedIds:new Set(),tab:'1d',step:0,scenario:null,disabled:new Set(),prototype:0};
+const state = {model:null,capabilities:null,scenarioData:null,threeD:null,axisRenderer:null,selected:null,selectedIds:new Set(),tab:'1d',step:0,scenario:null,disabled:new Set(),prototype:0,focal:new Set()};
 const $ = s => document.querySelector(s);
 const svgNS = 'http://www.w3.org/2000/svg';
 /* Canonical field accessors. 0.2.0 uses sourceId/targetId/type; 0.1.x models
@@ -15,9 +15,22 @@ function panel(parent,title){const p=node('section','panel',parent);node('h2',''
 function hint(parent,msg){node('p','hint',parent,msg);}
 function text(parent,label,value){const r=node('p','small',parent);node('b','',r,label+'：');node('span','muted',r,value==null?'未提供':String(value));return r;}
 function button(parent,txt,act){const b=node('button','action',parent,txt);b.type='button';b.addEventListener('click',act);return b;}
+/* A real hyperlink inside the document: the href is the target, the click
+   handler carries the state the target needs (a selected entity, a tab). The
+   href stays honest so the link can be copied, opened in a new tab and read by
+   a screen reader. */
+function link(parent,txt,href,act){const a=node('a','link',parent,txt);a.href=href;a.addEventListener('click',ev=>{ev.preventDefault();if(act)act()});return a;}
+/* Select an entity and show the 2D graph: the dimension that draws the entity
+   and the dimension that explains it are the same place on the page. */
+function selectEntity(id){state.selectedIds=new Set([id]);state.selected=id;showTab('2d')}
 function head(title,kicker){$('#headline').textContent=title;$('#kicker').textContent=kicker;}
-function showTab(tab){state.tab=tab;document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab));
+/* The tabs that own a WebGL scene. Leaving one of them releases the renderer:
+   the render loop of a removed canvas would otherwise keep running. */
+const SCENE_TABS=['3d','4d','5d'];
+function showTab(tab){const previous=state.tab;state.tab=tab;document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab));
  const el=clear($('#content'));clear($('#view-actions'));
+ if(SCENE_TABS.indexOf(previous)>=0&&SCENE_TABS.indexOf(tab)<0&&state.axisRenderer){state.axisRenderer.dispose();state.axisRenderer=null}
+ if(SCENE_TABS.indexOf(tab)<0)state.focal=new Set();
  if(tab==='1d')render1D(el);if(tab==='2d')render2D(el);if(tab==='3d')render3D(el);
  if(tab==='4d')render4D(el);if(tab==='5d')render5D(el);if(tab==='workflow')renderWorkflow(el);
  if(tab==='views')renderViews(el);
@@ -78,7 +91,9 @@ function render3D(el){head('3D 语义与空间','3D / WEBGL');
 }
 /* Mount the semantic-axis crystal scene. A WebGL failure is stated, never
    faked with a picture. */
+let axisMountToken=0;
 async function mountAxisScene(holder,status){
+ const token=++axisMountToken;
  if(state.axisRenderer){state.axisRenderer.dispose();state.axisRenderer=null}
  try{
   const THREE=await import('three');
@@ -89,15 +104,27 @@ async function mountAxisScene(holder,status){
      module, so the page and the code cannot disagree about them. */
   holder.after(node('p','hint unity-hint',holder.parentNode,
    '三维操作与 Unity 一致：'+UNITY_CONTROL_MAP.map(row=>row.action+' '+row.shortcut).join('，')+'。'));
+  /* A newer mount took over while this one was loading its modules: this one
+     must not create a second WebGL context. */
+  if(token!==axisMountToken)return;
   state.axisRenderer=createThreeAxisRenderer(THREE,{container:holder,view:views[0],
    onSelectNode:(id,selection)=>selectInScene(id,selection?selection.mode:'replace'),
    onSelectEdge:(id,selection)=>selectInScene(id,selection?selection.mode:'replace'),
    onClearSelection:()=>clearSceneSelection(),
    onHover:hit=>{status.textContent=hit?(hit.kind==='node'?'拾取目标：实体 '+hit.id:'拾取目标：关系 '+hit.id):'指针下没有可拾取的实体或关系。'}});
   state.axisRenderer.render();
+  applyFocal();
  }catch(err){
   const reason=err&&err.code==='GEMARC_AXIS_010'?'浏览器没有可用的 WebGL 上下文':(err&&err.message?err.message:'未知原因');
   holder.appendChild(node('p','hint',holder,'三维语义渲染未能启动：'+reason+'。三维拾取需要真实的 WebGL 渲染，此处不提供任何替代视图；坐标轴语义仍如实列在上方。'));
+ }
+}
+/* Mark the entities the current dimension puts in focus. 4D marks the module
+   the running event acts on, 5D marks the modules the intervention changes.
+   The focus never replaces the reader's own selection: the scene shows both. */
+function applyFocal(){
+ if(state.axisRenderer&&typeof state.axisRenderer.setHighlight==='function'){
+  state.axisRenderer.setHighlight({nodeIds:[...state.focal],edgeIds:[]});
  }
 }
 /* The selection modes are Unity's: a plain click replaces the selection, a
@@ -113,11 +140,28 @@ function scenarioPicker(parent,onChange){const sel=node('select','',parent);for(
 function render4D(el){clear(el);head('动态流程与时间轴','4D / EVENT TIME');if(!current().scenarios.length){hint(el,'缺少状态或事件模型，不能生成真实 4D 行为。');return;}
  const controls=panel(el,'选择模拟 Case');const r=node('div','control',controls);scenarioPicker(r,()=>render4D(el));
  const scenarioId=state.scenario||current().scenarios[0].id;state.scenario=scenarioId;const trace=state.scenarioData[scenarioId].normal.trace;
- button(r,'上一步',()=>{state.step=Math.max(0,state.step-1);render4D(el)});button(r,'下一事件',()=>{state.step=Math.min(trace.length,state.step+1);render4D(el)});
- button(r,'显示全部',()=>{state.step=trace.length;render4D(el)});node('span','chip',r,`${state.step} / ${trace.length} events`);
- const p=panel(el,'事件传播');trace.slice(0,state.step).forEach(e=>{const item=node('div','timeline-item'+(e.status==='blocked'?' blocked':''),p);node('b','',item,`${e.timeMs}ms  ${e.module} · ${e.event}`);text(item,'类型',e.status);if(e.triggeredBy)text(item,'来源',e.triggeredBy)});
- if(!state.step)node('p','muted',p,'点击「下一事件」开始按确定性模型回放。');
+ const counter=node('span','chip',r,'0 / 0 events');
+ const p=panel(el,'事件传播');
+ /* 4D is a dimension of change, so it carries the scene: the crystal shows
+    where the running event acts. The scene is mounted once; stepping the
+    timeline repaints the list and moves the focus instead of rebuilding the
+    WebGL context. */
+ const dim=panel(el,'三维语义轴 · 当前事件');const focusLine=node('p','small',dim);
+ const holder=node('div','axis-3d',dim);const status=node('p','hint axis-3d-status',dim,'将指针移到实体或关系上可查看拾取目标。');
+ const paint=()=>{
+  counter.textContent=`${state.step} / ${trace.length} events`;
+  clear(p);
+  trace.slice(0,state.step).forEach(e=>{const item=node('div','timeline-item'+(e.status==='blocked'?' blocked':''),p);node('b','',item,`${e.timeMs}ms  ${e.module} · ${e.event}`);text(item,'类型',e.status);if(e.triggeredBy)text(item,'来源',e.triggeredBy)});
+  if(!state.step)node('p','muted',p,'点击「下一事件」开始按确定性模型回放。');
+  const focus=state.step?trace[state.step-1]:null;
+  clear(focusLine);node('b','',focusLine,'当前事件：');node('span','muted',focusLine,focus?`${focus.module} · ${focus.event} · ${focus.status}`:'尚未推进到任何事件');
+  state.focal=new Set(focus?[focus.module]:[]);applyFocal();
+ };
+ button(r,'上一步',()=>{state.step=Math.max(0,state.step-1);paint()});button(r,'下一事件',()=>{state.step=Math.min(trace.length,state.step+1);paint()});
+ button(r,'显示全部',()=>{state.step=trace.length;paint()});
+ mountAxisScene(holder,status);paint();
  hint(el,'时间仅来自模型 timeMs/delayMs，示例数据不代表真实执行延迟。');
+ hint(el,'三维场景高亮的是当前事件作用的实体；推进时间轴，高亮随之移动。');
 }
 function simulateWeb(sc,disabled){const todo=(sc.events||[]).map((e,i)=>({module:e.module,event:e.event,timeMs:e.timeMs,order:i,triggeredBy:null}));let counter=todo.length;
  let trace=[];while(todo.length && trace.length<512){todo.sort((a,b)=>a.timeMs-b.timeMs||a.order-b.order);const evt=todo.shift();if(evt.timeMs>3600000)break;evt.status=disabled.has(evt.module)?'blocked':'delivered';evt.traceId=`trace-${String(trace.length).padStart(4,'0')}`;trace.push(evt);if(evt.status==='blocked')continue;
@@ -126,12 +170,32 @@ function simulateWeb(sc,disabled){const todo=(sc.events||[]).map((e,i)=>({module
 }
 function render5D(el){clear(el);head('模块组合与因果干预','5D / CAUSAL SYSTEM');if(!current().scenarios.length){hint(el,'没有显式因果规则，系统不会编造模拟结果。');return;}
  const controls=panel(el,'反事实干预 / disable(module)');const row=node('div','control',controls);scenarioPicker(row,()=>render5D(el));
- const toggles=node('div','',controls);current().nodes.forEach(n=>{const label=node('label','selectnode',toggles);const input=node('input','',label);input.type='checkbox';input.checked=state.disabled.has(n.id);input.addEventListener('change',()=>{input.checked?state.disabled.add(n.id):state.disabled.delete(n.id);render5D(el)});node('span','',label,`${n.name} 关闭`)});
- const sid=state.scenario||current().scenarios[0].id;state.scenario=sid;const sc=current().scenarios.find(s=>s.id===sid);const base=simulateWeb(sc,new Set()),changed=simulateWeb(sc,state.disabled);
- const delivered=arr=>new Set(arr.filter(e=>e.status==='delivered').map(e=>e.module+'::'+e.event));const a=delivered(base),b=delivered(changed);const lost=[...a].filter(x=>!b.has(x));const gained=[...b].filter(x=>!a.has(x));
- const split=node('div','split',el);const left=panel(split,'基准路径');const right=panel(split,'干预路径');for(const [target,trace] of [[left,base],[right,changed]]){trace.forEach(e=>{let t=node('div','timeline-item'+(e.status==='blocked'?' blocked':''),target);node('span','',t,`${e.timeMs}ms · ${e.module} / ${e.event} · ${e.status}`)})}
- const result=panel(el,'模型结果差异');text(result,'未达事件',lost.join('、')||'无');text(result,'新增事件',gained.join('、')||'无');text(result,'证据类型',sc.evidenceClass||'hypothetical');
+ const toggles=node('div','',controls);
+ const sid=state.scenario||current().scenarios[0].id;state.scenario=sid;const sc=current().scenarios.find(s=>s.id===sid);
+ const split=node('div','split',el);const left=panel(split,'基准路径');const right=panel(split,'干预路径');
+ const result=panel(el,'模型结果差异');
+ /* 5D is a dimension of change, so it carries the scene: the crystal shows
+    which entities the intervention touches. The scene is mounted once and the
+    focus moves with the intervention. */
+ const dim=panel(el,'三维语义轴 · 干预影响');const impactLine=node('p','small',dim);const legend=node('p','muted small',dim);
+ const holder=node('div','axis-3d',dim);const status=node('p','hint axis-3d-status',dim,'将指针移到实体或关系上可查看拾取目标。');
+ const paint=()=>{
+  const base=simulateWeb(sc,new Set()),changed=simulateWeb(sc,state.disabled);
+  const delivered=arr=>new Set(arr.filter(e=>e.status==='delivered').map(e=>e.module+'::'+e.event));const a=delivered(base),b=delivered(changed);
+  const lost=[...a].filter(x=>!b.has(x));const gained=[...b].filter(x=>!a.has(x));
+  clear(left);clear(right);
+  for(const [target,trace] of [[left,base],[right,changed]]){trace.forEach(e=>{let t=node('div','timeline-item'+(e.status==='blocked'?' blocked':''),target);node('span','',t,`${e.timeMs}ms · ${e.module} / ${e.event} · ${e.status}`)})}
+  clear(result);text(result,'未达事件',lost.join('、')||'无');text(result,'新增事件',gained.join('、')||'无');text(result,'证据类型',sc.evidenceClass||'hypothetical');
+  const modulesOf=arr=>new Set(arr.map(x=>x.split('::')[0]));const lostM=modulesOf(lost),gainedM=modulesOf(gained);
+  const focal=new Set([...state.disabled,...lostM,...gainedM]);
+  state.focal=focal;applyFocal();
+  clear(impactLine);node('b','',impactLine,'干预影响的实体：');node('span','muted',impactLine,focal.size?[...focal].join('、'):'无（当前干预未改变任何事件）');
+  clear(legend);legend.textContent=`关闭：${[...state.disabled].join('、')||'无'} · 未达所属：${[...lostM].join('、')||'无'} · 新增所属：${[...gainedM].join('、')||'无'}`;
+ };
+ current().nodes.forEach(n=>{const label=node('label','selectnode',toggles);const input=node('input','',label);input.type='checkbox';input.checked=state.disabled.has(n.id);input.addEventListener('change',()=>{input.checked?state.disabled.add(n.id):state.disabled.delete(n.id);paint()});node('span','',label,`${n.name} 关闭`)});
+ mountAxisScene(holder,status);paint();
  hint(el,'反事实输出只来自显式事件规则和所选干预，不能推断真实世界因果强度或未建模的反馈。');
+ hint(el,'三维场景高亮的是干预触及的实体：被关闭的模块，以及未达或新增事件所属的模块。');
 }
 /* 6D = WBS × 执行图: the work breakdown says what work the graph performs, the
    execution nodes say which capability does it, and the nodeIds bind the two. */
@@ -143,7 +207,7 @@ function wbsRows(workflow){const g=workflow&&workflow.executionGraph;return (g&&
 const EXECUTION_NODE_KINDS=['deterministic-program','agent-loop','tool-call','policy-gate','checkpoint','resume','manual-review','escalation','audit-event'];
 const EXECUTION_NODE_FIELDS=['executorKind','authorityScope','executionMode','inputStateSchema','outputStateSchema','stateWritePolicy','checkpointBefore','checkpointAfter','budgetPolicy','iterationLimit','approvalPolicyRef','toolContractRef'];
 function executionNodes(workflow){const canvas=(workflow.nodes||[]).filter(n=>EXECUTION_NODE_KINDS.indexOf(n.kind||n.legacyKind)>=0||EXECUTION_NODE_FIELDS.some(f=>n[f]!==undefined&&n[f]!==null));const g=workflow&&workflow.executionGraph;return canvas.concat(g&&Array.isArray(g.nodes)?g.nodes:[]);}
-function renderWbsTree(parent,rows,knownIds){
+function renderWbsTree(parent,rows,knownIds,nodeById){
  const known=new Set(rows.map(r=>r.packageId));const byParent=new Map();
  rows.forEach(r=>{const k=r.parentPackageId||'';if(!byParent.has(k))byParent.set(k,[]);byParent.get(k).push(r)});
  const label={phase:'阶段','work-package':'工作包',task:'任务'};
@@ -152,7 +216,17 @@ function renderWbsTree(parent,rows,knownIds){
   node('b','',line,(label[row.kind]||row.kind||'工作包')+' ');node('span','',line,row.title||row.packageId);node('span','muted',line,' · '+row.packageId);
   const bound=(row.nodeIds||[]).filter(id=>!knownIds||knownIds.has(id));
   const detail=node('ul','wbs-detail',item);
-  node('li','',detail,'交付物：'+(row.deliverable||'未提供'));node('li','',detail,'完成条件：'+(row.completionCriteria||'未提供'));node('li','',detail,'归属执行节点：'+bound.length);
+  node('li','',detail,'交付物：'+(row.deliverable||'未提供'));node('li','',detail,'完成条件：'+(row.completionCriteria||'未提供'));
+  /* The work package and the execution node are bound by the model, so the
+     binding is a link: it takes the reader to the entity the work runs on. */
+  const owner=node('li','',detail);node('span','',owner,'归属执行节点：');
+  if(!bound.length){node('span','muted',owner,'0');}
+  else bound.forEach((id,i)=>{
+   if(i)node('span','muted',owner,'、');
+   const exec=nodeById&&nodeById.get(id);const canonical=exec&&exec.canonicalNodeId;
+   const name=exec&&exec.name?exec.name:id;
+   if(canonical)link(owner,name,'#2d',()=>selectEntity(canonical));else node('span','',owner,name);
+  });
   const kids=byParent.get(row.packageId)||[];if(kids.length){const sub=node('ul','wbs',item);kids.forEach(draw)}
  };
  rows.filter(r=>!r.parentPackageId||!known.has(r.parentPackageId)).forEach(draw);
@@ -171,17 +245,36 @@ function renderWorkflow(el){
   if(g||wf.executionMode||wf.stateSchemaVersion){text(p,'执行模式',wf.executionMode);text(p,'执行图',g&&(g.executionGraphId||g.id));text(p,'状态契约版本',wf.stateSchemaVersion);text(p,'检查点策略',wf.checkpointPolicy)}
   const rows=wbsRows(wf);const nodes=executionNodes(wf);
   const knownIds=new Set(nodes.map(n=>n.id||n.nodeId||'').filter(Boolean));
+  const nodeById=new Map();nodes.forEach(n=>nodeById.set(n.id||n.nodeId,n));
   if(rows.length){
    const assigned=new Set();rows.forEach(r=>(r.nodeIds||[]).forEach(id=>{if(knownIds.has(id))assigned.add(id)}));
    const uncovered=[...knownIds].filter(id=>!assigned.has(id));
    text(p,'工作分解（WBS）',rows.length+' 个工作包');text(p,'执行节点归属',assigned.size+' / '+nodes.length);
    if(uncovered.length)text(p,'未归属执行节点',uncovered.join('、'));
-   const tree=node('ul','wbs',p);renderWbsTree(tree,rows,knownIds);
-   const ex=panel(p,'执行节点');nodes.forEach(n=>{const owner=rows.filter(r=>(r.nodeIds||[]).includes(n.id)).map(r=>r.packageId).join('、');
-    node('p','small',ex,[n.kind||'节点',n.name||n.id,n.executorKind?'执行器 '+n.executorKind:'',n.executionMode||'',n.iterationLimit?'上限 '+n.iterationLimit:'',n.approvalPolicyRef?'审批 '+n.approvalPolicyRef:'',owner?'归属 '+owner:''].filter(Boolean).join(' · '))});
+   const tree=node('ul','wbs',p);renderWbsTree(tree,rows,knownIds,nodeById);
+   const ex=panel(p,'执行节点');nodes.forEach(n=>{
+    const owner=rows.filter(r=>(r.nodeIds||[]).includes(n.id||n.nodeId)).map(r=>r.packageId).join('、');
+    const line=node('p','small',ex);
+    node('span','',line,[n.kind||'节点',n.name||n.id,n.executorKind?'执行器 '+n.executorKind:'',n.executionMode||'',n.iterationLimit?'上限 '+n.iterationLimit:'',n.approvalPolicyRef?'审批 '+n.approvalPolicyRef:'',owner?'归属 '+owner:''].filter(Boolean).join(' · '));
+    /* The execution node names the entity it runs on (canonicalNodeId). The
+       link takes the reader to that entity in the 2D graph. */
+    if(n.canonicalNodeId&&current().nodes.some(x=>x.id===n.canonicalNodeId)){
+     node('span','muted',line,' · ');link(line,'在 2D 中定位','#2d',()=>selectEntity(n.canonicalNodeId));
+    }
+   });
   } else if(nodes.length){
-   const ex=panel(p,'执行节点');nodes.forEach(n=>node('p','small',ex,[n.kind||'节点',n.name||n.id,n.executorKind?'执行器 '+n.executorKind:'',n.executionMode||'',n.iterationLimit?'上限 '+n.iterationLimit:''].filter(Boolean).join(' · ')));
+   const ex=panel(p,'执行节点');nodes.forEach(n=>{
+    const line=node('p','small',ex);
+    node('span','',line,[n.kind||'节点',n.name||n.id,n.executorKind?'执行器 '+n.executorKind:'',n.executionMode||'',n.iterationLimit?'上限 '+n.iterationLimit:''].filter(Boolean).join(' · '));
+    if(n.canonicalNodeId&&current().nodes.some(x=>x.id===n.canonicalNodeId)){node('span','muted',line,' · ');link(line,'在 2D 中定位','#2d',()=>selectEntity(n.canonicalNodeId))}
+   });
   }
+  /* 6D is one dimension of the same document: the reader can move to the
+     dimension that draws the entities or the one that explains them. */
+  const nav=node('p','small',p);node('span','muted',nav,'相关维度：');
+  link(nav,'3D 语义与空间','#3d',()=>showTab('3d'));node('span','muted',nav,' · ');
+  link(nav,'图示定义','#views',()=>showTab('views'));node('span','muted',nav,' · ');
+  link(nav,'1D 事实','#1d',()=>showTab('1d'));
   hint(p,'工作分解说明做什么、交付什么、何时算完成；执行节点说明由谁以什么能力去做。未登记的工作包不会被编造。');
  });
 }
@@ -254,6 +347,6 @@ async function main(){try{
  $('#footer').textContent=`GemArc MVP | 模型事实等级: ${evidence} | 3D: ${c.viewer3D} | 4D: ${c.dynamic4D} | 5D: ${c.causal5D}`;
  document.querySelectorAll('#nav button').forEach(btn=>btn.addEventListener('click',()=>showTab(btn.dataset.tab)));
  setupLayout();
- const requested=location.hash.substring(1);showTab(['1d','2d','3d','4d','5d','prototype'].includes(requested)?requested:'1d');
+ const requested=location.hash.substring(1);showTab(['1d','2d','3d','4d','5d','workflow','views','prototype'].includes(requested)?requested:'1d');
  }catch(err){$('#content').textContent='加载失败：请使用 python -m http.server 8000 启动本地 HTTP 服务，再访问 http://127.0.0.1:8000/ 。请检查 data/*.json 是否存在。';$('#evidence').textContent='LOAD ERROR';}}
 main();

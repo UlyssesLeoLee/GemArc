@@ -41,7 +41,12 @@ const state = {
   prototypeFeedback: null,
   spaceRenderer: null,
   axisRenderer: null,
+  //: The entities the current dimension puts in focus in the 3D scenes.
+  tabHighlight: [],
 };
+
+//: The tabs that own a WebGL scene. Leaving one of them releases the renderer.
+const SCENE_TABS = ['3d', '4d', '5d'];
 
 const $ = (selector) => document.querySelector(selector);
 const SVG_TAGS = new Set(['svg', 'g', 'path', 'rect', 'text', 'line', 'circle',
@@ -69,6 +74,9 @@ function renderTree(spec, parent) {
   if (spec.action) {
     node.addEventListener('click', (event) => {
       if (spec.tag === 'select') return;
+      // A link keeps its href, but the click carries the state the target
+      // needs, so the document does not jump away from the dimension.
+      if (spec.tag === 'a') event.preventDefault();
       event.stopPropagation();
       dispatch(spec.action);
     });
@@ -140,6 +148,9 @@ function dispatch(payload) {
       state.viewState.setSelection([payload.id], []);
       showTab('2d');
       break;
+    case 'goto-tab':
+      showTab(payload.tab);
+      break;
     case 'toggle-disable': {
       const set = new Set(state.disabled);
       if (set.has(payload.id)) set.delete(payload.id);
@@ -182,8 +193,8 @@ function currentView() {
     case '1d': return buildFactsView(state.model, state.store);
     case '2d': return buildGraphView(state.model, state.viewState);
     case '3d': return buildThreeDView();
-    case '4d': return buildTimelineView(state.model, state.scenario, state.disabled, state.step);
-    case '5d': return buildCausalView(state.model, state.scenario, state.disabled);
+    case '4d': return buildTimelineView(state.model, state.scenario, state.disabled, state.step, state.threeD);
+    case '5d': return buildCausalView(state.model, state.scenario, state.disabled, state.threeD);
     case 'views': return buildViewsView(state.model);
     case 'workflow': return buildWorkflowView(state.model);
     case 'prototype': return buildPrototypeView(state.model, {
@@ -213,9 +224,9 @@ function buildThreeDView() {
 }
 
 function showTab(tab) {
-  // Leaving the 3D tab releases the WebGL renderers. Without this the render
-  // loop of a removed canvas would keep running.
-  if (state.tab === '3d' && tab !== '3d') {
+  // Leaving a tab that owns a WebGL scene releases the renderers. Without this
+  // the render loop of a removed canvas would keep running.
+  if (SCENE_TABS.indexOf(state.tab) >= 0 && SCENE_TABS.indexOf(tab) < 0) {
     if (state.spaceRenderer) {
       state.spaceRenderer.dispose();
       state.spaceRenderer = null;
@@ -231,6 +242,9 @@ function showTab(tab) {
   });
   const root = clear($('#content'));
   const view = currentView();
+  // The dimension of change puts its focal entities in the scene: 4D marks the
+  // module the running event acts on, 5D the modules the intervention touches.
+  state.tabHighlight = (view.highlight || []).slice();
   $('#headline').textContent = view.headline;
   $('#kicker').textContent = view.kicker;
   for (const spec of view.body) renderTree(spec, root);
@@ -259,21 +273,18 @@ function unityGestureHint(map) {
 /**
  * Mirror the current selection into the 3D scenes. The selection lives in one
  * place - the view state - so the dimensions never disagree about what is
- * selected.
+ * selected. The focus of the dimension (what 4D and 5D are currently about)
+ * is added on top: the reader's own selection is never overwritten.
  */
 function syncSpaceHighlight() {
   const snapshot = state.viewState.snapshot();
+  const nodeIds = [...new Set([...snapshot.selectedNodeIds, ...(state.tabHighlight || [])])];
+  const edgeIds = snapshot.selectedEdgeIds;
   if (state.spaceRenderer) {
-    state.spaceRenderer.setHighlight({
-      nodeIds: snapshot.selectedNodeIds,
-      edgeIds: snapshot.selectedEdgeIds,
-    });
+    state.spaceRenderer.setHighlight({ nodeIds, edgeIds });
   }
   if (state.axisRenderer) {
-    state.axisRenderer.setHighlight({
-      nodeIds: snapshot.selectedNodeIds,
-      edgeIds: snapshot.selectedEdgeIds,
-    });
+    state.axisRenderer.setHighlight({ nodeIds, edgeIds });
   }
 }
 
@@ -292,7 +303,9 @@ async function mountScenes(root) {
  * the scene never invents an axis.
  * @param {object} root the content root
  */
+let axisMountToken = 0;
 async function mountAxis(root) {
+  const token = ++axisMountToken;
   const holder = root.querySelector('.axis-3d');
   if (!holder) return;
   const dataset = state.threeD;
@@ -306,6 +319,9 @@ async function mountAxis(root) {
       state.axisRenderer.dispose();
       state.axisRenderer = null;
     }
+    // A newer mount took over while this one was loading its modules: this one
+    // must not create a second WebGL context.
+    if (token !== axisMountToken) return;
     const status = document.createElement('p');
     status.className = 'hint axis-3d-status';
     status.textContent = '将指针移到实体或关系上可查看拾取目标。';

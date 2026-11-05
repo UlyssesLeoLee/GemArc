@@ -384,7 +384,7 @@ const scenario = process.argv[3];
 const nodes = {};
 function makeNode(id) {
   const n = {
-    id, hidden: id === '#authbar', value: '', className: '', disabled: false, children: [],
+    id, hidden: id === '#authbar' || id === '#role-badge', value: '', className: '', disabled: false, children: [],
     dataset: {}, listeners: {}, style: {}, childElementCount: 0, firstChild: null,
     append(...c) { this.children.push(...c); this.childElementCount = this.children.length; },
     querySelector() { return null; }, querySelectorAll() { return []; },
@@ -401,6 +401,7 @@ function makeNode(id) {
 }
 const document = {
   querySelector(sel) { return nodes[sel] || (nodes[sel] = makeNode(sel)); },
+  getElementById(id) { const key = '#' + id; return nodes[key] || (nodes[key] = makeNode(key)); },
   createElement() { return makeNode('x'); }, createTextNode() { return makeNode('t'); },
   createDocumentFragment() { return makeNode('f'); },
 };
@@ -432,6 +433,14 @@ async function fetch(url, options = {}) {
   return { ok: true, status: 200, text: async () => JSON.stringify({ jsonrpc: '2.0', id: 1, result }) };
 }
 const window = { GEMARC: { mcpPath: '/mcp', healthPath: '/healthz', writeTools: [] } };
+// The role of the caller, as the server injects it: '' is a deployment without accounts.
+const ROLE = process.argv[5] || '';
+if (ROLE) {
+  window.GEMARC.accounts = true;
+  window.GEMARC.admin = ROLE === 'admin';
+  window.GEMARC.write = ROLE === 'writer';
+  window.GEMARC.writeTools = ['gemarc_brief'];  // one write tool, so the WRITE group has something to show
+}
 const sandbox = { window, document, fetch, sessionStorage, performance: { now: () => 0 }, navigator: {}, console };
 new Function(...Object.keys(sandbox), source)(...Object.values(sandbox));
 const settle = () => new Promise((r) => setTimeout(r, 30));
@@ -442,6 +451,12 @@ const settle = () => new Promise((r) => setTimeout(r, 30));
     barHidden: document.querySelector('#authbar').hidden, msg: document.querySelector('#token-msg').textContent, connText: document.querySelector('#conn-text').textContent,
     storage: Object.assign({}, storage), urls: calls.map((c) => c.url),
     statChips: document.querySelector('#statbar').children.length };
+  if (ROLE) {
+    const badge = document.getElementById('role-badge');
+    const groups = document.querySelector('#tool-list').children
+      .map((c) => c.textContent).filter((t) => t === '只读 / READ' || t === '写入 / WRITE');
+    out.role = { badge: badge.textContent, hidden: badge.hidden, className: badge.className, groups };
+  }
   if (scenario === 'paste-token') {
     const before = calls.length;
     document.querySelector('#token-input').value = GOOD;
@@ -490,8 +505,8 @@ class ConsoleTokenFlowTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.dir.cleanup()
 
-    def run_scenario(self, scenario, mode):
-        done = subprocess.run(["node", str(self.harness), str(self.script), scenario, mode],
+    def run_scenario(self, scenario, mode, role=""):
+        done = subprocess.run(["node", str(self.harness), str(self.script), scenario, mode, role],
                               capture_output=True, text=True, timeout=60, encoding="utf-8")
         self.assertEqual(done.returncode, 0, done.stderr)
         return json.loads(done.stdout.strip().splitlines()[-1])
@@ -545,6 +560,48 @@ class ConsoleTokenFlowTests(unittest.TestCase):
         self.assertEqual(out["rpcCalls"], 3)
         paste = self.run_scenario("broken-storage", "auth")
         self.assertEqual(paste["rpcCalls"], 0)
+
+
+@unittest.skipUnless(sdk_available(), "MCP SDK is not installed")
+class ConsoleRoleTests(unittest.TestCase):
+    """console.js against a fake DOM: the role badge, and the write group only for a writer."""
+
+    @classmethod
+    def setUpClass(cls):
+        try:
+            subprocess.run(["node", "--version"], capture_output=True, check=True, timeout=20)
+        except Exception:
+            raise unittest.SkipTest("node is not available")
+        cls.dir = tempfile.TemporaryDirectory(prefix="gemarc-console-role-")
+        cls.harness = Path(cls.dir.name) / "harness.cjs"
+        cls.harness.write_text(NODE_HARNESS, encoding="utf-8")
+        cls.script = HERE.parent / "src" / "gemarc_mcp" / "scaffold" / "templates" / "console" / "console.js"
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.dir.cleanup()
+
+    def run_role(self, role):
+        done = subprocess.run(["node", str(self.harness), str(self.script), "none", "open", role],
+                              capture_output=True, text=True, timeout=60, encoding="utf-8")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        return json.loads(done.stdout.strip().splitlines()[-1])["role"]
+
+    def test_a_reader_is_told_that_the_account_reads_only(self):
+        role = self.run_role("reader")
+        self.assertFalse(role["hidden"], "the badge is shown")
+        self.assertEqual(role["badge"], "只读账号")
+        self.assertNotIn("写入 / WRITE", role["groups"], "a reader is offered no write tool")
+
+    def test_an_administrator_without_the_write_permission_is_still_a_reader(self):
+        role = self.run_role("admin")
+        self.assertEqual(role["badge"], "管理员 · 只读")
+        self.assertNotIn("写入 / WRITE", role["groups"])
+
+    def test_a_writer_sees_the_write_tools(self):
+        role = self.run_role("writer")
+        self.assertEqual(role["badge"], "可写账号")
+        self.assertIn("写入 / WRITE", role["groups"])
 
 
 if __name__ == "__main__":

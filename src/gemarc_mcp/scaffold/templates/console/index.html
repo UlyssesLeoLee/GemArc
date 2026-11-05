@@ -15,6 +15,9 @@
     <div class="conn">
       <span class="dot" id="conn-dot"></span>
       <span id="conn-text">正在连接 MCP…</span>
+      <!-- The role of the signed-in caller. The server decides both, so the badge can never claim a
+           privilege the server would not grant. -->
+      <span id="role-badge" class="chip" hidden></span>
     </div>
   </header>
 
@@ -95,7 +98,8 @@
 
   <!-- Injected by the server: paths and the write-tool list come from the
        running server, so the panel can never claim a tool the server does
-       not actually register. -->
+       not actually register. `admin` and `write` describe THIS caller: the
+       operator role, and the write permission of the signed-in session. -->
   <script>
     window.GEMARC = {
       mcpPath: "__MCP_PATH__",
@@ -104,6 +108,7 @@
       writeTools: __WRITE_TOOLS__,
       version: "__VERSION__",
       admin: __ADMIN__,
+      write: __WRITE__,
       adminPath: "__ADMIN_PATH__",
       accounts: __ACCOUNTS__
     };

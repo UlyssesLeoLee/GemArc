@@ -198,6 +198,7 @@ main {
 }
 .chip.write { border-color: #5a4526; color: var(--warn); }
 .chip.read { border-color: #234; color: var(--accent); }
+.chip.admin { border-color: #2b5c3a; color: var(--good); }
 
 button.primary {
   padding: 7px 18px;

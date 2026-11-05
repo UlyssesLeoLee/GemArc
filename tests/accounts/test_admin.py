@@ -245,6 +245,37 @@ class ConsoleGate(ServerCase):
         self.assertIn('admin: false', page.text)
         self.assertIn('id="admin-entry" hidden', page.text)
 
+    def user_id_of(self, email: str) -> str:
+        runtime = self.srv.runtime()
+        with runtime.db.transaction() as tx:
+            for candidate in runtime.crypto.blind_index_all("email", email):
+                row = tx.fetchone("SELECT id FROM users WHERE email_bidx = ?", (candidate,))
+                if row:
+                    return row["id"]
+        return ""
+
+    def test_a_signed_in_reader_is_told_that_the_account_reads_only(self):
+        self.login({"sub": "sub-someone", "email": "someone@gmail.com"})
+        page = self.browser.get("/")
+        self.assertEqual(page.status, 200)
+        self.assertIn("write: false", page.text)
+        self.assertIn('id="role-badge"', page.text)
+
+    def test_the_write_permission_of_the_session_reaches_the_console(self):
+        self.login({"sub": "sub-someone", "email": "someone@gmail.com"})
+        runtime = self.srv.runtime()
+        self.assertTrue(runtime.users.set_can_write(self.user_id_of("someone@gmail.com"), True, int(self.clock())))
+        page = self.browser.get("/")
+        self.assertEqual(page.status, 200)
+        self.assertIn("write: true", page.text)
+
+    def test_an_administrator_without_the_write_permission_is_still_a_reader(self):
+        self.login({"sub": "sub-owner", "email": "owner@gmail.com"})
+        page = self.browser.get("/")
+        self.assertEqual(page.status, 200)
+        self.assertIn("admin: true", page.text)
+        self.assertIn("write: false", page.text)
+
     def test_an_administrator_reaches_the_console_with_the_operator_entry(self):
         self.login({"sub": "sub-owner", "email": "owner@gmail.com"})
         page = self.browser.get("/")

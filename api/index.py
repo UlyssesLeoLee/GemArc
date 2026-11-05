@@ -647,7 +647,7 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
             payload["consoleRequiresLogin"] = True
         return payload
 
-    def render_console(admin: bool = False) -> str:
+    def render_console(admin: bool = False, write: bool = False) -> str:
         html = CONSOLE_HTML.read_text(encoding="utf-8")
         html = html.replace("__MCP_PATH__", MCP_PATH)
         html = html.replace("__HEALTH_PATH__", HEALTH_PATH)
@@ -655,6 +655,7 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
         html = html.replace("__VERSION__", gemarc_mcp.__version__)
         html = html.replace("__ADMIN_PATH__", ACCOUNT_ADMIN_PATH)
         html = html.replace("__ADMIN__", "true" if admin else "false")
+        html = html.replace("__WRITE__", "true" if write else "false")
         html = html.replace("__ACCOUNTS__", "true" if accounts_state == "ok" else "false")
         return html.replace("__WRITE_TOOLS__", json.dumps(list(write_tools), ensure_ascii=False))
 
@@ -737,14 +738,19 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
         if not await read_only(scope, receive, send):
             return
         admin = False
+        write = False
         if accounts_state == "ok":
             # The console is behind the login: a caller without a session is sent to the sign-in.
             # The DB is consulted for the session, so a broken database answers 503 (fail closed)
             # instead of serving the console to anyone.
             try:
                 runtime = get_account_runtime()
-                user_id = await runtime.signed_in_user(Headers(scope=scope))
+                session = await runtime.signed_in_session(Headers(scope=scope))
+                user_id = session.user_id if session is not None else None
                 admin = bool(user_id) and await runtime.is_admin_user(user_id)
+                # The write permission of this very session: the panel must offer only what the server
+                # will let this caller do, and the server decides that by the user's write permission.
+                write = bool(session is not None and session.can_write)
             except Exception as exc:
                 log.error("accounts_event id=%s class=%s", secrets.token_hex(4), type(exc).__name__)
                 await reply(_json(503, {"error": "accounts_unavailable", "code": "GEMARC_ACCT_002"},
@@ -759,7 +765,7 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
                                 "The MCP endpoint at /mcp is unaffected.",
                                 status_code=404, media_type="text/plain; charset=utf-8")
         else:
-            response = HTMLResponse(render_console(admin), headers={"Cache-Control": "no-cache"})
+            response = HTMLResponse(render_console(admin, write), headers={"Cache-Control": "no-cache"})
         await reply(response, scope, receive, send)
 
     async def console_asset(scope, receive, send, name: str):

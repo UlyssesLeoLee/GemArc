@@ -11,6 +11,10 @@ const CFG = window.GEMARC || {};
 const MCP_PATH = CFG.mcpPath || '/mcp';
 const HEALTH_PATH = CFG.healthPath || '/healthz';
 const WRITE_TOOLS = new Set(CFG.writeTools || []);
+// The write permission of THIS caller, injected by the server from the signed-in session. The
+// administrator role and the write permission are two different things: an administrator may still
+// be a plain reader, and a reader never gets the write tools.
+const MAY_WRITE = CFG.write === true;
 
 const TOKEN_KEY = 'gemarc.mcp.token';
 
@@ -267,6 +271,20 @@ function toolCard(tool) {
   return card;
 }
 
+/**
+ * Whether the WRITE group belongs on screen.
+ *
+ * The server refuses a write tool to a read scope (403 insufficient_scope), and the panel never
+ * offers what the server would refuse. With the login session the answer is the session's own write
+ * permission. A pasted bearer token carries its own scope, which the panel cannot read, so the
+ * group stays and the server has the last word.
+ */
+function writeGroupVisible() {
+  if (!WRITE_TOOLS.size) return false;
+  if (state.token) return true;
+  return MAY_WRITE;
+}
+
 function renderToolList(filterText) {
   const list = $('#tool-list');
   list.textContent = '';
@@ -277,8 +295,10 @@ function renderToolList(filterText) {
 
   const groups = [
     ['只读 / READ', state.tools.filter((t) => !WRITE_TOOLS.has(t.name) && match(t))],
-    ['写入 / WRITE', state.tools.filter((t) => WRITE_TOOLS.has(t.name) && match(t))],
   ];
+  if (writeGroupVisible()) {
+    groups.push(['写入 / WRITE', state.tools.filter((t) => WRITE_TOOLS.has(t.name) && match(t))]);
+  }
   for (const [label, tools] of groups) {
     if (!tools.length) continue;
     list.append(el('p', 'tool-group', label));
@@ -676,6 +696,20 @@ $('#tool-filter').addEventListener('input', (event) => renderToolList(event.targ
 if (CFG.accounts) {
   const accountEntry = document.getElementById('account-entry');
   if (accountEntry) accountEntry.hidden = false;
+  // The role badge: it states what this caller may do, so a signed-in user can tell the operator
+  // role from the plain reader. The administrator role and the write permission are two different
+  // things, so an administrator who may only read says so instead of pretending to be a writer.
+  const badge = document.getElementById('role-badge');
+  if (badge) {
+    badge.hidden = false;
+    if (CFG.admin) {
+      badge.textContent = MAY_WRITE ? '管理员 · 可写' : '管理员 · 只读';
+      badge.className = 'chip admin';
+    } else {
+      badge.textContent = MAY_WRITE ? '可写账号' : '只读账号';
+      badge.className = 'chip ' + (MAY_WRITE ? 'write' : 'read');
+    }
+  }
 }
 if (CFG.admin) {
   const adminEntry = document.getElementById('admin-entry');

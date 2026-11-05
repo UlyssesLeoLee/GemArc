@@ -554,5 +554,35 @@ class FailClosed(unittest.TestCase):
                 self.assertEqual((status, json.loads(body)), (404, {"error": "not_found"}))
 
 
+@unittest.skipUnless(sdk_available(), "MCP SDK is not installed")
+class LoginIntentGate(unittest.TestCase):
+    """``GEMARC_REQUIRE_LOGIN=1`` with working accounts: ``/mcp`` needs the login session or a PAT.
+
+    This is the switch a deployment uses to close the anonymous MCP entry. It must not change the
+    method gate, and it must say so in ``/healthz`` so an operator (and the post-deploy probe) can
+    see that a credential is needed.
+    """
+
+    def test_an_anonymous_caller_is_refused_and_healthz_says_a_login_is_required(self):
+        with built(complete_env(GEMARC_REQUIRE_LOGIN="1")) as app:
+            status, headers, body = mcp(app)
+            self.assertEqual(status, 401)
+            self.assertEqual(json.loads(body), {"error": "unauthorized"})
+            self.assertEqual(headers["www-authenticate"], "Bearer")
+            health = json.loads(run(app, "GET", "/healthz")[2])
+            self.assertTrue(health["authRequired"])
+            self.assertTrue(health["sessionAuth"])  # the login session is accepted, so the console works
+            self.assertEqual(health["accounts"], "ok")
+
+    def test_the_method_gate_still_comes_first(self):
+        with built(complete_env(GEMARC_REQUIRE_LOGIN="1")) as app:
+            self.assertEqual(run(app, "GET", "/mcp")[0], 405)
+
+    def test_without_the_login_intent_the_endpoint_stays_open(self):
+        with built(complete_env()) as app:
+            self.assertEqual(mcp(app)[0], 200)
+            self.assertFalse(json.loads(run(app, "GET", "/healthz")[2])["authRequired"])
+
+
 if __name__ == "__main__":
     unittest.main()

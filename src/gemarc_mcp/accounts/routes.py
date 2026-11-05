@@ -35,7 +35,7 @@ from .mcpauth import McpAuth, PatCache
 from .oidc import AccessPolicy, ClaimsError, GoogleClient, IdpEndpoints, IdpError, OAuthStates
 from .pages import CONFIRM_WORD, View
 from .ratelimit import RateLimiter
-from .sessions import SessionError, SessionPolicy, SessionStore, valid_sid_format
+from .sessions import SessionError, SessionInfo, SessionPolicy, SessionStore, valid_sid_format
 from .tokens import TokenError, TokenPolicy, TokenStore
 from .users import UserAccounts
 
@@ -860,12 +860,20 @@ class AccountsRuntime:
         return pages.redirect(ADMIN_PATH, 303, hsts=self.hsts)
 
     # -- helpers for the application ----------------------------------------------------------------------------
-    async def signed_in_user(self, headers: Any) -> Optional[str]:
-        """The user id of a signed-in caller, or None. Used by the console gate and by the MCP session lane."""
+    async def signed_in_session(self, headers: Any) -> Optional[SessionInfo]:
+        """The session of a signed-in caller, or None. Used by the console gate and by the MCP session lane.
+
+        The session carries the caller's write permission, so a caller (the console) can be told what
+        the server will really let this user do instead of guessing it from the role alone.
+        """
         sid = security.single_cookie(headers, self.sid_cookie)
         if sid is None or not valid_sid_format(sid):
             return None
-        info = await self.run_db(lambda: self.sessions.lookup(sid, self.now(), policy_check=self.policy.row_ok))
+        return await self.run_db(lambda: self.sessions.lookup(sid, self.now(), policy_check=self.policy.row_ok))
+
+    async def signed_in_user(self, headers: Any) -> Optional[str]:
+        """The user id of a signed-in caller, or None. Used by the console gate and by the MCP session lane."""
+        info = await self.signed_in_session(headers)
         return None if info is None else info.user_id
 
     async def is_admin_user(self, user_id: str) -> bool:

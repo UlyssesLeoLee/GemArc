@@ -6,6 +6,18 @@
   <meta name="color-scheme" content="dark">
   <title>GemArc MCP · 功能微调控制台</title>
   <link rel="stylesheet" href="./console.css">
+  <!--
+    The crystal scene of the tool surface needs the three-dimensional library.
+    It is optional: when it cannot be loaded the panel says "未加载" and the
+    rest of the console keeps working. Same import map as the public site.
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://esm.sh/three@0.180.0"
+    }
+  }
+  </script>
 </head>
 <body>
   <header class="top">
@@ -54,6 +66,19 @@
     </aside>
 
     <section class="pane col-stage">
+      <!-- The tool surface: one crystal per tool the server really registers.
+           The scene is filled by console-space.js; until it is there the panel
+           states plainly that the three-dimensional part is not loaded. -->
+      <p class="section-title">SURFACE · 工具面</p>
+      <div class="space-3d" id="space-host">
+        <p class="hint" id="space-hint">加载中…</p>
+        <span class="tip" id="space-tip" hidden></span>
+      </div>
+      <p class="space-legend">
+        <span class="read"><i></i>只读</span>
+        <span class="write"><i></i>写入</span>
+      </p>
+
       <div class="stage-head">
         <div class="stage-title">
           <h1 id="tool-name">选择一个工具</h1>
@@ -114,5 +139,8 @@
     };
   </script>
   <script type="module" src="./console.js"></script>
+  <!-- The crystal scene is a module of its own: it needs the three-dimensional
+       library, and the console has to keep working when it is missing. -->
+  <script type="module" src="./console-space/boot.js"></script>
 </body>
 </html>

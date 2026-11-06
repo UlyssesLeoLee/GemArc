@@ -63,6 +63,11 @@ export function createToonGradient(THREE) {
 /**
  * Build one crystal body material.
  *
+ * The facets are the geometry's own: a crystal is a polyhedron, so its faces
+ * already carry their own normals and the banded light breaks on them. (The
+ * toon material has no `flatShading` switch; asking for one only produces a
+ * warning.)
+ *
  * @param {object} THREE the three-dimensional library
  * @param {object} [options] the material options
  * @param {number} [options.color] the body colour
@@ -75,7 +80,6 @@ export function createToonMaterial(THREE, options = {}) {
     color: options.color ?? 0xffffff,
     transparent: true,
     opacity: options.opacity ?? 0.62,
-    flatShading: true,
     gradientMap: options.gradient ?? createToonGradient(THREE),
   });
   return material;

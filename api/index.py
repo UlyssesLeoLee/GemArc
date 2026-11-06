@@ -119,6 +119,15 @@ LEGACY_STATIC_DIR = REPO_ROOT / "examples" / "demo-site"
 CONSOLE_DIR = Path(gemarc_mcp.__file__).resolve().parent / "scaffold" / "templates" / "console"
 CONSOLE_HTML = CONSOLE_DIR / "index.html"
 CONSOLE_ASSETS = ("console.css", "console.js")
+#: The crystal scene of the console's tool surface. The scene engine and the two
+#: modules it shares with the public scenes are served from one place: the toon
+#: material and the gesture mapping must not exist twice (BD-010 section 13.4).
+CONSOLE_SPACE_ASSETS = {
+    "boot.js": CONSOLE_DIR / "console-space-boot.js",
+    "console-space.js": Path(gemarc_mcp.__file__).resolve().parent / "scaffold" / "runtime" / "space" / "console-space.js",
+    "toon-material.js": Path(gemarc_mcp.__file__).resolve().parent / "scaffold" / "runtime" / "space" / "toon-material.js",
+    "unity-controls.js": Path(gemarc_mcp.__file__).resolve().parent / "scaffold" / "runtime" / "space" / "unity-controls.js",
+}
 
 MCP_PATH = "/mcp"
 HEALTH_PATH = "/healthz"
@@ -780,6 +789,23 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
                                 headers={"Cache-Control": "no-cache"})
         await reply(response, scope, receive, send)
 
+    async def console_space_asset(scope, receive, send, name: str):
+        """The modules of the console's crystal scene.
+
+        The engine and the two shared modules are served from the package, so
+        the console uses the same toon material and the same gesture mapping as
+        the two public scenes.
+        """
+        if not await read_only(scope, receive, send):
+            return
+        target = CONSOLE_SPACE_ASSETS.get(name)
+        if target is None or not target.is_file():
+            response = _json(404, {"error": "not_found"})
+        else:
+            response = Response(target.read_bytes(), media_type="text/javascript",
+                                headers={"Cache-Control": "no-cache"})
+        await reply(response, scope, receive, send)
+
     async def kit_endpoint(scope, receive, send, path: str):
         found = _KIT_RE.fullmatch(path)
         if not found or found.group(1) not in KIT_PROFILES:
@@ -852,6 +878,8 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
             await mcp_endpoint(scope, receive, send)
         elif path in ("/console.css", "/console.js"):
             await console_asset(scope, receive, send, path[1:])
+        elif path.startswith("/console-space/") and path.count("/") == 2:
+            await console_space_asset(scope, receive, send, path[len("/console-space/"):])
         elif path in ("/", ""):
             await console_endpoint(scope, receive, send)
         elif path == "/site":

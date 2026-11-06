@@ -258,6 +258,53 @@ function handleUnauthorized(error) {
 
 /* -------------------------------------------------------------- tool panel */
 
+/**
+ * The bridge to the crystal scene of the tool surface.
+ *
+ * The scene is a module of its own: it needs the three-dimensional library,
+ * and the console has to keep working when it is missing. So the two never
+ * import each other - the panel tells the scene what the server registered,
+ * and the scene tells the panel what was picked. One selection, two views.
+ */
+const spaceBridge = (window.GEMARC_SPACE = window.GEMARC_SPACE || {
+  tools: [], scene: null, onPick: null, onHover: null,
+});
+spaceBridge.onPick = (name) => selectTool(name);
+spaceBridge.onHover = (name) => setSpaceTip(name);
+
+/**
+ * The name of the crystal under the pointer. The scene never relies on the
+ * colour alone, so the words carry the fact as well.
+ * @param {string|null} name the tool
+ */
+function setSpaceTip(name) {
+  const tip = $('#space-tip');
+  if (!tip) return;
+  if (!name) {
+    tip.hidden = true;
+    tip.textContent = '';
+    return;
+  }
+  tip.textContent = `${name} · ${WRITE_TOOLS.has(name) ? '写入' : '只读'}`;
+  tip.hidden = false;
+}
+
+/**
+ * The crystals of the tool surface: one per registered tool.
+ * @returns {Array<{name: string, write: boolean}>} the tools
+ */
+function spaceTools() {
+  return state.tools.map((tool) => ({ name: tool.name, write: WRITE_TOOLS.has(tool.name) }));
+}
+
+/**
+ * Hand the tool list to the scene (if it is there).
+ */
+function syncSpaceTools() {
+  spaceBridge.tools = spaceTools();
+  if (spaceBridge.scene) spaceBridge.scene.setTools(spaceBridge.tools);
+}
+
 function toolCard(tool) {
   const card = el('button', 'tool-item' + (WRITE_TOOLS.has(tool.name) ? ' write' : ''));
   card.type = 'button';
@@ -325,6 +372,8 @@ function selectTool(name) {
   const tool = state.tools.find((t) => t.name === name);
   if (!tool) return;
   renderToolList($('#tool-filter').value);
+  // The crystal of the selected tool is marked too: one selection, two views.
+  if (spaceBridge.scene) spaceBridge.scene.setSelected(name);
   $('#tool-name').textContent = tool.name;
   $('#tool-desc').textContent = tool.description || '(该工具没有描述)';
 
@@ -627,6 +676,7 @@ async function boot() {
     state.tools = (toolResult && toolResult.tools) || [];
     state.resources = (resourceResult && resourceResult.resources) || [];
     state.prompts = (promptResult && promptResult.prompts) || [];
+    syncSpaceTools();
     renderToolList('');
     renderSideLists();
     pushHistory({ name: '(连接建立)', ms: 0, ok: true });

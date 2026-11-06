@@ -1,15 +1,25 @@
-/* GemArc MCP console — a tuning panel for the server itself, not a design view. */
+/* GemArc MCP console - the gem theme of BD-010 (UI style policy).
+   The console is part of the same product as the public site, so it uses the
+   one palette of section 3 and the same rules of section 5: a cut face, one
+   bright edge, no stack of shadows. A panel is a facet; a bright line is an
+   edge. The tokens are the ones of the site - the console never starts a
+   second set of near-duplicate colours. */
 :root {
-  --bg: #0b0f14;
-  --panel: #121821;
-  --panel-2: #0e141c;
-  --line: #22303f;
-  --ink: #dbe6f0;
-  --muted: #8fa3b8;
-  --accent: #4cc2ff;
-  --warn: #ffb454;
-  --bad: #ff6b6b;
-  --good: #6bd68a;
+  /* The stage. */
+  --gem-void: #06090e;
+  --gem-bg: #0b0f16;
+  --gem-panel: #111823;
+  --gem-facet: #1b2635;
+  --gem-rim: #2c3d52;
+  /* The ink. */
+  --gem-ink: #e6eef7;
+  --gem-muted: #93a6bd;
+  /* The cut colours. Each one means exactly one thing. */
+  --gem-aqua: #6fe3ff;
+  --gem-violet: #b78cff;
+  --gem-topaz: #ffc46b;
+  --gem-emerald: #6bd68a;
+  --gem-ruby: #ff6b8a;
   --mono: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
@@ -17,32 +27,34 @@
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--ink);
+  background: var(--gem-bg);
+  color: var(--gem-ink);
   font: 14px/1.6 "Segoe UI", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
 }
 
+/* --- the shell: a panel with one bright edge underneath --- */
 .top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   padding: 11px 20px;
-  border-bottom: 1px solid var(--line);
-  background: var(--panel);
+  border-bottom: 1px solid var(--gem-rim);
+  background: var(--gem-panel);
 }
 
 .brand { display: flex; align-items: baseline; gap: 8px; font-size: 17px; font-weight: 600; }
-.brand .gem { color: var(--accent); }
-.brand small { color: var(--muted); font-weight: 400; font-size: 12px; }
+.brand .gem { color: var(--gem-aqua); }
+.brand small { color: var(--gem-muted); font-weight: 400; font-size: 12px; }
 
-.conn { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.conn { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--gem-muted); }
+/* A state is a dot AND a word: the colour never carries the fact alone. */
 .dot {
   width: 9px; height: 9px; border-radius: 50%;
-  background: var(--muted); box-shadow: 0 0 0 3px rgba(143, 163, 184, .12);
+  background: var(--gem-muted); box-shadow: 0 0 0 3px rgba(147, 166, 189, .12);
 }
-.dot.on { background: var(--good); box-shadow: 0 0 0 3px rgba(107, 214, 138, .16); }
-.dot.off { background: var(--bad); box-shadow: 0 0 0 3px rgba(255, 107, 107, .16); }
+.dot.on { background: var(--gem-emerald); box-shadow: 0 0 0 3px rgba(107, 214, 138, .16); }
+.dot.off { background: var(--gem-ruby); box-shadow: 0 0 0 3px rgba(255, 107, 138, .16); }
 
 /* --- status bar --- */
 .statbar {
@@ -50,22 +62,23 @@ body {
   flex-wrap: wrap;
   gap: 8px;
   padding: 9px 20px;
-  border-bottom: 1px solid var(--line);
-  background: var(--panel-2);
+  border-bottom: 1px solid var(--gem-rim);
+  background: var(--gem-panel);
 }
 .stat {
   display: inline-flex; align-items: baseline; gap: 6px;
   padding: 3px 9px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--gem-rim);
   border-radius: 4px;
   font-size: 12px;
-  background: #0b1219;
+  background: var(--gem-facet);
+  box-shadow: inset 0 1px 0 rgba(230, 238, 247, .04);
 }
-.stat b { color: var(--ink); font-weight: 600; font-family: var(--mono); }
-.stat.warn { border-color: #5a4526; color: var(--warn); }
-.stat.bad { border-color: #5c2b2b; color: var(--bad); }
-.stat.good { border-color: #2b5c3a; color: var(--good); }
-.muted { color: var(--muted); }
+.stat b { color: var(--gem-ink); font-weight: 600; font-family: var(--mono); }
+.stat.warn { border-color: var(--gem-topaz); color: var(--gem-topaz); }
+.stat.bad { border-color: var(--gem-ruby); color: var(--gem-ruby); }
+.stat.good { border-color: var(--gem-emerald); color: var(--gem-emerald); }
+.muted { color: var(--gem-muted); }
 
 /* --- bearer token bar (only when the server requires one) --- */
 .authbar {
@@ -74,66 +87,115 @@ body {
   align-items: center;
   gap: 8px;
   padding: 8px 20px;
-  border-bottom: 1px solid #5a4526;
-  background: #19140c;
+  border-bottom: 1px solid var(--gem-topaz);
+  background: var(--gem-panel);
   font-size: 12.5px;
 }
 .authbar[hidden] { display: none; }
-.authbar label { color: var(--warn); font-family: var(--mono); font-size: 11.5px; }
+.authbar label { color: var(--gem-topaz); font-family: var(--mono); font-size: 11.5px; }
 .authbar input {
   flex: 1 1 280px;
   max-width: 460px;
   padding: 5px 9px;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
+  background: var(--gem-bg);
+  border: 1px solid var(--gem-rim);
   border-radius: 4px;
-  color: var(--ink);
+  color: var(--gem-ink);
   font-family: var(--mono);
   font-size: 12.5px;
 }
-.authbar input:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
-.authbar #token-msg.bad { color: var(--bad); }
-.authbar #token-msg.good { color: var(--good); }
+.authbar input:focus-visible { outline: 2px solid var(--gem-aqua); outline-offset: 1px; border-color: var(--gem-aqua); }
+.authbar #token-msg.bad { color: var(--gem-ruby); }
+.authbar #token-msg.good { color: var(--gem-emerald); }
 
 /* --- layout --- */
 main {
   display: grid;
   grid-template-columns: 264px minmax(0, 1fr) 330px;
   gap: 1px;
-  background: var(--line);
+  background: var(--gem-rim);
   min-height: calc(100vh - 122px);
 }
-.pane { background: var(--bg); padding: 14px 16px; }
+.pane { background: var(--gem-bg); padding: 14px 16px; }
 .col-tools, .col-side { overflow-y: auto; max-height: calc(100vh - 122px); }
 .col-stage { overflow-y: auto; max-height: calc(100vh - 122px); }
 
 .section-title {
   margin: 4px 0 9px;
-  color: var(--muted);
+  color: var(--gem-muted);
   font-size: 11px;
   letter-spacing: .12em;
   text-transform: uppercase;
   font-family: var(--mono);
 }
 
+/* --- the crystal scene of the tool surface --- */
+/* The stage of the scene is the darkest surface of the console, so the bright
+   edges of the crystals read as light. When the three-dimensional library
+   cannot be loaded the panel says so; it never fakes a picture. */
+.space-3d {
+  position: relative;
+  height: 260px;
+  margin-bottom: 8px;
+  border: 1px solid var(--gem-rim);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--gem-void);
+}
+.space-3d .gemarc-console-canvas { display: block; width: 100%; height: 100%; }
+.space-3d .hint { padding: 14px; color: var(--gem-muted); font-size: 12.5px; }
+/* The name of the crystal under the pointer: the scene never relies on colour
+   alone, and it never relies on a hover-only colour either. */
+.space-3d .tip {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  max-width: 60%;
+  padding: 3px 8px;
+  border: 1px solid var(--gem-rim);
+  border-radius: 4px;
+  background: var(--gem-panel);
+  color: var(--gem-ink);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  pointer-events: none;
+}
+.space-3d .tip[hidden] { display: none; }
+.space-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 0 12px;
+  color: var(--gem-muted);
+  font-size: 11.5px;
+}
+.space-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.space-legend i {
+  width: 9px; height: 9px;
+  transform: rotate(45deg);
+  border: 1px solid var(--gem-rim);
+}
+.space-legend .read i { background: var(--gem-aqua); }
+.space-legend .write i { background: var(--gem-topaz); }
+
 /* --- tool list --- */
 .filter {
   width: 100%;
   padding: 7px 9px;
   margin-bottom: 8px;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
+  background: var(--gem-bg);
+  border: 1px solid var(--gem-rim);
   border-radius: 4px;
-  color: var(--ink);
+  color: var(--gem-ink);
   font: inherit;
   font-size: 13px;
 }
-.filter:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+.filter:focus-visible { outline: 2px solid var(--gem-aqua); outline-offset: 1px; border-color: var(--gem-aqua); }
 
 .tool-list { display: flex; flex-direction: column; gap: 2px; }
 .tool-group {
   margin: 10px 0 4px;
-  color: var(--muted);
+  color: var(--gem-muted);
   font-size: 10.5px;
   letter-spacing: .1em;
   text-transform: uppercase;
@@ -147,32 +209,35 @@ main {
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
-  color: var(--ink);
+  color: var(--gem-ink);
   cursor: pointer;
   font: inherit;
+  transition: border-color .1s ease, color .1s ease;
 }
-.tool-item:hover { background: var(--panel); border-color: var(--line); }
-.tool-item.active { background: #10222e; border-color: #1f4a63; }
+.tool-item:hover { border-color: var(--gem-rim); }
+.tool-item:focus-visible { outline: 2px solid var(--gem-aqua); outline-offset: 1px; }
+/* The selection is an edge and a colour of the word, never a filled block. */
+.tool-item.active { border-color: var(--gem-aqua); color: var(--gem-aqua); }
 .tool-item .tname { font-family: var(--mono); font-size: 12.5px; }
 .tool-item .tdesc {
   display: block;
-  color: var(--muted);
+  color: var(--gem-muted);
   font-size: 11.5px;
   line-height: 1.45;
   margin-top: 1px;
 }
-.tool-item.write .tname { color: var(--warn); }
-.tool-item.write.active .tname { color: var(--warn); }
+.tool-item.write .tname { color: var(--gem-topaz); }
+.tool-item.write.active .tname { color: var(--gem-topaz); }
 .tool-item .tag {
   float: right;
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--muted);
+  color: var(--gem-muted);
 }
 
 .endpoints div { margin-bottom: 5px; font-size: 11.5px; }
-.endpoints code { font-family: var(--mono); color: var(--accent); }
-.endpoints span { color: var(--muted); margin-left: 6px; }
+.endpoints code { font-family: var(--mono); color: var(--gem-aqua); }
+.endpoints span { color: var(--gem-muted); margin-left: 6px; }
 
 /* --- stage --- */
 .stage-head {
@@ -180,7 +245,7 @@ main {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--gem-rim);
   padding-bottom: 11px;
   margin-bottom: 12px;
 }
@@ -192,79 +257,88 @@ main {
   font-family: var(--mono);
   font-size: 11px;
   padding: 2px 8px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--gem-rim);
   border-radius: 999px;
-  color: var(--muted);
+  color: var(--gem-muted);
 }
-.chip.write { border-color: #5a4526; color: var(--warn); }
-.chip.read { border-color: #234; color: var(--accent); }
-.chip.admin { border-color: #2b5c3a; color: var(--good); }
+.chip.write { border-color: var(--gem-topaz); color: var(--gem-topaz); }
+.chip.read { border-color: var(--gem-aqua); color: var(--gem-aqua); }
+.chip.admin { border-color: var(--gem-emerald); color: var(--gem-emerald); }
 
 button.primary {
   padding: 7px 18px;
-  border: 1px solid #1f6d94;
+  border: 1px solid var(--gem-rim);
   border-radius: 4px;
-  background: #10384c;
-  color: #d6f0ff;
+  background: transparent;
+  color: var(--gem-ink);
   cursor: pointer;
   font: inherit;
   font-weight: 600;
+  transition: border-color .1s ease, color .1s ease, background .1s ease;
 }
-button.primary:hover:not(:disabled) { background: #164a66; }
+button.primary:hover:not(:disabled) { border-color: var(--gem-aqua); color: var(--gem-aqua); }
+button.primary:active:not(:disabled) { background: var(--gem-facet); }
 button.primary:disabled { opacity: .4; cursor: not-allowed; }
+button.primary:focus-visible { outline: 2px solid var(--gem-aqua); outline-offset: 1px; }
 button.ghost {
   padding: 3px 9px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--gem-rim);
   border-radius: 4px;
   background: transparent;
-  color: var(--muted);
+  color: var(--gem-muted);
   cursor: pointer;
   font: inherit;
   font-size: 12px;
+  transition: border-color .1s ease, color .1s ease;
 }
-button.ghost:hover { color: var(--ink); border-color: #35506b; }
+button.ghost:hover { color: var(--gem-ink); border-color: var(--gem-aqua); }
+button.ghost:focus-visible { outline: 2px solid var(--gem-aqua); outline-offset: 1px; }
 button.mini {
   padding: 2px 8px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--gem-rim);
   border-radius: 4px;
-  background: var(--panel);
-  color: var(--ink);
+  background: transparent;
+  color: var(--gem-ink);
   cursor: pointer;
   font: inherit;
   font-size: 12px;
+  transition: border-color .1s ease, color .1s ease;
 }
-button.mini:hover { border-color: #35506b; }
+button.mini:hover { border-color: var(--gem-aqua); color: var(--gem-aqua); }
+button.mini:focus-visible { outline: 2px solid var(--gem-aqua); outline-offset: 1px; }
 
 /* --- parameter form --- */
 .params { display: grid; gap: 11px; margin-bottom: 16px; }
 .field { display: grid; gap: 4px; }
 .field label { font-size: 12.5px; display: flex; align-items: baseline; gap: 7px; }
-.field .fname { font-family: var(--mono); color: var(--ink); }
-.field .req { color: var(--bad); font-size: 11px; }
-.field .ftype { color: var(--muted); font-size: 11px; font-family: var(--mono); }
-.field .fhint { color: var(--muted); font-size: 11.5px; }
+.field .fname { font-family: var(--mono); color: var(--gem-ink); }
+.field .req { color: var(--gem-ruby); font-size: 11px; }
+.field .ftype { color: var(--gem-muted); font-size: 11px; font-family: var(--mono); }
+.field .fhint { color: var(--gem-muted); font-size: 11.5px; }
 .field input[type="text"], .field input[type="number"], .field select, .field textarea {
   width: 100%;
   padding: 7px 9px;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
+  background: var(--gem-bg);
+  border: 1px solid var(--gem-rim);
   border-radius: 4px;
-  color: var(--ink);
+  color: var(--gem-ink);
   font: inherit;
   font-size: 13px;
 }
 .field textarea { min-height: 74px; resize: vertical; font-family: var(--mono); font-size: 12.5px; }
-.field input:focus, .field select:focus, .field textarea:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+.field input:focus-visible, .field select:focus-visible, .field textarea:focus-visible {
+  outline: 2px solid var(--gem-aqua); outline-offset: 1px; border-color: var(--gem-aqua);
+}
 .field .check { display: flex; align-items: center; gap: 8px; }
-.field .check input { width: 15px; height: 15px; accent-color: var(--accent); }
-.empty { color: var(--muted); font-size: 12.5px; padding: 6px 0; }
+.field .check input { width: 15px; height: 15px; accent-color: var(--gem-aqua); }
+.empty { color: var(--gem-muted); font-size: 12.5px; padding: 6px 0; }
 
-/* --- result --- */
+/* --- result: a card, and opaque. No blur ever sits on top of data. --- */
 .result-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .result {
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 5px;
+  background: var(--gem-facet);
+  border: 1px solid var(--gem-rim);
+  border-radius: 6px;
   padding: 10px 12px;
   max-height: 46vh;
   overflow: auto;
@@ -273,19 +347,19 @@ button.mini:hover { border-color: #35506b; }
   white-space: pre-wrap;
   word-break: break-word;
 }
-.result.error { border-color: #5c2b2b; color: #ffc9c9; }
-.result.ok { border-color: #234; }
+.result.error { border-color: var(--gem-ruby); color: var(--gem-ruby); }
+.result.ok { border-color: var(--gem-rim); }
 
 /* --- json tree --- */
 .code { font-family: var(--mono); font-size: 11.5px; max-height: 260px; overflow: auto; }
 .j { padding-left: 14px; }
-.jk { color: var(--accent); }
-.jv-s { color: #9fe0a5; }
-.jv-n { color: var(--warn); }
-.jv-b { color: #c39bff; }
-.jv-nil { color: var(--muted); }
-.jtoggle { cursor: pointer; color: var(--muted); user-select: none; }
-.jtoggle:hover { color: var(--ink); }
+.jk { color: var(--gem-aqua); }
+.jv-s { color: var(--gem-emerald); }
+.jv-n { color: var(--gem-topaz); }
+.jv-b { color: var(--gem-violet); }
+.jv-nil { color: var(--gem-muted); }
+.jtoggle { cursor: pointer; color: var(--gem-muted); user-select: none; }
+.jtoggle:hover { color: var(--gem-ink); }
 .jrow { line-height: 1.55; }
 
 .list { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; }
@@ -295,13 +369,13 @@ button.mini:hover { border-color: #35506b; }
   justify-content: space-between;
   gap: 8px;
   padding: 5px 8px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--gem-rim);
   border-radius: 4px;
-  background: var(--panel-2);
+  background: var(--gem-facet);
 }
-.list .item code { font-family: var(--mono); font-size: 11.5px; color: var(--accent); }
-.list .item .ok { color: var(--good); font-family: var(--mono); font-size: 11px; }
-.list .item .fail { color: var(--bad); font-family: var(--mono); font-size: 11px; }
+.list .item code { font-family: var(--mono); font-size: 11.5px; color: var(--gem-aqua); }
+.list .item .ok { color: var(--gem-emerald); font-family: var(--mono); font-size: 11px; }
+.list .item .fail { color: var(--gem-ruby); font-family: var(--mono); font-size: 11px; }
 .list .empty { border: none; background: transparent; padding: 2px 0; }
 
 .foot {
@@ -309,9 +383,9 @@ button.mini:hover { border-color: #35506b; }
   justify-content: space-between;
   gap: 16px;
   padding: 8px 20px;
-  border-top: 1px solid var(--line);
-  background: var(--panel);
-  color: var(--muted);
+  border-top: 1px solid var(--gem-rim);
+  background: var(--gem-panel);
+  color: var(--gem-muted);
   font-size: 11.5px;
 }
 

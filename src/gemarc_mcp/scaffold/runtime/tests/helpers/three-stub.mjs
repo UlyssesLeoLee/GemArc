@@ -249,6 +249,16 @@ export class Object3D {
     return this;
   }
 
+  /** Detach a child, the way three does. */
+  remove(child) {
+    const index = this.children.indexOf(child);
+    if (index >= 0) {
+      this.children.splice(index, 1);
+      child.parent = null;
+    }
+    return this;
+  }
+
   traverse(visit) {
     visit(this);
     for (const child of this.children) child.traverse(visit);

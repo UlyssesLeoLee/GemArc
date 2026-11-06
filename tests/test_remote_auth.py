@@ -131,8 +131,10 @@ class BearerTokenTests(unittest.TestCase):
         self.assertIn("POST", headers["Allow"])
 
     def test_public_content_stays_public(self):
+        # The console stylesheet is the gem theme of BD-010: it carries the
+        # tokens of the policy, not a second set of near-duplicate colours.
         for path, marker in (("/healthz", b'"status"'), ("/", b"GemArc MCP"), ("/console.js", b"sessionStorage"),
-                             ("/console.css", b"--bg"), ("/site/", b"importmap"), ("/kit/static.zip", b"PK"),
+                             ("/console.css", b"--gem-panel"), ("/site/", b"importmap"), ("/kit/static.zip", b"PK"),
                              ("/kit/vite.zip", b"PK")):
             status, _, body = http(self.live.url(path))
             self.assertEqual(status, 200, path)

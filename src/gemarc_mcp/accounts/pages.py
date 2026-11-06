@@ -85,20 +85,31 @@ def unavailable(code: str = "GEMARC_ACCT_001", *, hsts: bool = False, retry_afte
 esc = html.escape
 
 CSS = """
-:root{color-scheme:light dark;--bg:#fafafa;--fg:#1c1c1e;--mute:#5f6368;--line:#d0d3d9;--card:#fff;--acc:#1a56db;--bad:#b3261e;--ok:#146c2e}
-@media (prefers-color-scheme:dark){:root{--bg:#121316;--fg:#ececf0;--mute:#a0a4ad;--line:#33363d;--card:#1b1d22;--acc:#8ab4ff;--bad:#ff8a80;--ok:#7fd99a}}
-body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+/* The gem theme of BD-010 (UI style policy). The account page and the operator
+   area are the same product as the site and the console: one palette, the
+   tokens of section 3, cut faces and bright edges. The theme is dark and it
+   does not follow the system preference: a second light palette would be a
+   second set of near-duplicate colours. */
+:root{color-scheme:dark;
+--gem-void:#06090e;--gem-bg:#0b0f16;--gem-panel:#111823;--gem-facet:#1b2635;--gem-rim:#2c3d52;
+--gem-ink:#e6eef7;--gem-muted:#93a6bd;--gem-aqua:#6fe3ff;--gem-violet:#b78cff;--gem-topaz:#ffc46b;
+--gem-emerald:#6bd68a;--gem-ruby:#ff6b8a}
+body{margin:0;background:var(--gem-bg);color:var(--gem-ink);font:16px/1.6 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
 main{max-width:46rem;margin:0 auto;padding:1.5rem 16px 3rem}
 h1{font-size:1.4rem;margin:.2rem 0 1rem}h2{font-size:1.1rem;margin:2rem 0 .6rem}
-.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1rem 1.1rem;margin:1rem 0}
-.mute{color:var(--mute);font-size:.9rem}.bad{color:var(--bad)}.ok{color:var(--ok)}
-a{color:var(--acc)}
-.btn,button{display:inline-block;background:var(--acc);color:#fff;border:0;border-radius:8px;padding:.5rem 1rem;font:inherit;cursor:pointer;text-decoration:none}
-button.danger{background:var(--bad)}button.plain{background:transparent;color:var(--acc);border:1px solid var(--line)}
-input,select{font:inherit;padding:.4rem .5rem;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--fg);max-width:100%}
+.card{background:var(--gem-panel);border:1px solid var(--gem-rim);border-radius:8px;padding:1rem 1.1rem;margin:1rem 0;box-shadow:inset 0 1px 0 rgba(230,238,247,.04)}
+.mute{color:var(--gem-muted);font-size:.9rem}.bad{color:var(--gem-ruby)}.ok{color:var(--gem-emerald)}
+a{color:var(--gem-aqua)}
+.btn,button{display:inline-block;background:transparent;color:var(--gem-ink);border:1px solid var(--gem-rim);border-radius:6px;padding:.5rem 1rem;font:inherit;cursor:pointer;text-decoration:none}
+.btn:hover,button:hover{border-color:var(--gem-aqua);color:var(--gem-aqua)}
+.btn:active,button:active{background:var(--gem-facet)}
+button:focus-visible,.btn:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--gem-aqua);outline-offset:1px}
+button.danger{border-color:var(--gem-ruby);color:var(--gem-ruby)}button.danger:hover{background:var(--gem-facet)}
+button.plain{color:var(--gem-aqua)}button.plain:hover{border-color:var(--gem-aqua)}
+input,select{font:inherit;padding:.4rem .5rem;border:1px solid var(--gem-rim);border-radius:6px;background:var(--gem-bg);color:var(--gem-ink);max-width:100%}
 label{display:block;margin:.5rem 0 .2rem}
-table{border-collapse:collapse;width:100%;font-size:.9rem}th,td{border-bottom:1px solid var(--line);padding:.35rem .4rem;text-align:left;vertical-align:top}
-pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:.7rem;overflow-x:auto;white-space:pre-wrap;word-break:break-all;user-select:all}
+table{border-collapse:collapse;width:100%;font-size:.9rem}th,td{border-bottom:1px solid var(--gem-rim);padding:.35rem .4rem;text-align:left;vertical-align:top}
+pre{background:var(--gem-facet);border:1px solid var(--gem-rim);border-radius:6px;padding:.7rem;overflow-x:auto;white-space:pre-wrap;word-break:break-all;user-select:all}
 .tok{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.95rem}
 form{margin:.4rem 0}.row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:end}
 """

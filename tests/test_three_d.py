@@ -27,6 +27,11 @@ from gemarc_mcp.scaffold import derive, three_d  # noqa: E402
 
 STYLE_POLICY = REPO_ROOT / "docs" / "02_基本设计" / "10_UI风格方针.md"
 SHARED_CSS = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "templates" / "shared" / "style.css"
+CONSOLE_CSS = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "templates" / "console" / "console.css"
+ACCOUNT_PAGES = REPO_ROOT / "src" / "gemarc_mcp" / "accounts" / "pages.py"
+CONSOLE_HTML = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "templates" / "console" / "index.html"
+CONSOLE_SPACE = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space" / "console-space.js"
+TOON_MATERIAL = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space" / "toon-material.js"
 AXIS_VIEWER = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space" / "axis-viewer-three.js"
 SPACE_VIEWER = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space" / "space-viewer-three.js"
 UNITY_CONTROLS = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space" / "unity-controls.js"
@@ -222,6 +227,128 @@ class StylePolicyBindingTests(unittest.TestCase):
                 self.assertNotIn("Math.random", _without_comments(source),
                                  f"{name} randomises the scene: the same model must "
                                  "always produce the same picture")
+
+
+class ConsoleStyleBindingTests(unittest.TestCase):
+    """The console is part of the same product: the policy binds it too.
+
+    The console used to carry its own set of near-duplicate colours
+    (``--bg``/``--panel``/``--accent``). Section 12.1 forbids that: the
+    background shares the palette of section 3, the crystal scene shares the
+    toon material and the gesture mapping of the two public scenes.
+    """
+
+    def _policy_text(self):
+        return STYLE_POLICY.read_text(encoding="utf-8")
+
+    def _palette(self):
+        """The palette of section 3: token -> colour."""
+        policy = self._policy_text()
+        table = re.search(r"## 3\..*?\n(\|.*?)\n\n", policy, re.S)
+        self.assertIsNotNone(table, "the policy does not carry the palette table")
+        return dict(re.findall(r"\| `(--gem-[a-z]+)` \| `(#[0-9a-fA-F]{6})`", table.group(1)))
+
+    def test_the_console_uses_every_token_of_the_policy_with_the_same_colour(self):
+        palette = self._palette()
+        self.assertTrue(palette, "the policy does not list any token")
+        css = CONSOLE_CSS.read_text(encoding="utf-8")
+        for token, colour in sorted(palette.items()):
+            with self.subTest(token=token):
+                self.assertRegex(css, rf"{token}:\s*{colour}\s*;",
+                                 f"{token} is {colour} in the policy but not in the console")
+
+    def test_the_console_does_not_start_a_second_palette(self):
+        """A second set of near-duplicate colours would drift from the site."""
+        css = CONSOLE_CSS.read_text(encoding="utf-8")
+        for token in ("--bg", "--panel", "--accent", "--line", "--ink", "--muted",
+                      "--warn", "--bad", "--good", "--panel-2"):
+            with self.subTest(token=token):
+                self.assertNotRegex(css, rf"^\s*{token}\s*:", f"the console defines {token} of its own")
+
+    def test_the_console_colours_are_the_tokens_of_the_policy(self):
+        """No raw colour may sneak into the console: only the tokens."""
+        css = CONSOLE_CSS.read_text(encoding="utf-8")
+        body = css.split(":root", 1)[-1].split("}", 1)[0]
+        for hex_colour in re.findall(r"#[0-9a-fA-F]{6}", body):
+            with self.subTest(colour=hex_colour):
+                self.assertIn(hex_colour.lower(), [c.lower() for c in self._palette().values()],
+                              "the console root declares a colour the policy does not know")
+
+    def test_the_console_scene_shares_the_toon_material_and_the_gestures(self):
+        source = CONSOLE_SPACE.read_text(encoding="utf-8")
+        self.assertIn("toon-material.js", source,
+                      "the console scene does not use the shared toon material")
+        self.assertIn("unity-controls.js", source,
+                      "the console scene does not use the shared gesture mapping")
+        self.assertIn("UnityControls", source)
+        # A second gesture mapping would drift from the nine rows of section 9.1.
+        self.assertNotIn("event.button ===", _without_comments(source))
+
+    def test_the_toon_material_has_exactly_one_implementation(self):
+        """Section 13.4: the material lives in one module and everybody uses it."""
+        root = REPO_ROOT / "src" / "gemarc_mcp"
+        makers = [path for path in root.rglob("*.js")
+                  if "createToonMaterial" in path.read_text(encoding="utf-8")
+                  and "export function createToonMaterial" in path.read_text(encoding="utf-8")]
+        self.assertEqual([path.name for path in makers], ["toon-material.js"],
+                         "the toon material must exist in one module only")
+        for name, path in (("axis viewer", AXIS_VIEWER), ("space viewer", SPACE_VIEWER),
+                           ("console scene", CONSOLE_SPACE)):
+            with self.subTest(renderer=name):
+                self.assertIn("toon-material.js", path.read_text(encoding="utf-8"))
+
+    def test_the_toon_material_is_the_one_the_policy_describes(self):
+        """Section 13.1: three bands, a toon material, a constant gradient map."""
+        policy = self._policy_text()
+        source = TOON_MATERIAL.read_text(encoding="utf-8")
+        self.assertIn("3 阶", policy)
+        self.assertIn("TOON_BAND_COUNT = 3", source)
+        self.assertIn("MeshToonMaterial", source)
+        self.assertIn("DataTexture", source)
+        self.assertIn("NearestFilter", source)
+        # The gradient is a constant: it never depends on the entity or the frame.
+        self.assertNotIn("Math.random", _without_comments(source))
+
+    def test_the_console_scene_does_not_animate_itself(self):
+        source = CONSOLE_SPACE.read_text(encoding="utf-8")
+        self.assertNotIn("Math.random", _without_comments(source),
+                         "the console scene randomises itself: the same tool list must "
+                         "always produce the same picture")
+
+    def test_the_console_scene_uses_the_colours_of_the_policy(self):
+        """Section 12.4: a read tool is aqua, a write tool is topaz."""
+        palette = self._palette()
+        source = CONSOLE_SPACE.read_text(encoding="utf-8")
+        self.assertIn(f"0x{palette['--gem-aqua'][1:].lower()}", source)
+        self.assertIn(f"0x{palette['--gem-topaz'][1:].lower()}", source)
+        self.assertIn(f"0x{palette['--gem-void'][1:].lower()}", source)
+
+    def test_the_console_has_a_scene_and_says_so_when_it_is_missing(self):
+        html = CONSOLE_HTML.read_text(encoding="utf-8")
+        self.assertIn('id="space-host"', html)
+        self.assertIn('id="space-hint"', html)
+        # The library is optional: the page resolves it through an import map.
+        self.assertIn("importmap", html)
+        self.assertIn('"three"', html)
+
+    def test_the_account_pages_share_the_palette_and_the_theme(self):
+        """The account page and the operator area are the same product."""
+        palette = self._palette()
+        source = ACCOUNT_PAGES.read_text(encoding="utf-8")
+        css = re.search(r'CSS = """(.*?)"""', source, re.S)
+        self.assertIsNotNone(css, "the account pages carry no stylesheet")
+        block = css.group(1)
+        for token, colour in sorted(palette.items()):
+            with self.subTest(token=token):
+                self.assertRegex(block, rf"{token}:\s*{colour}\s*[;}}]",
+                                 f"{token} is {colour} in the policy but not in the account pages")
+        # A second palette is forbidden, and so is a second theme.
+        for token in ("--bg", "--fg", "--mute", "--line", "--card", "--acc", "--bad", "--ok"):
+            with self.subTest(token=token):
+                self.assertNotRegex(block, rf"{token}\s*:", f"the account pages define {token} of their own")
+        self.assertNotIn("prefers-color-scheme", block,
+                         "the backend is one dark theme: a light one would be a second palette")
+        self.assertIn("color-scheme:dark", block)
 
 
 class UnityGesturePolicyTests(unittest.TestCase):

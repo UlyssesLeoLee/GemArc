@@ -463,6 +463,33 @@ class RemoteDefaultTests(unittest.TestCase):
         self.assertIsNone(re.search(r"localStorage\s*[.\[]", script))
         self.assertIn("Authorization", script)
 
+    def test_the_console_carries_its_crystal_scene(self):
+        """The tool surface is drawn by the console itself, from the shared modules."""
+        body = http(self.live.url("/"))[2].decode("utf-8")
+        self.assertIn('id="space-host"', body)
+        self.assertIn("./console-space/boot.js", body)
+        # The library is optional and comes from the import map, like the site.
+        self.assertIn("importmap", body)
+        self.assertIn('"three"', body)
+
+        for asset, marker in (("/console-space/boot.js", "console-space.js"),
+                              ("/console-space/console-space.js", "createConsoleSpace"),
+                              ("/console-space/toon-material.js", "createToonMaterial"),
+                              ("/console-space/unity-controls.js", "UnityControls")):
+            with self.subTest(asset=asset):
+                status, headers, content = http(self.live.url(asset))
+                self.assertEqual(status, 200, asset)
+                self.assertIn("javascript", headers["Content-Type"])
+                self.assertIn(marker, content.decode("utf-8", "replace"))
+
+    def test_an_unknown_module_of_the_console_scene_is_a_clean_404(self):
+        for path in ("/console-space/", "/console-space/nothing.js", "/console-space/a/b.js"):
+            with self.subTest(path=path):
+                status, headers, raw = http(self.live.url(path))
+                self.assertEqual(status, 404, path)
+                self.assertIn("application/json", headers["Content-Type"])
+                self.assertEqual(json.loads(raw), {"error": "not_found"}, path)
+
     def test_scaffold_site_is_served_under_the_site_prefix(self):
         """Requests /site/ first, so it does not depend on test order."""
         status, _, raw = http(self.live.url("/site/"))

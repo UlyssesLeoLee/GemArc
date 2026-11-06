@@ -120,3 +120,64 @@ test('a scene without a container says so instead of drawing nothing', () => {
   assert.throws(() => createConsoleSpace(THREE, { container: null }), /容器/);
   assert.throws(() => createConsoleSpace(null, { container: {} }), /THREE/);
 });
+
+/* --- the motion of the tool surface (BD-010 section 12.4) --------------- */
+
+test('the crystals turn slowly and breathe', () => {
+  const THREE = createStubThree();
+  const canvas = createStubCanvas();
+  const container = createStubContainer({ canvas });
+  let clock = 0;
+  const scene = createConsoleSpace(THREE, { container, tools: TOOLS, now: () => clock });
+  const record = scene.crystals.get('gemarc_brief');
+
+  const turnBefore = record.mesh.rotation.y;
+  const lightBefore = record.material.emissiveIntensity;
+  clock = 3;
+  scene.tick();
+
+  assert.notEqual(record.mesh.rotation.y, turnBefore, 'the crystal does not turn');
+  assert.notEqual(record.material.emissiveIntensity, lightBefore, 'the crystal does not breathe');
+  // A slow turn: three seconds is a small part of one turn.
+  assert.ok(Math.abs(record.mesh.rotation.y) < Math.PI, 'the crystal spins too fast');
+  // The self-light stays inside the band of the policy.
+  assert.ok(record.material.emissiveIntensity > 0, 'the crystal is dark');
+  assert.ok(record.material.emissiveIntensity < 0.5, 'the crystal is too bright');
+});
+
+test('the motion never moves a crystal away from its place', () => {
+  const THREE = createStubThree();
+  const canvas = createStubCanvas();
+  const container = createStubContainer({ canvas });
+  let clock = 0;
+  const scene = createConsoleSpace(THREE, { container, tools: TOOLS, now: () => clock });
+  const record = scene.crystals.get('gemarc_model');
+  const place = { ...record.mesh.position };
+  const colour = record.material.color;
+
+  clock = 17;
+  scene.tick();
+
+  assert.deepEqual({ ...record.mesh.position }, place, 'the crystal left its place');
+  assert.equal(record.material.color, colour, 'the crystal changed its colour');
+});
+
+test('a reader who asks for less motion gets a still scene', () => {
+  const THREE = createStubThree();
+  const canvas = createStubCanvas();
+  const container = createStubContainer({ canvas });
+  let clock = 0;
+  const scene = createConsoleSpace(THREE, {
+    container, tools: TOOLS, now: () => clock, lessMotion: true,
+  });
+  const record = scene.crystals.get('gemarc_brief');
+  const turnBefore = record.mesh.rotation.y;
+  const lightBefore = record.material.emissiveIntensity;
+
+  clock = 9;
+  scene.tick();
+
+  assert.equal(scene.lessMotion, true);
+  assert.equal(record.mesh.rotation.y, turnBefore, 'the crystal turns although it should not');
+  assert.equal(record.material.emissiveIntensity, lightBefore, 'the crystal breathes although it should not');
+});

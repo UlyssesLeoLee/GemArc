@@ -45,7 +45,31 @@ export const CONSOLE_SPACE_CONSTANTS = Object.freeze({
   lift: 6,
   /** The distance of the camera. */
   distance: 62,
+  /** Seconds for one full turn of a crystal. */
+  spinPeriod: 60,
+  /** Seconds for one breath: dark, bright, dark. */
+  breathPeriod: 6,
+  /** The self-light of a crystal at the end and at the peak of a breath. */
+  breathLow: 0.12,
+  breathHigh: 0.34,
 });
+
+/**
+ * Whether the reader asked for less motion.
+ *
+ * The system preference wins: when it says "reduce", the scene stays still
+ * and only the reader's own actions change it (section 12.4).
+ *
+ * @returns {boolean} true when the motion must stay off
+ */
+export function prefersLessMotion() {
+  try {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+    return Boolean(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Where every crystal sits.
@@ -111,6 +135,18 @@ export function createConsoleSpace(THREE, options = {}) {
   const { container, tools = [], onSelect = null, onHover = null } = options;
   if (!container) throw new Error('控制台的晶体场景需要容器元素');
   if (!THREE || typeof THREE !== 'object') throw new Error('控制台的晶体场景需要注入 THREE');
+
+  // The clock of the scene. It can be injected, so a test can move time by hand.
+  const clock = typeof options.now === 'function'
+    ? options.now
+    : () => (typeof performance !== 'undefined' && typeof performance.now === 'function'
+      ? performance.now() / 1000
+      : Date.now() / 1000);
+  // Reduced motion: the scene then stays still (section 12.4).
+  const lessMotion = options.lessMotion === undefined
+    ? prefersLessMotion()
+    : Boolean(options.lessMotion);
+  const started = clock();
 
   const doc = container.ownerDocument
     || (typeof document !== 'undefined' ? document : null);
@@ -187,12 +223,16 @@ export function createConsoleSpace(THREE, options = {}) {
     pickTargets.length = 0;
 
     const layout = layoutConsoleCrystals(list);
-    for (const plan of layout) {
+    layout.forEach((plan, index) => {
       const geometry = new THREE.OctahedronGeometry(CONSOLE_SPACE_CONSTANTS.crystalSize, 0);
       const material = createToonMaterial(THREE, {
         color: plan.color,
-        opacity: 0.62,
+        opacity: 0.68,
         gradient,
+        // The self-light of the crystal: this is the only thing that breathes
+        // (section 13.3). No new texture, no new shader.
+        emissive: plan.color,
+        emissiveIntensity: CONSOLE_SPACE_CONSTANTS.breathLow,
       });
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.set(plan.position.x, plan.position.y, plan.position.z);
@@ -210,8 +250,18 @@ export function createConsoleSpace(THREE, options = {}) {
       const edge = new THREE.LineSegments(edgeGeometry, edgeMaterial);
       mesh.add(edge);
 
-      crystals.set(plan.name, { mesh, geometry, material, edgeGeometry, edgeMaterial, color: plan.color });
-    }
+      crystals.set(plan.name, {
+        mesh,
+        geometry,
+        material,
+        edgeGeometry,
+        edgeMaterial,
+        color: plan.color,
+        // The phase of this crystal in the turn and in the breath. It comes
+        // from the place of the crystal, so it never changes between two runs.
+        phase: index * 0.37,
+      });
+    });
     if (selected && !crystals.has(selected)) selected = null;
     markSelection();
     frameAll();
@@ -225,7 +275,7 @@ export function createConsoleSpace(THREE, options = {}) {
     for (const [name, record] of crystals) {
       const active = name === selected;
       // The body stays transparent; the selection is carried by the edge.
-      record.material.opacity = active ? 0.88 : 0.62;
+      record.material.opacity = active ? 0.88 : 0.68;
       record.edgeMaterial.opacity = active ? 1 : 0.8;
     }
   }
@@ -336,8 +386,31 @@ export function createConsoleSpace(THREE, options = {}) {
     renderer.render(scene, camera);
   }
 
+  /**
+   * One step of the motion: a slow turn and a slow breath.
+   *
+   * The motion changes the **pose** and the **self-light** only. The
+   * geometry, the place of every crystal and its colour stay exactly where
+   * the tool list put them (sections 12.4 and 11.8), so the picture of the
+   * tool surface still describes the same facts.
+   */
+  function applyMotion() {
+    if (lessMotion) return;
+    const elapsed = clock() - started;
+    const turn = CONSOLE_SPACE_CONSTANTS.spinPeriod;
+    const breath = CONSOLE_SPACE_CONSTANTS.breathPeriod;
+    for (const record of crystals.values()) {
+      const phase = record.phase || 0;
+      record.mesh.rotation.y = (elapsed / turn + phase) * Math.PI * 2;
+      const wave = 0.5 + 0.5 * Math.sin(((elapsed / breath) + phase) * Math.PI * 2);
+      record.material.emissiveIntensity = CONSOLE_SPACE_CONSTANTS.breathLow
+        + (CONSOLE_SPACE_CONSTANTS.breathHigh - CONSOLE_SPACE_CONSTANTS.breathLow) * wave;
+    }
+  }
+
   function loop() {
     controls.tick();
+    applyMotion();
     draw();
     if (typeof requestAnimationFrame === 'function') frame = requestAnimationFrame(loop);
   }
@@ -389,6 +462,14 @@ export function createConsoleSpace(THREE, options = {}) {
     setSelected,
     /** Render one frame. */
     render: draw,
+    /** One step: the camera, the motion and one picture. */
+    tick() {
+      controls.tick();
+      applyMotion();
+      draw();
+    },
+    /** Whether the motion is off because the reader asked for less of it. */
+    lessMotion,
     /** Re-measure the canvas. */
     resize,
     /** Release every resource the scene created. */

@@ -87,29 +87,52 @@ esc = html.escape
 CSS = """
 /* The gem theme of BD-010 (UI style policy). The account page and the operator
    area are the same product as the site and the console: one palette, the
-   tokens of section 3, cut faces and bright edges. The theme is dark and it
-   does not follow the system preference: a second light palette would be a
-   second set of near-duplicate colours. */
-:root{color-scheme:dark;
+   tokens of section 3. The backend is the crystal cabinet of section 12.2 - a
+   pale, misty air layer, three static halos, crystal panes with one bright edge
+   and one very light shadow. The theme is light and it does not follow the
+   system preference: a second dark palette would be a second set of
+   near-duplicate colours. */
+:root{color-scheme:light;
 --gem-void:#06090e;--gem-bg:#0b0f16;--gem-panel:#111823;--gem-facet:#1b2635;--gem-rim:#2c3d52;
 --gem-ink:#e6eef7;--gem-muted:#93a6bd;--gem-aqua:#6fe3ff;--gem-violet:#b78cff;--gem-topaz:#ffc46b;
---gem-emerald:#6bd68a;--gem-ruby:#ff6b8a}
-body{margin:0;background:var(--gem-bg);color:var(--gem-ink);font:16px/1.6 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
-main{max-width:46rem;margin:0 auto;padding:1.5rem 16px 3rem}
-h1{font-size:1.4rem;margin:.2rem 0 1rem}h2{font-size:1.1rem;margin:2rem 0 .6rem}
-.card{background:var(--gem-panel);border:1px solid var(--gem-rim);border-radius:8px;padding:1rem 1.1rem;margin:1rem 0;box-shadow:inset 0 1px 0 rgba(230,238,247,.04)}
-.mute{color:var(--gem-muted);font-size:.9rem}.bad{color:var(--gem-ruby)}.ok{color:var(--gem-emerald)}
-a{color:var(--gem-aqua)}
-.btn,button{display:inline-block;background:transparent;color:var(--gem-ink);border:1px solid var(--gem-rim);border-radius:6px;padding:.5rem 1rem;font:inherit;cursor:pointer;text-decoration:none}
-.btn:hover,button:hover{border-color:var(--gem-aqua);color:var(--gem-aqua)}
-.btn:active,button:active{background:var(--gem-facet)}
-button:focus-visible,.btn:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--gem-aqua);outline-offset:1px}
-button.danger{border-color:var(--gem-ruby);color:var(--gem-ruby)}button.danger:hover{background:var(--gem-facet)}
-button.plain{color:var(--gem-aqua)}button.plain:hover{border-color:var(--gem-aqua)}
-input,select{font:inherit;padding:.4rem .5rem;border:1px solid var(--gem-rim);border-radius:6px;background:var(--gem-bg);color:var(--gem-ink);max-width:100%}
-label{display:block;margin:.5rem 0 .2rem}
-table{border-collapse:collapse;width:100%;font-size:.9rem}th,td{border-bottom:1px solid var(--gem-rim);padding:.35rem .4rem;text-align:left;vertical-align:top}
-pre{background:var(--gem-facet);border:1px solid var(--gem-rim);border-radius:6px;padding:.7rem;overflow-x:auto;white-space:pre-wrap;word-break:break-all;user-select:all}
+--gem-emerald:#6bd68a;--gem-ruby:#ff6b8a;
+--gem-air:#e9eff8;--gem-sheen:#ffffff;--gem-halo-aqua:#c9ecf7;--gem-halo-violet:#ded3fb;
+--gem-halo-topaz:#ffe6c4;--gem-ink-deep:#16233a;--gem-muted-deep:#5a6b84;--gem-aqua-deep:#0c6d84;
+--gem-topaz-deep:#96601a;--gem-emerald-deep:#2a7048;--gem-ruby-deep:#a8324f}
+body{margin:0;min-height:100vh;color:var(--gem-ink-deep);font:16px/1.65 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+background:radial-gradient(52rem 32rem at 2% -12%,color-mix(in srgb,var(--gem-halo-aqua) 60%,transparent),transparent 68%),
+radial-gradient(44rem 30rem at 100% 0%,color-mix(in srgb,var(--gem-halo-violet) 52%,transparent),transparent 70%),
+radial-gradient(58rem 38rem at 48% 116%,color-mix(in srgb,var(--gem-halo-topaz) 48%,transparent),transparent 72%),
+var(--gem-air);background-attachment:fixed}
+main{max-width:46rem;margin:0 auto;padding:2.2rem 16px 3.4rem}
+h1{font-size:1.45rem;margin:.2rem 0 1rem;letter-spacing:-.01em}
+/* The brand mark: a crystal, and only in the title (section 12.3). */
+h1::before{content:"◆";color:var(--gem-aqua-deep);font-size:.72em;margin-right:.5rem;vertical-align:.1em}
+h2{font-size:1.08rem;margin:2.2rem 0 .7rem;color:var(--gem-ink-deep)}
+ul{margin:.5rem 0 .3rem;padding-left:1.15rem}
+li{margin:.3rem 0}
+.card{background:color-mix(in srgb,var(--gem-sheen) 64%,transparent);border:1px solid color-mix(in srgb,var(--gem-sheen) 74%,var(--gem-rim));
+border-radius:12px;padding:1.1rem 1.2rem;margin:1rem 0;
+box-shadow:0 1px 2px color-mix(in srgb,var(--gem-ink-deep) 9%,transparent),inset 0 1px 0 color-mix(in srgb,var(--gem-sheen) 86%,transparent);
+backdrop-filter:blur(16px) saturate(1.15);-webkit-backdrop-filter:blur(16px) saturate(1.15)}
+.mute{color:var(--gem-muted-deep);font-size:.9rem}.bad{color:var(--gem-ruby-deep)}.ok{color:var(--gem-emerald-deep)}
+a{color:var(--gem-aqua-deep)}
+.btn,button{display:inline-block;background:color-mix(in srgb,var(--gem-sheen) 72%,transparent);color:var(--gem-ink-deep);
+border:1px solid color-mix(in srgb,var(--gem-ink-deep) 18%,transparent);border-radius:8px;padding:.5rem 1rem;font:inherit;cursor:pointer;text-decoration:none;
+box-shadow:inset 0 1px 0 color-mix(in srgb,var(--gem-sheen) 90%,transparent);transition:border-color .12s ease,color .12s ease}
+.btn:hover,button:hover{border-color:var(--gem-aqua-deep);color:var(--gem-aqua-deep)}
+.btn:active,button:active{background:color-mix(in srgb,var(--gem-air) 72%,transparent)}
+button:focus-visible,.btn:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--gem-aqua-deep);outline-offset:1px}
+button.danger{border-color:var(--gem-ruby-deep);color:var(--gem-ruby-deep)}button.danger:hover{background:color-mix(in srgb,var(--gem-sheen) 72%,transparent)}
+button.plain{color:var(--gem-aqua-deep)}button.plain:hover{border-color:var(--gem-aqua-deep)}
+input,select{font:inherit;padding:.45rem .6rem;border:1px solid color-mix(in srgb,var(--gem-ink-deep) 15%,transparent);
+border-radius:6px;background:var(--gem-sheen);color:var(--gem-ink-deep);max-width:100%}
+label{display:block;margin:.6rem 0 .25rem;color:var(--gem-ink-deep)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;background:var(--gem-sheen);border-radius:8px;overflow:hidden}
+th,td{border-bottom:1px solid color-mix(in srgb,var(--gem-ink-deep) 12%,transparent);padding:.45rem .55rem;text-align:left;vertical-align:top}
+th{color:var(--gem-muted-deep);font-weight:600}
+pre{background:var(--gem-sheen);border:1px solid color-mix(in srgb,var(--gem-ink-deep) 13%,transparent);border-radius:8px;padding:.8rem;
+overflow-x:auto;white-space:pre-wrap;word-break:break-all;user-select:all}
 .tok{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.95rem}
 form{margin:.4rem 0}.row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:end}
 """

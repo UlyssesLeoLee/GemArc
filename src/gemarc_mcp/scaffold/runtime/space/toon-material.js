@@ -63,15 +63,21 @@ export function createToonGradient(THREE) {
 /**
  * Build one crystal body material.
  *
- * The facets are the geometry's own: a crystal is a polyhedron, so its faces
- * already carry their own normals and the banded light breaks on them. (The
- * toon material has no `flatShading` switch; asking for one only produces a
- * warning.)
+ * The cut faces are the geometry's own: a crystal is a polyhedron, so every
+ * face already carries its own direction and the banded light breaks on them.
+ * (The toon material has no `flatShading` switch; asking for one only produces
+ * a warning.)
+ *
+ * The self-light (`emissive`) is the one thing that may change over time: the
+ * tool surface breathes with it. It adds no texture and no shader - the three
+ * bands of the light stay the three bands (section 13.3).
  *
  * @param {object} THREE the three-dimensional library
  * @param {object} [options] the material options
  * @param {number} [options.color] the body colour
  * @param {number} [options.opacity] the body opacity (0.45-0.7, section 4.2)
+ * @param {number} [options.emissive] the self-light colour
+ * @param {number} [options.emissiveIntensity] how strong the self-light is
  * @param {object} [options.gradient] the gradient map from {@link createToonGradient}
  * @returns {object} the material (dispose it with the scene)
  */
@@ -81,6 +87,8 @@ export function createToonMaterial(THREE, options = {}) {
     transparent: true,
     opacity: options.opacity ?? 0.62,
     gradientMap: options.gradient ?? createToonGradient(THREE),
+    emissive: options.emissive ?? 0x000000,
+    emissiveIntensity: options.emissiveIntensity ?? 0,
   });
   return material;
 }

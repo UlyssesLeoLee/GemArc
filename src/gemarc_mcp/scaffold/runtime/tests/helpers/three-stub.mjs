@@ -152,6 +152,22 @@ export class Vector3 {
   }
 }
 
+/** The rotation of an object: three keeps it as an Euler with three angles. */
+export class Euler {
+  constructor(x = 0, y = 0, z = 0) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+  }
+
+  set(x, y, z) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    return this;
+  }
+}
+
 export class Quaternion {
   constructor(x = 0, y = 0, z = 0, w = 1) {
     this.x = x;
@@ -226,6 +242,7 @@ export class Object3D {
   constructor() {
     this.position = new Vector3();
     this.scale = new Vector3(1, 1, 1);
+    this.rotation = new Euler();
     this.quaternion = new Quaternion();
     this.children = [];
     this.parent = null;

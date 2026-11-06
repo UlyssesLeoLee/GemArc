@@ -30,6 +30,7 @@ SHARED_CSS = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "templates" / "shar
 CONSOLE_CSS = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "templates" / "console" / "console.css"
 ACCOUNT_PAGES = REPO_ROOT / "src" / "gemarc_mcp" / "accounts" / "pages.py"
 CONSOLE_HTML = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "templates" / "console" / "index.html"
+CONSOLE_JS = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "templates" / "console" / "console.js"
 CONSOLE_SPACE = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space" / "console-space.js"
 TOON_MATERIAL = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space" / "toon-material.js"
 AXIS_VIEWER = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space" / "axis-viewer-three.js"
@@ -37,6 +38,19 @@ SPACE_VIEWER = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "spac
 UNITY_CONTROLS = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space" / "unity-controls.js"
 SHARED_SHELL = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "templates" / "shared" / "app.js"
 PREVIEW_SHELL = REPO_ROOT / "src" / "gemarc_mcp" / "web" / "app.js"
+
+
+def _palette_section(policy: str, section: str) -> str:
+    """The palette table of one section of the style policy.
+
+    The policy carries two tables: the dark band (3.1) and the light band
+    (3.2). A caller asks for the one it means, so the site is bound to the
+    dark band and the backend to both.
+    """
+    table = re.search(rf"### {re.escape(section)} .*?\n(\|.*?)\n\n", policy, re.S)
+    if table is None:
+        return ""
+    return table.group(1)
 
 
 def _without_comments(source: str) -> str:
@@ -188,9 +202,11 @@ class StylePolicyBindingTests(unittest.TestCase):
         self.assertTrue(STYLE_POLICY.is_file(), "the style policy document is missing")
 
     def test_the_site_uses_every_token_of_the_policy(self):
+        """The site is the dark band: it uses the tokens of section 3.1."""
         policy = self._policy_text()
         css = SHARED_CSS.read_text(encoding="utf-8")
-        tokens = set(re.findall(r"\| `(--gem-[a-z]+)` \| `#[0-9a-fA-F]{6}`", policy))
+        tokens = set(re.findall(r"\| `(--gem-[a-z0-9-]+)` \| `#[0-9a-fA-F]{6}`",
+                                _palette_section(policy, "3.1")))
         self.assertTrue(tokens, "the policy does not list any token")
         for token in sorted(tokens):
             with self.subTest(token=token):
@@ -241,12 +257,16 @@ class ConsoleStyleBindingTests(unittest.TestCase):
     def _policy_text(self):
         return STYLE_POLICY.read_text(encoding="utf-8")
 
-    def _palette(self):
-        """The palette of section 3: token -> colour."""
+    def _palette(self, sections=("3.1", "3.2")):
+        """The palette of section 3: token -> colour (the dark band and the light band)."""
         policy = self._policy_text()
-        table = re.search(r"## 3\..*?\n(\|.*?)\n\n", policy, re.S)
-        self.assertIsNotNone(table, "the policy does not carry the palette table")
-        return dict(re.findall(r"\| `(--gem-[a-z]+)` \| `(#[0-9a-fA-F]{6})`", table.group(1)))
+        tokens = {}
+        for section in sections:
+            block = _palette_section(policy, section)
+            self.assertTrue(block, f"the policy does not carry the palette table of section {section}")
+            tokens.update(dict(re.findall(r"\| `(--gem-[a-z0-9-]+)` \| `(#[0-9a-fA-F]{6})`", block)))
+        self.assertTrue(tokens, "the policy does not list any token")
+        return tokens
 
     def test_the_console_uses_every_token_of_the_policy_with_the_same_colour(self):
         palette = self._palette()
@@ -347,8 +367,83 @@ class ConsoleStyleBindingTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertNotRegex(block, rf"{token}\s*:", f"the account pages define {token} of their own")
         self.assertNotIn("prefers-color-scheme", block,
-                         "the backend is one dark theme: a light one would be a second palette")
-        self.assertIn("color-scheme:dark", block)
+                         "the backend is one light theme: a dark one would be a second palette")
+        self.assertIn("color-scheme:light", block)
+
+    # --- section 12.2: the crystal cabinet --------------------------------
+
+    def test_the_backend_is_the_light_crystal_cabinet(self):
+        """Section 12.2: the backend is a pale, misty, crystal one - and only one."""
+        policy = self._policy_text()
+        self.assertIn("浅色单主题", policy)
+        for name, path in (("console", CONSOLE_CSS), ("account pages", ACCOUNT_PAGES)):
+            with self.subTest(surface=name):
+                css = path.read_text(encoding="utf-8")
+                self.assertNotIn("prefers-color-scheme", css,
+                                 "the backend does not follow the system preference: "
+                                 "a second theme would be a second palette")
+                self.assertRegex(css, r"color-scheme:\s*light",
+                                 "the backend declares one light theme")
+                self.assertIn("var(--gem-air)", css, "the backend sits on the air layer")
+
+    def test_the_backend_has_the_three_halos(self):
+        """Section 12.2: three static halos behind the crystal."""
+        policy = self._policy_text()
+        self.assertIn("背景光晕", policy)
+        halos = ("--gem-halo-aqua", "--gem-halo-violet", "--gem-halo-topaz")
+        for name, path in (("console", CONSOLE_CSS), ("account pages", ACCOUNT_PAGES)):
+            with self.subTest(surface=name):
+                css = path.read_text(encoding="utf-8")
+                self.assertIn("radial-gradient", css, "the backend has no halo")
+                for token in halos:
+                    self.assertIn(token, css, f"the halo {token} is missing")
+        # The halos are still: a drifting halo would be a loop animation.
+        for name, path in (("console", CONSOLE_CSS), ("account pages", ACCOUNT_PAGES)):
+            with self.subTest(surface=name):
+                css = path.read_text(encoding="utf-8")
+                self.assertNotIn("@keyframes", css, "the halos must stay still")
+
+    # --- section 12.6: the first screen says a few phrases ---------------
+
+    def test_the_status_line_says_a_few_phrases_and_folds_the_values(self):
+        """Section 12.6: at most five phrases, the values in the details."""
+        policy = self._policy_text()
+        self.assertIn("不超过 5 个要点", policy)
+        source = CONSOLE_JS.read_text(encoding="utf-8")
+        body = re.search(r"function renderStatus\(health\) \{(.*?)\n\}", source, re.S)
+        self.assertIsNotNone(body, "the console has no renderStatus")
+        phrases = re.findall(r"bar\.append\(phrase\(", body.group(1))
+        self.assertLessEqual(len(phrases), 5,
+                             "the first screen may carry at most five phrases")
+        self.assertGreaterEqual(len(phrases), 3)
+        # The protocol values are folded away, not shown on the first screen.
+        self.assertIn("details", source, "the technical values have no folded details")
+        html = CONSOLE_HTML.read_text(encoding="utf-8")
+        self.assertIn("<details", html)
+
+    # --- section 12.4: the tool surface moves, the public scenes do not --
+
+    def test_the_tool_surface_breathes_and_the_public_scenes_stay_still(self):
+        """Section 12.4: the motion is the tool surface's alone."""
+        policy = self._policy_text()
+        self.assertIn("缓慢自转", policy)
+        self.assertIn("呼吸辉光", policy)
+        scene = CONSOLE_SPACE.read_text(encoding="utf-8")
+        self.assertIn("rotation.y", _without_comments(scene), "the crystals do not turn")
+        self.assertIn("emissiveIntensity", _without_comments(scene), "the crystals do not breathe")
+        for name, path in (("axis viewer", AXIS_VIEWER), ("space viewer", SPACE_VIEWER)):
+            with self.subTest(renderer=name):
+                code = _without_comments(path.read_text(encoding="utf-8"))
+                self.assertNotIn("rotation.y", code, f"{name} turns by itself")
+                self.assertNotIn("emissiveIntensity", code, f"{name} breathes by itself")
+
+    def test_the_motion_answers_the_reader_who_asks_for_less(self):
+        """Section 7: the motion is off when the reader asked for less of it."""
+        policy = self._policy_text()
+        self.assertIn("prefers-reduced-motion", policy)
+        scene = CONSOLE_SPACE.read_text(encoding="utf-8")
+        self.assertIn("prefers-reduced-motion", scene)
+        self.assertIn("lessMotion", scene)
 
 
 class UnityGesturePolicyTests(unittest.TestCase):

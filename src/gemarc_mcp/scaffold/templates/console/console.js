@@ -197,36 +197,49 @@ function renderStatus(health) {
   const bar = $('#statbar');
   bar.textContent = '';
 
-  const chip = (label, value, cls) => {
-    const node = el('span', 'stat' + (cls ? ' ' + cls : ''));
+  // The first screen answers one question only: what is the server right now.
+  // At most five phrases, each one short; the protocol values are folded into
+  // the details panel (BD-010 section 12.6).
+  const phrase = (label, value, cls) => {
+    const node = el('span', 'fact' + (cls ? ' ' + cls : ''));
     node.append(el('span', '', label));
     node.append(el('b', '', String(value)));
     return node;
   };
 
-  bar.append(chip('transport', health.transport || '—'));
-  bar.append(chip('protocol path', health.protocolPath || '—'));
-  bar.append(chip('toolset', health.toolset || '—'));
-  bar.append(chip('tools', Array.isArray(health.tools) ? health.tools.length : '—'));
-  bar.append(chip('seed', health.seedProject || '—'));
-  bar.append(chip('static site', health.staticSiteSource || '—'));
-  bar.append(chip(
-    'auth',
-    health.authRequired ? (health.sessionAuth ? '登录会话 / 令牌' : 'bearer token') : 'open',
-    health.authRequired ? 'good' : 'warn'
-  ));
+  const site = health.staticSiteSource || '';
   const writeable = state.writeEnabled && WRITE_TOOLS.size > 0;
-  bar.append(chip(
-    'write tools',
-    WRITE_TOOLS.size === 0 ? 'none in this toolset' : (state.writeEnabled ? 'enabled' : 'disabled'),
-    writeable ? 'good' : 'warn'
-  ));
+  bar.append(phrase('工具', Array.isArray(health.tools) ? health.tools.length : '—'));
+  bar.append(phrase('权限', writeable ? '可写' : '只读', writeable ? 'good' : ''));
+  bar.append(phrase('站点', site === 'not-built-yet' ? '未构建' : (site || '—')));
+  bar.append(phrase('登录', health.authRequired ? (health.sessionAuth ? '已登录' : '需令牌') : '开放',
+    health.authRequired ? (health.sessionAuth ? 'good' : 'warn') : 'good'));
   if (health.status && health.status !== 'ok') {
-    bar.append(chip('status', `${health.status} · session manager ${health.sessionManager || '?'}`, 'bad'));
+    bar.append(phrase('状态', health.status, 'bad'));
+  }
+
+  // The technical values live in the folded details, not on the first screen.
+  const body = $('#facts-detail');
+  if (body) {
+    body.textContent = '';
+    const rows = [
+      ['传输', health.transport || '—'],
+      ['协议路径', health.protocolPath || '—'],
+      ['工具集', health.toolset || '—'],
+      ['种子项目', health.seedProject || '—'],
+      ['静态源', site || '—'],
+      ['写工具', WRITE_TOOLS.size === 0 ? '本工具集无' : (state.writeEnabled ? '已开启' : '已关闭')],
+    ];
+    for (const [label, value] of rows) {
+      const row = el('div');
+      row.append(el('span', '', label));
+      row.append(el('b', '', String(value)));
+      body.append(row);
+    }
   }
 
   $('#foot-meta').textContent =
-    `server ${health.server || 'gemarc-mcp'} ${health.version || ''} · ${health.writeEnabled ? '写工具已开启' : '写工具默认关闭'}`;
+    `server ${health.server || 'gemarc-mcp'} ${health.version || ''} · ${state.writeEnabled ? '写工具已开启' : '写工具默认关闭'}`;
 }
 
 /* --------------------------------------------------------------------- auth */
@@ -681,7 +694,7 @@ async function boot() {
     renderSideLists();
     pushHistory({ name: '(连接建立)', ms: 0, ok: true });
     dot.className = 'dot on';
-    text.textContent = `已连接 · ${state.tools.length} tools / ${state.resources.length} resources / ${state.prompts.length} prompts`;
+    text.textContent = `已连接 · ${state.tools.length} 工具 / ${state.resources.length} 资源 / ${state.prompts.length} 提示`;
     if (state.tools.length) selectTool(state.tools[0].name);
   } catch (error) {
     if (!current()) return;
@@ -693,7 +706,7 @@ async function boot() {
     text.textContent = `连接失败: ${error.message}`;
     const bar = $('#statbar');
     if (!healthShown) bar.textContent = '';  // keep the health chips (a degraded state included) once shown
-    bar.append(el('span', 'stat bad', error.message));
+    bar.append(el('span', 'fact bad', error.message));
   }
 }
 

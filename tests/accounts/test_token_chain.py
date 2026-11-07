@@ -164,6 +164,22 @@ class TheAccountPageSpeaksThreeLanguages(ServerCase):
         for lang in i18n.LANGUAGES:
             self.assertIn(f"?lang={lang}", resp.text)
 
+    def test_the_error_page_speaks_the_language_of_the_request(self):
+        """An error page is a page too: it must answer in the language of the reader."""
+        resp = self.signed_out("/auth/google/callback?code=x&state=y",
+                               headers={"Accept-Language": "ja-JP"})
+        self.assertEqual(resp.status, 400)
+        self.assertIn('lang="ja-JP"', resp.text)
+        self.assertIn(i18n.text("ja-JP", "messages", "GEMARC_ACCT_010"), resp.text)
+        english = self.signed_out("/auth/google/callback?code=x&state=y",
+                                  headers={"Accept-Language": "en-US"})
+        self.assertIn(i18n.text("en-US", "messages", "GEMARC_ACCT_010"), english.text)
+
+    def test_an_explicit_choice_wins_on_the_error_page(self):
+        resp = self.signed_out("/auth/google/callback?code=x&state=y&lang=en-US",
+                               headers={"Accept-Language": "ja-JP"})
+        self.assertIn(i18n.text("en-US", "messages", "GEMARC_ACCT_010"), resp.text)
+
 
 if __name__ == "__main__":
     unittest.main()

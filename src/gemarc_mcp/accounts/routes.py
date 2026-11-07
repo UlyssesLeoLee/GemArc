@@ -10,6 +10,7 @@ here logs a token, an e-mail, an address, a code, a cookie or a secret.
 """
 from __future__ import annotations
 
+import contextvars
 import hashlib
 import json
 import logging
@@ -65,6 +66,10 @@ LANG_COOKIE_MAX_AGE = 365 * 86400
 #: The error texts of the account routes. They live in the language tables (the `messages`
 #: section), so an error page speaks the language of the reader (DD-009).
 MESSAGES = {lang: i18n.section(lang, "messages") for lang in i18n.LANGUAGES}
+#: The language of the request being handled. The error pages come from many places (a
+#: limit, a stale session, a bad token, a wrong host), and every one of them must speak the
+#: language of the reader: the request carries it, the pages take it from here.
+REQUEST_LANG: "contextvars.ContextVar[str]" = contextvars.ContextVar("gemarc_request_lang", default="")
 TOKEN_ERROR_STATUS = {"GEMARC_ACCT_034": 400, "GEMARC_ACCT_033": 409, "GEMARC_ACCT_035": 403, "GEMARC_ACCT_013": 403}
 DB_ERROR_STATE = {"GEMARC_ACCT_002": "unreachable", "GEMARC_ACCT_003": "unreachable", "GEMARC_ACCT_004": "misconfigured"}
 
@@ -313,10 +318,12 @@ class AccountsRuntime:
     def error(self, status: int, code: str, *, email: Optional[str] = None, relogin: bool = True, cookies=(),
               retry_after: Optional[int] = None, lang: str = ""):
         headers = {"Retry-After": str(max(int(retry_after), 1))} if retry_after else None
+        # No language given: the one of the request being handled (DD-009).
+        lang = lang or REQUEST_LANG.get()
         message = MESSAGES.get(lang, {}).get(code) or MESSAGES.get("zh-CN", {}).get(code) or code
         return self._html(status, lambda n: pages.error_page(n, code, message, lang=lang, email=email,
                                                             relogin=relogin),
-                          cookies=cookies, headers=headers)
+                          cookies=cookies, headers=headers, lang=lang)
 
     def not_found(self):
         return pages.json_response(404, {"error": "not_found"}, hsts=self.hsts)
@@ -325,6 +332,9 @@ class AccountsRuntime:
     async def handle(self, scope: dict, receive: Callable, send: Callable) -> None:
         reader = security.BodyReader(receive)
         req = Req(scope["method"], scope["path"], Headers(scope=scope), scope, reader)
+        # The language of this request, for every page that is built on the way (the error
+        # pages above all): the reader asked for it with the header, the cookie or the link.
+        REQUEST_LANG.set(req.lang)
         try:
             response = await self._route(req)
         except Early as early:

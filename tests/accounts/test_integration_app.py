@@ -9,6 +9,7 @@ import json
 import re
 import sys
 import unittest
+from html import unescape
 from pathlib import Path
 
 TESTS = Path(__file__).resolve().parents[1]
@@ -61,7 +62,10 @@ class EndToEnd(ServerCase):
         token = first_token(created)
         self.assertIn("claude mcp add", created.text)
         self.assertIn("bearer_token_env_var", created.text)
-        self.assertIn("Bearer ${GEMARC_MCP_PAT}", created.text)
+        # the website hands the token out and the agent fills it in (OPS-002 section 3.15)
+        handed_out = unescape(created.text)
+        self.assertIn(f"Bearer {token}", handed_out)
+        self.assertIn(f"$env:GEMARC_MCP_PAT = '{token}'", handed_out)
         # 4. /mcp without it and with a wrong one
         status, headers, _ = rpc(self.srv.url("/mcp"), "initialize", INITIALIZE["params"])
         self.assertEqual(status, 401)

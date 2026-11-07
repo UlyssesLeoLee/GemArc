@@ -380,6 +380,7 @@ class VerifyRemoteScriptTests(unittest.TestCase):
 NODE_HARNESS = r"""
 // Runs console.js against a minimal fake DOM and a fake fetch to exercise the token flow.
 const fs = require('fs');
+const path = require('path');
 const source = fs.readFileSync(process.argv[2], 'utf8');
 const scenario = process.argv[3];
 
@@ -406,7 +407,19 @@ const document = {
   getElementById(id) { const key = '#' + id; return nodes[key] || (nodes[key] = makeNode(key)); },
   createElement() { return makeNode('x'); }, createTextNode() { return makeNode('t'); },
   createDocumentFragment() { return makeNode('f'); },
+  // The panel fills the page through these two; the fake DOM has no elements of its own.
+  querySelectorAll() { return []; },
+  documentElement: { lang: '' },
 };
+// The language tables the server sends with the page (window.GEMARC.i18n).
+const i18nDir = path.resolve(path.dirname(process.argv[2]), '..', '..', '..', '..', '..', 'src', 'gemarc_mcp', 'i18n');
+function consoleTables() {
+  const out = {};
+  for (const lang of ['zh-CN', 'ja-JP', 'en-US']) {
+    out[lang] = JSON.parse(fs.readFileSync(path.join(i18nDir, lang + '.json'), 'utf8')).console;
+  }
+  return out;
+}
 let storage = {}; let storageBroken = scenario === 'broken-storage';
 const sessionStorage = {
   getItem(k) { if (storageBroken) throw new Error('blocked'); return k in storage ? storage[k] : null; },
@@ -434,7 +447,7 @@ async function fetch(url, options = {}) {
   const result = method === 'tools/list' ? { tools: [{ name: 'gemarc_brief', inputSchema: { properties: {} } }] } : {};
   return { ok: true, status: 200, text: async () => JSON.stringify({ jsonrpc: '2.0', id: 1, result }) };
 }
-const window = { GEMARC: { mcpPath: '/mcp', healthPath: '/healthz', writeTools: [] } };
+const window = { GEMARC: { mcpPath: '/mcp', healthPath: '/healthz', writeTools: [], i18n: consoleTables(), lang: 'zh-CN' } };
 // The role of the caller, as the server injects it: '' is a deployment without accounts.
 const ROLE = process.argv[5] || '';
 if (ROLE) {

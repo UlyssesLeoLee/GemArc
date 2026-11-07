@@ -459,8 +459,13 @@ class RemoteDefaultTests(unittest.TestCase):
             self.assertTrue(content)
         script = http(self.live.url("/console.js"))[2].decode("utf-8")
         self.assertIn("sessionStorage", script)
-        # The token may only ever live in sessionStorage (a comment may name localStorage).
-        self.assertIsNone(re.search(r"localStorage\s*[.\[]", script))
+        # The token may only ever live in sessionStorage. The local store may carry the
+        # language choice (the panel remembers it on this machine, DD-010 section 12.7) and
+        # nothing else: every localStorage access must name the language key.
+        uses = re.findall(r"localStorage\.(getItem|setItem|removeItem)\(\s*([^)]*)\)", script)
+        self.assertTrue(uses, "the console reads no language choice from the local store")
+        for action, argument in uses:
+            self.assertIn("LANG_KEY", argument, f"localStorage.{action}({argument}) may touch no other key")
         self.assertIn("Authorization", script)
 
     def test_the_console_carries_its_crystal_scene(self):

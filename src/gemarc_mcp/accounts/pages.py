@@ -1,4 +1,4 @@
-"""Minimal server-rendered pages (zh-CN) and the ONE function that applies the security headers (design 3.2, 3.11).
+"""Minimal server-rendered pages (three languages) and the ONE function that applies the security headers.
 
 Rules enforced here:
 
@@ -20,12 +20,25 @@ from typing import Iterable, Optional, Sequence
 
 from starlette.responses import Response
 
+from .. import i18n
+
 CSP_BASE = "default-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
 HSTS = "max-age=31536000"
 PERMISSIONS = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
 HTML_TYPE = "text/html; charset=utf-8"
 #: The word the user must type to confirm deletion (kept in a variable: SQL-looking words stay out of string builds).
 CONFIRM_WORD = "DELETE"
+#: The language of a page when nothing else says which one to use.
+DEFAULT_LANG = i18n.DEFAULT_LANG
+
+
+def t(lang: str, key: str, **fmt) -> str:
+    """One string of the account pages in one language."""
+    return i18n.text(lang or DEFAULT_LANG, "accounts", key, **fmt)
+
+
+def esc(value) -> str:
+    return html.escape(str(value), quote=True)
 
 
 def new_nonce() -> str:
@@ -34,7 +47,8 @@ def new_nonce() -> str:
 
 def security_headers(*, nonce: Optional[str] = None, hsts: bool = False) -> "dict[str, str]":
     """The full header set of design 3.2 (the CSP only has ``style-src`` when the response carries a styled page)."""
-    csp = CSP_BASE if nonce is None else f"default-src 'none'; style-src 'nonce-{nonce}'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
+    csp = CSP_BASE if nonce is None else (
+        f"default-src 'none'; style-src 'nonce-{nonce}'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
     headers = {
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
@@ -82,7 +96,7 @@ def unavailable(code: str = "GEMARC_ACCT_001", *, hsts: bool = False, retry_afte
 
 
 # -- HTML -----------------------------------------------------------------------------------------------------------
-esc = html.escape
+
 
 CSS = """
 /* The gem theme of BD-010 (UI style policy). The account page and the operator
@@ -92,13 +106,17 @@ CSS = """
    and one very light shadow. The theme is light and it does not follow the
    system preference: a second dark palette would be a second set of
    near-duplicate colours. */
-:root{color-scheme:light;
---gem-void:#06090e;--gem-bg:#0b0f16;--gem-panel:#111823;--gem-facet:#1b2635;--gem-rim:#2c3d52;
---gem-ink:#e6eef7;--gem-muted:#93a6bd;--gem-aqua:#6fe3ff;--gem-violet:#b78cff;--gem-topaz:#ffc46b;
---gem-emerald:#6bd68a;--gem-ruby:#ff6b8a;
---gem-air:#e9eff8;--gem-sheen:#ffffff;--gem-halo-aqua:#c9ecf7;--gem-halo-violet:#ded3fb;
---gem-halo-topaz:#ffe6c4;--gem-ink-deep:#16233a;--gem-muted-deep:#5a6b84;--gem-aqua-deep:#0c6d84;
---gem-topaz-deep:#96601a;--gem-emerald-deep:#2a7048;--gem-ruby-deep:#a8324f}
+:root {
+  color-scheme:light;
+  /* The dark band of section 3.1 is the shared palette of the site and the three-dimensional
+     scene; the backend adds the light band of section 3.2. Both bands are the one colour
+     source (section 3), so the account pages carry both. */
+  --gem-void:#06090e;--gem-bg:#0b0f16;--gem-panel:#111823;--gem-facet:#1b2635;--gem-rim:#2c3d52;
+  --gem-ink:#e6eef7;--gem-muted:#93a6bd;--gem-aqua:#6fe3ff;--gem-violet:#b78cff;--gem-topaz:#ffc46b;
+  --gem-emerald:#6bd68a;--gem-ruby:#ff6b8a;
+  --gem-air:#e9eff8;--gem-sheen:#ffffff;--gem-halo-aqua:#c9ecf7;--gem-halo-violet:#ded3fb;
+  --gem-halo-topaz:#ffe6c4;--gem-ink-deep:#16233a;--gem-muted-deep:#5a6b84;--gem-aqua-deep:#0c6d84;
+  --gem-topaz-deep:#96601a;--gem-emerald-deep:#2a7048;--gem-ruby-deep:#a8324f}
 body{margin:0;min-height:100vh;color:var(--gem-ink-deep);font:16px/1.65 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
 background:radial-gradient(52rem 32rem at 2% -12%,color-mix(in srgb,var(--gem-halo-aqua) 60%,transparent),transparent 68%),
 radial-gradient(44rem 30rem at 100% 0%,color-mix(in srgb,var(--gem-halo-violet) 52%,transparent),transparent 70%),
@@ -124,7 +142,7 @@ box-shadow:inset 0 1px 0 color-mix(in srgb,var(--gem-sheen) 90%,transparent);tra
 .btn:active,button:active{background:color-mix(in srgb,var(--gem-air) 72%,transparent)}
 button:focus-visible,.btn:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--gem-aqua-deep);outline-offset:1px}
 button.danger{border-color:var(--gem-ruby-deep);color:var(--gem-ruby-deep)}button.danger:hover{background:color-mix(in srgb,var(--gem-sheen) 72%,transparent)}
-button.plain{color:var(--gem-aqua-deep)}button.plain:hover{border-color:var(--gem-aqua-deep)}
+button.plain{color:var(--gem-aqua-deep)}button.plain:hover{color:var(--gem-aqua-deep)}
 input,select{font:inherit;padding:.45rem .6rem;border:1px solid color-mix(in srgb,var(--gem-ink-deep) 15%,transparent);
 border-radius:6px;background:var(--gem-sheen);color:var(--gem-ink-deep);max-width:100%}
 label{display:block;margin:.6rem 0 .25rem;color:var(--gem-ink-deep)}
@@ -135,17 +153,40 @@ pre{background:var(--gem-sheen);border:1px solid color-mix(in srgb,var(--gem-ink
 overflow-x:auto;white-space:pre-wrap;word-break:break-all;user-select:all}
 .tok{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.95rem}
 form{margin:.4rem 0}.row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:end}
+/* The language switcher: three links, each written in its own language
+   (section 12.7). The pages have no script, so a link is the only control. */
+.langbar{display:flex;align-items:baseline;gap:.55rem;margin:0 0 1.4rem;font-size:.85rem}
+.langbar a{text-decoration:none;padding:.1rem .35rem;border-radius:5px}
+.langbar a:hover{background:color-mix(in srgb,var(--gem-sheen) 70%,transparent)}
+.langbar a.on{color:var(--gem-ink-deep);border:1px solid color-mix(in srgb,var(--gem-aqua-deep) 45%,transparent)}
 """
 
 
-def page(title: str, body: str, nonce: str) -> str:
+def page(title: str, body: str, nonce: str, lang: str = "") -> str:
+    language = lang or DEFAULT_LANG
     return (
-        "<!doctype html>\n<html lang=\"zh-CN\"><head><meta charset=\"utf-8\">"
+        "<!doctype html>\n"
+        f"<html lang=\"{esc(language)}\"><head><meta charset=\"utf-8\">"
         "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
         "<meta name=\"referrer\" content=\"no-referrer\">"
         f"<title>{esc(title)}</title><style nonce=\"{esc(nonce)}\">{CSS}</style></head>"
-        f"<body><main>{body}</main></body></html>\n"
+        f"<body><main>{language_switcher(language)}{body}</main></body></html>\n"
     )
+
+
+def language_switcher(lang: str) -> str:
+    """The language switcher: three links, because the pages have no script.
+
+    Every option is written in its own language, so the switcher reads the same
+    in every language (BD-010 section 12.7).
+    """
+    parts = [f"<p class=\"langbar\"><span class=\"mute\">{esc(t(lang, 'lang.label'))}</span>"]
+    for code in i18n.LANGUAGES:
+        label = {"zh-CN": "lang.zh", "ja-JP": "lang.ja", "en-US": "lang.en"}[code]
+        current = " class=\"on\"" if code == lang else ""
+        parts.append(f"<a{current} href=\"?lang={code}\" hreflang=\"{code}\">{esc(t(lang, label))}</a>")
+    parts.append("</p>")
+    return "".join(parts)
 
 
 @dataclass(frozen=True)
@@ -166,80 +207,91 @@ def _fmt_time(value: Optional[int]) -> str:
     return time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(int(value)))
 
 
-def privacy_notice(view: View) -> str:
+def privacy_notice(view: View, lang: str) -> str:
     link = ""
     if view.privacy_url:
-        link = f" 运营者的隐私声明：<a href=\"{esc(view.privacy_url)}\">查看</a>。"
+        link = (f" {t(lang, 'privacy.operator')}<a href=\"{esc(view.privacy_url)}\">{esc(t(lang, 'privacy.view'))}</a>"
+                + esc(t(lang, "common.period")))
     return (
-        "<div class=\"card\"><h2>隐私告知</h2>"
-        "<p>登录用 Google 账号（只请求 <code>openid</code> 与 <code>email</code> 两项，不请求姓名、头像）。</p>"
-        "<ul><li>存什么：你的邮箱与 Google 账号标识，字段加密后存入数据库；不存密码，也不存 Google 的任何令牌。</li>"
-        "<li>为什么存：识别你的账号、签发和撤销个人访问令牌、留下最小的安全审计记录。</li>"
-        "<li>存多久：账号存在期间保存；审计记录按运营者设定的天数清理；删除账号后数据库中的账号数据一并删除"
-        "（数据库服务商的备份可能在其保留窗口内仍含旧数据）。</li>"
-        "<li>你的权利：登录后可随时导出全部数据或删除账号。</li></ul>"
+        "<div class=\"card\"><h2>" + esc(t(lang, "privacy.h2")) + "</h2>"
+        "<p>" + esc(t(lang, "privacy.login")) + "</p>"
+        "<ul><li>" + esc(t(lang, "privacy.what")) + "</li>"
+        "<li>" + esc(t(lang, "privacy.why")) + "</li>"
+        "<li>" + esc(t(lang, "privacy.howlong")) + "</li>"
+        "<li>" + esc(t(lang, "privacy.rights")) + "</li></ul>"
         f"<p class=\"mute\">{link}</p></div>"
     )
 
 
-def signed_out_page(view: View, nonce: str, *, notice: Optional[str] = None) -> str:
+def signed_out_page(view: View, nonce: str, lang: str = "", notice: Optional[str] = None) -> str:
     banner = f"<p class=\"bad\">{esc(notice)}</p>" if notice else ""
     body = (
-        "<h1>GemArc 账号</h1>" + banner + privacy_notice(view)
-        + "<p><a class=\"btn\" href=\"/auth/google/start\">使用 Google 登录</a></p>"
-        "<p class=\"mute\">首次成功登录即完成注册。登录后可创建个人访问令牌，供 Claude Code、Codex、Hermes 调用 MCP。</p>"
+        "<h1>" + esc(t(lang, "title.account")) + "</h1>" + banner + privacy_notice(view, lang)
+        + "<p><a class=\"btn\" href=\"/auth/google/start\">" + esc(t(lang, "signedout.google")) + "</a></p>"
+        "<p class=\"mute\">" + esc(t(lang, "signedout.note")) + "</p>"
     )
-    return page("GemArc 账号", body, nonce)
+    return page(t(lang, "title.account"), body, nonce, lang)
 
 
-def error_page(nonce: str, code: str, message: str, *, email: Optional[str] = None, relogin: bool = True,
-               title: str = "出错了") -> str:
+def error_page(nonce: str, code: str, message: str, *, lang: str = "", email: Optional[str] = None,
+               relogin: bool = True, title: str = "") -> str:
     shown = ""
     if email:
-        shown = (f"<p>你登录的邮箱是 <strong>{esc(email)}</strong>。如果你确定应当被允许，"
-                 "请把这个地址发给运营者。</p>")
-    link = "<p><a class=\"btn\" href=\"/account\">返回账号页</a></p>"
+        shown = "<p>" + esc(t(lang, "error.email", email=email)) + "</p>"
+    heading = title or t(lang, "error.title")
+    link = "<p><a class=\"btn\" href=\"/account\">" + esc(t(lang, "error.back")) + "</a></p>"
     if relogin:
-        link = "<p><a class=\"btn\" href=\"/auth/google/start\">使用 Google 登录</a> <a href=\"/account\">返回账号页</a></p>"
-    body = (f"<h1>{esc(title)}</h1><div class=\"card\"><p class=\"bad\">{esc(message)}</p>"
-            f"<p class=\"mute\">错误编号：{esc(code)}</p></div>{shown}{link}")
-    return page(f"{title} {code}", body, nonce)
+        link = ("<p><a class=\"btn\" href=\"/auth/google/start\">" + esc(t(lang, "error.relogin"))
+                + "</a> <a href=\"/account\">" + esc(t(lang, "error.back")) + "</a></p>")
+    body = ("<h1>" + esc(heading) + "</h1><div class=\"card\"><p class=\"bad\">" + esc(message) + "</p>"
+            "<p class=\"mute\">" + esc(t(lang, "error.code", code=code)) + "</p></div>" + shown + link)
+    return page(f"{heading} {code}", body, nonce, lang)
 
 
-def deleted_page(nonce: str) -> str:
-    return page("账号已删除", "<h1>账号已删除</h1><div class=\"card\"><p>你的账号、会话与令牌已从数据库删除。"
-                "审计记录已匿名化。数据库服务商的备份在其保留窗口内可能仍含旧数据。</p>"
-                "<p class=\"mute\">你也可以在自己的 Google 账号设置里移除对本应用的授权。</p></div>"
-                "<p><a href=\"/account\">返回</a></p>", nonce)
+def deleted_page(nonce: str, lang: str = "") -> str:
+    body = ("<h1>" + esc(t(lang, "deleted.title")) + "</h1><div class=\"card\"><p>"
+            + esc(t(lang, "deleted.body")) + "</p>"
+            "<p class=\"mute\">" + esc(t(lang, "deleted.revoke")) + "</p></div>"
+            "<p><a href=\"/account\">" + esc(t(lang, "deleted.back")) + "</a></p>")
+    return page(t(lang, "deleted.title"), body, nonce, lang)
 
 
 def _csrf(csrf: str) -> str:
     return f"<input type=\"hidden\" name=\"csrf\" value=\"{esc(csrf)}\">"
 
 
-def snippets(view: View, token: str) -> str:
-    """Exact client configuration for a freshly created token (token only inside the one-time box)."""
+def snippets(view: View, token: str, lang: str) -> str:
+    """The client configuration of a freshly created token.
+
+    The token only lives inside the one-time box of the page that created it.
+    The three blocks carry the token already, so they can be copied into the
+    agent as they are; the environment-variable way is the alternative for a
+    reader who does not want a credential in a file (OPS-002 section 3.15).
+    """
     url = esc(view.base_url + "/mcp")
     env_ps = esc(f"$env:GEMARC_MCP_PAT = '{token}'")
     env_sh = esc(f"export GEMARC_MCP_PAT='{token}'")
     claude = esc(f"claude mcp add --transport http --scope user gemarc '{view.base_url}/mcp' "
-                 "--header 'Authorization: Bearer ${GEMARC_MCP_PAT}'")
+                 f"--header 'Authorization: Bearer {token}'")
     codex = esc(f"[mcp_servers.gemarc]\nurl = \"{view.base_url}/mcp\"\nbearer_token_env_var = \"GEMARC_MCP_PAT\"\n")
     hermes = esc(f"mcp_servers:\n  gemarc:\n    url: \"{view.base_url}/mcp\"\n    headers:\n"
-                 "      Authorization: \"Bearer ${GEMARC_MCP_PAT}\"\n")
+                 f"      Authorization: \"Bearer {token}\"\n")
     return (
-        "<h2>怎么用这个令牌</h2><p class=\"mute\">先把令牌放进环境变量 <code>GEMARC_MCP_PAT</code>，"
-        "配置文件里只写变量名，不写令牌本身。</p>"
-        f"<p>Windows PowerShell：</p><pre>{env_ps}</pre><p>macOS / Linux：</p><pre>{env_sh}</pre>"
-        f"<p>Claude Code：</p><pre>{claude}</pre>"
-        f"<p>Codex（<code>~/.codex/config.toml</code>）：</p><pre>{codex}</pre>"
-        f"<p>Hermes（<code>~/.hermes/config.yaml</code>）：</p><pre>{hermes}</pre>"
-        f"<p class=\"mute\">服务地址：<code>{url}</code>。claude.ai 的自定义连接器不能使用这种令牌。</p>"
+        "<h2>" + esc(t(lang, "account.snipfilledh2")) + "</h2>"
+        "<p class=\"mute\">" + esc(t(lang, "account.snipfillednote")) + "</p>"
+        "<p>" + esc(t(lang, "account.snipclaude")) + "</p><pre>" + claude + "</pre>"
+        "<p>" + esc(t(lang, "account.snipcodex")) + "</p><pre>" + codex + "</pre>"
+        "<p>" + esc(t(lang, "account.sniphermes")) + "</p><pre>" + hermes + "</pre>"
+        "<h2>" + esc(t(lang, "account.sniph2")) + "</h2>"
+        "<p class=\"mute\">" + esc(t(lang, "account.snipintro")) + "</p>"
+        "<p>" + esc(t(lang, "account.snipps")) + "</p><pre>" + env_ps + "</pre>"
+        "<p>" + esc(t(lang, "account.snipsh")) + "</p><pre>" + env_sh + "</pre>"
+        "<p class=\"mute\">" + esc(t(lang, "account.snipservice", url=url)) + "</p>"
     )
 
 
-def account_page(view: View, nonce: str, *, email: str, csrf: str, tokens: Sequence, now: int, recent: bool,
-                 created: Optional[dict] = None, message: Optional[str] = None,
+def account_page(view: View, nonce: str, *, lang: str = "", email: str, csrf: str, tokens: Sequence, now: int,
+                 recent: bool, created: Optional[dict] = None, message: Optional[str] = None,
                  default_days: Optional[int] = None, max_days: Optional[int] = None,
                  is_admin: bool = False) -> str:
     """The signed-in page. ``tokens`` are TokenMeta-like objects; ``created`` is ``{"token": ..., "id": ...}``.
@@ -249,179 +301,201 @@ def account_page(view: View, nonce: str, *, email: str, csrf: str, tokens: Seque
     """
     days_default = int(view.default_days if default_days is None else default_days)
     days_max = int(view.max_days if max_days is None else max_days)
-    parts = ["<h1>GemArc 账号</h1>"]
-    parts.append(f"<p>已登录：<strong>{esc(email)}</strong></p>")
-    links = "<p><a class=\"btn\" href=\"/\">打开 MCP 控制台</a>"
+    parts = ["<h1>" + esc(t(lang, "title.account")) + "</h1>"]
+    parts.append("<p>" + esc(t(lang, "account.signedin", email=email)) + "</p>")
+    links = "<p><a class=\"btn\" href=\"/\">" + esc(t(lang, "account.console")) + "</a>"
     if is_admin:
-        links += " <a class=\"btn\" href=\"/account/admin\">管理员设置</a>"
+        links += " <a class=\"btn\" href=\"/account/admin\">" + esc(t(lang, "account.admin")) + "</a>"
     links += "</p>"
     parts.append(links)
     if message:
         parts.append(f"<p class=\"ok\">{esc(message)}</p>")
     if not recent:
-        parts.append("<p class=\"bad\">为了安全，创建令牌、全部撤销、导出和删除需要在 15 分钟内登录过。"
-                     "<a href=\"/auth/google/start\">请重新登录以确认</a>。</p>")
+        parts.append("<p class=\"bad\">" + esc(t(lang, "account.stale"))
+                     + " <a href=\"/auth/google/start\">" + esc(t(lang, "account.stalelink")) + "</a>"
+                     + esc(t(lang, "common.period")) + "</p>")
     if created:
         parts.append(
-            "<div class=\"card\"><h2>你的新令牌（只显示这一次）</h2>"
-            "<p>请现在复制并妥善保存。离开此页后无法再次查看；丢失了就撤销后重建。</p>"
+            "<div class=\"card\"><h2>" + esc(t(lang, "account.tokennewh2")) + "</h2>"
+            "<p>" + esc(t(lang, "account.tokennewnote")) + "</p>"
             f"<pre class=\"tok\">{esc(created['token'])}</pre>"
-            f"{snippets(view, created['token'])}</div>"
-        )
+            f"{snippets(view, created['token'], lang)}</div>")
     rows = []
-    for t in tokens:
-        state = t.state(now)
-        label = {"active": "有效", "expired": "已过期", "revoked": "已撤销"}[state]
+    for tok in tokens:
+        state = tok.state(now)
+        label = {"active": "account.tokenactive", "expired": "account.tokenexpired",
+                 "revoked": "account.tokenrevoked"}[state]
         revoke = ""
         if state == "active":
-            revoke = (f"<form method=\"post\" action=\"/account/tokens/{esc(t.id)}/revoke\">{_csrf(csrf)}"
-                      "<button class=\"plain\" type=\"submit\">撤销</button></form>")
-        scope = "" if not view.write_scope else f"<td>{esc(t.scope)}</td>"
-        rows.append(f"<tr><td>{esc(t.name)}<br><span class=\"mute tok\">{esc(t.id)}</span></td>{scope}"
-                    f"<td>{label}</td><td>{_fmt_time(t.expires_at)}</td><td>{_fmt_time(t.last_used_at)}</td><td>{revoke}</td></tr>")
-    scope_head = "<th>范围</th>" if view.write_scope else ""
-    table = ("<p class=\"mute\">还没有令牌。</p>" if not rows else
-             f"<table><tr><th>名称</th>{scope_head}<th>状态</th><th>到期</th><th>最近使用</th><th></th></tr>{''.join(rows)}</table>")
+            revoke = (f"<form method=\"post\" action=\"/account/tokens/{esc(tok.id)}/revoke\">{_csrf(csrf)}"
+                      "<button class=\"plain\" type=\"submit\">" + esc(t(lang, "account.tokenrevoke")) + "</button></form>")
+        scope = "" if not view.write_scope else f"<td>{esc(tok.scope)}</td>"
+        rows.append(f"<tr><td>{esc(tok.name)}<br><span class=\"mute tok\">{esc(tok.id)}</span></td>{scope}"
+                    f"<td>{esc(t(lang, label))}</td><td>{_fmt_time(tok.expires_at)}</td>"
+                    f"<td>{_fmt_time(tok.last_used_at)}</td><td>{revoke}</td></tr>")
+    scope_head = "<th>" + esc(t(lang, "account.tokenscope")) + "</th>" if view.write_scope else ""
+    table = ("<p class=\"mute\">" + esc(t(lang, "account.tokennone")) + "</p>" if not rows else
+             "<table><tr><th>" + esc(t(lang, "account.tokenname")) + "</th>" + scope_head
+             + "<th>" + esc(t(lang, "account.tokenstate")) + "</th>"
+             + "<th>" + esc(t(lang, "account.tokenexpires")) + "</th>"
+             + "<th>" + esc(t(lang, "account.tokenused")) + "</th><th></th></tr>" + "".join(rows) + "</table>")
     scope_field = ""
     if view.write_scope:
-        scope_field = ("<div><label for=\"scope\">范围</label><select id=\"scope\" name=\"scope\">"
-                       "<option value=\"read\">read（只读）</option><option value=\"write\">write（需运营者授权）</option></select></div>")
+        scope_field = ("<div><label for=\"scope\">" + esc(t(lang, "account.tokenscopelabel")) + "</label>"
+                       "<select id=\"scope\" name=\"scope\">"
+                       "<option value=\"read\">" + esc(t(lang, "account.tokenscoperead")) + "</option>"
+                       "<option value=\"write\">" + esc(t(lang, "account.tokenscopewrite")) + "</option></select></div>")
     parts.append(
-        "<h2>个人访问令牌</h2>" + table +
+        "<h2>" + esc(t(lang, "account.tokenh2")) + "</h2>" + table +
         "<form method=\"post\" action=\"/account/tokens\" class=\"card\">" + _csrf(csrf) +
-        "<div class=\"row\"><div><label for=\"name\">名称（至多 40 字）</label>"
+        "<div class=\"row\"><div><label for=\"name\">" + esc(t(lang, "account.tokennamelabel")) + "</label>"
         "<input id=\"name\" name=\"name\" maxlength=\"40\" required></div>"
-        f"<div><label for=\"days\">有效天数（至多 {days_max}）</label>"
+        "<div><label for=\"days\">" + esc(t(lang, "account.tokendayslabel", max=days_max)) + "</label>"
         f"<input id=\"days\" name=\"days\" type=\"number\" min=\"1\" max=\"{days_max}\" value=\"{days_default}\"></div>"
         + scope_field +
-        "<div><button type=\"submit\">创建令牌</button></div></div></form>"
+        "<div><button type=\"submit\">" + esc(t(lang, "account.tokencreate")) + "</button></div></div></form>"
         "<form method=\"post\" action=\"/account/tokens/revoke-all\">" + _csrf(csrf) +
-        "<button class=\"plain\" type=\"submit\">撤销全部令牌</button></form>"
+        "<button class=\"plain\" type=\"submit\">" + esc(t(lang, "account.tokenrevokeall")) + "</button></form>"
     )
     parts.append(
-        "<h2>会话与数据</h2>"
-        "<form method=\"post\" action=\"/auth/logout\">" + _csrf(csrf) + "<button class=\"plain\" type=\"submit\">登出</button></form>"
-        "<form method=\"post\" action=\"/auth/logout-all\">" + _csrf(csrf) + "<button class=\"plain\" type=\"submit\">在所有设备登出</button></form>"
-        "<form method=\"post\" action=\"/account/export\">" + _csrf(csrf) + "<button class=\"plain\" type=\"submit\">导出我的数据（JSON）</button></form>"
+        "<h2>" + esc(t(lang, "account.sessionh2")) + "</h2>"
+        "<form method=\"post\" action=\"/auth/logout\">" + _csrf(csrf) + "<button class=\"plain\" type=\"submit\">"
+        + esc(t(lang, "account.logout")) + "</button></form>"
+        "<form method=\"post\" action=\"/auth/logout-all\">" + _csrf(csrf) + "<button class=\"plain\" type=\"submit\">"
+        + esc(t(lang, "account.logoutall")) + "</button></form>"
+        "<form method=\"post\" action=\"/account/export\">" + _csrf(csrf) + "<button class=\"plain\" type=\"submit\">"
+        + esc(t(lang, "account.export")) + "</button></form>"
     )
     parts.append(
-        "<h2>删除账号</h2><form method=\"post\" action=\"/account/delete\" class=\"card\">" + _csrf(csrf) +
-        f"<p>这会永久删除账号 <strong>{esc(email)}</strong>、会话与令牌，且无法撤销。</p>"
-        f"<label for=\"confirm\">请输入 {CONFIRM_WORD} 确认</label><input id=\"confirm\" name=\"confirm\" autocomplete=\"off\" required> "
-        "<button class=\"danger\" type=\"submit\">永久删除</button></form>"
+        "<h2>" + esc(t(lang, "account.deleteh2")) + "</h2><form method=\"post\" action=\"/account/delete\" class=\"card\">"
+        + _csrf(csrf) +
+        "<p>" + esc(t(lang, "account.deletewarn", email=email)) + "</p>"
+        "<label for=\"confirm\">" + esc(t(lang, "account.deleteconfirm", word=CONFIRM_WORD)) + "</label>"
+        "<input id=\"confirm\" name=\"confirm\" autocomplete=\"off\" required> "
+        "<button class=\"danger\" type=\"submit\">" + esc(t(lang, "account.deletebutton")) + "</button></form>"
     )
     if view.privacy_url:
-        parts.append(f"<p class=\"mute\"><a href=\"{esc(view.privacy_url)}\">隐私声明</a></p>")
-    return page("GemArc 账号", "".join(parts), nonce)
+        parts.append("<p class=\"mute\"><a href=\"" + esc(view.privacy_url) + "\">"
+                     + esc(t(lang, "privacy.link")) + "</a></p>")
+    return page(t(lang, "title.account"), "".join(parts), nonce, lang)
 
 
 # -- the operator area -------------------------------------------------------------------------------------------
 
-
-def _admin_user_rows(users: Sequence, csrf: str) -> str:
+def _admin_user_rows(users: Sequence, csrf: str, lang: str) -> str:
     """One row per user with the five actions. Every action is a POST with the CSRF token."""
     rows = []
     for u in users:
-        email = u.email or "（无法读取）"
-        admin = "是" if u.granted else "否"
+        email = u.email or t(lang, "admin.unreadable")
+        admin = t(lang, "admin.yes") if u.granted else t(lang, "admin.no")
         if u.status != "active":
-            admin = admin + " · 已停用"
+            admin = admin + " · " + t(lang, "admin.disabledmark")
         buttons = []
         if u.status == "active":
             buttons.append(f"<form method=\"post\" action=\"/account/admin/users/{esc(u.id)}/disable\">"
-                           f"{_csrf(csrf)}<button class=\"danger\" type=\"submit\">停用</button></form>")
+                           f"{_csrf(csrf)}<button class=\"danger\" type=\"submit\">{esc(t(lang, 'admin.disable'))}</button></form>")
         else:
             buttons.append(f"<form method=\"post\" action=\"/account/admin/users/{esc(u.id)}/enable\">"
-                           f"{_csrf(csrf)}<button type=\"submit\">启用</button></form>")
+                           f"{_csrf(csrf)}<button type=\"submit\">{esc(t(lang, 'admin.enable'))}</button></form>")
         if u.granted:
             buttons.append(f"<form method=\"post\" action=\"/account/admin/users/{esc(u.id)}/revoke-admin\">"
-                           f"{_csrf(csrf)}<button class=\"plain\" type=\"submit\">撤销管理员</button></form>")
+                           f"{_csrf(csrf)}<button class=\"plain\" type=\"submit\">{esc(t(lang, 'admin.revokeadmin'))}</button></form>")
         else:
             buttons.append(f"<form method=\"post\" action=\"/account/admin/users/{esc(u.id)}/grant-admin\">"
-                           f"{_csrf(csrf)}<button class=\"plain\" type=\"submit\">授予管理员</button></form>")
+                           f"{_csrf(csrf)}<button type=\"submit\">{esc(t(lang, 'admin.grantadmin'))}</button></form>")
         buttons.append(f"<form method=\"post\" action=\"/account/admin/users/{esc(u.id)}/revoke-tokens\">"
-                       f"{_csrf(csrf)}<button class=\"plain\" type=\"submit\">撤销全部令牌</button></form>")
+                       f"{_csrf(csrf)}<button class=\"plain\" type=\"submit\">{esc(t(lang, 'admin.revoketokens'))}</button></form>")
         rows.append(
             f"<tr><td>{esc(email)}<br><span class=\"mute tok\">{esc(u.id)}</span></td>"
-            f"<td>{esc(u.status)}</td><td>{esc(admin)}</td><td>{'是' if u.can_write else '否'}</td>"
-            f"<td>{_fmt_time(u.created_at)}</td><td>{_fmt_time(u.last_login_at)}</td>"
-            f"<td>{''.join(buttons)}</td></tr>")
+            f"<td>{esc(u.status)}</td><td>{esc(admin)}</td><td>{esc(t(lang, 'admin.yes') if u.can_write else t(lang, 'admin.no'))}</td>"
+            f"<td>{_fmt_time(u.created_at)}</td><td>{_fmt_time(u.last_login_at)}</td><td>{''.join(buttons)}</td></tr>")
     if not rows:
-        return "<p class=\"mute\">还没有用户。</p>"
-    return ("<table><tr><th>邮箱</th><th>状态</th><th>管理员</th><th>可写</th><th>创建</th><th>最近登录</th>"
-            f"<th>操作</th></tr>{''.join(rows)}</table>")
+        return "<p class=\"mute\">" + esc(t(lang, "admin.usersnone")) + "</p>"
+    return ("<table><tr><th>" + esc(t(lang, "admin.useremail")) + "</th>"
+            "<th>" + esc(t(lang, "admin.userstatus")) + "</th>"
+            "<th>" + esc(t(lang, "admin.useradmin")) + "</th>"
+            "<th>" + esc(t(lang, "admin.userwrite")) + "</th>"
+            "<th>" + esc(t(lang, "admin.usercreated")) + "</th>"
+            "<th>" + esc(t(lang, "admin.userlastlogin")) + "</th>"
+            "<th>" + esc(t(lang, "admin.useractions")) + "</th></tr>" + "".join(rows) + "</table>")
 
 
-def _admin_audit_rows(entries: Sequence) -> str:
-    if not entries:
-        return "<p class=\"mute\">还没有审计记录。</p>"
+def _admin_audit_rows(entries: Sequence, lang: str) -> str:
     rows = []
     for a in entries:
         extra = " · " + a["code"] if a["code"] else ""
         rows.append(f"<tr><td>{_fmt_time(a['ts'])}</td><td>{esc(a['event'])}{esc(extra)}</td>"
                     f"<td class=\"tok\">{esc(a['userId'])}</td><td class=\"tok\">{esc(a['ref'])}</td></tr>")
-    return ("<table><tr><th>时间</th><th>事件</th><th>用户</th><th>引用</th></tr>"
-            f"{''.join(rows)}</table>")
+    return ("<table><tr><th>" + esc(t(lang, "admin.audittime")) + "</th>"
+            "<th>" + esc(t(lang, "admin.auditevent")) + "</th>"
+            "<th>" + esc(t(lang, "admin.audituser")) + "</th>"
+            "<th>" + esc(t(lang, "admin.auditref")) + "</th></tr>" + "".join(rows) + "</table>")
 
 
-def admin_page(view: View, nonce: str, *, email: str, csrf: str, now: int, users: Sequence, audit: Sequence,
-               settings: dict, deployment: dict) -> str:
+def admin_page(view: View, nonce: str, *, lang: str = "", email: str, csrf: str, now: int, users: Sequence,
+               audit: Sequence, settings: dict, deployment: dict) -> str:
     """The operator area. Every value on this page comes from the server; nothing here is a script."""
-    parts = ["<h1>GemArc 设置</h1>"]
-    parts.append(f"<p class=\"mute\">当前管理员：<strong>{esc(email)}</strong> · "
-                 f"<a href=\"/account\">我的账号</a> · <a href=\"/\">MCP 控制台</a></p>")
+    yes, no = t(lang, "admin.yes"), t(lang, "admin.no")
+    parts = ["<h1>" + esc(t(lang, "title.admin")) + "</h1>"]
+    parts.append("<p class=\"mute\">" + esc(t(lang, "admin.current", email=email)) + " · "
+                 "<a href=\"/account\">" + esc(t(lang, "account.myaccount")) + "</a> · "
+                 "<a href=\"/\">" + esc(t(lang, "account.console")) + "</a></p>")
 
     parts.append(
-        "<h2>部署状态</h2><div class=\"card\"><table>"
-        f"<tr><th>工具集</th><td>{esc(str(deployment.get('toolset', '')))}</td></tr>"
-        f"<tr><th>MCP 鉴权模式</th><td>{esc(str(deployment.get('mcpMode', '')) or '（由环境变量决定）')}</td></tr>"
-        f"<tr><th>环境变量里的管理员</th><td>{esc(', '.join(deployment.get('adminEmails') or []) or '（无）')}</td></tr>"
-        f"<tr><th>允许的域名</th><td>{esc(', '.join(deployment.get('allowedDomains') or []) or '（无）')}</td></tr>"
-        f"<tr><th>允许登录的邮箱</th><td>{esc(', '.join(deployment.get('allowedEmails') or []) or '（按域名开放）')}</td></tr>"
-        f"<tr><th>用户上限</th><td>{esc(str(deployment.get('maxUsers', '')))}</td></tr>"
-        f"<tr><th>开放注册</th><td>{'是' if deployment.get('openRegistration') else '否'}</td></tr>"
+        "<h2>" + esc(t(lang, "admin.deployh2")) + "</h2><div class=\"card\"><table>"
+        f"<tr><th>{esc(t(lang, 'admin.toolset'))}</th><td>{esc(str(deployment.get('toolset', '')))}</td></tr>"
+        f"<tr><th>{esc(t(lang, 'admin.mcpmode'))}</th><td>{esc(str(deployment.get('mcpMode', '')))}</td></tr>"
+        f"<tr><th>{esc(t(lang, 'admin.envadmins'))}</th><td>{esc(', '.join(deployment.get('adminEmails') or []) or t(lang, 'admin.none'))}</td></tr>"
+        f"<tr><th>{esc(t(lang, 'admin.alloweddomains'))}</th><td>{esc(', '.join(deployment.get('allowedDomains') or []) or t(lang, 'admin.none'))}</td></tr>"
+        f"<tr><th>{esc(t(lang, 'admin.allowedemails'))}</th><td>{esc(', '.join(deployment.get('allowedEmails') or []) or t(lang, 'admin.bydomain'))}</td></tr>"
+        f"<tr><th>{esc(t(lang, 'admin.maxusers'))}</th><td>{esc(str(deployment.get('maxUsers', '')))}</td></tr>"
+        f"<tr><th>{esc(t(lang, 'admin.openregistration'))}</th><td>{esc(yes if deployment.get('openRegistration') else no)}</td></tr>"
         "</table></div>")
 
-    parts.append("<h2>用户管理</h2>" + _admin_user_rows(users, csrf))
+    parts.append("<h2>" + esc(t(lang, "admin.usersh2")) + "</h2>" + _admin_user_rows(users, csrf, lang))
 
     site = deployment.get("site")
     if site:
         parts.append(
-            "<h2>5D 站</h2><div class=\"card\"><table>"
-            f"<tr><th>可用</th><td>{'是' if site.get('available') else '否'}</td></tr>"
-            f"<tr><th>已构建</th><td>{'是' if site.get('built') else '否'}</td></tr>"
-            f"<tr><th>来源</th><td>{esc(str(site.get('source', '')) or '—')}</td></tr>"
+            "<h2>" + esc(t(lang, "admin.siteh2")) + "</h2><div class=\"card\"><table>"
+            f"<tr><th>{esc(t(lang, 'admin.siteavailable'))}</th><td>{esc(yes if site.get('available') else no)}</td></tr>"
+            f"<tr><th>{esc(t(lang, 'admin.sitebuilt'))}</th><td>{esc(yes if site.get('built') else no)}</td></tr>"
+            f"<tr><th>{esc(t(lang, 'admin.sitesource'))}</th><td>{esc(str(site.get('source', '')) or '—')}</td></tr>"
             "</table>"
             "<form method=\"post\" action=\"/account/admin/site\">" + _csrf(csrf) +
-            "<button type=\"submit\">重建站点</button></form>"
-            "<p class=\"mute\">重建只清掉本实例已物化的站点，下一次访问站点路径时重新生成；别的实例不受影响。</p>"
+            "<button type=\"submit\">" + esc(t(lang, "admin.siterebuild")) + "</button></form>"
+            "<p class=\"mute\">" + esc(t(lang, "admin.siterebuildnote")) + "</p>"
             "</div>")
 
     def number_row(key: str, label: str, low: int, high: int) -> str:
         current = settings.get(key, "")
-        shown = esc(current) if current else "（环境变量）"
+        shown = esc(current) if current else t(lang, "admin.settingsfromenv")
         return (f"<tr><td>{esc(label)}</td><td>{shown}</td>"
                 f"<td><form method=\"post\" action=\"/account/admin/settings\" class=\"row\">{_csrf(csrf)}"
                 f"<input type=\"hidden\" name=\"key\" value=\"{esc(key)}\">"
                 f"<input name=\"value\" type=\"number\" min=\"{low}\" max=\"{high}\" required "
-                f"style=\"width:6rem\">"
-                f"<button type=\"submit\">保存</button></form></td></tr>")
+                "style=\"width:6rem\">"
+                f"<button type=\"submit\">{esc(t(lang, 'admin.settingssave'))}</button></form></td></tr>")
 
     toolset_value = settings.get("toolset", "")
     toolset_row = (
-        "<tr><td>工具集</td><td>" + (esc(toolset_value) if toolset_value else "（环境变量）") + "</td>"
+        "<tr><td>" + esc(t(lang, "admin.toolset")) + "</td><td>"
+        + (esc(toolset_value) if toolset_value else t(lang, "admin.settingsfromenv")) + "</td>"
         "<td><form method=\"post\" action=\"/account/admin/settings\" class=\"row\">" + _csrf(csrf) +
         "<input type=\"hidden\" name=\"key\" value=\"toolset\">"
         "<input name=\"value\" list=\"gemarc-toolsets\" required style=\"width:10rem\">"
         "<datalist id=\"gemarc-toolsets\"><option value=\"stateless\"><option value=\"full\"></datalist>"
-        "<button type=\"submit\">保存</button></form></td></tr>")
+        "<button type=\"submit\">" + esc(t(lang, "admin.settingssave")) + "</button></form></td></tr>")
     parts.append(
-        "<h2>设置</h2><div class=\"card\"><table><tr><th>项</th><th>当前值</th><th>改成</th></tr>"
-        + number_row("pat_default_days", "令牌默认有效天数", 1, 365)
-        + number_row("pat_max_days", "令牌最长有效天数", 1, 365)
-        + number_row("pat_max_per_user", "每人令牌数量上限", 1, 50)
+        "<h2>" + esc(t(lang, "admin.settingsh2")) + "</h2><div class=\"card\"><table>"
+        "<tr><th>" + esc(t(lang, "admin.settingsitem")) + "</th>"
+        "<th>" + esc(t(lang, "admin.settingscurrent")) + "</th>"
+        "<th>" + esc(t(lang, "admin.settingschange")) + "</th></tr>"
+        + number_row("pat_default_days", t(lang, "admin.settingpatdefault"), 1, 365)
+        + number_row("pat_max_days", t(lang, "admin.settingpatmax"), 1, 365)
+        + number_row("pat_max_per_user", t(lang, "admin.settingpatcount"), 1, 50)
         + toolset_row +
-        "</table><p class=\"mute\">留空的项由环境变量决定。令牌策略立即生效；工具集在下次冷启动（重新部署或实例回收）后生效。</p></div>")
+        "</table><p class=\"mute\">" + esc(t(lang, "admin.settingsnote")) + "</p></div>")
 
-    parts.append("<h2>审计日志</h2>" + _admin_audit_rows(audit))
-    return page("GemArc 设置", "".join(parts), nonce)
+    parts.append("<h2>" + esc(t(lang, "admin.audith2")) + "</h2>" + _admin_audit_rows(audit, lang))
+    return page(t(lang, "title.admin"), "".join(parts), nonce, lang)

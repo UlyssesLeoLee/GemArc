@@ -4,11 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="light">
-  <title>GemArc MCP · 功能微调控制台</title>
+  <!-- The title is filled by the server in the language of the request; the same
+       value is replaced again by the panel when the reader switches language. -->
+  <title data-i18n="title">{{title}}</title>
   <link rel="stylesheet" href="./console.css">
   <!--
     The crystal scene of the tool surface needs the three-dimensional library.
-    It is optional: when it cannot be loaded the panel says "未加载" and the
+    It is optional: when it cannot be loaded the panel says "not loaded" and the
     rest of the console keeps working. Same import map as the public site.
   -->
   <script type="importmap">
@@ -22,11 +24,18 @@
 <body>
   <header class="top">
     <div class="brand">
-      <span class="gem">◆</span><span>GemArc MCP</span><small>功能微调控制台</small>
+      <span class="gem">◆</span><span>GemArc MCP</span><small data-i18n="brand.sub">{{brand.sub}}</small>
+    </div>
+    <!-- The language switcher. Every option is written in its own language
+         (BD-010 section 12.7), so it reads the same in every language. -->
+    <div class="lang" role="group" aria-label="Language">
+      <button type="button" class="lang-btn" data-uilang="zh-CN">中文</button>
+      <button type="button" class="lang-btn" data-uilang="ja-JP">日本語</button>
+      <button type="button" class="lang-btn" data-uilang="en-US">English</button>
     </div>
     <div class="conn">
       <span class="dot" id="conn-dot"></span>
-      <span id="conn-text">正在连接 MCP…</span>
+      <span id="conn-text" data-i18n="conn.connecting">{{conn.connecting}}</span>
       <!-- The role of the signed-in caller. The server decides both, so the badge can never claim a
            privilege the server would not grant. -->
       <span id="role-badge" class="chip" hidden></span>
@@ -38,39 +47,51 @@
        the folded "details" panel, not on the first screen (BD-010 section 12.6). -->
   <section class="statusbar">
     <div class="facts" id="statbar">
-      <span class="fact muted">等待 /healthz…</span>
+      <span class="fact muted" data-i18n="status.waiting">{{status.waiting}}</span>
     </div>
     <details class="detail">
-      <summary>详情</summary>
+      <summary data-i18n="status.details">{{status.details}}</summary>
       <div class="detail-body" id="facts-detail"></div>
     </details>
   </section>
 
   <!-- Shown only when /healthz says authRequired. The token is held in this
-       tab's sessionStorage (never localStorage, never in a URL) and is sent
-       only as an Authorization header with /mcp calls. -->
+       tab's session storage only (never in the persistent store of the browser,
+       never in a URL) and is sent only as an Authorization header with /mcp
+       calls. The token is issued by the website (the account page); the panel
+       only fills it in. -->
   <section class="authbar" id="authbar" hidden>
-    <label for="token-input">MCP 访问令牌</label>
+    <div class="auth-head">
+      <label for="token-input" data-i18n="auth.label">{{auth.label}}</label>
+      <span class="auth-source" id="token-source">
+        <span data-i18n="auth.source">{{auth.source}}</span>
+        <a href="/account" id="account-link" data-i18n="auth.sourcelink">{{auth.sourcelink}}</a>
+      </span>
+    </div>
     <input id="token-input" type="password" autocomplete="off" spellcheck="false"
-           placeholder="粘贴 Bearer 令牌(只保存在本标签页的 sessionStorage)">
-    <button id="token-save" class="primary" type="button">使用令牌</button>
-    <button id="token-clear" class="ghost" type="button">清除</button>
-    <span id="token-msg" class="muted" role="status"></span>
+           placeholder="{{auth.placeholder}}" data-i18n-placeholder="auth.placeholder">
+    <div class="auth-row">
+      <button id="token-save" class="primary" type="button" data-i18n="auth.use">{{auth.use}}</button>
+      <button id="token-clear" class="ghost" type="button" data-i18n="auth.clear">{{auth.clear}}</button>
+      <span id="token-msg" class="muted" role="status"></span>
+    </div>
+    <p class="auth-note muted" id="token-note" data-i18n="auth.sourcenote">{{auth.sourcenote}}</p>
   </section>
 
   <main>
     <aside class="pane col-tools">
-      <p class="section-title">TOOLS · 工具</p>
-      <input id="tool-filter" class="filter" type="search" placeholder="过滤工具名或说明…" autocomplete="off">
+      <p class="section-title" data-i18n="section.tools">{{section.tools}}</p>
+      <input id="tool-filter" class="filter" type="search" placeholder="{{filter.placeholder}}"
+             data-i18n-placeholder="filter.placeholder" autocomplete="off">
       <nav id="tool-list" class="tool-list"></nav>
-      <p class="section-title" style="margin-top:14px">ENDPOINTS</p>
+      <p class="section-title" style="margin-top:14px" data-i18n="section.endpoints">{{section.endpoints}}</p>
       <div class="endpoints">
         <div><code>POST /mcp</code><span>Streamable HTTP · JSON-RPC</span></div>
-        <div><code>GET /healthz</code><span>服务器状态</span></div>
-        <div><code><a href="__SITE_PATH__">__SITE_PATH__</a></code><span>脚手架产出的 5D 站</span></div>
-        <div><code>GET /kit/static.zip</code><span>站点固定件(另有 vite)</span></div>
-        <div id="admin-entry" hidden><code><a href="__ADMIN_PATH__">__ADMIN_PATH__</a></code><span>管理员设置</span></div>
-        <div id="account-entry" hidden><code><a href="/account">/account</a></code><span>我的账号与令牌</span></div>
+        <div><code>GET /healthz</code><span data-i18n="endpoint.health">{{endpoint.health}}</span></div>
+        <div><code><a href="__SITE_PATH__">__SITE_PATH__</a></code><span data-i18n="endpoint.site">{{endpoint.site}}</span></div>
+        <div><code>GET /kit/static.zip</code><span data-i18n="endpoint.kit">{{endpoint.kit}}</span></div>
+        <div id="admin-entry" hidden><code><a href="__ADMIN_PATH__">__ADMIN_PATH__</a></code><span data-i18n="endpoint.admin">{{endpoint.admin}}</span></div>
+        <div id="account-entry" hidden><code><a href="/account">/account</a></code><span data-i18n="endpoint.account">{{endpoint.account}}</span></div>
       </div>
     </aside>
 
@@ -78,62 +99,64 @@
       <!-- The tool surface: one crystal per tool the server really registers.
            The scene is filled by console-space.js; until it is there the panel
            states plainly that the three-dimensional part is not loaded. -->
-      <p class="section-title">SURFACE · 工具面</p>
+      <p class="section-title" data-i18n="section.surface">{{section.surface}}</p>
       <div class="space-3d" id="space-host">
-        <p class="hint" id="space-hint">加载中…</p>
+        <p class="hint" id="space-hint" data-i18n="space.loading">{{space.loading}}</p>
         <span class="tip" id="space-tip" hidden></span>
       </div>
       <p class="space-legend">
-        <span class="read"><i></i>只读</span>
-        <span class="write"><i></i>写入</span>
+        <span class="read"><i></i><span data-i18n="legend.read">{{legend.read}}</span></span>
+        <span class="write"><i></i><span data-i18n="legend.write">{{legend.write}}</span></span>
       </p>
 
       <div class="stage-head">
         <div class="stage-title">
-          <h1 id="tool-name">选择一个工具</h1>
-          <p id="tool-desc" class="muted">左侧列表里的每一项都是 MCP 协议里真实注册的工具。选中后可调整参数并直接调用。</p>
+          <h1 id="tool-name" data-i18n="tool.none">{{tool.none}}</h1>
+          <p id="tool-desc" class="muted" data-i18n="tool.hint">{{tool.hint}}</p>
         </div>
         <div class="stage-actions">
           <span id="tool-kind" class="chip"></span>
-          <button id="call-btn" class="primary" type="button" disabled>调用</button>
+          <button id="call-btn" class="primary" type="button" disabled data-i18n="call.button">{{call.button}}</button>
         </div>
       </div>
 
-      <p class="section-title">PARAMETERS · 参数</p>
+      <p class="section-title" data-i18n="section.params">{{section.params}}</p>
       <form id="params" class="params" autocomplete="off"></form>
 
-      <p class="section-title">RESULT · 结果</p>
+      <p class="section-title" data-i18n="section.result">{{section.result}}</p>
       <div class="result-bar">
-        <span id="result-meta" class="muted">尚未调用</span>
-        <button id="copy-btn" class="ghost" type="button" hidden>复制 JSON</button>
+        <span id="result-meta" class="muted" data-i18n="result.idle">{{result.idle}}</span>
+        <button id="copy-btn" class="ghost" type="button" hidden data-i18n="result.copy">{{result.copy}}</button>
       </div>
-      <div id="result" class="result"><p class="muted">调用结果会显示在这里。出错时显示原始 JSON-RPC 错误,不做美化。</p></div>
+      <div id="result" class="result"><p class="muted" data-i18n="result.empty">{{result.empty}}</p></div>
     </section>
 
     <aside class="pane col-side">
-      <p class="section-title">SCHEMA · 输入契约</p>
+      <p class="section-title" data-i18n="section.schema">{{section.schema}}</p>
       <div id="schema" class="code muted">—</div>
 
-      <p class="section-title">RESOURCES · 资源</p>
+      <p class="section-title" data-i18n="section.resources">{{section.resources}}</p>
       <div id="resources" class="list"></div>
 
-      <p class="section-title">PROMPTS · 提示词</p>
+      <p class="section-title" data-i18n="section.prompts">{{section.prompts}}</p>
       <div id="prompts" class="list"></div>
 
-      <p class="section-title">HISTORY · 调用历史</p>
+      <p class="section-title" data-i18n="section.history">{{section.history}}</p>
       <div id="history" class="list"></div>
     </aside>
   </main>
 
   <footer class="foot">
     <span id="foot-meta"></span>
-    <span>控制台只调用本服务器上真实注册的 MCP 工具;它不模拟任何能力。</span>
+    <span data-i18n="foot.note">{{foot.note}}</span>
   </footer>
 
   <!-- Injected by the server: paths and the write-tool list come from the
        running server, so the panel can never claim a tool the server does
        not actually register. `admin` and `write` describe THIS caller: the
-       operator role, and the write permission of the signed-in session. -->
+       operator role, and the write permission of the signed-in session.
+       The three language tables come from the same place, so the panel has
+       no text of its own (BD-010 section 12.7). -->
   <script>
     window.GEMARC = {
       mcpPath: "__MCP_PATH__",
@@ -144,7 +167,8 @@
       admin: __ADMIN__,
       write: __WRITE__,
       adminPath: "__ADMIN_PATH__",
-      accounts: __ACCOUNTS__
+      accounts: __ACCOUNTS__,
+      i18n: __I18N__
     };
   </script>
   <script type="module" src="./console.js"></script>

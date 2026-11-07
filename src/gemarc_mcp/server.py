@@ -22,6 +22,7 @@ from pathlib import Path
 from .paths import Workspace, GemArcError, safe_response, digest
 from . import service, simulation, stateless, __version__
 from . import model as model_lib
+from . import i18n
 
 TOOLSETS = ("full", "stateless", "atlas", "atlas_remote")
 
@@ -153,7 +154,14 @@ def create_server(toolset: str | None = None):
                 destructiveHint=destructive if write else None,
                 idempotentHint=idempotent if write else None,
                 openWorldHint=False)
-            return _app_tool(name=name, title=title, annotations=annotations)(fn)
+            # The three languages of the tool (DD-009): the description field itself stays the
+            # English of the docstring, so a client that reads nothing else still gets the
+            # canonical text, and a client that wants another language reads the `_meta`.
+            # A tool the tables do not translate carries no `_meta`: it would only repeat
+            # that English, and the list of the tools would grow for nothing.
+            texts = i18n.tool_texts(name, title, (fn.__doc__ or "").strip())
+            extra = {"meta": {"gemarc.dev/descriptions": texts}} if texts else {}
+            return _app_tool(name=name, title=title, annotations=annotations, **extra)(fn)
         return deco
 
     # ---- tools that work in every deployment ---------------------------------------

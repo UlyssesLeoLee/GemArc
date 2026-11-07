@@ -23,6 +23,7 @@ from typing import Any, Callable, Optional
 import anyio
 from starlette.datastructures import Headers
 
+from .. import i18n
 from . import admin as admin_mod
 from . import audit as audit_mod
 from . import oidc, pages, retention, schema, security
@@ -58,31 +59,12 @@ ADMIN_SETTINGS_PATH = "/account/admin/settings"
 ADMIN_SITE_PATH = "/account/admin/site"
 DRAIN_TIMEOUT_S = 2.0
 DRAIN_LIMIT = 1 << 20
+#: How long the cookie that remembers the language of the reader lives (one year).
+LANG_COOKIE_MAX_AGE = 365 * 86400
 
-MESSAGES = {
-    "GEMARC_ACCT_001": "账号功能当前不可用。",
-    "GEMARC_ACCT_002": "数据库暂时不可用，请稍后再试。",
-    "GEMARC_ACCT_003": "数据库结构需要升级，请联系运营者。",
-    "GEMARC_ACCT_004": "服务配置存在问题，请联系运营者。",
-    "GEMARC_ACCT_010": "登录状态无效或已过期，请重新登录。",
-    "GEMARC_ACCT_011": "登录与当前浏览器不匹配，请在同一个浏览器里重新登录。",
-    "GEMARC_ACCT_012": "Google 返回了错误，或登录没有完成，请重试。",
-    "GEMARC_ACCT_013": "无法完成登录。",
-    "GEMARC_ACCT_020": "未登录或会话已过期，请重新登录。",
-    "GEMARC_ACCT_021": "请求来源校验失败，请回到账号页重新操作。",
-    "GEMARC_ACCT_022": "请求过于频繁，请稍后再试。",
-    "GEMARC_ACCT_023": "服务繁忙，请稍后再试。",
-    "GEMARC_ACCT_033": "令牌数量已达上限，请先撤销不用的令牌。",
-    "GEMARC_ACCT_034": "令牌参数无效（名称 1 到 40 个字符，有效天数在允许范围内）。",
-    "GEMARC_ACCT_035": "不允许创建该范围的令牌。",
-    "GEMARC_ACCT_040": "需要重新登录确认：请在 15 分钟内登录过再操作。",
-    "GEMARC_ACCT_041": "确认词不匹配，账号没有被删除。",
-    "GEMARC_ACCT_050": "请求格式错误或过大。",
-    "GEMARC_ACCT_060": "这个页面只有管理员可以打开。",
-    "GEMARC_ACCT_061": "设置的值不合法，未做修改。",
-    "GEMARC_ACCT_062": "这个部署不提供该工具集（它的代码不在上传内容里），未做修改。",
-    "GEMARC_ACCT_404": "没有这个页面。",
-}
+#: The error texts of the account routes. They live in the language tables (the `messages`
+#: section), so an error page speaks the language of the reader (DD-009).
+MESSAGES = {lang: i18n.section(lang, "messages") for lang in i18n.LANGUAGES}
 TOKEN_ERROR_STATUS = {"GEMARC_ACCT_034": 400, "GEMARC_ACCT_033": 409, "GEMARC_ACCT_035": 403, "GEMARC_ACCT_013": 403}
 DB_ERROR_STATE = {"GEMARC_ACCT_002": "unreachable", "GEMARC_ACCT_003": "unreachable", "GEMARC_ACCT_004": "misconfigured"}
 
@@ -107,6 +89,21 @@ class Req:
     def query(self) -> "Optional[dict[str, str]]":
         return security.parse_query(self.scope.get("query_string", b""))
 
+    @property
+    def lang(self) -> str:
+        """The language of this request (DD-009): the explicit choice, then the cookie,
+        then the browser, then the default."""
+        query = self.query or {}
+        return i18n.resolve(query=query.get("lang"),
+                            cookie_header=self.headers.get("cookie"),
+                            accept_language=self.headers.get("accept-language"))
+
+    @property
+    def lang_chosen(self) -> bool:
+        """True when the request carries an explicit language choice (the browser guess
+        is not a choice and is not remembered)."""
+        return i18n.normalize((self.query or {}).get("lang")) is not None
+
 
 @dataclass
 class Authed:
@@ -114,6 +111,7 @@ class Authed:
     sid: str
     form: "dict[str, str]"
     now: int
+    lang: str = ""
 
 
 @dataclass
@@ -300,18 +298,24 @@ class AccountsRuntime:
     def hsts(self) -> bool:
         return self.config.secure_cookies
 
-    def _html(self, status: int, render: Callable[[str], str], *, cookies=(), headers=None):
+    def _html(self, status: int, render: Callable[[str], str], *, cookies=(), headers=None,
+              lang: str = "", lang_cookie: bool = False):
         nonce = pages.new_nonce()
+        cookies = list(cookies)
+        if lang_cookie and lang:
+            cookies.append(security.cookie_header(i18n.LANG_COOKIE, lang, secure=self.config.secure_cookies,
+                                                  max_age=LANG_COOKIE_MAX_AGE))
         return pages.respond(status, render(nonce), nonce=nonce, hsts=self.hsts, cookies=cookies, headers=headers)
 
     def _clear_sid(self) -> str:
         return security.clear_cookie_header(self.sid_cookie, secure=self.config.secure_cookies)
 
     def error(self, status: int, code: str, *, email: Optional[str] = None, relogin: bool = True, cookies=(),
-              retry_after: Optional[int] = None):
+              retry_after: Optional[int] = None, lang: str = ""):
         headers = {"Retry-After": str(max(int(retry_after), 1))} if retry_after else None
-        message = MESSAGES.get(code, MESSAGES["GEMARC_ACCT_001"])
-        return self._html(status, lambda n: pages.error_page(n, code, message, email=email, relogin=relogin),
+        message = MESSAGES.get(lang, {}).get(code) or MESSAGES.get("zh-CN", {}).get(code) or code
+        return self._html(status, lambda n: pages.error_page(n, code, message, lang=lang, email=email,
+                                                            relogin=relogin),
                           cookies=cookies, headers=headers)
 
     def not_found(self):
@@ -559,7 +563,8 @@ class AccountsRuntime:
         return self.users.email_of(user_id), self.tokens.list(user_id)
 
     async def _render_account(self, info, sid: str, now: int, *, created: Optional[dict] = None,
-                              message: Optional[str] = None, status: int = 200, cookies=()):
+                              message: Optional[str] = None, status: int = 200, cookies=(),
+                              lang: str = "", lang_cookie: bool = False):
         email, tokens = await self.run_db(self._account_data, info.user_id)
         csrf = self.crypto.csrf_token(sid)
         recent = self.sessions.is_recent(info, now)
@@ -567,11 +572,12 @@ class AccountsRuntime:
         # the deployment runs, and the form must not offer a longer lifetime than the store allows.
         policy = await self.run_db(self.tokens.effective_policy)
         is_admin = await self.run_db(self.admin.is_admin, info.user_id, email)
-        return self._html(status, lambda n: pages.account_page(self.view, n, email=email or "", csrf=csrf, tokens=tokens,
-                                                               now=now, recent=recent, created=created, message=message,
+        return self._html(status, lambda n: pages.account_page(self.view, n, lang=lang, email=email or "",
+                                                               csrf=csrf, tokens=tokens, now=now, recent=recent,
+                                                               created=created, message=message,
                                                                default_days=policy.default_days, max_days=policy.max_days,
                                                                is_admin=is_admin),
-                          cookies=cookies)
+                          cookies=cookies, lang=lang, lang_cookie=lang_cookie)
 
     async def _account(self, req: Req):
         now = self.now()
@@ -579,8 +585,9 @@ class AccountsRuntime:
         if info is None:
             stale = security.has_cookie(req.headers, self.sid_cookie)
             cookies = [self._clear_sid()] if stale else []
-            return self._html(200, lambda n: pages.signed_out_page(self.view, n), cookies=cookies)
-        return await self._render_account(info, sid, now)
+            return self._html(200, lambda n: pages.signed_out_page(self.view, n, lang=req.lang), cookies=cookies,
+                              lang=req.lang, lang_cookie=req.lang_chosen)
+        return await self._render_account(info, sid, now, lang=req.lang, lang_cookie=req.lang_chosen)
 
     async def _tokens(self, req: Req):
         now = self.now()
@@ -589,7 +596,7 @@ class AccountsRuntime:
         info, sid = await self._session(req, now)
         if info is None:
             return pages.redirect(ACCOUNT_PATH, 303, hsts=self.hsts)
-        return await self._render_account(info, sid, now)
+        return await self._render_account(info, sid, now, lang=req.lang, lang_cookie=req.lang_chosen)
 
     # -- state-changing routes --------------------------------------------------------------------------------------
     async def _post(self, req: Req, action: Callable, *, recent: bool, limit_scope: Optional[str] = None):
@@ -617,7 +624,7 @@ class AccountsRuntime:
         await self._limit("account_post", info.user_id, now)
         if recent and not self.sessions.is_recent(info, now):
             return self.error(403, "GEMARC_ACCT_040")
-        return await action(req, Authed(info, sid, form, now))
+        return await action(req, Authed(info, sid, form, now, req.lang))
 
     async def _logout(self, req: Req):
         return await self._post(req, self._do_logout, recent=False)
@@ -651,7 +658,8 @@ class AccountsRuntime:
         except TokenError as exc:
             return self.error(TOKEN_ERROR_STATUS.get(exc.code, 400), exc.code, relogin=False)
         return await self._render_account(a.info, a.sid, a.now, created={"token": created.token, "id": created.id},
-                                          message="令牌已创建。")
+                                          message=i18n.text(a.lang, "accounts", "account.tokencreated"),
+                                          lang=a.lang)
 
     def _create_and_tidy(self, a: Authed, name: str, scope: str, days: Optional[int]):
         """Create the token and run the (throttled, best-effort) retention pass in ONE executor job: a second
@@ -703,7 +711,7 @@ class AccountsRuntime:
         self.pat_cache.evict_user(a.info.user_id)
         if not done:
             return self.error(401, "GEMARC_ACCT_020", cookies=[self._clear_sid()])
-        return self._html(200, pages.deleted_page, cookies=[self._clear_sid()])
+        return self._html(200, lambda n: pages.deleted_page(n, lang=a.lang), cookies=[self._clear_sid()], lang=a.lang)
 
     # -- the operator area ------------------------------------------------------------------------------------------
     async def _session_user(self, req: Req):
@@ -734,8 +742,9 @@ class AccountsRuntime:
         csrf = self.crypto.csrf_token(sid)
         data = await self.run_db(self._admin_data)
         return self._html(200, lambda n: pages.admin_page(
-            self.view, n, email=email or "", csrf=csrf, now=now, users=data["users"], audit=data["audit"],
-            settings=data["settings"], deployment=data["deployment"]))
+            self.view, n, lang=req.lang, email=email or "", csrf=csrf, now=now, users=data["users"],
+            audit=data["audit"], settings=data["settings"], deployment=data["deployment"]),
+            lang=req.lang, lang_cookie=req.lang_chosen)
 
     def _admin_data(self) -> dict:
         """Everything the admin page shows, read in one executor job (one transaction each)."""

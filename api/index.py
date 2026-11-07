@@ -100,6 +100,7 @@ if str(REPO_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "src"))
 
 import gemarc_mcp  # noqa: E402
+from gemarc_mcp import i18n  # noqa: E402
 from gemarc_mcp import server as gemarc_server  # noqa: E402
 from gemarc_mcp import stateless  # noqa: E402
 from gemarc_mcp.accounts import flags as account_flags  # noqa: E402  (stdlib only; nothing else of the package)
@@ -128,6 +129,10 @@ CONSOLE_SPACE_ASSETS = {
     "toon-material.js": Path(gemarc_mcp.__file__).resolve().parent / "scaffold" / "runtime" / "space" / "toon-material.js",
     "unity-controls.js": Path(gemarc_mcp.__file__).resolve().parent / "scaffold" / "runtime" / "space" / "unity-controls.js",
 }
+
+#: The three language tables of the console, injected into the page. The console has no text of
+#: its own (BD-010 section 12.7); the panel looks every word up in these tables.
+CONSOLE_I18N: dict[str, dict] = {lang: i18n.section(lang, "console") for lang in i18n.LANGUAGES}
 
 MCP_PATH = "/mcp"
 HEALTH_PATH = "/healthz"
@@ -656,7 +661,8 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
             payload["consoleRequiresLogin"] = True
         return payload
 
-    def render_console(admin: bool = False, write: bool = False) -> str:
+    def render_console(admin: bool = False, write: bool = False, lang: str = "") -> str:
+        language = i18n.normalize(lang) or i18n.DEFAULT_LANG
         html = CONSOLE_HTML.read_text(encoding="utf-8")
         html = html.replace("__MCP_PATH__", MCP_PATH)
         html = html.replace("__HEALTH_PATH__", HEALTH_PATH)
@@ -666,7 +672,13 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
         html = html.replace("__ADMIN__", "true" if admin else "false")
         html = html.replace("__WRITE__", "true" if write else "false")
         html = html.replace("__ACCOUNTS__", "true" if accounts_state == "ok" else "false")
-        return html.replace("__WRITE_TOOLS__", json.dumps(list(write_tools), ensure_ascii=False))
+        html = html.replace("__LANG__", language)
+        # The text of the page: every {{key}} marker becomes the text of the language of the
+        # request (DD-009). A key that is not in the table stays the key, so a gap shows up in
+        # the page instead of quietly mixing two languages.
+        html = re.sub(r"\{\{([a-z0-9_.]+)\}\}", lambda m: i18n.text(language, "console", m.group(1)), html)
+        html = html.replace("__WRITE_TOOLS__", json.dumps(list(write_tools), ensure_ascii=False))
+        return html.replace("__I18N__", json.dumps(CONSOLE_I18N, ensure_ascii=False))
 
     async def reply(response: Response, scope, receive, send):
         # Answering early (401, 405, 503) with the request body unread can make
@@ -774,7 +786,12 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
                                 "The MCP endpoint at /mcp is unaffected.",
                                 status_code=404, media_type="text/plain; charset=utf-8")
         else:
-            response = HTMLResponse(render_console(admin, write), headers={"Cache-Control": "no-cache"})
+            request_headers = Headers(scope=scope)
+            # The language of the console: the choice the reader made, then the browser, then
+            # the default (DD-009). The panel can still switch afterwards.
+            lang = i18n.resolve(cookie_header=request_headers.get("cookie"),
+                                accept_language=request_headers.get("accept-language"))
+            response = HTMLResponse(render_console(admin, write, lang), headers={"Cache-Control": "no-cache"})
         await reply(response, scope, receive, send)
 
     async def console_asset(scope, receive, send, name: str):

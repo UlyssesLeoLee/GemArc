@@ -5,6 +5,11 @@
  * invents nothing: the tool list, the parameter forms and the input schemas
  * all come from `tools/list`, and every call goes through `tools/call`. A
  * failure is shown as the raw JSON-RPC error rather than a friendly rewrite.
+ *
+ * Every word the reader sees comes from the language tables the server injects
+ * (`window.GEMARC.i18n`); this file has no text of its own (BD-010 section 12.7).
+ * A key that is not in the table returns the key itself and is recorded, so a
+ * gap shows up instead of quietly mixing two languages.
  */
 
 const CFG = window.GEMARC || {};
@@ -17,6 +22,72 @@ const WRITE_TOOLS = new Set(CFG.writeTools || []);
 const MAY_WRITE = CFG.write === true;
 
 const TOKEN_KEY = 'gemarc.mcp.token';
+
+/* ------------------------------------------------------------------- i18n */
+
+const LANGUAGES = ['zh-CN', 'ja-JP', 'en-US'];
+const DEFAULT_LANG = 'zh-CN';
+const LANG_KEY = 'gemarc.console.lang';
+const I18N = CFG.i18n || {};
+
+/** The gaps: a key that was looked up and not found. The console never mixes languages silently. */
+window.__GEMARC_I18N_MISSING__ = [];
+
+/** One of the three languages, or null. `ja`, `ja-JP` and `JA` all mean `ja-JP`. */
+function normalizeLang(value) {
+  if (!value) return null;
+  const text = String(value).trim();
+  for (const lang of LANGUAGES) {
+    if (text.toLowerCase() === lang.toLowerCase()) return lang;
+  }
+  const base = text.split('-')[0].toLowerCase();
+  for (const lang of LANGUAGES) {
+    if (lang.split('-')[0].toLowerCase() === base) return lang;
+  }
+  return null;
+}
+
+/** The language of this panel: the one the reader chose, then the one the server used, then the browser. */
+function pickLang() {
+  try {
+    const stored = normalizeLang(localStorage.getItem(LANG_KEY));
+    if (stored) return stored;
+  } catch { /* the storage can be blocked; the other sources still work */ }
+  return normalizeLang(CFG.lang) || normalizeLang(navigator.language || '') || DEFAULT_LANG;
+}
+
+let LANG = pickLang();
+
+/** One string of the current language. A missing key returns the key itself and is recorded. */
+function t(key, vars) {
+  const table = I18N[LANG] || {};
+  const raw = table[key];
+  if (typeof raw !== 'string' || !raw) {
+    window.__GEMARC_I18N_MISSING__.push(`${LANG}/${key}`);
+    return key;
+  }
+  if (!vars) return raw;
+  return raw.replace(/\{(\w+)\}/g, (m, name) => (
+    Object.hasOwn(vars, name) && vars[name] !== undefined && vars[name] !== null ? String(vars[name]) : m));
+}
+
+/** Put the language into the page: the text nodes, the placeholders and the switcher. */
+function applyLanguage() {
+  document.documentElement.lang = LANG;
+  for (const node of document.querySelectorAll('[data-i18n]')) {
+    const key = node.getAttribute('data-i18n');
+    if (key) node.textContent = t(key);
+  }
+  for (const node of document.querySelectorAll('[data-i18n-placeholder]')) {
+    const key = node.getAttribute('data-i18n-placeholder');
+    if (key) node.setAttribute('placeholder', t(key));
+  }
+  for (const button of document.querySelectorAll('.lang-btn')) {
+    const on = button.dataset.uilang === LANG;
+    button.classList.toggle('on', on);
+    button.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+}
 
 /**
  * The bearer token lives in this tab's sessionStorage only (never
@@ -78,10 +149,10 @@ async function rpc(method, params) {
   });
   if (response.status === 401) {
     const err = new Error(tokenUsed
-      ? '令牌无效或已被轮换 (HTTP 401)。请在上方重新粘贴令牌。'
+      ? t('err.token401')
       : (state.sessionAuth
-        ? '登录会话无效或已过期 (HTTP 401)。请重新登录,或在右方粘贴令牌。'
-        : '该服务器需要访问令牌 (HTTP 401)。请在上方粘贴令牌。'));
+        ? t('err.session401')
+        : t('err.needtoken401')));
     err.unauthorized = true;
     err.tokenUsed = tokenUsed;
     throw err;
@@ -91,7 +162,7 @@ async function rpc(method, params) {
   try {
     data = JSON.parse(raw);
   } catch {
-    const err = new Error(`服务端返回的不是 JSON (HTTP ${response.status})`);
+    const err = new Error(t('err.notjson', { status: response.status }));
     err.detail = raw.slice(0, 500);
     throw err;
   }
@@ -99,7 +170,7 @@ async function rpc(method, params) {
     // JSON-RPC errors are objects; the server's own early answers (503, 405, ...) are {"error": "text"}.
     const message = typeof data.error === 'string'
       ? `${data.error} (HTTP ${response.status})`
-      : (data.error.message || 'JSON-RPC 错误');
+      : (data.error.message || t('err.jsonrpc'));
     const err = new Error(message);
     err.detail = data.error;
     throw err;
@@ -142,7 +213,7 @@ function jsonTree(value, key) {
     if (value.length) {
       const box = el('div', 'j');
       for (const item of value.slice(0, 200)) box.append(jsonTree(item, null));
-      if (value.length > 200) box.append(el('div', 'jv-nil', `… 其余 ${value.length - 200} 项已省略`));
+      if (value.length > 200) box.append(el('div', 'jv-nil', t('json.moreitems', { count: value.length - 200 })));
       frag.append(box);
     }
     return frag;
@@ -155,7 +226,7 @@ function jsonTree(value, key) {
     if (keys.length) {
       const box = el('div', 'j');
       for (const k of keys.slice(0, 200)) box.append(jsonTree(value[k], k));
-      if (keys.length > 200) box.append(el('div', 'jv-nil', `… 其余 ${keys.length - 200} 个键已省略`));
+      if (keys.length > 200) box.append(el('div', 'jv-nil', t('json.morekeys', { count: keys.length - 200 })));
       frag.append(box);
     }
     return frag;
@@ -170,7 +241,7 @@ function jsonTree(value, key) {
 function renderJson(target, value) {
   target.textContent = '';
   if (value === undefined || value === null) {
-    target.append(el('p', 'muted', '（空）'));
+    target.append(el('p', 'muted', t('json.empty')));
     return;
   }
   if (typeof value === 'string') {
@@ -185,7 +256,7 @@ function renderJson(target, value) {
 
 async function loadHealth() {
   const response = await fetch(HEALTH_PATH, { cache: 'no-store' });
-  if (!response.ok) throw new Error(`healthz 返回 HTTP ${response.status}`);
+  if (!response.ok) throw new Error(t('err.healthz', { status: response.status }));
   return response.json();
 }
 
@@ -209,13 +280,13 @@ function renderStatus(health) {
 
   const site = health.staticSiteSource || '';
   const writeable = state.writeEnabled && WRITE_TOOLS.size > 0;
-  bar.append(phrase('工具', Array.isArray(health.tools) ? health.tools.length : '—'));
-  bar.append(phrase('权限', writeable ? '可写' : '只读', writeable ? 'good' : ''));
-  bar.append(phrase('站点', site === 'not-built-yet' ? '未构建' : (site || '—')));
-  bar.append(phrase('登录', health.authRequired ? (health.sessionAuth ? '已登录' : '需令牌') : '开放',
+  bar.append(phrase(t('status.tools'), Array.isArray(health.tools) ? health.tools.length : '—'));
+  bar.append(phrase(t('status.permission'), writeable ? t('status.write') : t('status.read'), writeable ? 'good' : ''));
+  bar.append(phrase(t('status.site'), site === 'not-built-yet' ? t('status.notbuilt') : (site || '—')));
+  bar.append(phrase(t('status.login'), health.authRequired ? (health.sessionAuth ? t('status.signedin') : t('status.needtoken')) : t('status.open'),
     health.authRequired ? (health.sessionAuth ? 'good' : 'warn') : 'good'));
   if (health.status && health.status !== 'ok') {
-    bar.append(phrase('状态', health.status, 'bad'));
+    bar.append(phrase(t('status.state'), health.status, 'bad'));
   }
 
   // The technical values live in the folded details, not on the first screen.
@@ -223,12 +294,12 @@ function renderStatus(health) {
   if (body) {
     body.textContent = '';
     const rows = [
-      ['传输', health.transport || '—'],
-      ['协议路径', health.protocolPath || '—'],
-      ['工具集', health.toolset || '—'],
-      ['种子项目', health.seedProject || '—'],
-      ['静态源', site || '—'],
-      ['写工具', WRITE_TOOLS.size === 0 ? '本工具集无' : (state.writeEnabled ? '已开启' : '已关闭')],
+      [t('detail.transport'), health.transport || '—'],
+      [t('detail.protocolpath'), health.protocolPath || '—'],
+      [t('detail.toolset'), health.toolset || '—'],
+      [t('detail.seed'), health.seedProject || '—'],
+      [t('detail.source'), site || '—'],
+      [t('detail.writetools'), WRITE_TOOLS.size === 0 ? t('detail.nowritetools') : (state.writeEnabled ? t('detail.on') : t('detail.off'))],
     ];
     for (const [label, value] of rows) {
       const row = el('div');
@@ -239,7 +310,8 @@ function renderStatus(health) {
   }
 
   $('#foot-meta').textContent =
-    `server ${health.server || 'gemarc-mcp'} ${health.version || ''} · ${state.writeEnabled ? '写工具已开启' : '写工具默认关闭'}`;
+    `${t('foot.server', { server: health.server || 'gemarc-mcp', version: health.version || '' })} · `
+    + (state.writeEnabled ? t('foot.writeon') : t('foot.writeoff'));
 }
 
 /* --------------------------------------------------------------------- auth */
@@ -298,7 +370,7 @@ function setSpaceTip(name) {
     tip.textContent = '';
     return;
   }
-  tip.textContent = `${name} · ${WRITE_TOOLS.has(name) ? '写入' : '只读'}`;
+  tip.textContent = `${name} · ${WRITE_TOOLS.has(name) ? t('legend.write') : t('legend.read')}`;
   tip.hidden = false;
 }
 
@@ -318,6 +390,24 @@ function syncSpaceTools() {
   if (spaceBridge.scene) spaceBridge.scene.setTools(spaceBridge.tools);
 }
 
+/**
+ * The title and the description of one tool in the language of this panel.
+ *
+ * The server sends the three languages of every tool in the `_meta` of the tool
+ * (`gemarc.dev/descriptions`); the `description` field itself stays English, so
+ * a client that reads nothing else still gets the canonical text.
+ * @param {object} tool one tool of `tools/list`
+ * @returns {{title: string, description: string}} the words
+ */
+function toolText(tool) {
+  const meta = tool._meta && tool._meta['gemarc.dev/descriptions'];
+  const entry = meta && typeof meta[LANG] === 'object' ? meta[LANG] : null;
+  return {
+    title: (entry && entry.title) || tool.title || tool.name,
+    description: (entry && entry.description) || tool.description || '',
+  };
+}
+
 function toolCard(tool) {
   const card = el('button', 'tool-item' + (WRITE_TOOLS.has(tool.name) ? ' write' : ''));
   card.type = 'button';
@@ -326,7 +416,7 @@ function toolCard(tool) {
   const count = Object.keys(schema.properties || {}).length;
   card.append(name);
   card.append(el('span', 'tag', count ? `${count}p` : ''));
-  card.append(el('span', 'tdesc', tool.description || ''));
+  card.append(el('span', 'tdesc', toolText(tool).description));
   card.addEventListener('click', () => selectTool(tool.name));
   return card;
 }
@@ -351,13 +441,14 @@ function renderToolList(filterText) {
   const needle = (filterText || '').trim().toLowerCase();
   const match = (tool) => !needle
     || tool.name.toLowerCase().includes(needle)
-    || (tool.description || '').toLowerCase().includes(needle);
+    || (tool.description || '').toLowerCase().includes(needle)
+    || toolText(tool).description.toLowerCase().includes(needle);
 
   const groups = [
-    ['只读 / READ', state.tools.filter((t) => !WRITE_TOOLS.has(t.name) && match(t))],
+    [t('group.read'), state.tools.filter((t2) => !WRITE_TOOLS.has(t2.name) && match(t2))],
   ];
   if (writeGroupVisible()) {
-    groups.push(['写入 / WRITE', state.tools.filter((t) => WRITE_TOOLS.has(t.name) && match(t))]);
+    groups.push([t('group.write'), state.tools.filter((t2) => WRITE_TOOLS.has(t2.name) && match(t2))]);
   }
   for (const [label, tools] of groups) {
     if (!tools.length) continue;
@@ -368,7 +459,7 @@ function renderToolList(filterText) {
       list.append(card);
     }
   }
-  if (!list.childElementCount) list.append(el('p', 'empty', '没有匹配的工具'));
+  if (!list.childElementCount) list.append(el('p', 'empty', t('tool.nomatch')));
 }
 
 /* ---------------------------------------------------------------- the form */
@@ -377,21 +468,21 @@ function renderToolList(filterText) {
 function syncCallButton() {
   const blocked = Boolean(state.selected) && WRITE_TOOLS.has(state.selected) && !state.writeEnabled;
   $('#call-btn').disabled = blocked;
-  $('#call-btn').textContent = blocked ? '写工具已关闭' : '调用';
+  $('#call-btn').textContent = blocked ? t('call.blocked') : t('call.button');
 }
 
 function selectTool(name) {
   state.selected = name;
-  const tool = state.tools.find((t) => t.name === name);
+  const tool = state.tools.find((t2) => t2.name === name);
   if (!tool) return;
   renderToolList($('#tool-filter').value);
   // The crystal of the selected tool is marked too: one selection, two views.
   if (spaceBridge.scene) spaceBridge.scene.setSelected(name);
   $('#tool-name').textContent = tool.name;
-  $('#tool-desc').textContent = tool.description || '(该工具没有描述)';
+  $('#tool-desc').textContent = toolText(tool).description || t('tool.nodesc');
 
   const kind = $('#tool-kind');
-  kind.textContent = WRITE_TOOLS.has(name) ? 'WRITE · 需要写权限' : 'READ · 只读';
+  kind.textContent = WRITE_TOOLS.has(name) ? t('tool.kind.write') : t('tool.kind.read');
   kind.className = 'chip ' + (WRITE_TOOLS.has(name) ? 'write' : 'read');
 
   syncCallButton();
@@ -400,9 +491,39 @@ function selectTool(name) {
   renderJson($('#schema'), tool.inputSchema || {});
   $('#result').className = 'result';
   $('#result').textContent = '';
-  $('#result').append(el('p', 'muted', '参数已就绪,点「调用」执行。'));
-  $('#result-meta').textContent = '尚未调用';
+  $('#result').append(el('p', 'muted', t('result.ready')));
+  $('#result-meta').textContent = t('result.idle');
   $('#copy-btn').hidden = true;
+}
+
+/**
+ * Put the language into the parts the panel fills itself.
+ *
+ * The status line, the tool list, the tool head and the parameter form are
+ * rebuilt; the result stays as it is (it is JSON, not text).
+ */
+function refreshLanguage() {
+  if (state.health) renderStatus(state.health);
+  renderToolList($('#tool-filter').value);
+  const tool = state.tools.find((t2) => t2.name === state.selected);
+  if (tool) {
+    $('#tool-desc').textContent = toolText(tool).description || t('tool.nodesc');
+    const kind = $('#tool-kind');
+    kind.textContent = WRITE_TOOLS.has(tool.name) ? t('tool.kind.write') : t('tool.kind.read');
+    renderParams(tool);
+  }
+  syncCallButton();
+  renderHistory();
+}
+
+function switchLanguage(lang) {
+  if (!normalizeLang(lang) || lang === LANG) return;
+  LANG = lang;
+  try {
+    localStorage.setItem(LANG_KEY, lang);
+  } catch { /* the choice is not remembered, the panel still speaks the new language */ }
+  applyLanguage();
+  refreshLanguage();
 }
 
 function renderParams(tool) {
@@ -414,7 +535,7 @@ function renderParams(tool) {
   const names = Object.keys(properties);
 
   if (!names.length) {
-    form.append(el('p', 'empty', '该工具没有参数。'));
+    form.append(el('p', 'empty', t('param.none')));
     return;
   }
 
@@ -423,7 +544,7 @@ function renderParams(tool) {
     const field = el('div', 'field');
     const label = el('label');
     label.append(el('span', 'fname', name));
-    if (required.has(name)) label.append(el('span', 'req', '必填'));
+    if (required.has(name)) label.append(el('span', 'req', t('param.required')));
     label.append(el('span', 'ftype', Array.isArray(spec.type) ? spec.type.join('|') : (spec.type || 'any')));
     field.append(label);
     if (spec.description) field.append(el('span', 'fhint', spec.description));
@@ -432,7 +553,7 @@ function renderParams(tool) {
 
     if (Array.isArray(spec.enum) && spec.enum.length) {
       const select = el('select');
-      select.append(el('option', '', '(未设置)'));
+      select.append(el('option', '', t('param.unset')));
       for (const value of spec.enum) {
         const option = el('option', '', String(value));
         option.value = String(value);
@@ -445,7 +566,7 @@ function renderParams(tool) {
       const input = el('input');
       input.type = 'checkbox';
       wrap.append(input);
-      wrap.append(el('span', '', '启用'));
+      wrap.append(el('span', '', t('param.enable')));
       field.append(wrap);
       field.dataset.kind = 'boolean';
     } else if (spec.type === 'integer' || spec.type === 'number') {
@@ -456,7 +577,7 @@ function renderParams(tool) {
       field.dataset.kind = 'number';
     } else if (spec.type === 'array' || spec.type === 'object') {
       const area = el('textarea');
-      area.placeholder = spec.type === 'array' ? 'JSON 数组,例如 ["a","b"]' : 'JSON 对象';
+      area.placeholder = spec.type === 'array' ? t('param.array') : t('param.object');
       if (spec.default !== undefined) area.value = JSON.stringify(spec.default);
       field.append(area);
       field.dataset.kind = 'json';
@@ -464,7 +585,7 @@ function renderParams(tool) {
       const long = (spec.description || '').length > 90 || name.endsWith('_model');
       const input = long ? el('textarea') : el('input');
       if (!long) input.type = 'text';
-      input.placeholder = spec.default !== undefined ? `默认 ${JSON.stringify(spec.default)}` : '';
+      input.placeholder = spec.default !== undefined ? t('param.default', { value: JSON.stringify(spec.default) }) : '';
       field.append(input);
       field.dataset.kind = 'string';
     }
@@ -495,7 +616,7 @@ function collectParams() {
       try {
         args[name] = JSON.parse(value);
       } catch (error) {
-        throw new Error(`参数 ${name} 不是合法 JSON: ${error.message}`);
+        throw new Error(t('err.badjson', { name, message: error.message }));
       }
       continue;
     }
@@ -511,7 +632,7 @@ async function callSelected() {
   if (!name) return;
   const button = $('#call-btn');
   button.disabled = true;
-  button.textContent = '调用中…';
+  button.textContent = t('call.running');
 
   let args = {};
   try {
@@ -555,7 +676,7 @@ function showError(message, detail, meta) {
   box.textContent = '';
   box.append(el('pre', '', message));
   if (detail) box.append(el('pre', '', JSON.stringify(detail, null, 2)));
-  $('#result-meta').textContent = meta || '调用失败';
+  $('#result-meta').textContent = meta || t('result.failed');
   $('#copy-btn').hidden = false;
 }
 
@@ -565,12 +686,12 @@ function pushHistory(entry) {
   const list = $('#history');
   list.textContent = '';
   if (!state.history.length) {
-    list.append(el('p', 'empty', '暂无调用记录'));
+    list.append(el('p', 'empty', t('history.empty')));
     return;
   }
   for (const item of state.history) {
     const row = el('div', 'item');
-    row.append(el('code', '', item.name));
+    row.append(el('code', '', item.key ? t(item.key) : item.name));
     const right = el('span', item.ok ? 'ok' : 'fail', `${item.ms}ms`);
     row.append(right);
     list.append(row);
@@ -621,11 +742,11 @@ async function getPrompt(name) {
 function renderSideLists() {
   const res = $('#resources');
   res.textContent = '';
-  if (!state.resources.length) res.append(el('p', 'empty', '无资源'));
+  if (!state.resources.length) res.append(el('p', 'empty', t('resources.empty')));
   for (const resource of state.resources) {
     const row = el('div', 'item');
     row.append(el('code', '', resource.uri || resource.name || '?'));
-    const button = el('button', 'mini', '读取');
+    const button = el('button', 'mini', t('resources.read'));
     button.type = 'button';
     button.addEventListener('click', () => readResource(resource.uri));
     row.append(button);
@@ -634,11 +755,11 @@ function renderSideLists() {
 
   const pro = $('#prompts');
   pro.textContent = '';
-  if (!state.prompts.length) pro.append(el('p', 'empty', '无提示词'));
+  if (!state.prompts.length) pro.append(el('p', 'empty', t('prompts.empty')));
   for (const prompt of state.prompts) {
     const row = el('div', 'item');
     row.append(el('code', '', prompt.name || '?'));
-    const button = el('button', 'mini', '预览');
+    const button = el('button', 'mini', t('prompts.preview'));
     button.type = 'button';
     button.addEventListener('click', () => getPrompt(prompt.name));
     row.append(button);
@@ -668,14 +789,14 @@ async function boot() {
         // The deployment accepts the login session, so the token bar is optional: pasting one
         // acts as another identity. Without a token the session alone is enough.
         showAuthBar(state.token
-          ? '已使用本标签页保存的令牌(登录会话同样可用)。'
-          : '正在使用登录会话;也可以粘贴令牌改用其他身份。', state.token ? 'good' : 'muted');
+          ? t('auth.sessionnote')
+          : t('auth.sessionalt'), state.token ? 'good' : 'muted');
       } else {
-        showAuthBar(state.token ? '已使用本标签页保存的令牌。' : '该服务器需要访问令牌,请粘贴后点「使用令牌」。',
+        showAuthBar(state.token ? t('auth.tokensaved') : t('auth.needtokenpaste'),
           state.token ? 'good' : 'warn');
         if (!state.token) {
           dot.className = 'dot off';
-          text.textContent = '需要访问令牌';
+          text.textContent = t('conn.needtoken');
           return;
         }
       }
@@ -692,18 +813,22 @@ async function boot() {
     syncSpaceTools();
     renderToolList('');
     renderSideLists();
-    pushHistory({ name: '(连接建立)', ms: 0, ok: true });
+    pushHistory({ key: 'history.connected', name: '', ms: 0, ok: true });
     dot.className = 'dot on';
-    text.textContent = `已连接 · ${state.tools.length} 工具 / ${state.resources.length} 资源 / ${state.prompts.length} 提示`;
+    text.textContent = t('conn.ok', {
+      tools: state.tools.length,
+      resources: state.resources.length,
+      prompts: state.prompts.length,
+    });
     if (state.tools.length) selectTool(state.tools[0].name);
   } catch (error) {
     if (!current()) return;
     dot.className = 'dot off';
     if (error.unauthorized) {
-      if (handleUnauthorized(error)) text.textContent = '需要访问令牌';
+      if (handleUnauthorized(error)) text.textContent = t('conn.needtoken');
       return;
     }
-    text.textContent = `连接失败: ${error.message}`;
+    text.textContent = t('conn.failed', { message: error.message });
     const bar = $('#statbar');
     if (!healthShown) bar.textContent = '';  // keep the health chips (a degraded state included) once shown
     bar.append(el('span', 'fact bad', error.message));
@@ -715,18 +840,18 @@ function useToken() {
   const value = input.value.trim();
   input.value = '';
   if (!value) {
-    setAuthMessage('令牌为空。', 'bad');
+    setAuthMessage(t('auth.emptytoken'), 'bad');
     return;
   }
   // A header value is Latin-1 without control characters. A zero-width space or a smart quote that came
   // along with a copy would make every fetch throw before any request is sent, with the token still stored.
   if (!/^[\x20-\x7e]+$/.test(value)) {
-    setAuthMessage('令牌里有不可见字符或非 ASCII 字符(常见于复制时带入的零宽空格、弯引号),请重新复制。', 'bad');
+    setAuthMessage(t('auth.badchars'), 'bad');
     return;
   }
   state.token = value;
   storeToken(value);
-  setAuthMessage('正在用该令牌连接…', 'muted');
+  setAuthMessage(t('auth.connecting'), 'muted');
   boot();
 }
 
@@ -734,7 +859,7 @@ function clearToken() {
   state.token = '';
   storeToken('');
   $('#token-input').value = '';
-  setAuthMessage('已清除本标签页里的令牌。', 'muted');
+  setAuthMessage(t('auth.cleared'), 'muted');
 }
 
 $('#token-save').addEventListener('click', useToken);
@@ -743,15 +868,19 @@ $('#token-input').addEventListener('keydown', (event) => {
   if (event.key === 'Enter') useToken();
 });
 $('#call-btn').addEventListener('click', callSelected);
-$('#tool-filter').addEventListener('input', (event) => renderToolList(event.target.value));$('#copy-btn').addEventListener('click', async () => {
+$('#tool-filter').addEventListener('input', (event) => renderToolList(event.target.value));
+$('#copy-btn').addEventListener('click', async () => {
   const text = $('#result').innerText;
   try {
     await navigator.clipboard.writeText(text);
-    $('#result-meta').textContent = '已复制到剪贴板';
+    $('#result-meta').textContent = t('result.copied');
   } catch {
-    $('#result-meta').textContent = '浏览器拒绝了剪贴板访问,请手动复制';
+    $('#result-meta').textContent = t('result.copydenied');
   }
 });
+for (const button of document.querySelectorAll('.lang-btn')) {
+  button.addEventListener('click', () => switchLanguage(button.dataset.uilang));
+}
 
 // The account page and the operator area exist only when the deployment has accounts; the
 // operator area only for an administrator. The server decides both, so the panel can never
@@ -766,17 +895,26 @@ if (CFG.accounts) {
   if (badge) {
     badge.hidden = false;
     if (CFG.admin) {
-      badge.textContent = MAY_WRITE ? '管理员 · 可写' : '管理员 · 只读';
+      badge.textContent = MAY_WRITE ? t('role.adminwrite') : t('role.adminread');
       badge.className = 'chip admin';
     } else {
-      badge.textContent = MAY_WRITE ? '可写账号' : '只读账号';
+      badge.textContent = MAY_WRITE ? t('role.write') : t('role.read');
       badge.className = 'chip ' + (MAY_WRITE ? 'write' : 'read');
     }
   }
+} else {
+  // Without accounts there is no page that issues a token, so the panel does not point at one.
+  const source = document.getElementById('token-source');
+  if (source) source.hidden = true;
+  const note = document.getElementById('token-note');
+  if (note) note.hidden = true;
 }
 if (CFG.admin) {
   const adminEntry = document.getElementById('admin-entry');
   if (adminEntry) adminEntry.hidden = false;
 }
 
+// The language of the page: the server already wrote the text in the language of the request,
+// the panel keeps the reader's own choice.
+applyLanguage();
 boot();

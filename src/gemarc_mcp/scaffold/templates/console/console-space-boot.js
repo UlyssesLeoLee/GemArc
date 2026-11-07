@@ -16,6 +16,22 @@ const HOST_ID = 'space-host';
 const HINT_ID = 'space-hint';
 
 /**
+ * The one word the scene has to say when it cannot load.
+ *
+ * The panel has no text of its own (BD-010 section 12.7): the word comes from
+ * the language table the server injects. A table that is not there returns the
+ * key itself, so the gap is visible instead of hidden.
+ * @param {string} key the key of the table
+ * @returns {string} the word
+ */
+function t(key) {
+  const gemarc = window.GEMARC || {};
+  const tables = gemarc.i18n || {};
+  const table = tables[gemarc.lang] || {};
+  return typeof table[key] === 'string' && table[key] ? table[key] : key;
+}
+
+/**
  * The bridge between the panel and the scene.
  * @returns {object} the bridge
  */
@@ -46,7 +62,7 @@ async function main() {
     THREE = await import('three');
     engine = await import('./console-space.js');
   } catch {
-    say('三维未加载');
+    say(t('space.notloaded'));
     return;
   }
 
@@ -63,7 +79,7 @@ async function main() {
     const hint = document.getElementById(HINT_ID);
     if (hint && typeof hint.remove === 'function') hint.remove();
   } catch {
-    say('三维未加载');
+    say(t('space.notloaded'));
   }
 }
 

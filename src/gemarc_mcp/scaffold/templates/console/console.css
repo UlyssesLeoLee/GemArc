@@ -84,6 +84,29 @@ body {
 }
 .brand small { color: var(--gem-muted-deep); font-weight: 400; font-size: 12px; }
 
+/* The language switcher: three options in one row, each written in its own
+   language (section 12.7). It is a switch, not a menu: the current language is
+   marked, the other two are not. */
+.lang { display: flex; align-items: center; gap: 2px; }
+.lang-btn {
+  padding: 3px 9px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--gem-muted-deep);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.lang-btn:hover { color: var(--gem-aqua-deep); border-color: color-mix(in srgb, var(--gem-aqua-deep) 40%, transparent); }
+.lang-btn.on {
+  color: var(--gem-ink-deep);
+  border-color: color-mix(in srgb, var(--gem-aqua-deep) 50%, transparent);
+  background: color-mix(in srgb, var(--gem-sheen) 70%, transparent);
+}
+.lang-btn:focus-visible { outline: 2px solid var(--gem-aqua-deep); outline-offset: 1px; }
+
 .conn { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--gem-muted-deep); }
 /* A state is a dot AND a word: the colour never carries the fact alone. */
 .dot {
@@ -165,6 +188,14 @@ body {
 }
 .authbar[hidden] { display: none; }
 .authbar label { color: var(--gem-topaz-deep); font-family: var(--mono); font-size: 11.5px; }
+/* The token bar says where the token comes from: the website issues it, the
+   panel only fills it in (OPS-002 section 3.15). */
+.auth-head { flex: 1 1 100%; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.auth-row { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; flex-wrap: wrap; }
+.auth-note { flex: 1 1 100%; margin: 0; font-size: 12px; }
+.auth-source { color: var(--gem-muted-deep); font-size: 12px; }
+.auth-source a { color: var(--gem-aqua-deep); }
+.auth-source[hidden], .auth-note[hidden] { display: none; }
 .authbar input {
   flex: 1 1 280px;
   max-width: 460px;

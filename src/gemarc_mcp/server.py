@@ -23,6 +23,7 @@ from .paths import Workspace, GemArcError, safe_response, digest
 from . import service, simulation, stateless, __version__
 from . import model as model_lib
 from . import i18n
+from . import userctx
 
 TOOLSETS = ("full", "stateless", "atlas", "atlas_remote")
 
@@ -95,6 +96,62 @@ def _source(project: str, inline: dict):
     return data, stateless.model_digest(data)
 
 
+# -- the per-caller view of the tools (DD-010 section 4) --------------------------------------------------------
+#: The key under which the three languages of a tool live inside its ``_meta`` (DD-009).
+DESCRIPTIONS_KEY = "gemarc.dev/descriptions"
+
+
+def _tool_texts(tool) -> dict:
+    """The three languages of one tool, read from its ``_meta``."""
+    meta = getattr(tool, "meta", None)
+    if not isinstance(meta, dict):
+        return {}
+    texts = meta.get(DESCRIPTIONS_KEY)
+    return texts if isinstance(texts, dict) else {}
+
+
+def _personalized_tool(tool, ctx):
+    """The tool as this caller must see it: the title and the description in the caller's language.
+
+    A tool the tables do not translate keeps the English of the code (DD-009), and a caller whose
+    language is the English sees exactly the tool the SDK returns.
+    """
+    entry = _tool_texts(tool).get(ctx.lang)
+    if not isinstance(entry, dict):
+        return tool
+    update: dict = {}
+    description = entry.get("description")
+    title = entry.get("title")
+    if isinstance(description, str) and description:
+        update["description"] = description
+    if isinstance(title, str) and title:
+        update["title"] = title
+        annotations = getattr(tool, "annotations", None)
+        if annotations is not None:
+            update["annotations"] = annotations.model_copy(update={"title": title})
+    if not update:
+        return tool
+    return tool.model_copy(update=update)
+
+
+def _refused_tool(name: str, lang: str = ""):
+    """The answer to a call of a tool the account does not keep (DD-010 section 4.3).
+
+    The tool list of that account does not carry the tool, so a call to it is a mistake of the
+    client, not a permission problem: the answer says which tool and why, in the language of the
+    account and in the same JSON shape every other tool failure uses. An account that pins no
+    language gets the English text, the formal one (DD-010 section 4.1).
+    """
+    from mcp.types import CallToolResult, TextContent
+
+    message = i18n.text(lang or "en-US", "messages", "GEMARC_ACCT_036")
+    payload = {"status": "error", "error": "tool_not_allowed", "code": "GEMARC_ACCT_036",
+               "tool": name, "message": message}
+    return CallToolResult(content=[TextContent(type="text", text=json.dumps(payload, ensure_ascii=False,
+                                                                     separators=(",", ":")))],
+                          is_error=True)
+
+
 def create_server(toolset: str | None = None):
     # Import only when MCP is actually launched, allowing offline core unit tests.
     from mcp.server import MCPServer
@@ -112,6 +169,33 @@ def create_server(toolset: str | None = None):
     WRITE_TOOLS.clear()
     REGISTERED_TOOLS.clear()
     _app_tool = app.tool
+
+    # -- the per-caller view of the tools (DD-010 section 4) --------------------------------
+    # With no identity in the request (no login, or the shared environment token) the answer is
+    # exactly the one of the SDK: the list, the descriptions and the defaults do not change.
+    # With an identity, the list is the account's own list, every description is the translation
+    # into the language of that account, and a tool outside the account's list is refused.
+    # A server without those two methods (the SDK-free registration smoke test) has no list to
+    # personalize, so it is left alone.
+    _base_list_tools = getattr(app, "list_tools", None)
+    _base_call_tool = getattr(app, "call_tool", None)
+    if _base_list_tools is not None and _base_call_tool is not None:
+
+        async def _list_tools():
+            tools = await _base_list_tools()
+            ctx = userctx.current()
+            if ctx is None or not ctx.has_identity:
+                return tools
+            return [_personalized_tool(tool, ctx) for tool in tools if ctx.allows(tool.name)]
+
+        async def _call_tool(name, arguments, context=None):
+            ctx = userctx.current()
+            if ctx is not None and ctx.has_identity and not ctx.allows(name):
+                return _refused_tool(name, ctx.lang)
+            return await _base_call_tool(name, arguments, context)
+
+        app.list_tools = _list_tools
+        app.call_tool = _call_tool
 
     def reply(payload: dict):
         """Same JSON text as before, but a failed call is flagged as an error.
@@ -223,9 +307,11 @@ def create_server(toolset: str | None = None):
         return run(action)
 
     @tool("gemarc_render", "Render site data from a model", stateless_ok=True)
-    def render(model: dict, profile: str = "static"):
-        """Validate a model and return the files that depend on it: data/architecture.json, scenarios.json, capabilities.json, evidence-index.json, diagram-catalog.json, spatial-layout.json, three-d.json, workflow-ir.json and case-library.json, plus a description of the fixed site kit and where to download it. The kit carries the site shell, the shared runtime and data/workflow-schema.json (the GWF-IR schema, which follows the vocabulary and not the model). Kit + these files is the complete multimedia document site; nothing is stored on the server. `profile` is static (default; zero-build ESM) or vite (npm project)."""
-        return run(lambda: stateless.render(model, profile))
+    def render(model: dict, profile: str = ""):
+        """Validate a model and return the files that depend on it: data/architecture.json, scenarios.json, capabilities.json, evidence-index.json, diagram-catalog.json, spatial-layout.json, three-d.json, workflow-ir.json and case-library.json, plus a description of the fixed site kit and where to download it. The kit carries the site shell, the shared runtime and data/workflow-schema.json (the GWF-IR schema, which follows the vocabulary and not the model). Kit + these files is the complete multimedia document site; nothing is stored on the server. `profile` is empty (the default), which means the render form of the caller: the account's own default when the caller has one, static otherwise; it is static (zero-build ESM) or vite (npm project)."""
+        ctx = userctx.current()
+        effective = ctx.render_form(profile) if ctx is not None else (profile or userctx.DEFAULT_RENDER_PROFILE)
+        return run(lambda: stateless.render(model, effective))
 
     # ---- tools that need a workspace (local servers) ------------------------------
 

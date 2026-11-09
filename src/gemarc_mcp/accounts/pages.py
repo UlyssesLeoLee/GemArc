@@ -290,14 +290,71 @@ def snippets(view: View, token: str, lang: str) -> str:
     )
 
 
+def _settings_form(csrf: str, lang: str, settings, tools: Sequence[str]) -> str:
+    """The settings of the account as a plain form: it works without any script (DD-010).
+
+    ``settings`` is the stored settings (or None for an account that never chose anything) and
+    ``tools`` are the tools the server really registers. The form posts to ``/account/settings``.
+    """
+    current_lang = getattr(settings, "lang", "") or ""
+    current_profile = getattr(settings, "render_profile", "") or ""
+    kept = set(getattr(settings, "tools", ()) or ())
+    mode = "some" if kept else "all"
+
+    def option(value: str, label: str, selected: bool) -> str:
+        mark = " selected" if selected else ""
+        return "<option value=\"" + esc(value) + "\"" + mark + ">" + esc(label) + "</option>"
+
+    # The first option is "follow the reader": the account does not pin a language. It is the one
+    # marked when the account never chose one, so saving another field never pins the language of
+    # the reader by accident (DD-010 section 4.1).
+    lang_options = option("", t(lang, "account.settingslangdefault"), current_lang == "")
+    lang_options += "".join(
+        option(code, t(lang, key), code == current_lang)
+        for code, key in (("zh-CN", "lang.zh"), ("ja-JP", "lang.ja"), ("en-US", "lang.en")))
+    profile_options = option("", t(lang, "account.settingsprofiledefault"), current_profile == "")
+    profile_options += "".join(option(code, code, code == current_profile) for code in ("mvp", "static", "vite"))
+
+    boxes = []
+    for name in tools:
+        mark = " checked" if mode == "all" or name in kept else ""
+        boxes.append("<label><input type=\"checkbox\" name=\"tools\" value=\"" + esc(name) + "\"" + mark + ">"
+                     + " <code>" + esc(name) + "</code></label>")
+    box_list = "".join(boxes) or "<p class=\"mute\">-</p>"
+
+    def radio(value: str, label: str, checked: bool) -> str:
+        mark = " checked" if checked else ""
+        return ("<label><input type=\"radio\" name=\"tools_mode\" value=\"" + value + "\"" + mark + ">"
+                + esc(label) + "</label>")
+
+    return (
+        "<form method=\"post\" action=\"/account/settings\" class=\"card\">" + _csrf(csrf) +
+        "<div class=\"row\">"
+        "<div><label for=\"set-lang\">" + esc(t(lang, "account.settingslang")) + "</label>"
+        "<select id=\"set-lang\" name=\"lang\">" + lang_options + "</select></div>"
+        "<div><label for=\"set-profile\">" + esc(t(lang, "account.settingsprofile")) + "</label>"
+        "<select id=\"set-profile\" name=\"render_profile\">" + profile_options + "</select></div>"
+        "</div>"
+        "<p class=\"mute\">" + esc(t(lang, "account.settingstoolsnote")) + "</p>"
+        "<div class=\"row\">"
+        + radio("all", t(lang, "account.settingstoolsall"), mode == "all")
+        + radio("some", t(lang, "account.settingstoolssome"), mode == "some")
+        + "</div>"
+        "<div class=\"checks\">" + box_list + "</div>"
+        "<button type=\"submit\">" + esc(t(lang, "account.settingssave")) + "</button>"
+        "</form>"
+    )
+
+
 def account_page(view: View, nonce: str, *, lang: str = "", email: str, csrf: str, tokens: Sequence, now: int,
                  recent: bool, created: Optional[dict] = None, message: Optional[str] = None,
                  default_days: Optional[int] = None, max_days: Optional[int] = None,
-                 is_admin: bool = False) -> str:
+                 is_admin: bool = False, settings=None, tools: Sequence[str] = ()) -> str:
     """The signed-in page. ``tokens`` are TokenMeta-like objects; ``created`` is ``{"token": ..., "id": ...}``.
 
     ``default_days`` and ``max_days`` are the token policy in force; without them the deployment
     defaults from the environment are used. ``is_admin`` shows the link to the operator area.
+    ``settings`` and ``tools`` are the settings of the account and the tools the server registers.
     """
     days_default = int(view.default_days if default_days is None else default_days)
     days_max = int(view.max_days if max_days is None else max_days)
@@ -356,6 +413,9 @@ def account_page(view: View, nonce: str, *, lang: str = "", email: str, csrf: st
         "<div><button type=\"submit\">" + esc(t(lang, "account.tokencreate")) + "</button></div></div></form>"
         "<form method=\"post\" action=\"/account/tokens/revoke-all\">" + _csrf(csrf) +
         "<button class=\"plain\" type=\"submit\">" + esc(t(lang, "account.tokenrevokeall")) + "</button></form>"
+    )
+    parts.append(
+        "<h2>" + esc(t(lang, "account.settingsh2")) + "</h2>" + _settings_form(csrf, lang, settings, tools)
     )
     parts.append(
         "<h2>" + esc(t(lang, "account.sessionh2")) + "</h2>"

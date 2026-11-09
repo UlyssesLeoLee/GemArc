@@ -28,6 +28,7 @@ from .. import i18n
 from . import admin as admin_mod
 from . import audit as audit_mod
 from . import oidc, pages, retention, schema, security
+from . import settings as settings_mod
 from . import users as users_mod
 from .admin import AdminService
 from .config import AccountsConfig
@@ -51,6 +52,8 @@ PREFILTER_LIMIT = 120
 PREFILTER_LIMIT_NO_IP = 300
 PREFILTER_WINDOW_S = 60
 REVOKE_PATH = re.compile(r"^/account/tokens/([a-z2-7]{8})/revoke\Z")
+#: Where the per-user settings live (DD-010 section 5). The same path reads (GET) and writes (POST).
+SETTINGS_PATH = "/account/settings"
 #: The operator area. Every path under it needs an administrator session; the actions are the four
 #: verbs the admin page offers (enable, disable, grant-admin, revoke-admin, revoke-tokens).
 ADMIN_PATH = "/account/admin"
@@ -70,6 +73,13 @@ MESSAGES = {lang: i18n.section(lang, "messages") for lang in i18n.LANGUAGES}
 #: limit, a stale session, a bad token, a wrong host), and every one of them must speak the
 #: language of the reader: the request carries it, the pages take it from here.
 REQUEST_LANG: "contextvars.ContextVar[str]" = contextvars.ContextVar("gemarc_request_lang", default="")
+
+
+def _split_names(raw: object) -> "list[str]":
+    """A comma separated list of names (the tools an account keeps). Never anything else."""
+    if not isinstance(raw, str):
+        return []
+    return [part.strip() for part in raw.split(",") if part.strip()]
 TOKEN_ERROR_STATUS = {"GEMARC_ACCT_034": 400, "GEMARC_ACCT_033": 409, "GEMARC_ACCT_035": 403, "GEMARC_ACCT_013": 403}
 DB_ERROR_STATE = {"GEMARC_ACCT_002": "unreachable", "GEMARC_ACCT_003": "unreachable", "GEMARC_ACCT_004": "misconfigured"}
 
@@ -148,6 +158,7 @@ class AccountsRuntime:
         self.sessions = SessionStore(self.db, self.crypto, SessionPolicy.from_config(config))
         self.tokens = TokenStore(self.db, self.crypto, TokenPolicy.from_config(config),
                                  policy_provider=self._token_policy)
+        self.settings = settings_mod.SettingsStore(self.db)
         self.audit = audit_mod.Audit(self.db, self.crypto, config.audit_retention_days)
         self.limiter = RateLimiter(self.db, self.crypto)
         self.states = OAuthStates(self.db)
@@ -385,6 +396,7 @@ class AccountsRuntime:
             "/auth/logout-all": (("POST",), self._logout_all),
             "/account": (("GET", "HEAD"), self._account),
             "/account/tokens": (("GET", "HEAD", "POST"), self._tokens),
+            SETTINGS_PATH: (("GET", "HEAD", "POST"), self._settings),
             "/account/tokens/revoke-all": (("POST",), self._revoke_all),
             "/account/export": (("POST",), self._export),
             "/account/delete": (("POST",), self._delete),
@@ -570,12 +582,12 @@ class AccountsRuntime:
         return (info, sid) if info is not None else (None, None)
 
     def _account_data(self, user_id: str):
-        return self.users.email_of(user_id), self.tokens.list(user_id)
+        return self.users.email_of(user_id), self.tokens.list(user_id), self.settings.load(user_id)
 
     async def _render_account(self, info, sid: str, now: int, *, created: Optional[dict] = None,
                               message: Optional[str] = None, status: int = 200, cookies=(),
                               lang: str = "", lang_cookie: bool = False):
-        email, tokens = await self.run_db(self._account_data, info.user_id)
+        email, tokens, account_settings = await self.run_db(self._account_data, info.user_id)
         csrf = self.crypto.csrf_token(sid)
         recent = self.sessions.is_recent(info, now)
         # The policy in force, not the environment defaults: the operator area can change it while
@@ -586,7 +598,8 @@ class AccountsRuntime:
                                                                csrf=csrf, tokens=tokens, now=now, recent=recent,
                                                                created=created, message=message,
                                                                default_days=policy.default_days, max_days=policy.max_days,
-                                                               is_admin=is_admin),
+                                                               is_admin=is_admin, settings=account_settings,
+                                                               tools=self.registered_tools),
                           cookies=cookies, lang=lang, lang_cookie=lang_cookie)
 
     async def _account(self, req: Req):
@@ -597,7 +610,11 @@ class AccountsRuntime:
             cookies = [self._clear_sid()] if stale else []
             return self._html(200, lambda n: pages.signed_out_page(self.view, n, lang=req.lang), cookies=cookies,
                               lang=req.lang, lang_cookie=req.lang_chosen)
-        return await self._render_account(info, sid, now, lang=req.lang, lang_cookie=req.lang_chosen)
+        # The language of a signed-in account: an explicit choice of this visit wins, then the
+        # account's own choice, then the cookie and the browser (DD-010 section 4.1).
+        settings = await self.run_db(self.settings.load, info.user_id)
+        lang = req.lang if req.lang_chosen else (settings.lang or req.lang)
+        return await self._render_account(info, sid, now, lang=lang, lang_cookie=req.lang_chosen)
 
     async def _tokens(self, req: Req):
         now = self.now()
@@ -606,11 +623,89 @@ class AccountsRuntime:
         info, sid = await self._session(req, now)
         if info is None:
             return pages.redirect(ACCOUNT_PATH, 303, hsts=self.hsts)
-        return await self._render_account(info, sid, now, lang=req.lang, lang_cookie=req.lang_chosen)
+        settings = await self.run_db(self.settings.load, info.user_id)
+        lang = req.lang if req.lang_chosen else (settings.lang or req.lang)
+        return await self._render_account(info, sid, now, lang=lang, lang_cookie=req.lang_chosen)
+
+    # -- the per-user settings (DD-010 section 5) ---------------------------------------------------------------------
+    async def _settings(self, req: Req):
+        """Read or write the settings of the signed-in account. Never anybody else's."""
+        if req.method == "POST":
+            return await self._post(req, self._do_settings, recent=True,
+                                    parse=lambda body: security.parse_form_repeated(body, repeatable="tools"))
+        now = self.now()
+        info, sid = await self._session(req, now)
+        if info is None:
+            return self.error(401, "GEMARC_ACCT_020")
+        current = await self.run_db(self.settings.load, info.user_id)
+        return pages.json_response(200, {
+            "lang": current.lang,
+            "tools": sorted(current.tools),
+            "render_profile": current.render_profile,
+            "updated_at": current.updated_at,
+            "available_tools": list(self.registered_tools),
+        }, hsts=self.hsts)
+
+    async def _do_settings(self, req: Req, a: Authed):
+        form = a.form
+        # The mode says what the form means: every tool, or only the checked ones. A client that
+        # sends no mode at all is read by what it sent: a list of tools, or nothing.
+        mode = (form.get("tools_mode") or "").strip()
+        if mode not in ("all", "some"):
+            mode = "some" if "tools" in form else "all"
+        try:
+            lang = settings_mod.clean_lang(form.get("lang", ""))
+            profile = settings_mod.clean_render_profile(form.get("render_profile", ""))
+            if mode == "all":
+                tools: "tuple[str, ...]" = ()
+            else:
+                names = _split_names(form.get("tools", ""))
+                if not names:
+                    # "Only the checked ones" with nothing checked is a mistake, not "all of them".
+                    return self._settings_error(req, 400, "GEMARC_ACCT_038")
+                tools = settings_mod.clean_tools(names, self.registered_tools)
+        except settings_mod.SettingsError:
+            # A refused value changes nothing: the stored settings stay as they were.
+            return self._settings_error(req, 400, "GEMARC_ACCT_037")
+        await self.run_db(self._save_settings, a.info.user_id, lang, tools, profile, a.now)
+        # The change has to be visible at once: the cached grants of this account still carry the old
+        # settings, and a token of this account would otherwise keep the old list for a whole TTL.
+        self.pat_cache.evict_user(a.info.user_id)
+        payload = {"lang": lang, "tools": list(tools), "render_profile": profile, "updated_at": a.now}
+        if self._wants_json(req):
+            return pages.json_response(200, payload, hsts=self.hsts)
+        # The page comes back in the language that was just saved. An account that does not pin a
+        # language (the empty string) goes back in the language of the reader (DD-010 section 4.1).
+        page_lang = lang or req.lang
+        return await self._render_account(a.info, a.sid, a.now,
+                                          message=i18n.text(page_lang, "accounts", "account.settingssaved"),
+                                          lang=page_lang)
+
+    def _save_settings(self, user_id: str, lang: str, tools: "tuple[str, ...]", profile: str, now: int) -> None:
+        self.settings.save(user_id, lang=lang, tools=tools, render_profile=profile, now=now)
+        self.audit.event(now, "settings_updated", user_id=user_id)
+
+    @staticmethod
+    def _wants_json(req: Req) -> bool:
+        """Whether the caller asked for JSON. The console does, a browser form does not."""
+        return "application/json" in (req.headers.get("accept") or "").lower()
+
+    def _settings_error(self, req: Req, status: int, code: str):
+        """The refusal of a settings change: JSON for the console, a page for the browser."""
+        if self._wants_json(req):
+            lang = REQUEST_LANG.get() or i18n.DEFAULT_LANG
+            message = MESSAGES.get(lang, {}).get(code) or MESSAGES.get(i18n.DEFAULT_LANG, {}).get(code) or code
+            return pages.json_response(status, {"error": code, "message": message}, hsts=self.hsts)
+        return self.error(status, code, relogin=False)
 
     # -- state-changing routes --------------------------------------------------------------------------------------
-    async def _post(self, req: Req, action: Callable, *, recent: bool, limit_scope: Optional[str] = None):
-        """Common pipeline of every POST: origin, session, body, CSRF token, per-user limit, step-up, action."""
+    async def _post(self, req: Req, action: Callable, *, recent: bool, limit_scope: Optional[str] = None,
+                    parse: Optional[Callable[[bytes], "Optional[dict[str, str]]"]] = None):
+        """Common pipeline of every POST: origin, session, body, CSRF token, per-user limit, step-up, action.
+
+        ``parse`` replaces the body parser for the one endpoint that needs a different shape (the settings
+        form carries a list of checkboxes, so one key may repeat); every other step stays the same.
+        """
         cfg = self.config
         if not security.origin_ok(req.headers, cfg.origin):
             return self.error(403, "GEMARC_ACCT_021")
@@ -626,7 +721,7 @@ class AccountsRuntime:
             body = await req.reader.read(security.MAX_FORM_BYTES)
         except security.BodyTooLarge:
             return self.error(413, "GEMARC_ACCT_050")
-        form = security.parse_form(body)
+        form = (parse or security.parse_form)(body)
         if form is None:
             return self.error(400, "GEMARC_ACCT_050")
         if not self.crypto.verify_csrf(sid, form.get("csrf", "")):
@@ -894,6 +989,27 @@ class AccountsRuntime:
         """The user id of a signed-in caller, or None. Used by the console gate and by the MCP session lane."""
         info = await self.signed_in_session(headers)
         return None if info is None else info.user_id
+
+    async def signed_in_context(self, headers: Any) -> Optional[dict]:
+        """The signed-in caller with their settings and the CSRF token, in one go (DD-010).
+
+        The console needs all three: the session (who is calling and what they may do), the settings
+        (the language of the panel and the tool list) and the CSRF token (to save a change). One
+        lookup of the session, one of the settings; a caller without a session gets ``None``.
+        """
+        sid = security.single_cookie(headers, self.sid_cookie)
+        if sid is None or not valid_sid_format(sid):
+            return None
+        info = await self.run_db(lambda: self.sessions.lookup(sid, self.now(), policy_check=self.policy.row_ok))
+        if info is None:
+            return None
+        settings = await self.run_db(self.settings.load, info.user_id)
+        return {
+            "user_id": info.user_id,
+            "can_write": bool(info.can_write),
+            "csrf": self.crypto.csrf_token(sid),
+            "settings": settings,
+        }
 
     async def is_admin_user(self, user_id: str) -> bool:
         """Whether this user id may open the operator area."""

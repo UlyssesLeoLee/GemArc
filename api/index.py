@@ -103,6 +103,7 @@ import gemarc_mcp  # noqa: E402
 from gemarc_mcp import i18n  # noqa: E402
 from gemarc_mcp import server as gemarc_server  # noqa: E402
 from gemarc_mcp import stateless  # noqa: E402
+from gemarc_mcp import userctx  # noqa: E402
 from gemarc_mcp.accounts import flags as account_flags  # noqa: E402  (stdlib only; nothing else of the package)
 
 log = logging.getLogger("gemarc.api")
@@ -362,6 +363,8 @@ TOOLSET_LOOKUP_TIMEOUT_S = 4.0
 
 #: Where the operator area lives (the accounts module owns the paths under /account).
 ACCOUNT_ADMIN_PATH = "/account/admin"
+#: Where the settings of the signed-in account live (read and written by the console, DD-010).
+ACCOUNT_SETTINGS_PATH = "/account/settings"
 
 
 def _toolset_override(account_config) -> str:
@@ -661,7 +664,8 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
             payload["consoleRequiresLogin"] = True
         return payload
 
-    def render_console(admin: bool = False, write: bool = False, lang: str = "") -> str:
+    def render_console(admin: bool = False, write: bool = False, lang: str = "",
+                       account_lang: str = "", csrf: str = "") -> str:
         language = i18n.normalize(lang) or i18n.DEFAULT_LANG
         html = CONSOLE_HTML.read_text(encoding="utf-8")
         html = html.replace("__MCP_PATH__", MCP_PATH)
@@ -673,6 +677,11 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
         html = html.replace("__WRITE__", "true" if write else "false")
         html = html.replace("__ACCOUNTS__", "true" if accounts_state == "ok" else "false")
         html = html.replace("__LANG__", language)
+        # The language of the account and the token that saves a change (DD-010). The panel needs
+        # both to keep the account's own choices; without a session there is nothing to save.
+        html = html.replace("__ACCOUNT_LANG__", account_lang)
+        html = html.replace("__CSRF__", csrf)
+        html = html.replace("__SETTINGS_PATH__", ACCOUNT_SETTINGS_PATH)
         # The text of the page: every {{key}} marker becomes the text of the language of the
         # request (DD-009). A key that is not in the table stays the key, so a gap shows up in
         # the page instead of quietly mixing two languages.
@@ -717,6 +726,7 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
             await reply(_json(503, {"error": "accounts_unavailable", "code": "GEMARC_ACCT_001"},
                               {"Cache-Control": "no-store"}), scope, receive, send)
             return
+        decision = None
         if switches.uses_pat:
             headers = Headers(scope=scope)
             decision = await get_account_mcp_auth().authenticate(scope, headers, _presented_token(headers), receive)
@@ -743,7 +753,24 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
         normalised = dict(scope)
         normalised["path"] = MCP_PATH
         normalised["raw_path"] = MCP_PATH.encode("ascii")
-        await inner(normalised, receive, send)
+        # 4. The identity of the caller travels with the request (DD-010). The tool layer reads it
+        #    from the request context: the list of the tools, the language of their descriptions and
+        #    the default render form are then the ones of this account. A request without an identity
+        #    (the shared environment token, or no login at all) keeps the behaviour of before.
+        ctx_token = None
+        if decision is not None and decision.user_id:
+            settings = decision.settings
+            ctx_token = userctx.activate(userctx.UserContext(
+                user_id=decision.user_id,
+                scope=decision.scope or "read",
+                lang=settings.lang,
+                tools=frozenset(settings.tools),
+                render_profile=settings.render_profile))
+        try:
+            await inner(normalised, receive, send)
+        finally:
+            if ctx_token is not None:
+                userctx.reset(ctx_token)
 
     async def accounts_endpoint(scope, receive, send):
         if accounts_state != "ok":
@@ -760,18 +787,19 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
             return
         admin = False
         write = False
+        account = None
         if accounts_state == "ok":
             # The console is behind the login: a caller without a session is sent to the sign-in.
             # The DB is consulted for the session, so a broken database answers 503 (fail closed)
             # instead of serving the console to anyone.
             try:
                 runtime = get_account_runtime()
-                session = await runtime.signed_in_session(Headers(scope=scope))
-                user_id = session.user_id if session is not None else None
+                account = await runtime.signed_in_context(Headers(scope=scope))
+                user_id = account["user_id"] if account else None
                 admin = bool(user_id) and await runtime.is_admin_user(user_id)
                 # The write permission of this very session: the panel must offer only what the server
                 # will let this caller do, and the server decides that by the user's write permission.
-                write = bool(session is not None and session.can_write)
+                write = bool(account and account["can_write"])
             except Exception as exc:
                 log.error("accounts_event id=%s class=%s", secrets.token_hex(4), type(exc).__name__)
                 await reply(_json(503, {"error": "accounts_unavailable", "code": "GEMARC_ACCT_002"},
@@ -791,7 +819,17 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
             # the default (DD-009). The panel can still switch afterwards.
             lang = i18n.resolve(cookie_header=request_headers.get("cookie"),
                                 accept_language=request_headers.get("accept-language"))
-            response = HTMLResponse(render_console(admin, write, lang), headers={"Cache-Control": "no-cache"})
+            account_lang = ""
+            csrf = ""
+            if account is not None:
+                # The account's own language comes first (DD-010): it is the same on every machine,
+                # and the agent side reads the very same value for the tool descriptions. An account
+                # that never chose a language has none: the request language decides then.
+                account_lang = account["settings"].lang
+                lang = account_lang or lang
+                csrf = account["csrf"]
+            response = HTMLResponse(render_console(admin, write, lang, account_lang, csrf),
+                                    headers={"Cache-Control": "no-cache"})
         await reply(response, scope, receive, send)
 
     async def console_asset(scope, receive, send, name: str):

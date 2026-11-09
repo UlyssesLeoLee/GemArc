@@ -158,6 +158,33 @@ def parse_form(body: bytes) -> "Optional[dict[str, str]]":
     return out
 
 
+def parse_form_repeated(body: bytes, *, repeatable: str = "tools", max_fields: int = 128) -> "Optional[dict[str, str]]":
+    """``application/x-www-form-urlencoded`` in which ONE key may appear more than once (DD-010 section 5).
+
+    A list of checkboxes (the tools the account keeps) needs the same name on every box, so the browser
+    sends that name again and again. Only the named key may repeat; its values are joined with a comma.
+    Every other key stays single-valued, exactly as in :func:`parse_form`.
+
+    The field count is bounded by ``max_fields`` instead of the 20 of the generic parser, because a list
+    of checkboxes is one field per entry. The body size is still bounded by the caller (``MAX_FORM_BYTES``),
+    so a form with many boxes cannot become a memory problem.
+    """
+    try:
+        parsed = parse_qs(body.decode("utf-8"), keep_blank_values=True, strict_parsing=False,
+                          max_num_fields=max_fields, errors="strict")
+    except (UnicodeDecodeError, ValueError):
+        return None
+    out = {}
+    for key, values in parsed.items():
+        if key == repeatable:
+            out[key] = ",".join(values)
+            continue
+        if len(values) != 1:
+            return None
+        out[key] = values[0]
+    return out
+
+
 def parse_query(raw: bytes) -> "Optional[dict[str, str]]":
     """Query string to a single-valued dict; ``None`` for a malformed or repeated parameter."""
     try:

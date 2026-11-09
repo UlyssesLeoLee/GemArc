@@ -23,6 +23,11 @@ const MAY_WRITE = CFG.write === true;
 
 const TOKEN_KEY = 'gemarc.mcp.token';
 
+/* The settings of the signed-in account (DD-010). The server holds them, so the panel
+   only reads them and writes them back; it never keeps a second copy of the truth. */
+const SETTINGS_PATH = CFG.settingsPath || '/account/settings';
+const CSRF = CFG.csrf || '';
+
 /* ------------------------------------------------------------------- i18n */
 
 const LANGUAGES = ['zh-CN', 'ja-JP', 'en-US'];
@@ -47,8 +52,17 @@ function normalizeLang(value) {
   return null;
 }
 
-/** The language of this panel: the one the reader chose, then the one the server used, then the browser. */
+/**
+ * The language of this panel: the account's own setting, then the choice the reader
+ * made, then the language the server used, then the browser.
+ *
+ * The account's setting comes first (DD-010): it is the same on every machine, and the
+ * agent side reads the very same value for the tool descriptions. The local choice only
+ * counts while nobody is signed in.
+ */
 function pickLang() {
+  const account = normalizeLang(CFG.accountLang);
+  if (account) return account;
   try {
     const stored = normalizeLang(localStorage.getItem(LANG_KEY));
     if (stored) return stored;
@@ -121,6 +135,8 @@ const state = {
   token: readStoredToken(),
   sessionAuth: false,
   bootSeq: 0,
+  settings: null,
+  settingsMode: 'all',
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -516,7 +532,13 @@ function refreshLanguage() {
   renderHistory();
 }
 
-function switchLanguage(lang) {
+/**
+ * Switch the language of the panel and of the account.
+ *
+ * The panel speaks the new language at once; the account's own setting follows, so the
+ * agent side reads the same value for the tool descriptions (DD-010).
+ */
+async function switchLanguage(lang) {
   if (!normalizeLang(lang) || lang === LANG) return;
   LANG = lang;
   try {
@@ -524,6 +546,21 @@ function switchLanguage(lang) {
   } catch { /* the choice is not remembered, the panel still speaks the new language */ }
   applyLanguage();
   refreshLanguage();
+  if (!CSRF) return;
+  const settings = state.settings || (await loadSettings());
+  if (!settings) return;
+  const tools = settings.tools || [];
+  try {
+    await saveSettings({
+      lang,
+      render_profile: settings.render_profile || '',
+      tools_mode: tools.length ? 'some' : 'all',
+      tools,
+    });
+    await loadSettings();
+  } catch {
+    /* the panel keeps the new language; the account keeps the old one until it is saved */
+  }
 }
 
 function renderParams(tool) {
@@ -767,6 +804,140 @@ function renderSideLists() {
   }
 }
 
+/* ------------------------------------------- the settings of the account (DD-010) */
+
+/**
+ * Read the settings of the signed-in account from the server.
+ *
+ * The server is the only source of truth: the panel shows what it says and writes back
+ * what the reader changed. Without a session there is nothing to read.
+ */
+async function loadSettings() {
+  if (!CSRF) return null;
+  try {
+    const response = await fetch(SETTINGS_PATH, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      credentials: 'same-origin',
+    });
+    if (!response.ok) return null;
+    state.settings = await response.json();
+    return state.settings;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Write the settings back. The form is the same one the account page sends: the three
+ * values and the token that proves the session.
+ */
+async function saveSettings(values) {
+  const body = new URLSearchParams();
+  body.set('csrf', CSRF);
+  body.set('lang', values.lang);
+  body.set('render_profile', values.render_profile || '');
+  body.set('tools_mode', values.tools_mode || 'all');
+  if ((values.tools_mode || 'all') === 'some') {
+    for (const name of values.tools || []) body.append('tools', name);
+  }
+  const response = await fetch(SETTINGS_PATH, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+    credentials: 'same-origin',
+    body: body.toString(),
+  });
+  let payload = null;
+  try { payload = await response.json(); } catch { /* the answer may not be JSON at all */ }
+  if (!response.ok) {
+    throw new Error((payload && payload.message) || `HTTP ${response.status}`);
+  }
+  return payload;
+}
+
+/** The values of the dialog: the language, the render form and the tools it keeps. */
+function settingsValues() {
+  const language = $('#settings-lang');
+  const profile = $('#settings-profile');
+  const tools = [];
+  for (const input of document.querySelectorAll('#settings-tools input[type="checkbox"]')) {
+    if (input.checked) tools.push(input.value);
+  }
+  return {
+    // An empty language means "follow the reader": the account pins no language (DD-010).
+    lang: language ? language.value : LANG,
+    render_profile: profile ? profile.value : '',
+    tools_mode: state.settingsMode,
+    tools,
+  };
+}
+
+/** Mark the current choice of a segmented switch. */
+function markSegment(container, attribute, value) {
+  for (const button of document.querySelectorAll(`${container} .seg-btn`)) {
+    button.classList.toggle('on', button.getAttribute(attribute) === value);
+  }
+}
+
+/** Fill the dialog with the settings of the account. */
+function renderSettings() {
+  const data = state.settings;
+  if (!data) return;
+  // An empty language in the row means "follow the reader": the account pins no language.
+  const language = $('#settings-lang');
+  if (language) language.value = data.lang || '';
+  const profile = $('#settings-profile');
+  if (profile) profile.value = data.render_profile || '';
+  const kept = new Set(data.tools || []);
+  state.settingsMode = kept.size ? 'some' : 'all';
+  markSegment('#settings-mode', 'data-mode', state.settingsMode);
+  const box = $('#settings-tools');
+  box.textContent = '';
+  for (const name of data.available_tools || []) {
+    const label = el('label');
+    const input = el('input');
+    input.type = 'checkbox';
+    input.value = name;
+    input.checked = state.settingsMode === 'all' || kept.has(name);
+    label.append(input);
+    label.append(el('code', '', name));
+    box.append(label);
+  }
+}
+
+/** Open the dialog: the values come from the server, never from the panel. */
+async function openSettings() {
+  await loadSettings();
+  renderSettings();
+  const dialog = $('#settings');
+  if (!dialog) return;
+  const message = $('#settings-msg');
+  if (message) message.textContent = '';
+  if (typeof dialog.showModal === 'function') dialog.showModal();
+  else dialog.setAttribute('open', '');
+}
+
+/** Save the dialog and show what the server said. */
+async function saveSettingsFromDialog() {
+  const button = $('#settings-save');
+  const message = $('#settings-msg');
+  button.disabled = true;
+  message.textContent = t('settings.saving');
+  try {
+    await saveSettings(settingsValues());
+    message.textContent = t('settings.saved');
+    await loadSettings();
+    const dialog = $('#settings');
+    if (dialog && typeof dialog.close === 'function') dialog.close();
+    // The tool list of the account may have changed: the panel shows the new one.
+    boot();
+  } catch (error) {
+    message.textContent = t('settings.failed', { message: error.message });
+  } finally {
+    button.disabled = false;
+  }
+}
+
 /* -------------------------------------------------------------------- boot */
 
 async function boot() {
@@ -777,6 +948,9 @@ async function boot() {
   const current = () => generation === state.bootSeq;
   let healthShown = false;
   try {
+    // The settings of the account (DD-010): the panel shows what the server holds, and the
+    // language switcher writes back to the same place.
+    await loadSettings();
     // Health first: it says whether a token is needed, so no MCP call is made
     // (and none can 401) before the user has had a chance to supply one.
     const health = await loadHealth();
@@ -880,6 +1054,37 @@ $('#copy-btn').addEventListener('click', async () => {
 });
 for (const button of document.querySelectorAll('.lang-btn')) {
   button.addEventListener('click', () => switchLanguage(button.dataset.uilang));
+}
+
+// The settings of the account exist only when the deployment has accounts and the reader
+// is signed in: the console is behind the login in that case, and the server is the only
+// place the settings live.
+if (CSRF) {
+  const openButton = document.getElementById('settings-open');
+  if (openButton) {
+    openButton.hidden = false;
+    openButton.addEventListener('click', openSettings);
+  }
+  const closeButton = document.getElementById('settings-close');
+  if (closeButton) {
+    closeButton.addEventListener('click', () => {
+      const dialog = $('#settings');
+      if (dialog && typeof dialog.close === 'function') dialog.close();
+    });
+  }
+  const saveButton = document.getElementById('settings-save');
+  if (saveButton) saveButton.addEventListener('click', saveSettingsFromDialog);
+  for (const button of document.querySelectorAll('#settings-mode .seg-btn')) {
+    button.addEventListener('click', () => {
+      state.settingsMode = button.dataset.mode === 'some' ? 'some' : 'all';
+      markSegment('#settings-mode', 'data-mode', state.settingsMode);
+      // The boxes follow the mode: every tool, or the ones the account keeps.
+      const kept = new Set((state.settings && state.settings.tools) || []);
+      for (const input of document.querySelectorAll('#settings-tools input[type="checkbox"]')) {
+        input.checked = state.settingsMode === 'all' || kept.has(input.value);
+      }
+    });
+  }
 }
 
 // The account page and the operator area exist only when the deployment has accounts; the

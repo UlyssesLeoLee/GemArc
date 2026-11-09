@@ -30,6 +30,7 @@ from typing import Any, Callable, Optional
 from starlette.responses import JSONResponse, Response
 
 from . import security
+from . import settings as settings_mod
 from . import tokens as tokens_mod
 from .db import DBError
 from .security import Busy
@@ -78,6 +79,9 @@ class CachedGrant:
     user_id: str
     scope: str
     until: float
+    #: The settings of the account, read with the token (DD-010). They travel with the grant so that
+    #: a personalized tool list does not cost a database round trip on every request.
+    settings: "settings_mod.UserSettings" = settings_mod.default_settings()
 
 
 class PatCache:
@@ -227,6 +231,8 @@ class Decision:
     user_id: Optional[str] = None
     receive: Optional[Callable] = None  # replacement ``receive`` when the body was buffered for the scope gate
     body_consumed: bool = False  # the request body was fully read: answer without draining it again
+    #: The settings of the account, when the request carries an identity (DD-010).
+    settings: "settings_mod.UserSettings" = settings_mod.default_settings()
 
 
 class McpAuth:
@@ -282,7 +288,7 @@ class McpAuth:
         if state == "neg":
             return Decision(False, unauthorized_response())
         if state == "pos" and grant is not None:
-            return await self._admit(grant.user_id, grant.scope, scope, receive, pid)
+            return await self._admit(grant.user_id, grant.scope, scope, receive, pid, grant.settings)
         # cache miss: slow lane when this client is already failing a lot
         lane = False
         if self._failures(scope) >= FAIL_LIMIT:
@@ -291,7 +297,7 @@ class McpAuth:
             lane = True
         try:
             try:
-                verification = await self._single_flight(key, token)
+                verification, settings = await self._single_flight(key, token)
             except Busy:
                 return Decision(False, unavailable_response("GEMARC_ACCT_023", retry_after=1))
             except DBError as exc:
@@ -308,8 +314,10 @@ class McpAuth:
         ttl = min(rt.pat_cache.ttl, remaining)
         if ttl > 0:
             rt.pat_cache.put_positive(key, CachedGrant(verification.token_id or pid, verification.user_id or "",
-                                                       verification.scope or "read", rt.clock() + ttl))
-        return await self._admit(verification.user_id or "", verification.scope or "read", scope, receive, pid)
+                                                       verification.scope or "read", rt.clock() + ttl,
+                                                       settings))
+        return await self._admit(verification.user_id or "", verification.scope or "read", scope, receive, pid,
+                                 settings)
 
     # -- internals -----------------------------------------------------------------------------------------------
     async def _session_grant(self, scope: dict, headers: Any, receive: Callable) -> Optional[Decision]:
@@ -331,8 +339,9 @@ class McpAuth:
         info = await rt.run_db(lambda: rt.sessions.lookup(sid, rt.now(), policy_check=rt.policy.row_ok))
         if info is None:
             return None
+        settings = await rt.run_db(rt.settings.load, info.user_id)
         effective = "write" if info.can_write else "read"
-        return await self._admit(info.user_id, effective, scope, receive, "")
+        return await self._admit(info.user_id, effective, scope, receive, "", settings)
 
     async def _single_flight(self, key: "tuple[str, str]", token: str):
         loop = asyncio.get_running_loop()
@@ -359,8 +368,13 @@ class McpAuth:
         return outcome[1]
 
     def _verify(self, token: str):
+        """The token and the settings of its account, in one go (DD-010 section 5)."""
         rt = self.runtime
-        return rt.tokens.verify(token, rt.now(), policy_check=rt.policy.row_ok)
+        verification = rt.tokens.verify(token, rt.now(), policy_check=rt.policy.row_ok)
+        settings = settings_mod.default_settings()
+        if verification.ok and verification.user_id:
+            settings = rt.settings.load(verification.user_id)
+        return verification, settings
 
     def _failures(self, scope: dict) -> int:
         return self._fails.count("pat_auth_fail", self.runtime.client_key(scope), FAIL_WINDOW_S)
@@ -377,9 +391,10 @@ class McpAuth:
             except Exception:
                 pass
 
-    async def _admit(self, user_id: str, effective: str, scope: dict, receive: Callable, pid: str) -> Decision:
+    async def _admit(self, user_id: str, effective: str, scope: dict, receive: Callable, pid: str,
+                     settings: "settings_mod.UserSettings" = settings_mod.default_settings()) -> Decision:
         if not self.write_tools or effective == "write":
-            return Decision(True, scope=effective, user_id=user_id)
+            return Decision(True, scope=effective, user_id=user_id, settings=settings)
         body = await buffer_body(receive)
         if body is None:
             return Decision(False, JSONResponse({"error": "request_too_large", "code": "GEMARC_ACCT_050"},
@@ -391,4 +406,5 @@ class McpAuth:
             except Exception:
                 pass
             return Decision(False, insufficient_scope_response(), body_consumed=True)
-        return Decision(True, scope=effective, user_id=user_id, receive=replay_receive(body, receive))
+        return Decision(True, scope=effective, user_id=user_id, receive=replay_receive(body, receive),
+                        settings=settings)

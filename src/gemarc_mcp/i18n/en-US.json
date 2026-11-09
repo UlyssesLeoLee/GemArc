@@ -114,7 +114,23 @@
     "lang.label": "Language",
     "lang.zh": "中文",
     "lang.ja": "日本語",
-    "lang.en": "English"
+    "lang.en": "English",
+    "settings.button": "Settings",
+    "settings.title": "My settings",
+    "settings.close": "Close",
+    "settings.lang": "Language",
+    "settings.langreader": "Follow reader",
+    "settings.profile": "Default render form",
+    "settings.profiledefault": "Server default (static)",
+    "settings.tools": "Tool list",
+    "settings.toolsall": "All tools",
+    "settings.toolssome": "Only the checked tools",
+    "settings.toolsnote": "All tools is what you have now. Only the checked tools narrows the list to those; a tool the server adds later will not appear.",
+    "settings.save": "Save",
+    "settings.saving": "Saving…",
+    "settings.saved": "Saved. The agent side applies it right away.",
+    "settings.failed": "Could not save: {message}",
+    "settings.count": "{count} tools"
   },
   "accounts": {
     "title.account": "GemArc account",
@@ -238,7 +254,18 @@
     "admin.auditevent": "Event",
     "admin.audituser": "User",
     "admin.auditref": "Reference",
-    "account.tokencreated": "The token has been created."
+    "account.tokencreated": "The token has been created.",
+    "account.settingsh2": "My settings",
+    "account.settingslang": "Language",
+    "account.settingslangdefault": "Follow the reader (language not pinned)",
+    "account.settingsprofile": "Default render form",
+    "account.settingsprofiledefault": "Server default (static)",
+    "account.settingstools": "Tool list",
+    "account.settingstoolsall": "All tools",
+    "account.settingstoolssome": "Only the checked tools",
+    "account.settingstoolsnote": "All tools is what you have now. Only the checked tools narrows the list to those; a tool the server adds later will not appear.",
+    "account.settingssave": "Save settings",
+    "account.settingssaved": "Settings saved."
   },
   "messages": {
     "GEMARC_ACCT_001": "The accounts feature is not available right now.",
@@ -262,6 +289,9 @@
     "GEMARC_ACCT_060": "Only an administrator can open this page.",
     "GEMARC_ACCT_061": "The value is not valid; nothing was changed.",
     "GEMARC_ACCT_062": "This deployment does not ship that tool set (its code is not in the upload); nothing was changed.",
-    "GEMARC_ACCT_404": "There is no such page."
+    "GEMARC_ACCT_404": "There is no such page.",
+    "GEMARC_ACCT_036": "That tool is not in your tool list.",
+    "GEMARC_ACCT_037": "The setting value is not valid (language, tool list or render form).",
+    "GEMARC_ACCT_038": "You chose only the checked tools, but no tool is checked."
   }
 }

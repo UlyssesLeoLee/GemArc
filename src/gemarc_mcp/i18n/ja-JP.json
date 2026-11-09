@@ -114,7 +114,23 @@
     "lang.label": "言語",
     "lang.zh": "中文",
     "lang.ja": "日本語",
-    "lang.en": "English"
+    "lang.en": "English",
+    "settings.button": "調整",
+    "settings.title": "調整項目",
+    "settings.close": "閉じる",
+    "settings.lang": "言語",
+    "settings.langreader": "読者に合わせる",
+    "settings.profile": "既定のサイト形",
+    "settings.profiledefault": "サーバーの既定に従う（static）",
+    "settings.tools": "ツールの表",
+    "settings.toolsall": "すべてのツール",
+    "settings.toolssome": "選んだツールだけ",
+    "settings.toolsnote": "「すべてのツール」はいまと同じです。「選んだツールだけ」にすると表はそのツールだけになり、サーバーが後から加えたツールは現れません。",
+    "settings.save": "保存",
+    "settings.saving": "保存中…",
+    "settings.saved": "保存しました。エージェント側にはすぐ効きます。",
+    "settings.failed": "保存に失敗しました: {message}",
+    "settings.count": "{count} 個のツール"
   },
   "accounts": {
     "title.account": "GemArc 利用者画面",
@@ -238,7 +254,18 @@
     "admin.auditevent": "記録",
     "admin.audituser": "利用者",
     "admin.auditref": "参照",
-    "account.tokencreated": "認証鍵を作りました。"
+    "account.tokencreated": "認証鍵を作りました。",
+    "account.settingsh2": "調整項目",
+    "account.settingslang": "言語",
+    "account.settingslangdefault": "読者の言語に合わせる（固定しない）",
+    "account.settingsprofile": "既定のサイト形",
+    "account.settingsprofiledefault": "サーバーの既定に従う（static）",
+    "account.settingstools": "ツールの表",
+    "account.settingstoolsall": "すべてのツール",
+    "account.settingstoolssome": "選んだツールだけ",
+    "account.settingstoolsnote": "「すべてのツール」はいまと同じです。「選んだツールだけ」にすると表はそのツールだけになり、サーバーが後から加えたツールは現れません。",
+    "account.settingssave": "調整を保存",
+    "account.settingssaved": "調整を保存しました。"
   },
   "tools": {
     "gemarc_media_doc_guide": {
@@ -275,7 +302,7 @@
     },
     "gemarc_render": {
       "title": "モデルからサイトデータを作る",
-      "description": "モデルを検証して、依存するファイルを返します: アーキテクチャ、想定、能力、証拠索引、図の目録、空間配置、三次元、ワークフロー、ケース集。サイトの共通部分は別に受領し、共通部分とこれらのファイルで資料サイトが完成します。"
+      "description": "モデルを検証して、依存するファイルを返します: アーキテクチャ、想定、能力、証拠索引、図の目録、空間配置、三次元、ワークフロー、ケース集。サイトの共通部分は別に受領し、共通部分とこれらのファイルで資料サイトが完成します。profile を空にすると呼び出し側の既定の形式を使います: 保存した指定があればそれを、なければ static を使います。static や vite を明示することもできます。"
     },
     "gemarc_inspect": {
       "title": "近くの場所を走査",
@@ -332,6 +359,9 @@
     "GEMARC_ACCT_060": "この画面は管理者しか開けません。",
     "GEMARC_ACCT_061": "値が正しくないため、書き換えませんでした。",
     "GEMARC_ACCT_062": "この設置にはそのツール群のコードがありません（アップロードに含まれません）。書き換えませんでした。",
-    "GEMARC_ACCT_404": "その画面はありません。"
+    "GEMARC_ACCT_404": "その画面はありません。",
+    "GEMARC_ACCT_036": "そのツールはあなたの表にありません。",
+    "GEMARC_ACCT_037": "調整の値が無効です（言語、ツールの表、サイト形）。",
+    "GEMARC_ACCT_038": "「選んだツールだけ」を選びましたが、一つも選ばれていません。"
   }
 }

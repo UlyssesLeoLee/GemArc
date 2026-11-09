@@ -114,7 +114,23 @@
     "lang.label": "语言",
     "lang.zh": "中文",
     "lang.ja": "日本語",
-    "lang.en": "English"
+    "lang.en": "English",
+    "settings.button": "设置",
+    "settings.title": "我的设置",
+    "settings.close": "关闭",
+    "settings.lang": "语言",
+    "settings.langreader": "跟随读者",
+    "settings.profile": "默认渲染形态",
+    "settings.profiledefault": "沿用服务器默认（static）",
+    "settings.tools": "工具清单",
+    "settings.toolsall": "全部工具",
+    "settings.toolssome": "只用勾选的工具",
+    "settings.toolsnote": "「全部工具」和现在一样；「只用勾选的工具」会让清单只剩这些，服务器以后新增的工具不会自动出现。",
+    "settings.save": "保存",
+    "settings.saving": "保存中…",
+    "settings.saved": "已保存，agent 侧立即生效。",
+    "settings.failed": "保存失败：{message}",
+    "settings.count": "{count} 个工具"
   },
   "accounts": {
     "title.account": "GemArc 账号",
@@ -238,7 +254,18 @@
     "admin.auditevent": "事件",
     "admin.audituser": "用户",
     "admin.auditref": "引用",
-    "account.tokencreated": "令牌已创建。"
+    "account.tokencreated": "令牌已创建。",
+    "account.settingsh2": "我的设置",
+    "account.settingslang": "语言",
+    "account.settingslangdefault": "跟随读者（不固定语言）",
+    "account.settingsprofile": "默认渲染形态",
+    "account.settingsprofiledefault": "沿用服务器默认（static）",
+    "account.settingstools": "工具清单",
+    "account.settingstoolsall": "全部工具",
+    "account.settingstoolssome": "只用勾选的工具",
+    "account.settingstoolsnote": "「全部工具」和现在一样；「只用勾选的工具」会让清单只剩这些，服务器以后新增的工具不会自动出现。",
+    "account.settingssave": "保存设置",
+    "account.settingssaved": "设置已保存。"
   },
   "tools": {
     "gemarc_media_doc_guide": {
@@ -275,7 +302,7 @@
     },
     "gemarc_render": {
       "title": "从模型渲染站点数据",
-      "description": "校验模型并返回依赖它的文件：架构、场景、能力、证据索引、图目录、空间布局、三维、工作流与案例库。站点固定件单独下载，固定件加这些文件就是完整的文档站点。"
+      "description": "校验模型并返回依赖它的文件：架构、场景、能力、证据索引、图目录、空间布局、三维、工作流与案例库。站点固定件单独下载，固定件加这些文件就是完整的文档站点。profile 留空表示用调用方的缺省形态：账号有自己的设置就用账号的，没有就用 static；也可以显式写 static 或 vite。"
     },
     "gemarc_inspect": {
       "title": "扫描本地仓库",
@@ -332,6 +359,9 @@
     "GEMARC_ACCT_060": "这个页面只有管理员可以打开。",
     "GEMARC_ACCT_061": "设置的值不合法，未做修改。",
     "GEMARC_ACCT_062": "这个部署不提供该工具集（它的代码不在上传内容里），未做修改。",
-    "GEMARC_ACCT_404": "没有这个页面。"
+    "GEMARC_ACCT_404": "没有这个页面。",
+    "GEMARC_ACCT_036": "该工具不在你的工具清单里。",
+    "GEMARC_ACCT_037": "设置的值无效（语言、工具清单或渲染形态不可用）。",
+    "GEMARC_ACCT_038": "选择了「只用勾选的工具」，但一个都没有勾选。"
   }
 }

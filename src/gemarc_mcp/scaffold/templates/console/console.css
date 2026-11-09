@@ -534,6 +534,91 @@ button.mini:focus-visible { outline: 2px solid var(--gem-aqua-deep); outline-off
 
 .muted { color: var(--gem-muted-deep); }
 
+/* --- the settings of the signed-in account (DD-010) ------------------------ */
+/* The switcher and the settings button share one row on the right of the bar. */
+.head-right { display: flex; align-items: center; gap: 12px; }
+
+/* The dialog is a crystal pane over the panel: the same edges, the same air. */
+dialog.settings {
+  width: min(560px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--gem-ink-deep) 14%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--gem-sheen) 92%, transparent);
+  color: var(--gem-ink-deep);
+  box-shadow: 0 18px 48px color-mix(in srgb, var(--gem-ink-deep) 26%, transparent);
+}
+dialog.settings::backdrop { background: color-mix(in srgb, var(--gem-ink-deep) 38%, transparent); }
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px 8px;
+}
+.settings-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.settings-body { display: grid; gap: 12px; padding: 6px 18px 14px; }
+.settings-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.settings-row .fname { font-size: 12.5px; color: var(--gem-ink-deep); }
+.settings-row select {
+  padding: 6px 10px;
+  background: var(--gem-sheen);
+  border: 1px solid color-mix(in srgb, var(--gem-ink-deep) 15%, transparent);
+  border-radius: 6px;
+  color: var(--gem-ink-deep);
+  font: inherit;
+  font-size: 13px;
+}
+.settings-row select:focus-visible { outline: 2px solid var(--gem-aqua-deep); outline-offset: 1px; }
+.settings-body .hint { margin: 0; color: var(--gem-muted-deep); font-size: 11.5px; line-height: 1.5; }
+
+/* One segmented switch: the current choice is marked, the other one is not. */
+.seg { display: flex; align-items: center; gap: 2px; }
+.seg-btn {
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--gem-muted-deep);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.seg-btn:hover { color: var(--gem-aqua-deep); border-color: color-mix(in srgb, var(--gem-aqua-deep) 40%, transparent); }
+.seg-btn.on {
+  color: var(--gem-ink-deep);
+  border-color: color-mix(in srgb, var(--gem-aqua-deep) 50%, transparent);
+  background: color-mix(in srgb, var(--gem-sheen) 70%, transparent);
+}
+.seg-btn:focus-visible { outline: 2px solid var(--gem-aqua-deep); outline-offset: 1px; }
+
+/* The tool list: one line per tool, in a grid so it stays readable. */
+.checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 4px 12px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--gem-ink-deep) 12%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--gem-sheen) 54%, transparent);
+}
+.checks label { display: flex; align-items: center; gap: 7px; font-size: 12px; }
+.checks input { width: 14px; height: 14px; accent-color: var(--gem-aqua-deep); }
+.checks code { font-family: var(--mono); font-size: 11.5px; color: var(--gem-aqua-deep); }
+
+.settings-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 18px 14px;
+  border-top: 1px solid color-mix(in srgb, var(--gem-ink-deep) 10%, transparent);
+}
+.settings-foot .muted { font-size: 12px; }
+
 /* --- narrow viewports: one column, then the stage first ---------------- */
 @media (max-width: 1160px) {
   main { grid-template-columns: 250px minmax(0, 1fr); }

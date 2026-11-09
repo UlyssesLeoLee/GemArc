@@ -482,7 +482,7 @@ class OperatorCommands(DbCase):
         self.assertEqual(code, 1)  # the accounts variables are not complete in this environment
         self.assertIn("users: active=2", out)
         self.assertIn("can_write=0", out)
-        self.assertIn("schema: head 0002_admin; pending 0; unknown 0", out)
+        self.assertIn("schema: head 0003_user_settings; pending 0; unknown 0", out)
         self.assertNotIn("@", out + err)
         self.assertNotIn(self.alice, out + err)
 
@@ -490,7 +490,7 @@ class OperatorCommands(DbCase):
         env = {"GEMARC_MIGRATE_DATABASE_URL": self.env["GEMARC_MIGRATE_DATABASE_URL"],
                "GEMARC_ACCOUNTS_ALLOW_SQLITE": "1"}  # no keys, no other accounts variables (section 8.7)
         code, out, err = run(["status"], env)
-        self.assertIn("schema: head 0002_admin; pending 0; unknown 0", out)
+        self.assertIn("schema: head 0003_user_settings; pending 0; unknown 0", out)
         self.assertIn("users: active=2", out)
         self.assertIn("key references: skipped", out)
         self.assertNotIn("database:", out + err)  # the schema is reported, not a refusal to open the database

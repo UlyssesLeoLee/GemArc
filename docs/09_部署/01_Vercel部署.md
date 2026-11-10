@@ -227,7 +227,7 @@ OAuth 或「无认证」；静态请求头只是部分组织可用的 beta。所
   即使同时带了错误的头也不会被查询串“救回”）；方案名大小写不敏感，前后空白忽略；
 - 用 `hmac.compare_digest` 对**字节**逐个令牌比较（不会因非 ASCII 输入抛 `TypeError`）；
 - 失败：HTTP 401、`WWW-Authenticate: Bearer`、`Cache-Control: no-store`、
-  `{"error":"unauthorized"}`；令牌不会出现在任何响应或 `/healthz` 里，也不写日志；
+  `{"error":"unauthorized"}`（**账号模式**的 401 响应体多一句 `hint`，见本节末尾）；令牌不会出现在任何响应或 `/healthz` 里，也不写日志；
 - 豁免（公开静态内容，无机密）：`/healthz`、`/`、`/console.*`、`/site/*`、`/kit/*`、
   `/.well-known/*`、`OPTIONS`；方法检查**先于**鉴权，所以 GET/HEAD/DELETE 无论有无令牌都是 405；
 - 轮换：`GEMARC_MCP_TOKEN="old,new"` 两个都有效；空项与首尾空白被忽略。

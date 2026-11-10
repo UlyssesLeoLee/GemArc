@@ -18,7 +18,7 @@
 | 增量编译与缓存 | 未完成 | `diff` 提供影响分析，build 仍全量重建 |
 | Graphology / Dagre / Dexie | 可选适配器 | 运行时**零第三方硬依赖**：这些库一律工厂函数注入 + 内置兜底；不装也能跑 |
 | 浏览器自动化、视觉回归 | 部分 | 有 view-model 结构快照门禁（跑在**构建产物**上）；**像素级视觉回归仍未实现** |
-| 远程 MCP 端点（Vercel） | 实现，**已部署并公网实测** | 无状态：模型随调用传入，服务端不保存项目；可选 Bearer 令牌（`GEMARC_MCP_TOKEN`）；`GET /mcp` 返回 405；固定件经 `/kit/<profile>.zip` 下载。`scripts/verify_remote.py` 对公网域名 27/27 通过。详见 `docs/09_部署/01_Vercel部署.md` |
+| 远程 MCP 端点（Vercel） | 实现，**已部署并公网实测** | 无状态：模型随调用传入，服务端不保存项目；可选 Bearer 令牌（`GEMARC_MCP_TOKEN`）；`GET /mcp` 返回 405；固定件经 `/kit/<profile>.zip` 下载。`scripts/verify_remote.py` 对公网域名逐项自检（脚本现有 53 个检查点；2026-10-30 那次实测 25 项全通过，是当时的工具面口径，详见 `docs/09_部署/01_Vercel部署.md` 第 12 节）。详见 `docs/09_部署/01_Vercel部署.md` |
 | 安装时完全离线 | 不保证 | Python MCP SDK 需 pip 获取；生成的基础站点不使用 CDN |
 
 ## Windows 11 安装 / PowerShell
@@ -132,7 +132,7 @@ E:\GemArc\.venv\Scripts\python.exe -m gemarc_mcp.cli build demo --profile static
 
 `gemarc_brief` 一次性返回：目标、五步流程、六条硬规则、12 个槽位（带 JSON Pointer 与规则）、
 全部允许词值（6 级证据 / 20 实体类型 / 20 关系类型 / 21 图示类型 / Case 分类 / 空间层级）、
-构建命令，以及「哪些固定件已经写好、不要重写」的清单。**实测约 10 KB**，
+构建命令，以及「哪些固定件已经写好、不要重写」的清单。**实测约 19 KB**（紧凑 JSON 19,280 字节），
 用来替掉原先 13323 字节的提示词规格。
 
 ### 两种交付 profile，共用一份源码

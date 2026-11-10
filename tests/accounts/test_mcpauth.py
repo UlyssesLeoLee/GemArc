@@ -131,6 +131,27 @@ class PatMode(ServerCase):
         _status, _headers, body = post(self)
         self.assertEqual(json.loads(body)["hint"], expected_hint(self, i18n.DEFAULT_LANG))
 
+    def test_the_explicit_language_wins_over_the_cookie_and_the_browser(self):
+        """``?lang=`` is the explicit choice (DD-009), and the hint follows the same order.
+
+        The ADR and the security design promise this order for the hint; ``/mcp`` is not a page,
+        but the language of a request is the same rule everywhere (ADR-018).
+        """
+        for lang in i18n.LANGUAGES:
+            _s, _h, body = post(self, path=f"/mcp?lang={lang}", headers={"Accept-Language": "en-US"})
+            self.assertEqual(json.loads(body)["hint"], expected_hint(self, lang), lang)
+        # the cookie is the second choice
+        _s, _h, body = post(self, headers={"Cookie": "gemarc_lang=ja-JP", "Accept-Language": "en-US"})
+        self.assertEqual(json.loads(body)["hint"], expected_hint(self, "ja-JP"))
+        # the query string wins over the cookie
+        _s, _h, body = post(self, path="/mcp?lang=en-US",
+                            headers={"Cookie": "gemarc_lang=ja-JP", "Accept-Language": "zh-CN"})
+        self.assertEqual(json.loads(body)["hint"], expected_hint(self, "en-US"))
+        # a value that is not a language is not a choice: it falls back, it never fails
+        for query in ("?lang=xx", "?lang=", "?lang", "?other=1", "?lang=%E2%98%83"):
+            _s, _h, body = post(self, path="/mcp" + query, headers={"Accept-Language": "ja-JP"})
+            self.assertEqual(json.loads(body)["hint"], expected_hint(self, "ja-JP"), query)
+
     def test_methods_are_gated_before_authentication(self):
         for method in ("GET", "HEAD", "DELETE", "PUT"):
             status, headers, _ = http(self.srv.url("/mcp"), method)

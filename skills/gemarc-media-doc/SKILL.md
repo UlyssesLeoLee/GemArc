@@ -32,7 +32,7 @@ GemArc 把「可被写死的东西」（字段名、词表、校验规则、模�
 ## 硬规则（两种模式都适用）
 
 1. **事实不可臆造。** 每个节点、每条关系都要指回一个 evidence 实体；指不回去就标 `Unknown`，写进 `missing`，不要补全、不要「合理推断」成事实。
-2. **证据等级、实体种类、边类型、图类型一律以服务端为准。** 需要时调用 `gemarc_brief(section="vocabulary")`，不要凭记忆写，也不要在回复里重述一份词表。其他可取的分段：`slots`、`rules`、`procedure`、`commands`、`alreadyDone`（`gemarc_brief()` 不带 `section` 约 10 KB，一次会话读一次就够）。
+2. **证据等级、实体种类、边类型、图类型一律以服务端为准。** 需要时调用 `gemarc_brief(section="vocabulary")`，不要凭记忆写，也不要在回复里重述一份词表。其他可取的分段：`slots`、`rules`、`procedure`、`commands`、`alreadyDone`（`gemarc_brief()` 不带 `section` 约 19 KB，一次会话读一次就够）。
 3. **模拟是基于规则的 what-if，不是因果识别。** `gemarc_simulate` 的结论强度不会超过场景自身的证据等级；`hypothetical` 场景的结果不得写成「实际运行结果」。汇报时说明这一点。
 4. **写操作是用户的决定。** 本地写工具（`gemarc_scaffold` `gemarc_init` `gemarc_model` `gemarc_build` `gemarc_export`）只有在用户的 MCP 配置里设了 `GEMARC_ALLOW_WRITE=1` 时才会执行；收到 `GEMARC_AUTH_002` 就告诉用户如何开启，**不要**自己改配置或换办法绕过。路径越出 `GEMARC_WORKSPACE_ROOT` 会得到 `GEMARC_AUTH_001`，同样不要绕。
 5. **不夸大验证范围。** `gemarc_verify` 只检查生成站点的文件完整性和 schema；浏览器、WebGL、性能行为没有测过，必须在最终说明里写出来。

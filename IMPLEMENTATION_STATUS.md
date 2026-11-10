@@ -39,7 +39,7 @@
 | 0.2.0 归一化（sourceId/targetId/type、6 级证据） | 实现，旧模型不破 | `test_model_compat` | 无 |
 | 4D/5D 双端同构 | 实现 | `test_sim_consistency` 逐字比对 8 个黄金用例 | 结构因果模型 |
 | 脚手架生成器 + 槽位清单 | 实现 | `test_scaffold`、`test_scaffold_flow` | 槽位收敛策略 |
-| `gemarc_scaffold` / `gemarc_contracts` / `gemarc_brief` 工具 | 实现 | MCP 工具注册数 16（full）/ 8（stateless）；brief 实测约 10 KB | 无 |
+| `gemarc_scaffold` / `gemarc_contracts` / `gemarc_brief` 工具 | 实现 | MCP 工具注册数 16（full）/ 8（stateless）；brief 实测约 19 KB | 无 |
 | 表现层纯函数化（view-model） | 实现 | `test_view_model_structure` 在构建产物上比对基线 | 像素级基线仍缺 |
 | `static` / `vite` 双 profile 共用一份源码 | 实现 | `test_scaffold_flow`（含 Node 实际 import 站点 runtime） | 离线 vendor 流程 |
 | 随附预览站与生成代码同步 | 实现 | `test_generated_artifacts` 逐字节比对真实构建产物 | 无 |

@@ -28,6 +28,7 @@ import time
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
+from urllib.parse import parse_qs
 
 from starlette.responses import JSONResponse, Response
 
@@ -81,6 +82,28 @@ def throttled_response(retry_after: int) -> Response:
 def insufficient_scope_response() -> Response:
     return JSONResponse({"error": "insufficient_scope", "code": "GEMARC_ACCT_032"}, status_code=403,
                         headers={"WWW-Authenticate": 'Bearer error="insufficient_scope"', "Cache-Control": "no-store"})
+
+
+def _query_lang(scope: Any) -> Optional[str]:
+    """The ``lang`` of the request's query string (``?lang=``), if it carries one.
+
+    The language of a request is the same everywhere in the product (DD-009): the explicit
+    choice wins. ``/mcp`` is not a page, but a client that wants another language says so the
+    same way. A value that is not one of the three languages is not a choice and is ignored
+    (``i18n.normalize``), so a malformed query string can only fall back, never fail.
+    """
+    if not scope:
+        return None
+    raw = scope.get("query_string") or b""
+    if isinstance(raw, str):
+        raw = raw.encode("utf-8", "ignore")
+    if len(raw) > 2048:  # the server bounds the request line; this bounds the parse
+        return None
+    try:
+        values = parse_qs(raw.decode("utf-8", "ignore"), max_num_fields=64).get("lang") or []
+    except (AttributeError, UnicodeError, ValueError):
+        return None
+    return values[0] if values else None
 
 
 # -- cache -----------------------------------------------------------------------------------------------------------
@@ -280,7 +303,7 @@ class McpAuth:
             return Decision(True, scope="env")
         rt = self.runtime
         if rt.config.mcp_host_only and (headers.get("host") or "").lower() != rt.config.host.lower():
-            return Decision(False, unauthorized_response(self._hint(headers)))
+            return Decision(False, unauthorized_response(self._hint(scope, headers)))
         if presented is None:
             # No bearer token: this may be the browser console, which carries the login session instead.
             decision = await self._session_grant(scope, headers, receive)
@@ -292,12 +315,12 @@ class McpAuth:
         parsed = tokens_mod.parse(token) if token is not None else None
         if parsed is None:  # no cache, no database
             self._note_failure(scope)
-            return Decision(False, unauthorized_response(self._hint(headers)))
+            return Decision(False, unauthorized_response(self._hint(scope, headers)))
         pid, secret = parsed
         key = (pid, tokens_mod.hash_secret(secret))
         state, grant = rt.pat_cache.get(key)
         if state == "neg":
-            return Decision(False, unauthorized_response(self._hint(headers)))
+            return Decision(False, unauthorized_response(self._hint(scope, headers)))
         if state == "pos" and grant is not None:
             return await self._admit(grant.user_id, grant.scope, scope, receive, pid, grant.settings)
         # cache miss: slow lane when this client is already failing a lot
@@ -319,7 +342,7 @@ class McpAuth:
         if not verification.ok:
             rt.pat_cache.put_negative(key)
             await self._record_failure(scope)
-            return Decision(False, unauthorized_response(self._hint(headers)))
+            return Decision(False, unauthorized_response(self._hint(scope, headers)))
         now = rt.now()
         remaining = max(int(verification.expires_at or 0) - now, 0)
         ttl = min(rt.pat_cache.ttl, remaining)
@@ -331,16 +354,17 @@ class McpAuth:
                                  settings)
 
     # -- internals -----------------------------------------------------------------------------------------------
-    def _hint(self, headers: Any) -> str:
+    def _hint(self, scope: Any, headers: Any) -> str:
         """The one sentence every failure of this request carries (ADR-018).
 
         It says where to get a token (the account page of this deployment) and where to put it
         (the client's environment variable or its ``Authorization`` header). It never says why
         the request was refused. The language follows the request, like every other text of the
-        product: the explicit choice, the cookie, the browser, the default.
+        product: the explicit choice (``?lang=``), the cookie, the browser, the default.
         """
         rt = self.runtime
-        lang = i18n.resolve(cookie_header=headers.get("cookie"),
+        lang = i18n.resolve(query=_query_lang(scope),
+                            cookie_header=headers.get("cookie"),
                             accept_language=headers.get("accept-language"))
         return i18n.text(lang, "mcp", "unauthorized.hint", url=f"{rt.config.base_url}/account")
 

@@ -9,11 +9,13 @@ Checks (see docs/03_详细设计/02_MCP工具详细契约.md and docs/05_项目�
 * every tool name cited by the skill and the integration docs exists.
 """
 import asyncio
+import io
 import json
 import re
 import sys
 import tomllib
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -332,6 +334,35 @@ class BriefSectionTests(unittest.TestCase):
     def test_a_section_name_is_not_case_sensitive(self):
         from gemarc_mcp import service
         self.assertEqual(service.brief(section="Vocabulary", stateless=True)["status"], "ok")
+
+    def test_the_payload_and_the_section_list_do_not_drift(self):
+        """The section list and the payload must name the same things.
+
+        ``service.brief`` answers a section with ``payload[key]``: a name in the list that
+        the payload does not have raises KeyError (a 500 on the server), and a payload key
+        nobody may ask for is unreachable. Both directions are pinned here.
+        """
+        from gemarc_mcp import service
+
+        for stateless in (False, True):
+            with self.subTest(stateless=stateless):
+                payload = service.brief(stateless=stateless)
+                content_keys = set(payload) - {"status", "schemaVersion", "project"}
+                self.assertEqual(content_keys, set(service.BRIEF_SECTIONS))
+
+    def test_the_cli_help_names_the_sections(self):
+        """The CLI lists the sections it accepts, so nobody has to guess them there either."""
+        from gemarc_mcp import service
+        from gemarc_mcp import cli
+
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            with self.assertRaises(SystemExit) as caught:
+                cli.main(["brief", "--help"])
+        self.assertEqual(caught.exception.code, 0)
+        text = " ".join(buffer.getvalue().split())  # the help text is wrapped to the terminal width
+        for section in service.BRIEF_SECTIONS:
+            self.assertIn(section, text, section)
 
     def test_the_contract_document_names_the_same_sections(self):
         from gemarc_mcp import service

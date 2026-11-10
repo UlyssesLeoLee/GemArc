@@ -303,5 +303,63 @@ class CitedToolNamesExistTests(unittest.TestCase):
             self.assertEqual(service.brief(section=section)["status"], "ok", section)
 
 
+class BriefSectionTests(unittest.TestCase):
+    """A wrong section says which sections exist: a model that guesses must not guess twice.
+
+    Found by a real run against the production endpoint (a model asked for ``section="format"``
+    and got "未知的分段: format" with nothing else).
+    """
+
+    def test_the_error_names_the_sections_that_exist(self):
+        from gemarc_mcp import service
+        from gemarc_mcp.paths import GemArcError
+
+        with self.assertRaises(GemArcError) as caught:
+            service.brief(section="format", stateless=True)
+        self.assertEqual(caught.exception.code, "GEMARC_BRIEF_001")
+        message = caught.exception.message
+        self.assertIn("format", message)
+        for section in service.BRIEF_SECTIONS:
+            self.assertIn(section, message, section)
+
+    def test_every_section_of_the_contract_is_answered(self):
+        from gemarc_mcp import service
+        for section in service.BRIEF_SECTIONS:
+            result = service.brief(section=section, stateless=True)
+            self.assertEqual(result["status"], "ok", section)
+            self.assertEqual(result["section"], section)
+
+    def test_a_section_name_is_not_case_sensitive(self):
+        from gemarc_mcp import service
+        self.assertEqual(service.brief(section="Vocabulary", stateless=True)["status"], "ok")
+
+    def test_the_contract_document_names_the_same_sections(self):
+        from gemarc_mcp import service
+        rows = [line for line in _text(CONTRACT_DOC).splitlines()
+                if line.startswith("| `gemarc_brief`") and "GEMARC_BRIEF_001" in line]
+        self.assertEqual(len(rows), 1, "the contract must have exactly one parameter row for gemarc_brief")
+        for section in service.BRIEF_SECTIONS:
+            self.assertIn(section, rows[0], section)
+
+    def test_the_tool_description_names_every_section(self):
+        """The model reads the description before it calls: the sections must be in it.
+
+        Found by a real run: a model asked for ``section="format"`` (an atlas section name) and
+        had to call again.
+        """
+        from gemarc_mcp import i18n
+        from gemarc_mcp import service
+
+        _names, tools = _registered("stateless")
+        tool = [t for t in tools if t.name == "gemarc_brief"]
+        self.assertEqual(len(tool), 1)
+        for section in service.BRIEF_SECTIONS:
+            self.assertIn(section, tool[0].description or "", section)
+        for lang in i18n.TRANSLATION_LANGS:
+            text = (i18n.section(lang, "tools").get("gemarc_brief") or {}).get("description") or ""
+            for section in service.BRIEF_SECTIONS:
+                self.assertIn(section, text, f"{lang}: {section}")
+
+
 if __name__ == "__main__":
     unittest.main()

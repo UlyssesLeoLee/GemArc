@@ -33,7 +33,7 @@
 | Tool | 集 | 参数 | 主要输出字段 | 执行约束 |
 |---|---|---|---|---|
 | `gemarc_media_doc_guide` | S | `topic=""` | topic, title, content, bytes, sha256, source, sections[], notice | 只读；`topic` 为 `""`/`workflow`（完整工作流）或 `assemble`（组装站点的逐步命令），其它值 `GEMARC_GUIDE_001`；返回随包发布的完整流程正文，客户端无需另装 skill |
-| `gemarc_brief` | S | `project=""`, `section=""` | purpose, procedure, rules, slots, vocabulary, commands, alreadyDone, vocabDigest；带 `section` 时为 `{status, section, content, vocabDigest}` | 只读；`section` 取上述任一键，未知值 `GEMARC_BRIEF_001`；`stateless` 下 procedure/commands 只含该工具集里的工具 |
+| `gemarc_brief` | S | `project=""`, `section=""` | purpose, procedure, rules, slots, vocabulary, commands, alreadyDone, vocabDigest；带 `section` 时为 `{status, section, content, vocabDigest}` | 只读；`section` 取上述任一键（**不区分大小写**），未知值 `GEMARC_BRIEF_001`（**错误里列出可用分段**，模型不必再猜一次）；`stateless` 下 procedure/commands 只含该工具集里的工具 |
 | `gemarc_contracts` | S | `query=""` | contracts[], vocabularies[], profiles[], slots[]；带 `query`（文件名）时多一个 `document` | 只读；`query` 只能是 `contracts[]` / `vocabularies[]` 里出现的文件名，路径、`..` 与不在列表里的名字一律 `GEMARC_CONTRACT_001` |
 | `gemarc_assets` | S | `query=""` | name, licensePolicy, components[] | 只读；`planned` 状态的组件尚未实现 |
 | `gemarc_new_model` | S | `system`* | model（空骨架）, slots[], next[] | 只读；`system` 非空且 ≤ 80 字符（`GEMARC_INPUT_001`） |

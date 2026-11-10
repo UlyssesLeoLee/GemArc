@@ -275,7 +275,7 @@
     },
     "gemarc_brief": {
       "title": "モデル作成の作業票",
-      "description": "言語モデル向けの短い作業票です。目的、手順、埋めるべき枠と規約、使える語彙（証拠レベル、要素の種類、辺の種類、図の種類）、そして出来ている部分が入っています。section で一部だけ取り出せます。"
+      "description": "言語モデル向けの短い作業票です。目的、手順、埋めるべき枠と規約、使える語彙（証拠レベル、要素の種類、辺の種類、図の種類）、そして出来ている部分が入っています。section で一部だけ取り出せます：purpose、procedure、rules、slots、vocabulary、commands、alreadyDone、vocabDigest（空のときは全体）。"
     },
     "gemarc_contracts": {
       "title": "契約と語彙",

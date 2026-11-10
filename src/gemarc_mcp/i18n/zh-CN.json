@@ -275,7 +275,7 @@
     },
     "gemarc_brief": {
       "title": "模型工作单",
-      "description": "给语言模型的紧凑工作单：目的、步骤、待填槽位与规则、可用词表（证据等级、实体种类、边类型、图类型），以及已经建好的部分。section 取其中一段。"
+      "description": "给语言模型的紧凑工作单：目的、步骤、待填槽位与规则、可用词表（证据等级、实体种类、边类型、图类型），以及已经建好的部分。section 取其中一段：purpose、procedure、rules、slots、vocabulary、commands、alreadyDone、vocabDigest；不填则返回全部。"
     },
     "gemarc_contracts": {
       "title": "契约与词表",

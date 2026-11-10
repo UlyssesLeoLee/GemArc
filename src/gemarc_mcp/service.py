@@ -18,6 +18,12 @@ SKIP_DIRS = {".git", "node_modules", "target", "dist", "build", ".venv", ".next"
 EXTS = {".py", ".rs", ".cs", ".java", ".ts", ".tsx", ".js", ".json", ".md", ".sql"}
 MAX_SCAN_FILES = 1500
 MAX_SCAN_BYTES = 12 * 1024 * 1024
+#: The sections ``gemarc_brief`` answers on its own (the tool contract, 03_详细设计/02).
+#: A wrong section says which ones exist: a model that guesses must not have to guess twice.
+BRIEF_SECTIONS = ("purpose", "procedure", "rules", "slots", "vocabulary", "commands", "alreadyDone",
+                  "vocabDigest")
+#: The same sections, keyed by their lower-case name (the lookup is case-insensitive).
+_BRIEF_SECTION_BY_LOWER = {name.lower(): name for name in BRIEF_SECTIONS}
 
 
 def sample_model(name: str) -> dict:
@@ -268,9 +274,10 @@ def brief(project: str = "", section: str = "", stateless: bool = False) -> dict
                                "note": "远程端点无状态：模型每次随调用传入，服务端不保存任何项目。"}
         payload["alreadyDone"]["site"] = "固定件由 kit 提供；render 只返回随模型变化的 data/*.json"
     if section:
-        key = section.strip()
-        if key not in payload:
-            raise GemArcError("GEMARC_BRIEF_001", f"未知的分段: {section}")
+        key = _BRIEF_SECTION_BY_LOWER.get(section.strip().lower())
+        if key is None:
+            raise GemArcError("GEMARC_BRIEF_001",
+                              f"未知的分段: {section}；可用分段: {', '.join(BRIEF_SECTIONS)}")
         return {"status": "ok", "section": key, "content": payload[key],
                 "vocabDigest": payload["vocabDigest"]}
     return payload
@@ -313,7 +320,8 @@ def scaffold_project(ws: Workspace, name: str, profile: str = "static") -> dict:
 
     ws.writable()
     if profile not in builder.PROFILES:
-        raise GemArcError("GEMARC_SCAFFOLD_001", f"未知的 profile: {profile}")
+        raise GemArcError("GEMARC_SCAFFOLD_001",
+                          f"未知的 profile: {profile}；可用: {', '.join(builder.PROFILES)}")
     project = ws.project(name)
     scaffold_dir = ws.path(project / "scaffold")
     manifest_path = scaffold_dir / "scaffold-manifest.json"
@@ -392,7 +400,8 @@ BUILD_PROFILES = ("mvp", "static", "vite")
 def build(ws: Workspace, name: str, legacy_dist: str | None = None, profile: str = "mvp") -> dict:
     ws.writable()
     if profile not in BUILD_PROFILES:
-        raise GemArcError("GEMARC_BUILD_005", f"未知的 build profile: {profile}")
+        raise GemArcError("GEMARC_BUILD_005",
+                          f"未知的 build profile: {profile}；可用: {', '.join(BUILD_PROFILES)}")
     folder, model = load_model(ws, name)
     result = validate(model)
     if result["status"] != "ok":

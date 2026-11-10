@@ -257,7 +257,7 @@ def create_server(toolset: str | None = None):
 
     @tool("gemarc_brief", "Work order for the model", stateless_ok=True)
     def brief(project: str = "", section: str = ""):
-        """Start here. The compact work order for a language model: purpose, procedure, the slots to fill with their rules, the allowed vocabulary (evidence levels, entity kinds, edge types, diagram types), and what is already built. `section` returns one part (e.g. slots, vocabulary, rules)."""
+        """Start here. The compact work order for a language model: purpose, procedure, the slots to fill with their rules, the allowed vocabulary (evidence levels, entity kinds, edge types, diagram types), and what is already built. `section` returns one part - purpose, procedure, rules, slots, vocabulary, commands, alreadyDone, vocabDigest - and an empty `section` returns everything."""
         return run(lambda: service.brief(project, section, stateless=remote))
 
     @tool("gemarc_contracts", "Contracts and vocabularies", stateless_ok=True)

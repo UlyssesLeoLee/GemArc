@@ -1,6 +1,6 @@
 # Claude Code 接入 GemArc MCP
 
-标记：**[RAN]** 本机实际执行过（Claude Code 2.1.314，Windows 11）；**[DOCS]** 来自官方文档 / 源码的调研结论，没在本机运行；**[UNVERIFIED]** 没运行过，也没有可引用的结论。
+标记：**[RAN]** 本机实际执行过（Claude Code 2.1.318，Windows 11）；**[DOCS]** 来自官方文档 / 源码的调研结论，没在本机运行；**[UNVERIFIED]** 没运行过，也没有可引用的结论。
 
 本目录文件：
 
@@ -89,7 +89,20 @@ claude mcp add gemarc --scope user --transport stdio -e GEMARC_WORKSPACE_ROOT='<
 
 - **[RAN]** `claude -p ... --mcp-config integration-examples/claude-code/.mcp.json --strict-mcp-config` 在干净目录里：Claude Code 展开了 `${GEMARC_WORKSPACE_ROOT:-…}`，启动了 `gemarc_local`（stdio），并成功调用 `mcp__gemarc_local__gemarc_new_model`（`status` = `ok`，无权限拒绝）。
 - **[RAN]** 缺少令牌变量时 `claude mcp list` 只对 `gemarc` 条目报 `Missing environment variables: <变量名>` 警告，`gemarc_local` 不受影响（实测当时那个变量名是 `GEMARC_MCP_TOKEN`；本目录现在的示例用 `GEMARC_MCP_PAT`，警告里出现的就是配置里写的那个名字）。
-- **[UNVERIFIED]** 用 Claude Code 连接真实的 Vercel 远程端点（端点已部署，官方 `mcp` 客户端库的握手已实测，见 `docs/09_部署/01_Vercel部署.md` 第 12 节；Claude Code 本身没有连过）。
+- **[RAN]（2026-11-10 实测，生产端点 + 账号制的个人访问令牌）** Claude Code 连真实的 Vercel 远程端点成功：
+  - `claude mcp add --transport http --scope user gemarc 'https://gem-arc.vercel.app/mcp' --header 'Authorization: Bearer ${GEMARC_MCP_PAT}'` → 写入 `~/.claude.json`（**user 作用域**，不会碰仓库里的 `.mcp.json`）；
+  - `claude mcp list` → `gemarc: https://gem-arc.vercel.app/mcp (HTTP) - √ Connected`；
+  - `claude -p "…mcp__gemarc__gemarc_brief…" --allowedTools mcp__gemarc__gemarc_brief` → **真的调到了生产服务器并拿回工作指令正文**（工具名带服务器前缀 `mcp__gemarc__`；服务器名用 `gemarc`，不要用点号）。
+- **[RAN]（2026-11-10 实测）没设令牌变量时，Claude Code 自己就把服务端的提示显示出来**（这是账号制部署的 401 `hint`，ADR-018）：
+
+  ```
+  gemarc: https://gem-arc.vercel.app/mcp (HTTP) - × Failed to connect — Server rejected the configured
+  Authorization header (HTTP 401). … Error detail: {"error":"unauthorized","hint":"访问令牌在账号页签发:打开
+  https://gem-arc.vercel.app/account 创建个人访问令牌,再放进客户端的环境变量 GEMARC_MCP_PAT…"}
+   └ [Warning] [gemarc] mcpServers.gemarc: Missing environment variables: GEMARC_MCP_PAT
+  ```
+
+  ⇒ **不用去翻文档**：连不上时，客户端的报错里就写着令牌从哪拿、填到哪。（未开账号的部署没有这句 `hint`，那是另一回事。）
 - **[UNVERIFIED]** Skill 安装位置：本机存在 `~/.claude/skills/` 目录，但我没验证 Claude Code 如何发现 `skills/gemarc-media-doc`。
 
 ## claude.ai 与 Claude Desktop（远程）

@@ -83,6 +83,8 @@ Claude Code、Codex、Hermes 的配置容器键名各不相同，下一节与 `i
 - Hermes：`hermes mcp add gemarc --url https://<project>.vercel.app/mcp`。
 - claude.ai / Claude Desktop 的远程 connector 只支持 OAuth 或无认证（本仓库未实现 OAuth）：要用就得让部署不设 `GEMARC_MCP_TOKEN`，代价是端点对知道 URL 的人开放。
 - **令牌从哪来、装的时候怎么设、装完以后怎么改**：账号制部署里，登录 `https://<project>.vercel.app/account` → 「创建令牌」拿到**个人访问令牌**（明文只显示这一次），放进**客户端**的环境变量 `GEMARC_MCP_PAT`（或写进客户端的 `Authorization: Bearer` 头）；换令牌时改环境变量并重启客户端。服务端的环境变量 `GEMARC_MCP_TOKEN` 是另一侧的事（未开账号部署的共享令牌）。逐个客户端的写法见 `integration-examples/README.md` 的「令牌」一节。
+- **连不上时看哪里**：客户端的报错里就有答案——账号制部署的 401 响应体带一句 `hint`（令牌在账号页拿、填进 `GEMARC_MCP_PAT` 或 `Authorization: Bearer` 头），Claude Code 会把它原样显示在 `claude mcp list` 的失败行里 **[RAN，2026-11-10 实测]**。
+- **Claude Code 连真实远程端点已实测**（2026-11-10）：`claude mcp add --transport http --scope user gemarc 'https://<project>.vercel.app/mcp' --header 'Authorization: Bearer ${GEMARC_MCP_PAT}'` → `claude mcp list` 显示 `√ Connected` → 真调 `mcp__gemarc__gemarc_brief` 拿到工作指令正文。`--scope user` 写进 `~/.claude.json`（本机所有项目可用，不动仓库里的 `.mcp.json`）；`--scope project` 写进项目的 `.mcp.json`（会随仓库提交，**别把令牌明文写进去**）。
 - **连上 MCP 就已经具备「制作多媒体文档」的能力**：多媒体文档制作流程随服务器发布，工具 `gemarc_media_doc_guide`（或资源 `gemarc://skill/gemarc-media-doc`）就是它，模型按 brief → new_model → 填写 → validate → simulate → render 的顺序执行即可，**不必再单独装 skill**（ADR-012）。
 - `skills/gemarc-media-doc/` 是同一份工作流的独立副本（SKILL.md），用于离线查阅或给不读 MCP 资源的客户端；它与服务器发的那份由 `tests/test_skill_pack.py` 断言不会漂移。
 

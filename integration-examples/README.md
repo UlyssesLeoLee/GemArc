@@ -8,13 +8,13 @@
 - **DOCS / SOURCE**：来自官方文档 / 开源客户端源码的调研结论，**没有**在本机运行。
 - **UNVERIFIED**：没有运行过真实客户端，也没有可引用的结论。
 
-本机装了 Claude Code 2.1.314 和 codex-cli 0.145.0；**没有** Claude Desktop、Hermes Agent、`uv`。远程端点（Vercel）已于 2026-10-30 部署，并用官方 `mcp` 客户端库实测了握手与工具调用（`scripts/verify_remote.py`，见 `docs/09_部署/01_Vercel部署.md` 第 12 节）；但下面这些客户端产品没有一个连接过它，客户端行为的结论仍按各自的标记（DOCS / SOURCE / UNVERIFIED）看待。
+本机装了 Claude Code 2.1.318 和 codex-cli 0.145.0；**没有** Claude Desktop、Hermes Agent、`uv`。远程端点（Vercel）已于 2026-10-30 部署，并用官方 `mcp` 客户端库实测了握手与工具调用（`scripts/verify_remote.py`，见 `docs/09_部署/01_Vercel部署.md` 第 12 节）；**Claude Code 连真实远程端点也已于 2026-11-10 实测**（`claude mcp add` → `√ Connected` → 真调 `mcp__gemarc__gemarc_brief`，见 `claude-code/README.md`）；但下面这些客户端产品里 claude.ai / Desktop / Hermes / Codex 仍没有连过它，客户端行为的结论继续按各自的标记（DOCS / SOURCE / UNVERIFIED）看待。
 
 ## 兼容矩阵
 
 | 客户端 | stdio（本地） | 远程 + Bearer | 远程 无认证 / OAuth | tools | resources | prompts | skills |
 |---|---|---|---|---|---|---|---|
-| Claude Code | **RAN**：配置展开、启动服务器、调用成功 | DOCS（`--header`）；`claude mcp add` 写入配置 **RAN**；连接 UNVERIFIED | 无认证 DOCS；OAuth 本仓库未实现 | **RAN**（stdio 调 `gemarc_new_model`） | DOCS（`@gemarc:gemarc://registry`） | DOCS（`/mcp__gemarc__gemarc-media-doc`） | UNVERIFIED |
+| Claude Code | **RAN**：配置展开、启动服务器、调用成功 | **RAN**（`--header` + `claude mcp add` + 连上生产端点 + 真调 `mcp__gemarc__gemarc_brief`）；没令牌时客户端会把服务端的 `hint` 显示出来 | 无认证 DOCS；OAuth 本仓库未实现 | **RAN**（stdio 调 `gemarc_new_model`） | DOCS（`@gemarc:gemarc://registry`） | DOCS（`/mcp__gemarc__gemarc-media-doc`） | UNVERIFIED |
 | Claude Desktop | UNVERIFIED（配置 JSON 语法 RAN） | UNVERIFIED（静态 header 仅 beta，DOCS） | 无认证 DOCS | UNVERIFIED | UNVERIFIED | UNVERIFIED | UNVERIFIED |
 | claude.ai / API connector | 不适用 | UNVERIFIED（静态 header 仅 beta，DOCS） | 无认证 DOCS；API connector 仅 tools、token 须为 OAuth（DOCS） | UNVERIFIED | UNVERIFIED（API connector 不支持，DOCS） | UNVERIFIED（API connector 不支持，DOCS） | UNVERIFIED |
 | OpenAI Codex | 配置被 `--strict-config` 接受、`codex mcp add/list/get/remove` **RAN**；启动服务器 UNVERIFIED | SOURCE（`bearer_token_env_var`）；配置解析 **RAN** | SOURCE | SOURCE | SOURCE（仅内置 list/read 工具） | SOURCE（被忽略） | UNVERIFIED |

@@ -362,6 +362,37 @@ class SessionsAndCsrf(ServerCase):
         self.assertEqual(bad.status, 403)
         self.assertEqual(self.count("api_tokens"), 1)
 
+    def test_null_origin_is_judged_by_fetch_metadata(self):
+        """A null Origin means "the browser reported no source origin", not "the source origin does not match".
+
+        Chromium derives the Origin of a *navigation* request from the referrer, so the account pages (which set
+        ``Referrer-Policy: no-referrer``) make the browser send ``Origin: null`` even for their own same-origin form
+        posts. Judging that like a real origin refuses every form on the account pages in Chromium, so a null Origin
+        is judged by ``Sec-Fetch-Site`` exactly like a missing Origin. See ADR-017.
+        """
+        # the real browser shape: a same-origin form navigation from an account page
+        ok = self.browser.post("/account/tokens", {"csrf": self.csrf, "name": "x"}, origin="null",
+                                headers={"Sec-Fetch-Site": "same-origin", "Sec-Fetch-Mode": "navigate",
+                                         "Sec-Fetch-Dest": "document"})
+        self.assertEqual(ok.status, 200)
+        self.assertEqual(self.count("api_tokens"), 1)
+        # a null Origin with any other fetch metadata is refused
+        for site in ("cross-site", "same-site", "none"):
+            bad = self.browser.post("/account/tokens", {"csrf": self.csrf, "name": "x"}, origin="null",
+                                    headers={"Sec-Fetch-Site": site})
+            self.assertEqual(bad.status, 403, site)
+            self.assertIn("GEMARC_ACCT_021", bad.text)
+        # a null Origin without fetch metadata is refused (the stricter shape, unchanged)
+        bare = self.browser.post("/account/tokens", {"csrf": self.csrf, "name": "x"}, origin="null")
+        self.assertEqual(bare.status, 403)
+        self.assertIn("GEMARC_ACCT_021", bare.text)
+        # a null Origin never waives the CSRF token
+        wrong = self.browser.post("/account/tokens", {"csrf": "A" * 43, "name": "x"}, origin="null",
+                                  headers={"Sec-Fetch-Site": "same-origin"})
+        self.assertEqual(wrong.status, 403)
+        self.assertIn("GEMARC_ACCT_021", wrong.text)
+        self.assertEqual(self.count("api_tokens"), 1)
+
     def test_csrf_token_of_another_session_is_refused(self):
         other = Browser(self.srv.base)
         other_page = self.logged_in_page({"sub": "c-2", "email": "bob@gmail.com"}, other)

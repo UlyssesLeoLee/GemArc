@@ -134,6 +134,17 @@
   - 设置**只减不增**：白名单变不出写工具，令牌作用域与 `can_write` 两道关照旧。
   - 设计全文见 `docs/03_详细设计/10_用户个性化设置详细设计.md`（DD-010）。
 
+### ADR-017 `Origin: null` 是「没报出源 origin」，不是「源 origin 不匹配」
+
+- **背景**：账号页上的表单 POST 在 Chromium 系浏览器（Edge / Chrome）里一律 403 `GEMARC_ACCT_021`，而同一个表单在 Firefox/Safari 正常、在控制台里用 `fetch()` 提交也正常。真实浏览器抓到的请求头是 `Origin: null` + `Sec-Fetch-Site: same-origin`；用 Python 客户端带上正确的 `Origin` 提交则 200。对照实验（真实 Edge headless 加载与账号页同响应头的合成页）定位到：**Chromium 导航式请求的 `Origin` 是从 referrer 推导的**——账号页的 `Referrer-Policy: no-referrer`（响应头与 `<meta>` 两处都有）把 referrer 剥掉，浏览器就没有源 origin 可报，只能发 `Origin: null`；把 `Referrer-Policy` 换成 `same-origin` / `strict-origin-when-cross-origin` / 去掉，浏览器就会报出真实 origin。其余响应头（COOP / CORP / `X-Frame-Options`）与此无关。
+- **决策**：**判定规则改一行**——`Origin` 缺失**或为 `null`** 时，一律回落用 `Sec-Fetch-Site: same-origin` 判定；非 `null` 的 `Origin` 仍必须逐字等于配置基址。`null` 与「没有 `Origin` 头」是同一类信息（浏览器没报出源 origin），必须用同一个信号判定。
+- **原因**：原规则把「有 `Origin` 头」当成「浏览器一定报出了真实源 origin」，于是 `null` 被当成「不匹配」而拒——这比规则自己写的「缺 `Origin` 时用 `Sec-Fetch-Site`」**更严**，结果把自家账号页的表单在 Chromium 里全部挡死：改设置、建令牌、登出、登出全部、删号全都提交不了。**不放宽的部分**：非 `null` 的 `Origin` 仍逐字比对；`null` 且 `Sec-Fetch-Site` 不是 `same-origin`（`cross-site` / `none` / 缺失）一律拒绝。不透明源（沙箱 iframe、`data:` 文档、`file:` 页面）的 `Sec-Fetch-Site` 必然不是 `same-origin`，进不来；`SameSite=Lax` 的会话 Cookie 本来就不随跨站 POST 送出，CSRF 令牌又与会话绑定，三道锁互相独立，改规则没有减少任何一道。
+- **后果**：
+  - **响应头不动**：不把 `Referrer-Policy` 改成 `same-origin`。那确实能让 Chromium 报出真实 `Origin`，但登录回调 `/auth/google/callback?code=…` 的 303 会把授权码放进下一次同源请求的 `Referer`，与第 2.4 节 T 行「授权码出现在 URL、Referer、日志」冲突。为了保住授权码不进 `Referer`，保住头集合里的 `no-referrer`；改为让判定规则理解 `null`。
+  - 实现：`security.origin_ok()` 把 `Origin: null` 与「没有 `Origin` 头」合并为同一分支；`routes.py` 的 POST 管线与 `mcpauth.py` 的会话通道共用这一个函数，两处同时受益。
+  - 绑定测试：`tests/accounts/test_routes.py` 的 `SessionsAndCsrf` 增加 `Origin: null` 的四种组合（`same-origin` 放行 / `cross-site` / `none` / 缺失全拒；令牌错仍拒）。既有断言（`Origin: null` 且无 `Sec-Fetch-Site` → 拒）**未改动且仍为绿**。
+  - 规则全文与证据记在 `docs/09_部署/02_账号与安全.md` 第 3.2 节「`Origin` 判定与 `Referrer-Policy` 的关系」。
+
 ## 变更流程
 
 提交 CR→影响分析 FR/NFR/Schema/View/测试→设计变更评审→实现和测试→QA 审查→基线发布。凡变动稳定 ID 与 Schema major，需要迁移方案与回滚计划。变更决议与审批记在台账，未经审批不改成“已采用”。

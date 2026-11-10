@@ -7,7 +7,8 @@ callers pass the mapping they want consulted.
 * ``owns(path)``            which paths belong to the account routes (exact ``/account`` or ``/account/...``, ``/auth/...``).
 * ``trusted_ip``            the client address, taken ONLY from ``x-vercel-forwarded-for`` (when running on Vercel) or from
                             the N-th entry from the right of ``x-forwarded-for`` when the operator configured N hops.
-* ``origin_ok``             CSRF origin rule: ``Origin`` equals the configured origin, else ``Sec-Fetch-Site: same-origin``.
+* ``origin_ok``             CSRF origin rule: ``Origin`` equals the configured origin; with no usable source origin
+                            (no ``Origin`` header, or ``Origin: null``) ``Sec-Fetch-Site`` must be ``same-origin``.
 * cookie / form / body helpers with strict parsing (a duplicated cookie name means "no cookie").
 """
 from __future__ import annotations
@@ -61,10 +62,17 @@ def trusted_ip(headers: Any, environ: Mapping[str, str], hops: Optional[int] = N
 
 # -- csrf ------------------------------------------------------------------------------------------------------------
 def origin_ok(headers: Any, origin: str) -> bool:
-    """Design D37: ``Origin`` must equal the configured origin; with no ``Origin`` header ``Sec-Fetch-Site`` must be
-    ``same-origin``. Anything else (including ``Origin: null``) is refused."""
+    """Design D37 (ADR-017): ``Origin`` must equal the configured origin. When the browser reports no usable source
+    origin -- no ``Origin`` header at all, or the literal ``Origin: null`` -- ``Sec-Fetch-Site`` must be
+    ``same-origin`` instead.
+
+    ``Origin: null`` is **not** a mismatching origin. Chromium derives the ``Origin`` of a *navigation* request from
+    the referrer, so a page served with ``Referrer-Policy: no-referrer`` makes the browser send ``Origin: null`` even
+    for its own same-origin form posts (see ``docs/09_部署/02_账号与安全.md`` 3.2). Judging it like a real origin
+    refuses every form on the account pages in Chromium. Anything else is refused.
+    """
     presented = headers.get("origin")
-    if presented is not None:
+    if presented is not None and presented != "null":
         return presented == origin
     return headers.get("sec-fetch-site") == "same-origin"
 

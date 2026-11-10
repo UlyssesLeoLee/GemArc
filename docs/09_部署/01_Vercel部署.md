@@ -307,13 +307,15 @@ npx vercel@65.8.0 env add GEMARC_ACCOUNTS_ADMIN_EMAILS production --value lidian
 
 #### 4.3.2 上线步骤（按顺序）
 
-1. **先跑迁移**（新表 `admin_users`、`operator_settings`）：
+1. **先跑迁移**（新表 `admin_users`、`operator_settings`、`user_settings`）：
    ```powershell
    $env:GEMARC_MIGRATE_DATABASE_URL = "<unpooled 连接串>"
    $env:GEMARC_ACCOUNTS_KEYS = "k1:<base64url>"
    python -m gemarc_mcp.accounts migrate
    ```
-   期望输出 `applied: 0001_init, 0002_admin`。
+   期望输出 `applied: <本次待应用的迁移>`；跑完是 `schema head: 0003_user_settings; pending: 0`。
+   **顺序不能颠倒**：迁移文件随代码一起上线，数据库里少一个版本时，账号页与 `/mcp` 会按
+   `GEMARC_ACCT_003`（数据库结构需要升级）回 503，而不是照常服务。
 2. **设环境变量**（4.3.1），然后**重新部署**。
 3. **验证**：用 `lidian727@gmail.com` 打开 `https://gem-arc.vercel.app/` → 应跳到 Google 登录；
    登录后应回到控制台，左下角出现「管理员设置」入口。

@@ -10,6 +10,17 @@
 
 两个 YAML 都用服务器名 `gemarc`，**只启用一个**。占位符：`<workspace>`（已存在的目录）、`<project>`（Vercel 子域名）、`<token>`。
 
+## 令牌从哪来
+
+| 部署形态 | 令牌从哪来 | 客户端环境变量（写进 `~/.hermes/.env`） |
+|---|---|---|
+| 账号制（本仓库现在的生产形态） | 登录 `https://<project>.vercel.app/account` → 「创建令牌」→ **明文只显示这一次** | `GEMARC_MCP_PAT` = 你自己的个人访问令牌 |
+| 未开账号 | 运营者给的共享令牌 | `GEMARC_MCP_PAT` = 那个共享令牌 |
+
+服务端的环境变量 `GEMARC_MCP_TOKEN` 是**另一侧**的事（未开账号部署的共享令牌）；本目录的示例原来客户端侧也用它，现在统一改成 `GEMARC_MCP_PAT`（与账号页给出的配置一致）。**已经照旧示例配好的用户不用改**：服务端不校验客户端环境变量的名字。
+
+**装完以后怎么改**：改 `~/.hermes/.env` 里的值，然后在会话里 `/reload-mcp`（或重启 Hermes）；`config.yaml` 里写着令牌明文的，删掉那个条目再重新添加一次。也可以在**控制台**（浏览器里的 `https://<project>.vercel.app/`）粘贴令牌，它只存在那个标签页的 `sessionStorage` 里。
+
 ## 配置位置与变量
 
 - 配置目录是 `~/.hermes`（Windows 原生安装为 `%LOCALAPPDATA%\hermes`），`HERMES_HOME` 可覆盖；文件有 `config.yaml`、`.env`、`skills/` **[SOURCE]**。PowerShell 下查看：`$env:HERMES_HOME`、`Get-ChildItem $env:LOCALAPPDATA\hermes`。
@@ -30,7 +41,7 @@ hermes mcp remove gemarc
 ```
 
 - `hermes mcp add NAME --command CMD --args ...` 也存在 **[SOURCE]**，但 `-m` 这类以 `-` 开头的参数能否经由 `--args` 传入我没验证 **[UNVERIFIED]**；本地 stdio 建议直接编辑 `config.yaml`。
-- `config.remote.yaml` 用 `GEMARC_MCP_TOKEN` 而不是 `hermes mcp add` 生成的 `MCP_<NAME>_API_KEY`：两者等价，只是少一个变量名要记。
+- `config.remote.yaml` 用 `GEMARC_MCP_PAT` 而不是 `hermes mcp add` 生成的 `MCP_<NAME>_API_KEY`：两者等价，只是少一个变量名要记。
 - 预检会请求你配置的**确切** URL：必须是 `/mcp`。一个返回 HTML 的 200（比如把站点根 `/` 当 MCP 地址）会预检失败；401、405 能通过 **[SOURCE]**。
 
 ## 过滤工具

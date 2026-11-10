@@ -36,8 +36,32 @@
 |---|---|
 | `<project>` | 你的 Vercel 项目子域名，远程地址是 `https://<project>.vercel.app/mcp` |
 | `<workspace>` | 本地工作区，必须是**已存在**的目录；`gemarc_inspect` 只能扫描它里面的目录，写入也落在这里 |
-| `<token>` | 远程 Bearer token（服务端环境变量 `GEMARC_MCP_TOKEN`）；只放环境变量或 `.env`，不要写进配置文件 |
+| `<token>` | 远程 Bearer token。**客户端**放环境变量 `GEMARC_MCP_PAT`（账号制部署里是你自己的个人访问令牌），**服务端**的环境变量叫 `GEMARC_MCP_TOKEN`（未开账号部署的共享令牌）；令牌只放环境变量或 `.env`，不要写进配置文件 |
 | `D:\GemArc` | 本仓库的检出路径（不是尖括号，但示例里写死了，换成你的） |
+
+## 令牌：从哪来、装的时候怎么设、装完以后怎么改
+
+远程端点有两种形态，**令牌的名字与来源不同**，不要混：
+
+| | 未开账号的部署 | 账号制部署（本仓库现在的生产形态） |
+|---|---|---|
+| 服务端认什么 | 环境变量 `GEMARC_MCP_TOKEN`（可逗号分隔多个，便于轮换） | 账号页签发的个人访问令牌（PAT）；`pat-or-env` 模式仍兼容环境令牌 |
+| 令牌从哪来 | 运营者给的共享令牌 | **登录账号页 → 创建令牌**（明文只显示一次，离开页面就看不到） |
+| 客户端怎么填 | 客户端环境变量里放共享令牌 | 客户端环境变量 `GEMARC_MCP_PAT` 里放**你自己**的 PAT，或写进客户端的 `Authorization: Bearer` 头 |
+
+**同名不同侧**：`GEMARC_MCP_TOKEN` 是**服务端**的变量名，`GEMARC_MCP_PAT` 是**客户端**的变量名。本目录的示例原来两边都用 `GEMARC_MCP_TOKEN`，现在客户端侧统一改成 `GEMARC_MCP_PAT`（与账号页给出的配置一致）；**已经照旧示例配好的用户不用改**——服务端不校验客户端环境变量的名字。
+
+**装的时候怎么设**：令牌放进客户端的**环境变量**，配置文件里只写变量名（令牌不落进文件）：
+
+| 客户端 | 安装（令牌先放进环境变量，再执行添加命令） |
+|---|---|
+| Claude Code | `$env:GEMARC_MCP_PAT = '<token>'` → `claude mcp add --transport http --scope project gemarc 'https://<project>.vercel.app/mcp' --header 'Authorization: Bearer ${GEMARC_MCP_PAT}'` |
+| Codex | `$env:GEMARC_MCP_PAT = '<token>'` → `codex mcp add gemarc --url 'https://<project>.vercel.app/mcp' --bearer-token-env-var GEMARC_MCP_PAT` |
+| Hermes | `GEMARC_MCP_PAT=<token>` 写进 `~/.hermes/.env` → YAML 里写 `Authorization: "Bearer ${GEMARC_MCP_PAT}"` |
+
+**装完以后怎么改**：改环境变量里的值并**重启客户端**（客户端只在启动时读一次）；配置里写着令牌明文的，删掉那个条目再重新添加一次。也可以在**控制台**里粘贴令牌：它只存在那个标签页的 `sessionStorage` 里，关掉标签页就没了。
+
+**连不上时看哪里**：账号制部署的 `POST /mcp` 在 401 响应体里带一句 `hint`，写明令牌在哪拿、填到哪。**所有失败原因同一句**（没带、带错、过期、被撤销一律同形），它不会告诉你令牌是过期还是写错。
 
 ## stdio 启动命令
 

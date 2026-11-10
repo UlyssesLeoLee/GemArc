@@ -239,6 +239,20 @@ def describe(response: Response) -> str:
     return f"HTTP {response.status} in {response.elapsed:.2f}s"
 
 
+def unauthorized_body(response: Response) -> bool:
+    """The 401 body is JSON and names the error.
+
+    Two shapes are legal: ``{"error":"unauthorized"}`` (the deployment without accounts) and
+    ``{"error":"unauthorized","hint":"..."}`` (the accounts mode, where the hint says where to
+    get a token and where to put it). Anything else is not.
+    """
+    payload = response.json()
+    if not isinstance(payload, dict) or payload.get("error") != "unauthorized":
+        return False
+    hint = payload.get("hint")
+    return hint is None or (isinstance(hint, str) and bool(hint.strip()))
+
+
 def stop_if_protected(probe: Probe, response: Response) -> bool:
     if probe.protected:
         probe.check("reachable without a Deployment Protection challenge", False,
@@ -299,6 +313,10 @@ def run_checks(probe: Probe) -> None:
     if auth_required:
         probe.check("POST /mcp without a token -> 401",
                     response.status == 401 and "bearer" in response.header("www-authenticate").lower(), describe(response))
+        probe.check("the 401 body names the error", unauthorized_body(response), describe(response))
+        hint = (response.json() or {}).get("hint") if isinstance(response.json(), dict) else None
+        probe.info("the 401 hint (where to get a token)",
+                   hint if isinstance(hint, str) else "none (the deployment without accounts)")
         wrong = probe.rpc("tools/list", token="not-the-token")[0]
         probe.check("POST /mcp with a wrong token -> 401", wrong.status == 401, describe(wrong))
         if not probe.token:

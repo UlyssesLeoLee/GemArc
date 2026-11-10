@@ -1,9 +1,12 @@
 """The three-language tables (DD-009, the section "language handling").
 
-One source of truth: ``<locale>.json`` next to this module. Three tables; the ``console``
-and ``accounts`` sections have the same key set in all three. A key that cannot be found
+One source of truth: ``<locale>.json`` next to this module. Three tables; the ``console``,
+``accounts`` and ``mcp`` sections have the same key set in all three. A key that cannot be found
 returns the key itself and is recorded: a gap is a defect, never a silent mix of two
 languages.
+
+The ``mcp`` section holds the texts the MCP wire carries (the hint of the 401), so a client that
+gets refused is told the same thing in the reader's language.
 
 The ``tools`` section exists only in the two translation tables. The English text of a tool
 is the description the code registers itself (the docstring), so it is never written twice;

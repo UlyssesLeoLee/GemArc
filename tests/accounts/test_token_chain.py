@@ -53,6 +53,12 @@ class TheAccountPageIssues(ServerCase):
         self.assertIn(f"$env:GEMARC_MCP_PAT = '{token}'", text)
         self.assertIn(f"export GEMARC_MCP_PAT='{token}'", text)
 
+    def test_the_page_says_where_to_put_the_token_and_how_to_change_it(self):
+        """The reader must learn the two things the account page is the only place to learn."""
+        text = unescape(self.create().text)
+        self.assertIn(i18n.text("zh-CN", "accounts", "account.snipintro"), text)
+        self.assertIn("GEMARC_MCP_PAT", text)
+
     def test_the_configurations_are_ready_to_copy(self):
         """The Codex block is TOML and the Hermes block is YAML: the lines must be real lines."""
         text = unescape(self.create().text)
@@ -112,6 +118,12 @@ class TheConsoleOnlyFillsIn(ServerCase):
         html = self.console()
         self.assertIn('href="/account"', html)
         self.assertIn(i18n.text("zh-CN", "console", "auth.source"), html)
+
+    def test_the_console_names_the_client_variable(self):
+        """The console is the other place a reader is; it must say where the token goes."""
+        html = self.console()
+        self.assertIn(i18n.text("zh-CN", "console", "auth.sourcenote"), html)
+        self.assertIn("GEMARC_MCP_PAT", html)
 
     def test_the_console_has_no_way_to_issue_a_token(self):
         """The console only fills a token in: it never offers to create one."""

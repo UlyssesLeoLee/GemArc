@@ -4,7 +4,7 @@
       "type": "http",
       "url": "${GEMARC_URL:-https://<project>.vercel.app/mcp}",
       "headers": {
-        "Authorization": "Bearer ${GEMARC_MCP_TOKEN}"
+        "Authorization": "Bearer ${GEMARC_MCP_PAT}"
       }
     },
     "gemarc_local": {

@@ -92,7 +92,7 @@
     "auth.clear": "清除",
     "auth.source": "令牌在账号页生成",
     "auth.sourcelink": "去账号页生成",
-    "auth.sourcenote": "令牌由网站(账号页)签发。粘贴到这里,或直接填进你的 agent 配置。",
+    "auth.sourcenote": "令牌由网站(账号页)签发。粘贴到这里(只对本标签页有效),或放进客户端的环境变量 GEMARC_MCP_PAT(Claude Code / Codex / Hermes 都读它)。",
     "auth.sessionnote": "已使用本标签页保存的令牌(登录会话同样可用)。",
     "auth.sessionalt": "正在使用登录会话;也可以粘贴令牌改用其他身份。",
     "auth.tokensaved": "已使用本标签页保存的令牌。",
@@ -170,7 +170,7 @@
     "account.tokennewh2": "你的新令牌（只显示这一次）",
     "account.tokennewnote": "请现在复制并妥善保存。离开此页后无法再次查看；丢失了就撤销后重建。",
     "account.sniph2": "怎么用这个令牌",
-    "account.snipintro": "也可以先把令牌放进环境变量 GEMARC_MCP_PAT，配置文件里只写变量名，不写令牌本身。",
+    "account.snipintro": "也可以先把令牌放进环境变量 GEMARC_MCP_PAT，配置文件里只写变量名，不写令牌本身。换令牌时改这个变量并重启客户端即可；配置里带着令牌明文的，删掉旧条目再执行一次上面的命令。",
     "account.snipfilledh2": "已经填好令牌的配置",
     "account.snipfillednote": "下面三段配置已经配好，复制到 agent 即可：Claude Code 与 Hermes 的配置里直接带着令牌，Codex 的配置指向 GEMARC_MCP_PAT（下一段里那一行也已经填好）。",
     "account.snipps": "Windows PowerShell：",
@@ -364,5 +364,8 @@
     "GEMARC_ACCT_036": "该工具不在你的工具清单里。",
     "GEMARC_ACCT_037": "设置的值无效（语言、工具清单或渲染形态不可用）。",
     "GEMARC_ACCT_038": "选择了「只用勾选的工具」，但一个都没有勾选。"
+  },
+  "mcp": {
+    "unauthorized.hint": "访问令牌在账号页签发：打开 {url} 创建个人访问令牌，再放进客户端的环境变量 GEMARC_MCP_PAT（Claude Code / Codex / Hermes 都读它），或直接写进客户端的 Authorization: Bearer 头。"
   }
 }

@@ -78,10 +78,11 @@ Claude Code、Codex、Hermes 的配置容器键名各不相同，下一节与 `i
 `integration-examples/README.md`；先运行 `python scripts/verify_stdio.py` 自检本地服务器，
 运行 `python scripts/verify_remote.py https://<project>.vercel.app` 自检远程端点。
 
-- Claude Code：`claude mcp add --transport http --scope project gemarc 'https://<project>.vercel.app/mcp' --header 'Authorization: Bearer ${GEMARC_MCP_TOKEN}'`。**用单引号**，否则令牌会明文写进 `.mcp.json`。
-- Codex：`codex mcp add gemarc --url 'https://<project>.vercel.app/mcp' --bearer-token-env-var GEMARC_MCP_TOKEN`。
+- Claude Code：`claude mcp add --transport http --scope project gemarc 'https://<project>.vercel.app/mcp' --header 'Authorization: Bearer ${GEMARC_MCP_PAT}'`。**用单引号**，否则令牌会明文写进 `.mcp.json`。
+- Codex：`codex mcp add gemarc --url 'https://<project>.vercel.app/mcp' --bearer-token-env-var GEMARC_MCP_PAT`。
 - Hermes：`hermes mcp add gemarc --url https://<project>.vercel.app/mcp`。
 - claude.ai / Claude Desktop 的远程 connector 只支持 OAuth 或无认证（本仓库未实现 OAuth）：要用就得让部署不设 `GEMARC_MCP_TOKEN`，代价是端点对知道 URL 的人开放。
+- **令牌从哪来、装的时候怎么设、装完以后怎么改**：账号制部署里，登录 `https://<project>.vercel.app/account` → 「创建令牌」拿到**个人访问令牌**（明文只显示这一次），放进**客户端**的环境变量 `GEMARC_MCP_PAT`（或写进客户端的 `Authorization: Bearer` 头）；换令牌时改环境变量并重启客户端。服务端的环境变量 `GEMARC_MCP_TOKEN` 是另一侧的事（未开账号部署的共享令牌）。逐个客户端的写法见 `integration-examples/README.md` 的「令牌」一节。
 - **连上 MCP 就已经具备「制作多媒体文档」的能力**：多媒体文档制作流程随服务器发布，工具 `gemarc_media_doc_guide`（或资源 `gemarc://skill/gemarc-media-doc`）就是它，模型按 brief → new_model → 填写 → validate → simulate → render 的顺序执行即可，**不必再单独装 skill**（ADR-012）。
 - `skills/gemarc-media-doc/` 是同一份工作流的独立副本（SKILL.md），用于离线查阅或给不读 MCP 资源的客户端；它与服务器发的那份由 `tests/test_skill_pack.py` 断言不会漂移。
 
@@ -221,6 +222,7 @@ npx vercel@65.8.0 deploy --prod
 开启后本部署变成「登录才能用」：控制台 `/` 需要登录会话；`POST /mcp` 同时认个人访问令牌与登录会话（会话通道要求同源）；
 `/account/admin` 是**仅管理员**的设置区（用户管理、审计日志、站点与工具集、令牌策略）。管理员 = 环境变量
 `GEMARC_ACCOUNTS_ADMIN_EMAILS` 白名单**或**数据库表 `admin_users` 里的运行时授予（两者取并集，收权要两边都做）。
+账号制部署下，`POST /mcp` 的 401 响应体带一句 `hint`（令牌在账号页拿、填进客户端的环境变量 `GEMARC_MCP_PAT` 或 `Authorization: Bearer` 头）；**所有失败原因同一句**，不区分「没带 / 带错 / 过期 / 被撤销」。
 
 ## 复用现有 GemArc Three.js Viewer
 

@@ -7,8 +7,8 @@
 url = "https://<project>.vercel.app/mcp"
 # The NAME of an environment variable, never the token itself (an inline bearer_token is rejected).
 # The variable must be set and non-empty in the environment Codex starts from, or startup fails.
-# If the server runs without GEMARC_MCP_TOKEN (authless), delete this line.
-bearer_token_env_var = "GEMARC_MCP_TOKEN"
+# If the server runs without a token (authless), delete this line.
+bearer_token_env_var = "GEMARC_MCP_PAT"
 startup_timeout_sec = 30
 tool_timeout_sec = 120
 

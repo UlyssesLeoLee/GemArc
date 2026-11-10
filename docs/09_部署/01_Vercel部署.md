@@ -234,6 +234,8 @@ OAuth 或「无认证」；静态请求头只是部分组织可用的 beta。所
   令牌里不能含逗号（十六进制令牌没有此问题）。
 - 令牌是环境变量，**改了之后必须重新部署才生效**（UNVERIFIED：Vercel 对环境变量变更的生效时机以其文档为准）。
 
+**账号制部署下的 401（`GEMARC_MCP_AUTH=pat` / `pat-or-env` 或 `GEMARC_REQUIRE_LOGIN=1`）**：401 的响应体多一句 `hint`：`{"error":"unauthorized","hint":"令牌在账号页签发……放进客户端的环境变量 GEMARC_MCP_PAT……"}`（ADR-018）。**所有失败原因同一句**（没带 / 带错 / 过期 / 被撤销不区分），hint 的语言按请求判定。上面这条「失败：HTTP 401 … `{"error":"unauthorized"}`」说的是**未开账号**的部署，那里的响应体逐字节不变。详见 `docs/09_部署/02_账号与安全.md` 第 3.6 节。
+
 ### 4.1 生成与轮换（PowerShell 5.1）
 
 ```powershell
@@ -439,7 +441,8 @@ python scripts/verify_remote.py --local                                         
 1. `/healthz` 为 ok，且**不含路径形状的值**；`/` 是 HTML 控制台；`/site/` 200；
 2. `GET /mcp` 在 5 秒内返回 405（`Allow: POST`），`HEAD`/`DELETE` 也是 405；
    `/.well-known/oauth-protected-resource` 是 404 JSON；
-3. 无令牌 `POST /mcp`：要求令牌时 401（并检查错误令牌也是 401），否则 200；
+3. 无令牌 `POST /mcp`：要求令牌时 401（并检查错误令牌也是 401；401 的响应体必须是 `{"error":"unauthorized"}`，
+   或是账号模式下带 `hint` 的同形），否则 200；
 4. `initialize` 回报服务器名与协议版本；`tools/list` 与 `/healthz.tools` 一致（stateless 时恰好是那 9 个名字），
    每个名字都匹配 `^[a-zA-Z0-9_-]{1,64}$`；
 5. `gemarc_new_model` → `gemarc_validate`（空骨架、内联探测模型、`project="demo"`）→ `gemarc_simulate`

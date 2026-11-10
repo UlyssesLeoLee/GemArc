@@ -92,7 +92,7 @@
     "auth.clear": "空にする",
     "auth.source": "認証鍵は利用者画面で作られます",
     "auth.sourcelink": "利用者画面を開く",
-    "auth.sourcenote": "認証鍵はウェブサイト（利用者画面）が作ります。ここに貼り付けるか、agent の構成ファイルへ直接入れてください。",
+    "auth.sourcenote": "認証鍵はウェブサイト（利用者画面）が作ります。ここに貼り付けるか（このタブだけの有効期限です）、あるいはクライアントの実行環境へ参照名 GEMARC_MCP_PAT として入れてください（Claude Code / Codex / Hermes が読みます）。",
     "auth.sessionnote": "このタブに保管した認証鍵を使っています（サインイン状態も使えます）。",
     "auth.sessionalt": "サインイン状態を使っています。認証鍵を貼り付けると別の使用者として動けます。",
     "auth.tokensaved": "このタブに保管した認証鍵を使っています。",
@@ -170,7 +170,7 @@
     "account.tokennewh2": "新しい認証鍵（この 1 回だけ表示されます）",
     "account.tokennewnote": "今すぐ控え書きして安全に保管してください。この画面を離れた後はあとから表示できません。失ったときは取消して作り直してください。",
     "account.sniph2": "この認証鍵の使い方",
-    "account.snipintro": "認証鍵を先に実行環境へ入れておく方法もあります。構成ファイルには参照名だけを書きます。",
+    "account.snipintro": "認証鍵を先に実行環境へ入れておく方法もあります。構成ファイルには参照名だけを書きます。差し替えるときは実行環境側の値を書き換えてクライアントを起動し直してください。鍵そのものを含む構成は古い項目を削除してから上のコマンドを実行し直します。",
     "account.snipfilledh2": "認証鍵を入れた構成",
     "account.snipfillednote": "次の 3 つの構成はそのまま agent へ貼り付けられます。Claude Code と Hermes には認証鍵が入っています。Codex は GEMARC_MCP_PAT を参照します（その行は次の段にもう入っています）。",
     "account.snipps": "Windows PowerShell:",
@@ -364,5 +364,8 @@
     "GEMARC_ACCT_036": "そのツールはあなたの表にありません。",
     "GEMARC_ACCT_037": "調整の値が無効です（言語、ツールの表、サイト形）。",
     "GEMARC_ACCT_038": "「選んだツールだけ」を選びましたが、一つも選ばれていません。"
+  },
+  "mcp": {
+    "unauthorized.hint": "認証鍵は利用者画面で発行されます：{url} を開いてトークンを作成し、クライアントの実行環境へ参照名 GEMARC_MCP_PAT として入れてください（Claude Code / Codex / Hermes が読みます）。クライアントが送る Authorization: Bearer に直接書くこともできます。"
   }
 }

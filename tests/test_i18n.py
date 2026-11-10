@@ -29,8 +29,8 @@ INDEX_HTML = CONSOLE_DIR / "index.html"
 CONSOLE_JS = CONSOLE_DIR / "console.js"
 SPACE_BOOT_JS = CONSOLE_DIR / "console-space-boot.js"
 ACCOUNTS_DIR = PACKAGE / "accounts"
-#: The three sections the three tables must agree on, key by key.
-SECTIONS = ("console", "accounts", "messages")
+#: The sections the three tables must agree on, key by key.
+SECTIONS = ("console", "accounts", "messages", "mcp")
 #: The tool sets this product serves; the Atlas tool sets keep the English of the code.
 PRODUCT_TOOLSETS = ("full", "stateless")
 #: Any CJK run (the template and the scripts must not carry text of their own).

@@ -27,12 +27,14 @@ claude.ai 和 Desktop 的远程 connector 只支持三种认证 **[DOCS]**：OAu
 
 - `GEMARC_MCP_TOKEN` **未设置** → 端点无认证。claude.ai / Desktop 可以直接填 `https://<project>.vercel.app/mcp` 使用。
 - `GEMARC_MCP_TOKEN` **已设置** → 端点要求 `Authorization: Bearer ...`。claude.ai / Desktop 除非你的组织开了静态 header 的 beta，否则**连不上**；而这个静态 header 路径我没有验证 **[UNVERIFIED]**。
+- **账号制部署**（本仓库现在的生产形态）要求个人访问令牌（PAT），而 PAT 就是 `Authorization: Bearer <PAT>`：claude.ai / Desktop 同样**用不了**（它们的连接器不认这种令牌），除非你们组织开了静态 header 的 beta **[DOCS]** **[UNVERIFIED]**。
 
-所以要在 claude.ai / Desktop 里用远程端点，就必须让部署跑在无认证模式（Vercel 项目里不要设 `GEMARC_MCP_TOKEN`）。这是一个真实的取舍，请你自己决定：
+所以要在 claude.ai / Desktop 里用远程端点，就必须让部署跑在无认证模式（Vercel 项目里不要设 `GEMARC_MCP_TOKEN`），或者你们组织有静态 header 的 beta。这是一个真实的取舍，请你自己决定：
 
 - 代价：知道 URL 的任何人都能调用这 9 个工具。它们是纯计算（`stateless` 工具集：没有工作区、不读写文件、服务端不保存任何东西），没有数据可泄露，但会消耗你的 Vercel 函数额度，可能被滥用或刷量。URL 隐蔽不算访问控制。
-- 缓解（都没有在本仓库验证）：给 Vercel 项目加用量告警；如果只给自己的 Claude Code / Codex / Hermes 用，就设 token，不要给 claude.ai 用。
+- 缓解（都没有在本仓库验证）：给 Vercel 项目加用量告警；如果只给自己的 Claude Code / Codex / Hermes 用，就设 token（或用账号制部署 + 个人访问令牌），不要给 claude.ai 用。
 - 彻底的办法是在服务端实现 OAuth，**本仓库没有做**，也没有计划内的实现。
+- 账号制部署下，想在**浏览器里**用 MCP，走控制台（`https://<project>.vercel.app/`）：登录后直接在控制台里调工具；控制台的令牌粘贴框只存在那个标签页的 `sessionStorage` 里。
 
 另外，Claude API 的 MCP connector 只支持 tools（不含 resources、prompts），其 `authorization_token` 文档说明是 OAuth access token，所以静态 Bearer token 不能直接填进去 **[DOCS]**。
 

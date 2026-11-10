@@ -212,8 +212,27 @@ class IntegrationExamplesTests(unittest.TestCase):
         self.assertIn("startup_timeout_sec", stdio)
         self.assertIn("tool_timeout_sec", stdio)
         remote = tomllib.loads(_text(EXAMPLES / "codex" / "config.remote.toml"))["mcp_servers"]["gemarc"]
-        self.assertEqual(remote["bearer_token_env_var"], "GEMARC_MCP_TOKEN")
+        self.assertEqual(remote["bearer_token_env_var"], "GEMARC_MCP_PAT")
         self.assertNotIn("bearer_token", remote)  # an inline token is rejected by Codex
+
+    def test_the_client_examples_name_one_token_variable(self):
+        """The client-side variable is ``GEMARC_MCP_PAT``; ``GEMARC_MCP_TOKEN`` is the server-side name.
+
+        The account page hands out ``GEMARC_MCP_PAT`` (tests/accounts/test_token_chain.py), so the
+        examples must not name another variable: one name on the client, one on the server.
+        """
+        claude = json.loads(_text(EXAMPLES / "claude-code" / ".mcp.json"))
+        self.assertEqual(claude["mcpServers"]["gemarc"]["headers"]["Authorization"],
+                         "Bearer ${GEMARC_MCP_PAT}")
+        codex = tomllib.loads(_text(EXAMPLES / "codex" / "config.remote.toml"))["mcp_servers"]["gemarc"]
+        self.assertEqual(codex["bearer_token_env_var"], "GEMARC_MCP_PAT")
+        self.assertIn("GEMARC_MCP_PAT=<token>", _text(EXAMPLES / "hermes" / "env.example"))
+        try:
+            import yaml
+        except ImportError:
+            self.skipTest("PyYAML is not installed")
+        hermes = yaml.safe_load(_text(EXAMPLES / "hermes" / "config.remote.yaml"))["mcp_servers"]["gemarc"]
+        self.assertEqual(hermes["headers"]["Authorization"], "Bearer ${GEMARC_MCP_PAT}")
 
 
 class SkillTests(unittest.TestCase):

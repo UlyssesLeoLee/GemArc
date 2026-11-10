@@ -19,6 +19,7 @@ if str(TESTS) not in sys.path:
 
 from test_http_transport import INITIALIZE, http, sdk_available  # noqa: E402
 
+from gemarc_mcp import i18n
 from gemarc_mcp.accounts import mcpauth, tokens as tokens_mod  # noqa: E402
 from gemarc_mcp.accounts.crypto import b64u  # noqa: E402
 
@@ -69,13 +70,20 @@ def count_transactions(case):
     return calls
 
 
+def expected_hint(case, lang: str = "zh-CN") -> str:
+    """The one sentence the 401 carries (ADR-018): where to get a token, where to put it."""
+    return i18n.text(lang, "mcp", "unauthorized.hint", url=f"{case.srv.base}/account")
+
+
 @unittest.skipUnless(sdk_available(), "MCP SDK is not installed")
 class PatMode(ServerCase):
     def test_pat_mode_accepts_only_pats(self):
         token, _ = make_pat(self)
         status, headers, body = post(self)
         self.assertEqual(status, 401)
-        self.assertEqual(json.loads(body), {"error": "unauthorized"})
+        payload = json.loads(body)
+        self.assertEqual(payload["error"], "unauthorized")
+        self.assertEqual(payload["hint"], expected_hint(self))
         self.assertEqual(headers["WWW-Authenticate"], "Bearer")
         self.assertEqual(headers["Cache-Control"], "no-store")
         self.assertEqual(post(self, ENV_TOKEN)[0], 401)
@@ -100,7 +108,28 @@ class PatMode(ServerCase):
         # expired, revoked, disabled users answer with the very same bytes
         self.clock.advance(31 * 86400)
         bodies.add(post(self, token)[2])
-        self.assertEqual(bodies, {b'{"error":"unauthorized"}'})
+        # one body for every reason (ADR-018): the hint is the same sentence, the reason is never told
+        self.assertEqual(len(bodies), 1, "the failures must answer the very same bytes")
+        payload = json.loads(bodies.pop())
+        self.assertEqual(payload["error"], "unauthorized")
+        self.assertEqual(payload["hint"], expected_hint(self))
+        self.assertNotIn(token, json.dumps(payload, ensure_ascii=False))
+
+    def test_the_401_says_where_to_get_a_token_and_where_to_put_it(self):
+        """The hint is the one thing the caller gets: it must be actionable (ADR-018)."""
+        _status, _headers, body = post(self)
+        hint = json.loads(body)["hint"]
+        self.assertIn(f"{self.srv.base}/account", hint)
+        self.assertIn("GEMARC_MCP_PAT", hint)
+        self.assertIn("Authorization: Bearer", hint)
+
+    def test_the_hint_follows_the_language_of_the_request(self):
+        for lang in i18n.LANGUAGES:
+            _status, _headers, body = post(self, headers={"Accept-Language": lang})
+            self.assertEqual(json.loads(body)["hint"], expected_hint(self, lang))
+        # the default is the product's default
+        _status, _headers, body = post(self)
+        self.assertEqual(json.loads(body)["hint"], expected_hint(self, i18n.DEFAULT_LANG))
 
     def test_methods_are_gated_before_authentication(self):
         for method in ("GET", "HEAD", "DELETE", "PUT"):
@@ -567,7 +596,10 @@ class LoginIntentGate(unittest.TestCase):
         with built(complete_env(GEMARC_REQUIRE_LOGIN="1")) as app:
             status, headers, body = mcp(app)
             self.assertEqual(status, 401)
-            self.assertEqual(json.loads(body), {"error": "unauthorized"})
+            payload = json.loads(body)
+            self.assertEqual(payload["error"], "unauthorized")
+            self.assertEqual(payload["hint"], i18n.text("zh-CN", "mcp", "unauthorized.hint",
+                                                         url="http://127.0.0.1:8000/account"))
             self.assertEqual(headers["www-authenticate"], "Bearer")
             health = json.loads(run(app, "GET", "/healthz")[2])
             self.assertTrue(health["authRequired"])

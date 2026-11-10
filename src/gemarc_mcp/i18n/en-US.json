@@ -92,7 +92,7 @@
     "auth.clear": "Clear",
     "auth.source": "Tokens are issued on the account page",
     "auth.sourcelink": "Open the account page",
-    "auth.sourcenote": "The website (the account page) issues the token. Paste it here, or straight into your agent's configuration.",
+    "auth.sourcenote": "The website (the account page) issues the token. Paste it here (this tab only), or put it in the client's GEMARC_MCP_PAT environment variable (Claude Code, Codex and Hermes read it).",
     "auth.sessionnote": "Using the token saved in this tab (the sign-in session works too).",
     "auth.sessionalt": "Using the sign-in session; paste a token to act as someone else.",
     "auth.tokensaved": "Using the token saved in this tab.",
@@ -170,7 +170,7 @@
     "account.tokennewh2": "Your new token (shown only once)",
     "account.tokennewnote": "Copy it and keep it safe now. It cannot be shown again after you leave this page; if you lose it, revoke it and create another one.",
     "account.sniph2": "How to use this token",
-    "account.snipintro": "You can also put the token into the environment variable GEMARC_MCP_PAT first; then the configuration file names the variable and never the token itself.",
+    "account.snipintro": "You can also put the token into the environment variable GEMARC_MCP_PAT first; then the configuration file names the variable and never the token itself. To change the token, update that variable and restart the client; for a configuration that carries the token itself, remove the old entry and run the command above again.",
     "account.snipfilledh2": "Configuration with the token already filled in",
     "account.snipfillednote": "The three configurations below are ready to copy into your agent: Claude Code and Hermes carry the token itself, and Codex points at GEMARC_MCP_PAT (that line is filled in below).",
     "account.snipps": "Windows PowerShell:",
@@ -294,5 +294,8 @@
     "GEMARC_ACCT_036": "That tool is not in your tool list.",
     "GEMARC_ACCT_037": "The setting value is not valid (language, tool list or render form).",
     "GEMARC_ACCT_038": "You chose only the checked tools, but no tool is checked."
+  },
+  "mcp": {
+    "unauthorized.hint": "An access token is issued on the account page: open {url} to create one, then put it in the client's GEMARC_MCP_PAT environment variable (Claude Code, Codex and Hermes read it), or straight into the client's Authorization: Bearer header."
   }
 }

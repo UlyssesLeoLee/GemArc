@@ -10,7 +10,9 @@ Modes (see ``flags.py`` for how the effective mode is chosen): ``none``, ``env-t
   immediate on the handling instance and bounded by the TTL elsewhere.
 * Concurrent cache misses for the same token share ONE database query (single flight).
 * A database failure answers 503 (GEMARC_ACCT_002/003/004), never 401 and never "allow".
-* Failures answer 401 with a body byte-identical to the legacy bearer-token failure, whatever the reason.
+* Failures answer 401 with the same body for every reason. The body says that a token is needed,
+  never why the request was refused; the optional ``hint`` says where to get a token and where to
+  put it (ADR-018). The legacy bearer failure of ``api/index.py`` keeps its own body.
 * Only when the toolset has write tools and the token's effective scope is ``read`` is the request body buffered and
   checked against an ALLOW-LIST of read methods and read tools; the exact buffered bytes are forwarded.
 * Nothing here logs or echoes a token.
@@ -29,6 +31,7 @@ from typing import Any, Callable, Optional
 
 from starlette.responses import JSONResponse, Response
 
+from .. import i18n
 from . import security
 from . import settings as settings_mod
 from . import tokens as tokens_mod
@@ -49,9 +52,17 @@ READ_METHODS = frozenset({
 })
 
 
-def unauthorized_response() -> Response:
-    """Byte-identical to the legacy bearer failure of ``api/index.py``."""
-    return JSONResponse({"error": "unauthorized"}, status_code=401,
+def unauthorized_response(hint: Optional[str] = None) -> Response:
+    """The 401 of the account modes.
+
+    Every failure reason answers the very same body: it says *that* a token is needed, never
+    *why* the request was refused. ``hint`` (ADR-018) is the one sentence that tells the caller
+    where to get a token and where to put it; it is the same sentence for every reason.
+    """
+    body: "dict[str, str]" = {"error": "unauthorized"}
+    if hint:
+        body["hint"] = hint
+    return JSONResponse(body, status_code=401,
                         headers={"WWW-Authenticate": "Bearer", "Cache-Control": "no-store"})
 
 
@@ -269,7 +280,7 @@ class McpAuth:
             return Decision(True, scope="env")
         rt = self.runtime
         if rt.config.mcp_host_only and (headers.get("host") or "").lower() != rt.config.host.lower():
-            return Decision(False, unauthorized_response())
+            return Decision(False, unauthorized_response(self._hint(headers)))
         if presented is None:
             # No bearer token: this may be the browser console, which carries the login session instead.
             decision = await self._session_grant(scope, headers, receive)
@@ -281,12 +292,12 @@ class McpAuth:
         parsed = tokens_mod.parse(token) if token is not None else None
         if parsed is None:  # no cache, no database
             self._note_failure(scope)
-            return Decision(False, unauthorized_response())
+            return Decision(False, unauthorized_response(self._hint(headers)))
         pid, secret = parsed
         key = (pid, tokens_mod.hash_secret(secret))
         state, grant = rt.pat_cache.get(key)
         if state == "neg":
-            return Decision(False, unauthorized_response())
+            return Decision(False, unauthorized_response(self._hint(headers)))
         if state == "pos" and grant is not None:
             return await self._admit(grant.user_id, grant.scope, scope, receive, pid, grant.settings)
         # cache miss: slow lane when this client is already failing a lot
@@ -308,7 +319,7 @@ class McpAuth:
         if not verification.ok:
             rt.pat_cache.put_negative(key)
             await self._record_failure(scope)
-            return Decision(False, unauthorized_response())
+            return Decision(False, unauthorized_response(self._hint(headers)))
         now = rt.now()
         remaining = max(int(verification.expires_at or 0) - now, 0)
         ttl = min(rt.pat_cache.ttl, remaining)
@@ -320,6 +331,19 @@ class McpAuth:
                                  settings)
 
     # -- internals -----------------------------------------------------------------------------------------------
+    def _hint(self, headers: Any) -> str:
+        """The one sentence every failure of this request carries (ADR-018).
+
+        It says where to get a token (the account page of this deployment) and where to put it
+        (the client's environment variable or its ``Authorization`` header). It never says why
+        the request was refused. The language follows the request, like every other text of the
+        product: the explicit choice, the cookie, the browser, the default.
+        """
+        rt = self.runtime
+        lang = i18n.resolve(cookie_header=headers.get("cookie"),
+                            accept_language=headers.get("accept-language"))
+        return i18n.text(lang, "mcp", "unauthorized.hint", url=f"{rt.config.base_url}/account")
+
     async def _session_grant(self, scope: dict, headers: Any, receive: Callable) -> Optional[Decision]:
         """The browser case: a signed-in session may call ``/mcp`` without a bearer token.
 

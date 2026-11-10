@@ -9,7 +9,18 @@
 | `.mcp.json` | 项目级配置，含远程 `gemarc`（HTTP）和本地 `gemarc_local`（stdio）两个条目，复制到项目根目录 |
 | `settings.example.json` | 只读工具的权限白名单示例，合并进 `.claude/settings.json` |
 
-占位符（`<尖括号>`）：`<project>` Vercel 项目子域名；`<workspace>` 一个**已存在**的工作区目录；token 放在环境变量 `GEMARC_MCP_TOKEN` 里，**不要**写进文件。
+占位符（`<尖括号>`）：`<project>` Vercel 项目子域名；`<workspace>` 一个**已存在**的工作区目录；token 放在环境变量 `GEMARC_MCP_PAT` 里，**不要**写进文件。
+
+## 令牌从哪来
+
+| 部署形态 | 令牌从哪来 | 客户端环境变量 |
+|---|---|---|
+| 账号制（本仓库现在的生产形态） | 登录 `https://<project>.vercel.app/account` → 「创建令牌」→ **明文只显示这一次** | `GEMARC_MCP_PAT` = 你自己的个人访问令牌 |
+| 未开账号 | 运营者给的共享令牌 | `GEMARC_MCP_PAT` = 那个共享令牌 |
+
+服务端的环境变量 `GEMARC_MCP_TOKEN` 是**另一侧**的事（未开账号部署的共享令牌）；本目录的示例文件原来客户端侧也用它，现在统一改成 `GEMARC_MCP_PAT`（与账号页给出的配置一致）。**已经照旧示例配好的用户不用改**：服务端不校验客户端环境变量的名字。
+
+**装完以后怎么改**：改环境变量里的值并**重启 Claude Code**（客户端只在启动时读一次）；`.mcp.json` 里写着令牌明文的，删掉那个条目再重新 `claude mcp add` 一次。也可以在**控制台**（浏览器里的 `https://<project>.vercel.app/`）粘贴令牌，它只存在那个标签页的 `sessionStorage` 里。
 
 ## 选哪个
 
@@ -22,7 +33,7 @@
 | 变量 | 作用 | 默认 |
 |---|---|---|
 | `GEMARC_URL` | 远程 MCP 地址（含 `/mcp`） | `.mcp.json` 里的默认值 |
-| `GEMARC_MCP_TOKEN` | 远程 Bearer token（只放环境变量）。客户端缺这个变量时，`.mcp.json` 里的 `gemarc` 条目会报 `Missing environment variables` 警告 **[RAN]**；服务端没设 token（无认证）时，可以删掉 `headers` | 无 |
+| `GEMARC_MCP_PAT` | 远程 Bearer token（只放环境变量）。客户端缺这个变量时，`.mcp.json` 里的 `gemarc` 条目会报 `Missing environment variables` 警告 **[RAN]**；服务端没设 token（无认证）时，可以删掉 `headers` | 无 |
 | `GEMARC_WORKSPACE_ROOT` | 本地工作区，**必须已存在**；`gemarc_inspect` 只能扫描它里面的目录 | `.mcp.json` 里的 `<workspace>` |
 | `GEMARC_ALLOW_WRITE` | `1` 才允许 `gemarc_scaffold/init/model/build/export` | `0` |
 
@@ -30,14 +41,14 @@
 
 ## 用 `claude mcp add` 添加
 
-**要点 1（[RAN]）**：`--scope project` 会把配置写进 `.mcp.json`。header 里的 token 要用**单引号**保留 `${GEMARC_MCP_TOKEN}` 引用；用双引号或不加引号，shell 会在添加时展开，token 明文就写进 `.mcp.json` 并随仓库提交了。
+**要点 1（[RAN]）**：`--scope project` 会把配置写进 `.mcp.json`。header 里的 token 要用**单引号**保留 `${GEMARC_MCP_PAT}` 引用；用双引号或不加引号，shell 会在添加时展开，token 明文就写进 `.mcp.json` 并随仓库提交了。
 **要点 2（[RAN]）**：`--env`/`-e` 可重复，但紧挨服务器名之前的 `-e` 会把名字吞掉（`Invalid environment variable format: <name>`）。把服务器名放在最前，选项在后，`--` 后面才是启动命令。
 
 ### PowerShell
 
 ```powershell
-# 远程（需要先 $env:GEMARC_MCP_TOKEN = '<token>'；服务端未设 token 时可去掉 --header）
-claude mcp add --transport http --scope project gemarc 'https://<project>.vercel.app/mcp' --header 'Authorization: Bearer ${GEMARC_MCP_TOKEN}'
+# 远程（需要先 $env:GEMARC_MCP_PAT = '<token>'；服务端未设 token 时可去掉 --header）
+claude mcp add --transport http --scope project gemarc 'https://<project>.vercel.app/mcp' --header 'Authorization: Bearer ${GEMARC_MCP_PAT}'
 
 # 本地 stdio（用户级；先 New-Item -ItemType Directory <workspace>）
 claude mcp add gemarc --scope user --transport stdio -e GEMARC_WORKSPACE_ROOT='<workspace>' -e GEMARC_ALLOW_WRITE=0 -e PYTHONUTF8=1 -- D:\GemArc\.venv\Scripts\python.exe -m gemarc_mcp
@@ -48,8 +59,8 @@ PowerShell 5.1 对原生 exe（`claude.exe`）原样传递 `--` **[RAN]**。
 ### bash（含 Git Bash）
 
 ```bash
-export GEMARC_MCP_TOKEN='<token>'
-claude mcp add --transport http --scope project gemarc 'https://<project>.vercel.app/mcp' --header 'Authorization: Bearer ${GEMARC_MCP_TOKEN}'
+export GEMARC_MCP_PAT='<token>'
+claude mcp add --transport http --scope project gemarc 'https://<project>.vercel.app/mcp' --header 'Authorization: Bearer ${GEMARC_MCP_PAT}'
 
 mkdir -p '<workspace>'
 claude mcp add gemarc --scope user --transport stdio -e GEMARC_WORKSPACE_ROOT='<workspace>' -e GEMARC_ALLOW_WRITE=0 -e PYTHONUTF8=1 -- D:/GemArc/.venv/Scripts/python.exe -m gemarc_mcp
@@ -77,7 +88,7 @@ claude mcp add gemarc --scope user --transport stdio -e GEMARC_WORKSPACE_ROOT='<
 ## 已验证到哪一步
 
 - **[RAN]** `claude -p ... --mcp-config integration-examples/claude-code/.mcp.json --strict-mcp-config` 在干净目录里：Claude Code 展开了 `${GEMARC_WORKSPACE_ROOT:-…}`，启动了 `gemarc_local`（stdio），并成功调用 `mcp__gemarc_local__gemarc_new_model`（`status` = `ok`，无权限拒绝）。
-- **[RAN]** 缺少 `GEMARC_MCP_TOKEN` 时 `claude mcp list` 只对 `gemarc` 条目报 `Missing environment variables: GEMARC_MCP_TOKEN` 警告，`gemarc_local` 不受影响。
+- **[RAN]** 缺少令牌变量时 `claude mcp list` 只对 `gemarc` 条目报 `Missing environment variables: <变量名>` 警告，`gemarc_local` 不受影响（实测当时那个变量名是 `GEMARC_MCP_TOKEN`；本目录现在的示例用 `GEMARC_MCP_PAT`，警告里出现的就是配置里写的那个名字）。
 - **[UNVERIFIED]** 用 Claude Code 连接真实的 Vercel 远程端点（端点已部署，官方 `mcp` 客户端库的握手已实测，见 `docs/09_部署/01_Vercel部署.md` 第 12 节；Claude Code 本身没有连过）。
 - **[UNVERIFIED]** Skill 安装位置：本机存在 `~/.claude/skills/` 目录，但我没验证 Claude Code 如何发现 `skills/gemarc-media-doc`。
 

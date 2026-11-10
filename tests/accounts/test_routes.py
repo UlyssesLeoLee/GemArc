@@ -393,6 +393,30 @@ class SessionsAndCsrf(ServerCase):
         self.assertIn("GEMARC_ACCT_021", wrong.text)
         self.assertEqual(self.count("api_tokens"), 1)
 
+    def test_the_console_offers_the_sign_out_and_it_ends_the_session(self):
+        """The console of a signed-in reader ends the session from its own header (BD-010 section 12.8).
+
+        The entry is a plain form with the CSRF token of this session, so it posts to the very
+        route the account page uses; the console only offers the door.
+        """
+        console = self.browser.get("/").text
+        self.assertIn('id="signout"', console)
+        self.assertIn('action="/auth/logout"', console)
+        self.assertIn('method="post"', console)
+        # The token of the form is the token of this session, and the label speaks the console's
+        # language (the default one here).
+        self.assertIn(f'name="csrf" value="{self.csrf}"', console)
+        self.assertIn("登出", console)
+        # The form is hidden in the markup: without a session there is nothing to end, and the
+        # panel reveals it only when the server gave a token.
+        self.assertIn("hidden", console.split('id="signout"', 1)[1].split(">", 1)[0])
+        # And it works: the session is gone afterwards and the console is behind the login again.
+        resp = self.browser.post("/auth/logout", {"csrf": self.csrf})
+        self.assertEqual((resp.status, resp.location), (303, "/account"))
+        self.assertEqual(self.count("sessions"), 0)
+        self.assertEqual(self.count("audit_log", "event = 'logout'"), 1)
+        self.assertEqual(self.browser.get("/").status, 303)
+
     def test_csrf_token_of_another_session_is_refused(self):
         other = Browser(self.srv.base)
         other_page = self.logged_in_page({"sub": "c-2", "email": "bob@gmail.com"}, other)

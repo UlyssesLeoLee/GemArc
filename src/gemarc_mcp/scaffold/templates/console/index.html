@@ -38,6 +38,14 @@
            deployment has accounts: without an account there is nothing to personalise. -->
       <button id="settings-open" class="ghost" type="button" hidden
               data-i18n="settings.button">{{settings.button}}</button>
+      <!-- Signing out ends the session, so it is a POST with the CSRF token: a plain form works
+           without any script, and a link can never trigger it (BD-010 section 12.8). The panel
+           shows it only when there is a session; without one the token is empty and there is
+           nothing to end. -->
+      <form id="signout" class="signout" method="post" action="__LOGOUT_PATH__" hidden>
+        <input type="hidden" name="csrf" value="__CSRF__">
+        <button type="submit" class="ghost" data-i18n="session.logout">{{session.logout}}</button>
+      </form>
     </div>
     <div class="conn">
       <span class="dot" id="conn-dot"></span>

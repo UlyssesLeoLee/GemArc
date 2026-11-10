@@ -538,6 +538,14 @@ button.mini:focus-visible { outline: 2px solid var(--gem-aqua-deep); outline-off
 /* The switcher and the settings button share one row on the right of the bar. */
 .head-right { display: flex; align-items: center; gap: 12px; }
 
+/* Signing out is a boundary, not one more setting: a hairline separates it from the
+   settings button, and it is the last item of the row (BD-010 section 12.8). */
+.head-right .signout {
+  margin: 0;
+  padding-left: 12px;
+  border-left: 1px solid color-mix(in srgb, var(--gem-ink-deep) 12%, transparent);
+}
+
 /* The dialog is a crystal pane over the panel: the same edges, the same air. */
 dialog.settings {
   width: min(560px, calc(100vw - 32px));
@@ -631,5 +639,8 @@ dialog.settings::backdrop { background: color-mix(in srgb, var(--gem-ink-deep) 3
      the tool list is one scroll away. */
   .col-stage { order: -1; }
   .top { padding: 10px 14px; }
+  /* The bar has grown a fourth item (the sign-out): let the row wrap instead of
+     squeezing the words (BD-010 section 12.5). */
+  .top, .head-right { flex-wrap: wrap; }
   .statusbar { padding: 8px 14px; }
 }

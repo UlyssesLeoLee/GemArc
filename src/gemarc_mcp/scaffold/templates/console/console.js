@@ -1085,6 +1085,10 @@ if (CSRF) {
       }
     });
   }
+  // Signing out belongs to the session, so it shows exactly when there is one (BD-010 12.8).
+  // The form itself carries the CSRF token and posts to the account route: no script of its own.
+  const signout = document.getElementById('signout');
+  if (signout) signout.hidden = false;
 }
 
 // The account page and the operator area exist only when the deployment has accounts; the

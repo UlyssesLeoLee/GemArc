@@ -130,7 +130,8 @@
     "settings.saving": "Saving…",
     "settings.saved": "Saved. The agent side applies it right away.",
     "settings.failed": "Could not save: {message}",
-    "settings.count": "{count} tools"
+    "settings.count": "{count} tools",
+    "session.logout": "Sign out"
   },
   "accounts": {
     "title.account": "GemArc account",

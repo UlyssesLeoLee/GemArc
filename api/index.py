@@ -365,6 +365,9 @@ TOOLSET_LOOKUP_TIMEOUT_S = 4.0
 ACCOUNT_ADMIN_PATH = "/account/admin"
 #: Where the settings of the signed-in account live (read and written by the console, DD-010).
 ACCOUNT_SETTINGS_PATH = "/account/settings"
+#: Where the console signs the reader out. The same route the account page uses: the console
+#: only offers the entry, the session rules stay in one place (BD-010 section 12.8).
+ACCOUNT_LOGOUT_PATH = "/auth/logout"
 
 
 def _toolset_override(account_config) -> str:
@@ -682,6 +685,7 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
         html = html.replace("__ACCOUNT_LANG__", account_lang)
         html = html.replace("__CSRF__", csrf)
         html = html.replace("__SETTINGS_PATH__", ACCOUNT_SETTINGS_PATH)
+        html = html.replace("__LOGOUT_PATH__", ACCOUNT_LOGOUT_PATH)
         # The text of the page: every {{key}} marker becomes the text of the language of the
         # request (DD-009). A key that is not in the table stays the key, so a gap shows up in
         # the page instead of quietly mixing two languages.

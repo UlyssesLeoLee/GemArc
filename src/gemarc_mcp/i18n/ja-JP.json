@@ -130,7 +130,8 @@
     "settings.saving": "保存中…",
     "settings.saved": "保存しました。エージェント側にはすぐ効きます。",
     "settings.failed": "保存に失敗しました: {message}",
-    "settings.count": "{count} 個のツール"
+    "settings.count": "{count} 個のツール",
+    "session.logout": "サインアウト"
   },
   "accounts": {
     "title.account": "GemArc 利用者画面",

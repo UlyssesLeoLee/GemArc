@@ -130,7 +130,8 @@
     "settings.saving": "保存中…",
     "settings.saved": "已保存，agent 侧立即生效。",
     "settings.failed": "保存失败：{message}",
-    "settings.count": "{count} 个工具"
+    "settings.count": "{count} 个工具",
+    "session.logout": "登出"
   },
   "accounts": {
     "title.account": "GemArc 账号",

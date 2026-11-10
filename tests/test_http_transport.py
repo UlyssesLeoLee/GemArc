@@ -444,7 +444,8 @@ class RemoteDefaultTests(unittest.TestCase):
         self.assertIn("text/html", headers["Content-Type"])
         self.assertIn("GemArc MCP", body)
         self.assertIn("功能微调控制台", body)
-        for placeholder in ("__MCP_PATH__", "__HEALTH_PATH__", "__SITE_PATH__", "__VERSION__", "__WRITE_TOOLS__"):
+        for placeholder in ("__MCP_PATH__", "__HEALTH_PATH__", "__SITE_PATH__", "__VERSION__", "__WRITE_TOOLS__",
+                            "__LOGOUT_PATH__"):
             self.assertNotIn(placeholder, body)
         # The write-tool list comes from the running server: empty for the stateless set.
         self.assertIn("writeTools: []", body)

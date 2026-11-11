@@ -404,7 +404,9 @@ python scripts/verify_remote.py https://<project>.vercel.app --token <T>   # 4. 
 - 推 `origin/main` ⇒ Vercel 自动做一次生产部署，并把 **`gem-arc.vercel.app` 改指到那次部署**；
 - 推 `origin/dev` ⇒ 只产生预览部署（别名形如 `gem-arc-git-dev-<team>.vercel.app`），**不改**生产别名。
 
-而本仓库的 `main` 落后 `dev` 很多（实测 655 个文件），所以「推 main ⇒ 别名落到没有新功能的旧代码」会让生产**看起来像功能被关掉**（实测：`/` 不再 303、`/healthz` 里连 `accounts` 键都没有）。
+而当时的 `main` 落后 `dev` 很多（实测 655 个文件），所以「推 main ⇒ 别名落到没有新功能的旧代码」会让生产**看起来像功能被关掉**（实测：`/` 不再 303、`/healthz` 里连 `accounts` 键都没有）。
+
+**现状（2026-11-11）**：`dev` 已合并进 `main`（merge commit `2fb1552`，无冲突），两个分支内容一致。规矩第 2 条现在可以按字面执行：**先合并，后推**。推完别名落到的那次部署带的就是完整代码，第 2 条里「重新指别名」不再是必需动作；复验记录见 §12。
 
 规矩：
 
@@ -559,6 +561,25 @@ curl.exe -I https://<domain>/kit/static.zip              # 期望：200，ETag�
 
 副作用（须知）：`vercel curl` 首次运行时**自动在项目里创建了 "Protection Bypass for Automation" 密钥**；不需要时可在项目
 Settings → Deployment Protection 撤销。`vercel link` 会生成含 `VERCEL_OIDC_TOKEN` 的 `.env.local`（已被 `.gitignore` 与 `.vercelignore` 排除，用完应删除）。
+
+### 推 `main` 后的生产复验（2026-11-11）
+
+`dev` 合并进 `main` 之后推 `origin/main`（merge commit `2fb1552`，含 61 个提交），触发一次自动生产部署：
+GitHub 上该提交的 Vercel 检查是 success，部署 id `dpl_fP3G25GdYMWsephVF6eVDcvBenyf`
+（该次部署地址 `gem-9bbwf53si-lidian727.vercel.app`），生产别名 `gem-arc.vercel.app` 随之指到它，
+另有分支别名 `gem-arc-git-main-lidian727.vercel.app`。每个部署的专属地址仍在 Deployment Protection 之后
+（返回 302 / 保护页），生产别名是公开的那一个——功能验证一律走别名。
+
+只读复验（不带令牌、不带凭据）：
+
+- `/healthz` → 200：`toolset: stateless`、`accounts: ok`、`consoleRequiresLogin: true`、`version: 0.3.0`；
+- `/`、`/account`、`/site/` → 均 200；
+- `POST /mcp` 无令牌 → 401。`hint` 按 `?lang=` → Cookie → `Accept-Language` → 默认（zh-CN）的顺序给出，
+  9 种组合语言全对；五种失败原因（无令牌 / 错令牌 / 垃圾令牌 / 浏览器 `Origin: null` 形态 / 跨站形态）
+  返回**逐字节相同**的响应体；`hint` 指名账号页与客户端变量 `GEMARC_MCP_PAT`；
+- `scripts/verify_remote.py https://gem-arc.vercel.app`（无令牌形态）：**11 PASS / 2 FAIL**。两条 FAIL 是
+  **脚本断言的既有问题，不是生产缺陷**：①「`/` 是控制台 HTML」——生产 `/` 现在要求登录，脚本的旧断言没跟上；
+  ②「a bearer token is available」——无令牌形态下本项必然红，令牌形态那一半没有被覆盖到。
 
 ### UNVERIFIED（没有人运行过）
 

@@ -137,6 +137,10 @@ def _parser(prog: str = "python -m gemarc_mcp.atlas") -> argparse.ArgumentParser
     s.add_argument("project")
     s.add_argument("--action", default="report", choices=["report", "record"])
     s.add_argument("--notes", default="")
+    s = sub.add_parser("versions", help="the fingerprints and the version history of the built output")
+    s.add_argument("project")
+    s.add_argument("--view", default="history", choices=list(tools.VERSIONS_VIEWS))
+    s.add_argument("--scope", default="")
     s = sub.add_parser("brief", help="the work order")
     s.add_argument("--section", default="")
     s.add_argument("--lang", default="en-US")
@@ -195,6 +199,19 @@ def _human(reply: dict) -> str:
                      + (f"; skipped: {', '.join(reply.get('skipped', []))}" if reply.get("skipped") else ""))
     if isinstance(reply.get("attestation"), dict):
         lines.append(reply["attestation"].get("badge", ""))
+    if reply.get("view") in ("history", "fingerprints", "check"):     # versions: the three views
+        if isinstance(reply.get("builds"), list):
+            for row in reply["builds"]:
+                lines.append(f"build {row.get('at', '')} site {(row.get('site') or {}).get('sha8', '')} label {row.get('label', '')}")
+        if isinstance(reply.get("documents"), dict):
+            for path, rows in reply["documents"].items():
+                for row in rows[:1]:
+                    lines.append(f"doc {path} {row.get('sha8', '')} {row.get('label', '')}")
+        elif isinstance(reply.get("documents"), list):
+            for row in reply["documents"]:
+                lines.append(f"doc {row.get('p', '')} {row.get('sha8', '')} {row.get('dim', '')}")
+        if isinstance(reply.get("same"), bool):
+            lines.append(f"same version: {reply['same']}")
     return "\n".join(lines) if lines else json.dumps(reply, ensure_ascii=False, indent=2)
 
 
@@ -252,6 +269,8 @@ def run(argv: Sequence[str], prog: str = "python -m gemarc_mcp.atlas") -> "tuple
         reply = tools.verify(ws, args.project, widths)
     elif args.cmd == "review":
         reply = tools.review(ws, args.project, args.action, args.notes, require_report=False)   # every shell call is its own process
+    elif args.cmd == "versions":
+        reply = tools.versions(ws, args.project, args.view, args.scope)
     else:
         reply = tools.brief(args.section, args.lang)
     bad = reply.get("status") in ("invalid", "error")

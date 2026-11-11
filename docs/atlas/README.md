@@ -9,7 +9,7 @@ Atlas 让 AI 产出 5D 设计资料（1D 文档、2D 结构、3D 空间、4D 运
 | 文件 | 内容 |
 |---|---|
 | `README.md`（本文） | 用户指南：安装、怎么说、输出、停止点、确认、限制 |
-| `ATLAS_TOOLS.md` | 13 个工具、入口提示、完成契约（`status` 的门）的契约 |
+| `ATLAS_TOOLS.md` | 14 个工具、入口提示、完成契约（`status` 的门）的契约 |
 | `TOKEN_LEDGER.md` | token 账本：脚本流水线的字节实测、与设计账本的对照，留着「待实测(LLM)」一节 |
 | `examples/` | Claude Code、Claude Code 无头模式、Codex、Hermes 的配置示例和说明 |
 | `spec/` | 模型、查看器数据包、oracle、文档骨架的规格 |
@@ -30,7 +30,7 @@ py -3.11 -m venv .venv
 
 | 变量 | 含义 |
 |---|---|
-| `GEMARC_TOOLSET=atlas` | 选 Atlas 工具集（13 个工具加一个入口提示）。一个服务器进程只带一个工具集；要同时用 v1 工具，另外注册一个 `gemarc` 条目 |
+| `GEMARC_TOOLSET=atlas` | 选 Atlas 工具集（14 个工具加一个入口提示）。一个服务器进程只带一个工具集；要同时用 v1 工具，另外注册一个 `gemarc` 条目 |
 | `GEMARC_WORKSPACE_ROOT=<工作区>` | 项目写在这里。选一个已存在的空目录，**不要选在你要分析的仓库里面** |
 | `GEMARC_ALLOW_WRITE=1` | 允许写项目的工具工作（`init`、`put`、`simulate`、`evidence`、`build`、`verify`、`review` 的 `record`）；不设时它们返回 `GEMARC_AUTH_002` |
 | `GEMARC_ATLAS_ROOTS=main=<被分析的仓库>` | 被分析源码的位置，`别名=路径;别名=路径`。模型只能写别名；没有它 as-is 里 Implemented 的声明无法核验 |
@@ -68,9 +68,10 @@ atlas.toml                      项目标识、模式、语言、用到的证据
 slices/<名字>.atl               已提交的切片（状态就是这个目录）
 user/<名字>.txt                 需求原文和你对 TBD 的回答（原话；引用会对着它核对）
 .atlas/                         红稿、历史版本、oracle 账本、证据印记、自审记录、锁（不用管，也不要手改）
+.atlas/versions.json            指纹与版本台账：每次构建一行（整站指纹 + 每个 1D 文档的指纹与版本标记），最多 50 行
 out/model.json                  check --emit-model 写出的完整模型（可选）
 dist/index.html                 查看器：一个自包含的文件，双击打开（1D 文档、2D、3D、4D、5D、QA 六个页签）
-dist/build-info.json            这次构建的大小、各部分、检查结果、发布状态
+dist/build-info.json            这次构建的大小、各部分、检查结果、发布状态，以及这次产物的指纹
 dist/docs/<语言>/REQ.md BD.md DD.md   三层文档（需求、基本设计、详细设计）
 dist/diagrams/*.mmd             Mermaid 图（结构图、已封存用例的序列图与状态图）
 dist/prompts/*.md               派生的提示词
@@ -79,6 +80,8 @@ dist/.verify/                   浏览器门的报告和印记
 ```
 
 页面在参考规模（169 个节点、374 条边、23 个用例）下约 1.9 MB。2 MiB 是测试对参考规模的预算，不是构建的上限：构建在 3 MiB 时警告（BD-005），8 MiB 时拒绝；页面随模型增大（验证者对 400 个节点的合成模型实测约 2.4 MB，没有警告）。同一个项目构建两次，字节完全一致。
+
+**版本与指纹**：`build-info.json` 里记着这次产物每个文件的指纹（内容指纹，只有 8 位十六进制）和整站的指纹；带分钟的版本标记（`<指纹>-<年月日-时分>`）在 `.atlas/versions.json` 里——产物必须逐字节可复现，所以标记不进产物。想看更新历史、想知道这一轮改了哪些 1D 文档，用 `gemarc_atlas_versions`（`view=history` 看历史、`fingerprints` 看当前指纹、`check` 核对这一轮改了哪些文档；它只报告，不拒绝任何东西），命令行是 `python -m gemarc_mcp.atlas versions <项目名> --view check`。规则见 `docs/atlas/spec/versions.md`。
 
 ## 5. 怎么读 needs-user 停止点
 

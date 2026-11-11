@@ -1076,6 +1076,126 @@ def evidence(ws: Workspace, project: str, ids: "Sequence[str] | str" = ()) -> di
     return _guard(body)
 
 
+# ---------------------------------------------------------------------------------------------------------------
+# versions (the fingerprints and the version history; design docs/atlas/spec/versions.md)
+# ---------------------------------------------------------------------------------------------------------------
+
+VERSIONS_CAP = 4500
+VERSIONS_VIEWS = ("history", "fingerprints", "check")
+#: How many rows each list of the history view carries before the reply is cut.
+HISTORY_BUILDS = 12
+HISTORY_DOCUMENTS = 12
+HISTORY_VERSIONS = 6
+HISTORY_SLICES = 12
+
+
+def versions(ws: Workspace, project: str, view: str = "history", scope: str = "") -> dict:
+    """``gemarc_atlas_versions``: the fingerprints and the version history of what the build produced.
+
+    ``view=history``: the builds, the versions of every document and the archived slice versions.
+    ``view=fingerprints``: the fingerprint of the built site and of every 1D document.
+    ``view=check``: whether every 1D document is at the version the last build recorded (a report: it refuses nothing and writes nothing).
+    """
+    def body() -> dict:
+        paths, cfg = _loaded(ws, project)
+        kind = (view or "history").strip() or "history"
+        if kind not in VERSIONS_VIEWS:
+            raise GemArcError(E_ARG, "view must be history, fingerprints or check")
+        if kind == "fingerprints":
+            reply = _version_fingerprints(paths, project)
+        elif kind == "check":
+            reply = _version_check(paths, cfg, project)
+        else:
+            reply = _version_history(paths, project, scope)
+        return fit_result(reply, VERSIONS_CAP)
+    return _guard(body)
+
+
+def _version_history(paths: pj.Paths, project: str, scope: str) -> dict:
+    """The builds, the document versions and the slice archives of the ledger (newest first)."""
+    from . import versions as vrs
+
+    needle = (scope or "").strip()
+    ledger = vrs.read_ledger(paths)
+    entries = list(reversed(ledger["entries"]))
+    documents = vrs.document_versions(ledger)
+    slices = vrs.slice_versions(paths)
+    if needle:
+        entries = [e for e in entries if _entry_has(e, needle)]
+        documents = {p: rows for p, rows in documents.items() if needle in p}
+        slices = [row for row in slices if needle in row["slice"]]
+    builds = [{"at": e.get("at", ""), "modelSha8": e.get("modelSha8", ""),
+               "site": {"sha8": (e.get("site") or {}).get("sha8", ""), "sha256": (e.get("site") or {}).get("sha256", "")},
+               "label": (e.get("site") or {}).get("label", "")} for e in entries[:HISTORY_BUILDS]]
+    docs = {p: rows[:HISTORY_VERSIONS] for p, rows in list(documents.items())[:HISTORY_DOCUMENTS]}
+    return {"status": "ok", "authority": AUTHORITY, "view": "history", "project": project,
+            "builds": builds, "documents": docs, "slices": slices[:HISTORY_SLICES],
+            "counts": {"builds": len(entries), "documents": len(documents), "slices": len(slices)}}
+
+
+def _entry_has(entry: Mapping, needle: str) -> bool:
+    """Whether a build touched a document whose path contains ``needle``."""
+    docs = entry.get("docs")
+    return isinstance(docs, Mapping) and any(needle in str(path) for path in docs)
+
+
+def _version_fingerprints(paths: pj.Paths, project: str) -> dict:
+    """The fingerprint of the built site and of every 1D document (the build info first, the tree itself otherwise)."""
+    from . import build as build_mod
+    from . import versions as vrs
+
+    dist = build_mod.dist_dir(paths)
+    site: dict = {}
+    documents: list = []
+    source = "dist"
+    info = dist / "build-info.json"
+    if info.is_file():
+        try:
+            data = json.loads(info.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            data = {}
+        prints = data.get("fingerprints") if isinstance(data, dict) else None
+        if isinstance(prints, dict) and prints.get("site"):
+            site = dict(prints.get("site") or {})
+            documents = [row for row in (prints.get("documents") or []) if isinstance(row, dict)]
+            source = "build-info"
+    if not site:
+        rows = vrs.inventory(dist)
+        site = vrs.site_of(rows)
+        documents = [row for row in rows if row["k"] in ("doc", "read")]
+    return {"status": "ok", "authority": AUTHORITY, "view": "fingerprints", "project": project,
+            "site": site, "documents": documents, "source": source}
+
+
+def _version_check(paths: pj.Paths, cfg, project: str) -> dict:
+    """Whether every 1D document is at the version the last build recorded (a report, nothing is written)."""
+    from .derive import docbuild
+    from . import versions as vrs
+
+    ledger = vrs.read_ledger(paths)
+    last = ledger["entries"][-1] if ledger["entries"] else {}
+    recorded = last.get("docs") if isinstance(last.get("docs"), Mapping) else {}
+    snap = status_mod.load_snapshot(paths, cfg)
+    model = snap.model
+    rows: list = []
+    for lang in docbuild.default_langs(model):
+        bundle = docbuild.get_bundle(model, lang)
+        for level in docbuild.LEVELS:
+            text = docbuild.document_text(bundle, level)
+            now = vrs.sha8_of(text.encode("utf-8"))
+            path = f"docs/{lang}/{level}.md"
+            before = recorded.get(path) if isinstance(recorded.get(path), Mapping) else {}
+            was = str(before.get("sha8", "") or "")
+            rows.append({"p": path, "now": now, "was": was, "label": str(before.get("label", "") or ""),
+                         "same": bool(was) and now == was})
+    checked = {row["p"] for row in rows}
+    not_checked = [{"p": path, "sha8": str(row.get("sha8", "") or ""), "label": str(row.get("label", "") or "")}
+                   for path, row in recorded.items() if path not in checked and isinstance(row, Mapping)]
+    same = bool(rows) and all(row["same"] for row in rows)
+    return {"status": "ok", "authority": AUTHORITY, "view": "check", "project": project,
+            "same": same, "documents": rows, "notChecked": not_checked}
+
+
 def build_all(ws: Workspace, project: str, release: bool = False, docs: bool = True, gate: str = "none") -> dict:
     """``build`` plus the oracle sheet hand-off (design 7.6): whenever the build wrote ``dist/``, ``atlas/dist/oracle-sheet.md`` is written
     too (one line per expectation the user has not confirmed, and ``APPROVE-ALL``). The MCP never writes the user's confirmation file."""

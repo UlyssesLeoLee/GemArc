@@ -93,6 +93,7 @@ python -I atlas.py simulate demo                           # 盲测判定（先�
 python -I atlas.py evidence demo                           # 把证据行对着源码核验（需要 GEMARC_ATLAS_ROOTS）
 python -I atlas.py build demo --gate smoke                 # atlas/dist/index.html、文档、图、oracle 表
 python -I atlas.py review demo --action report             # 自审恰好一次，然后 --action record --notes "fixed=...; open=..."
+python -I atlas.py versions demo --view check               # 产物的指纹与版本：check 核对这一轮改了哪些 1D 文档
 ```
 
 其余命令：`index`、`doc`、`outline`、`verify`。完整说明：`python -I atlas.py --help`，规格见 `docs/atlas/spec/`。

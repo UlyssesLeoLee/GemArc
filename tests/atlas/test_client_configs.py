@@ -1,15 +1,15 @@
 """The client side of the atlas toolset (milestone M8): the example configs for Claude Code (interactive and headless ``claude -p``), Codex and
-Hermes, and the thin command-line client ``scripts/atlas_mcp.py``, tested for the 13-tool ``atlas`` toolset with ``GEMARC_ALLOW_WRITE=1`` and
+Hermes, and the thin command-line client ``scripts/atlas_mcp.py``, tested for the 14-tool ``atlas`` toolset with ``GEMARC_ALLOW_WRITE=1`` and
 ``GEMARC_ATLAS_ROOTS``.
 
 Run: PYTHONPATH=src ./.venv/Scripts/python.exe -m unittest discover -s tests/atlas -t tests -p "test_client_configs*.py"
 
 * JSON, TOML and YAML syntax of every example (YAML: PyYAML when it is installed, else a small strict parser of the subset the example uses, which is
   itself tested; the two agree whenever both exist);
-* the headless settings list exactly the 13 registered atlas tools (as ``mcp__gemarc_atlas__<name>``) plus ``Read``, ``Grep``, ``Glob``, deny the writing
+* the headless settings list exactly the 14 registered atlas tools (as ``mcp__gemarc_atlas__<name>``) plus ``Read``, ``Grep``, ``Glob``, deny the writing
   tools, and the command line in the README carries the same list;
 * a server is started from each config (placeholders replaced, the config's own command, arguments and environment, a filtered environment as the
-  real clients give it) over real stdio: 13 tools, the entry prompt, a write into the workspace, an outline of a file of the evidence root;
+  real clients give it) over real stdio: 14 tools, the entry prompt, a write into the workspace, an outline of a file of the evidence root;
 * ``scripts/atlas_mcp.py``: ``list-tools``, ``list-prompts``, ``get-prompt``, ``call`` (JSON on the command line and ``@file``), the exit status 1 on
   ``isError``, the write gate, ``--toolset atlas_remote``.
 
@@ -245,7 +245,7 @@ class HeadlessTests(unittest.TestCase):
     def test_the_settings_allow_exactly_the_atlas_tools_and_the_three_read_only_tools(self):
         settings = json.loads(text(EXAMPLES / "claude-headless.settings.json"))["permissions"]
         self.assertEqual(sorted(settings["allow"]), sorted([*self.registered(), "Read", "Grep", "Glob"]))
-        self.assertEqual(len(self.registered()), 13)
+        self.assertEqual(len(self.registered()), 14)
         for writing in ("Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch"):
             self.assertIn(writing, settings["deny"])
             self.assertNotIn(writing, settings["allow"])
@@ -321,7 +321,7 @@ class ConfigServerTests(unittest.TestCase):
 
         init, tools, prompts, made, outline, refused = asyncio.run(session())
         self.assertEqual([t.name for t in tools], list(atlas_tools.tool_names("atlas")), name)
-        self.assertEqual(len(tools), 13, name)
+        self.assertEqual(len(tools), 14, name)
         self.assertEqual(prompts, ["gemarc-atlas-create"], name)
         self.assertEqual(made["status"], "created", f"{name}: GEMARC_ALLOW_WRITE=1 lets init write into the workspace: {made}")
         self.assertTrue((workspace / "cfg" / "atlas" / "atlas.toml").is_file(), name)
@@ -356,7 +356,7 @@ class CommandLineClientTests(unittest.TestCase):
 
         tools = json.loads(self.run_cli("list-tools").stdout)
         self.assertEqual([t["name"] for t in tools], list(atlas_tools.tool_names("atlas")))
-        self.assertEqual(len(tools), 13)
+        self.assertEqual(len(tools), 14)
         self.assertLessEqual(len(json.dumps(tools, ensure_ascii=False, separators=(",", ":")).encode("utf-8")), 10 * 1024)
         self.assertEqual([p["name"] for p in json.loads(self.run_cli("list-prompts").stdout)], ["gemarc-atlas-create"])
         prompt = self.run_cli("get-prompt", "gemarc-atlas-create", "mode=asis", "project=demo", "requirement=An invented lending desk.")

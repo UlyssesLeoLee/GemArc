@@ -375,7 +375,7 @@ class StdioFullFlow(unittest.TestCase):
         tools = (await session.list_tools()).tools
         names = [t.name for t in tools]
         self.assertEqual(names, list(atlas_tools.tool_names("atlas")))
-        self.assertEqual(len(names), 13, "the 12 tools of design 4.1 plus the review tool of addendum A1")
+        self.assertEqual(len(names), 14, "the 12 tools of design 4.1, the review tool of addendum A1 and the versions tool of ADR-019")
         listed = len(json.dumps([t.model_dump(by_alias=True, exclude_none=True) for t in tools], ensure_ascii=False, separators=(",", ":")).encode())
         self.assertLessEqual(listed, 10 * 1024, f"tools/list is {listed} B")
         for tool in tools:

@@ -13,7 +13,7 @@ Atlas 是 v1 工具集旁边的另一套工具：AI 只写紧凑的、经校验�
 | `atlas` | 本地 stdio，完整的撰写流程 | 见第 3 节 | 项目目录即状态 | `init`、`put`、`simulate`、`evidence`、`build`、`verify`、`review record`，需要 `GEMARC_ALLOW_WRITE=1` |
 | `atlas_remote` | 远程（无状态、只读） | `gemarc_atlas_brief`、`gemarc_atlas_check` | 无，不保存任何东西 | 无 |
 
-`atlas` 工具集共 13 个工具：设计表 4.1 的 12 个，加上附录 A1 的自审工具 `gemarc_atlas_review`。
+`atlas` 工具集共 14 个工具：设计表 4.1 的 12 个，加上附录 A1 的自审工具 `gemarc_atlas_review`，加上指纹与版本历史的 `gemarc_atlas_versions`（ADR-019）。
 
 `atlas` 和 `atlas_remote` 各自还带一个 MCP 提示 `gemarc-atlas-create`（第 5 节），v1 的两个工具集没有它；Atlas 工具集不带 v1 的资源和 `gemarc-media-doc` 提示。
 
@@ -171,6 +171,24 @@ Atlas 是 v1 工具集旁边的另一套工具：AI 只写紧凑的、经校验�
 
 输出（大纲）：`{status, authority, unit, level, lang, no, bytes, filled, total, ch, junk, links, markers, blocks, other, pages, sha8, next?}`，不超过 1 KiB；`ch` 每章一位数字（0 为空状态，1 有内容，2 有内容但含 `[NOT-AUTHORED]` 空位），`markers` 是挡住 `done` 的空位个数，`links` 与 `junk` 是文档检查的计数。输出（章节）：`{status, authority, chapter, page, pages, title, text}`，正文每页约 15 KiB（JSON 转义后仍在 20 KiB 硬上限内）。只读，不写任何文件。
 
+### `gemarc_atlas_versions`
+
+产物指纹与版本历史（规则全文见 `docs/atlas/spec/versions.md`）：1D 层每个文档一个内容指纹（SHA-256 的前 8 位），每次构建给它们一个带分钟的版本标记（`<sha8>-<YYYYMMDD-HHMM>`，UTC），整站另有一个指纹。**标记不进产物**：产物必须逐字节可复现，所以产物里只有指纹，带分钟的标记只在台账 `.atlas/versions.json` 与本工具的回复里。只存在于 `atlas` 工具集。
+
+| 输入 | 默认 | 说明 |
+|---|---|---|
+| `project` | 必填 | 项目名 |
+| `view` | `history` | `history`（构建历史、逐文档版本、切片归档版本）、`fingerprints`（当前产物的整站指纹与每个 1D 文档的指纹）、`check`（预备更新时的核对） |
+| `scope` | `""` | 子串过滤：只显示路径或切片名含它的行 |
+
+输出：
+
+- `history`：`{status, authority, view, project, builds[{at, modelSha8, site{sha8, sha256}, label}], documents{路径: [{sha8, label, at}]}, slices[{slice, versions[{sha8, at}]}], counts}`，新的在前；上限 4,500 字节（超出时按 `fit_result` 截断并给 `truncated`）。
+- `fingerprints`：`{status, authority, view, project, site{sha256, sha8, files}, documents[{p, k, dim, sha8, b}], source}`。`source` 是 `build-info`（读构建写下的 `build-info.json`）或 `dist`（现场算）。`k` 是类别（`doc` 派生文档、`read` 阅读面页面、`diagram`、`prompt`、`viewer`、`twin`、`data`），`dim` 是维度（派生文档是 `1D`，阅读面页面取路径里的那一段）。
+- `check`：`{status, authority, view, project, same, documents[{p, now, was, label, same}], notChecked[{p, sha8, label}]}`。`now` 是当前模型直接得出的指纹，`was` 是最后一次构建记下的指纹，`label` 是被记下那一版的标记。**只报告**：不拒绝任何操作，不写任何文件（`notChecked` 是台账里记着但当前模型给不出指纹的文档，例如阅读面页面由阅读面那条线单独构建）。
+
+只读，不写任何文件。
+
 ### `gemarc_atlas_outline`
 
 读源码的辅助：一个文件的 def、class、标题行，带行号和一个唯一的锚点片段，直接抄进证据行的 `anchor`。只存在于 `atlas` 工具集。
@@ -268,6 +286,7 @@ Atlas 是 v1 工具集旁边的另一套工具：AI 只写紧凑的、经校验�
 | `gemarc_atlas_index` | List model contents | true | — | — | false | atlas |
 | `gemarc_atlas_simulate` | Blind verdicts | false | false | true | false | atlas |
 | `gemarc_atlas_doc` | Document outline | true | — | — | false | atlas |
+| `gemarc_atlas_versions` | Version history | true | — | — | false | atlas |
 | `gemarc_atlas_outline` | Source outline | true | — | — | false | atlas |
 | `gemarc_atlas_evidence` | Verify evidence | false | false | true | false | atlas |
 | `gemarc_atlas_build` | Build the atlas | false | true | true | false | atlas |

@@ -121,75 +121,81 @@ def check_remote(text: str, known: str = "", format: str = "text") -> dict:
 @atlas_tool("gemarc_atlas_init", "Create project", write=True)
 def init(project: str, title: str = "", mode: str = "asis", languages: list[str] = ["zh-CN"], profile: str = "software",
          repos: list[str] = []) -> dict:
-    """Create the project. `mode` asis (code/docs) or tobe (from a requirement text). `repos`: evidence root aliases the operator set. Never overwrites. Needs GEMARC_ALLOW_WRITE=1."""
+    """Create the project. `mode` asis or tobe (from a requirement). `repos`: evidence root aliases. Never overwrites. Needs GEMARC_ALLOW_WRITE=1."""
     return core.init(_ws(True), project, title, mode, list(languages), profile, list(repos))
 
 
 @atlas_tool("gemarc_atlas_put", "Store one slice", write=True, destructive=True, idempotent=True)
 def put(project: str, slice: str, text: str, mode: str = "replace", format: str = "atl", base: str = "") -> dict:
-    """Validate and store one slice ([a-z0-9-]{1,40}). No ERROR: committed. ERROR: not committed, kept as a red draft. `mode=patch`: only changed rows (same identity replaces, `-id` deletes). `base`=sha8 to replace. Needs GEMARC_ALLOW_WRITE=1."""
+    """Validate and store one slice ([a-z0-9-]{1,40}). No ERROR: committed. ERROR: kept as a red draft. `mode=patch`: only changed rows (same identity replaces, `-id` deletes). `base`=sha8 to replace. Needs GEMARC_ALLOW_WRITE=1."""
     return core.put(_ws(True), project, slice, text, mode, format, base)
 
 
 @atlas_tool("gemarc_atlas_check", "Check project or text", sets=(LOCAL,))
 def check(project: str = "", text: str = "", slice: str = "", mode: str = "slice", rule: str = "", offset: int = 0,
           format: str = "text") -> dict:
-    """Validate, never writes. One of `project` or `text` (advisory). `slice` narrows. `mode` slice or full. `rule` filters (RF), `offset` pages, `format` text or json."""
+    """Validate, never writes. One of `project` or `text` (advisory). `slice` narrows. `mode` slice or full. `rule` filters, `offset` pages, `format` text or json."""
     return core.check(_ws() if project else None, project, text, slice, mode, rule, int(offset), format)
 
 
 @atlas_tool("gemarc_atlas_status", "Project status")
 def status(project: str, view: str = "next", scope: str = "") -> dict:
-    """What to do next; resumes after lost context. `view=next`: {done, phase, next (<=10 lines), blockers, needsUser, waived}. Others: report (`scope` filters), dims, oracle, evidence."""
+    """What to do next; resumes after lost context. `view=next`: {done, phase, next (<=10 lines), blockers, needsUser, waived}. Others: report, dims, oracle."""
     return core.status(_ws(), project, view, scope)
 
 
 @atlas_tool("gemarc_atlas_index", "List model contents")
 def index(project: str, scope: str = "nodes", with_edges: bool = False, ids: list[str] = [], detail: str = "line",
           offset: int = 0) -> dict:
-    """Compact lines about the committed model (instead of re-reading slices). `scope` nodes, room:<id>, req:<id>, case:<id>, ids:<prefix>; `with_edges`, `detail=expanded`, `offset`."""
+    """Compact lines about the model. `scope` nodes, room:<id>, req:<id>, case:<id>, ids:<prefix>; `with_edges`, `detail=expanded`."""
     return core.index(_ws(), project, scope, bool(with_edges), list(ids), detail, int(offset))
 
 
 @atlas_tool("gemarc_atlas_simulate", "Blind verdicts", write=True, idempotent=True)
 def simulate(project: str, case: str = "", intervention: str = "", detail: str = "count") -> dict:
-    """Blind verdicts for your expectations (seals first). `detail=count`: pass/fail and HOW MANY asserted nodes differ, never which; `ids`/`trace` reveal, are logged, and later edits make the item `revised`. Needs GEMARC_ALLOW_WRITE=1."""
+    """Blind verdicts (seals first). `detail=count`: pass/fail and HOW MANY asserted nodes differ, never which; `ids`/`trace` reveal and are logged. Needs GEMARC_ALLOW_WRITE=1."""
     return core.simulate(_ws(), project, case, intervention, detail)
 
 
 @atlas_tool("gemarc_atlas_doc", "Document outline")
 def doc(project: str, unit: str = "system", level: str = "BD", lang: str = "", chapter: str = "", page: int = 0) -> dict:
-    """Structure of the derived documents (never engine output): outline of a `unit` (system, req:<id>, case:<id>, node:<id>) at `level` REQ|BD|DD, a digit per chapter (2 = NOT-AUTHORED slot). `chapter` 1-12 (+`page`): its text."""
+    """Structure of the derived documents (never engine output): outline of a `unit` (system or an id) at `level` REQ|BD|DD, a digit per chapter (2 = NOT-AUTHORED slot). `chapter` 1-12 (+`page`): its text."""
     return core.doc(_ws(), project, unit, level, lang, chapter, int(page))
+
+
+@atlas_tool("gemarc_atlas_versions", "Version history")
+def versions(project: str, view: str = "history", scope: str = "") -> dict:
+    """Fingerprints and versions of the output. `view`: history (builds, document versions), fingerprints (the site), check (is every 1D document at its recorded version? a report, never a refusal). `scope` filters by path."""
+    return core.versions(_ws(), project, view, scope)
 
 
 @atlas_tool("gemarc_atlas_outline", "Source outline")
 def outline(root: str, path: str, offset: int = 0) -> dict:
-    """Reading aid for as-is evidence: def/class/heading lines of ONE file with line numbers and a unique anchor snippet. `root` = alias the operator set, `path` relative to it, `offset` continues. Secrets redacted."""
+    """Reading aid for as-is evidence: def/class/heading lines of ONE file with line numbers and a unique anchor snippet. `root` = alias, `path` relative to it."""
     return core.outline(root, path, int(offset))
 
 
 @atlas_tool("gemarc_atlas_evidence", "Verify evidence", write=True, idempotent=True)
 def evidence(project: str, ids: list[str] = []) -> dict:
-    """Check evidence rows against the real files (roots from the operator's env), stamp the passes, list each row not green with a repair hint (never applied). `ids` limits. As-is Implemented claims need a stamped anchor. Needs GEMARC_ALLOW_WRITE=1."""
+    """Check evidence rows against the real files, stamp the passes, list each row not green with a repair hint (never applied). As-is Implemented claims need a stamped anchor. Needs GEMARC_ALLOW_WRITE=1."""
     return core.evidence(_ws(), project, list(ids))
 
 
 @atlas_tool("gemarc_atlas_build", "Build the atlas", write=True, destructive=True, idempotent=True)
 def build(project: str, release: bool = False, docs: bool = True, gate: str = "none") -> dict:
-    """Write dist/ (viewer page, documents, diagrams, prompts) and oracle-sheet.md for the user. Only sealed or confirmed expectations show results. `gate=smoke` runs the browser gate; `release=true` needs every gate, docs=true and gate=smoke, and is built beside dist/: a refusal changes no page or document there (oracle-sheet.md is refreshed). Needs GEMARC_ALLOW_WRITE=1."""
+    """Write dist/ (page, docs, diagrams, prompts) and oracle-sheet.md; only sealed or confirmed expectations show results. `release=true` needs every gate and builds beside dist/. `gate=smoke` runs the browser gate. Needs GEMARC_ALLOW_WRITE=1."""
     return _no_host_paths(core.build_all(_ws(), project, bool(release), bool(docs), gate))
 
 
 @atlas_tool("gemarc_atlas_verify", "Browser gate", write=True, idempotent=True)
 def verify(project: str, widths: list[int] = [1024, 1366, 1600]) -> dict:
-    """Browser gate on the built page at `widths`, verdict bound to this page. FAIL, SKIPPED (no browser: NOT passed) and INCONCLUSIVE reply invalid. Needs a current build and GEMARC_ALLOW_WRITE=1."""
+    """Browser gate on the built page at `widths`, bound to this page. FAIL, SKIPPED (no browser: NOT passed) and INCONCLUSIVE reply invalid. Needs a current build and GEMARC_ALLOW_WRITE=1."""
     return _no_host_paths(core.verify(_ws(), project, [int(w) for w in widths]))
 
 
 @atlas_tool("gemarc_atlas_review", "Self-review", write=True)
 def review(project: str, action: str = "report", notes: str = "") -> dict:
-    """The ONE self-review, only at phase review. `action=report` (never writes): ranked findings and 8 sample rows to check against the real source. `action=record` (after a report): `notes` required (fixed=<ids>; open=<ids>); needs GEMARC_ALLOW_WRITE=1."""
+    """The ONE self-review, at phase review. `action=report` (never writes): ranked findings and sample rows to check against the real source. `action=record` (after a report): `notes` required (fixed=<ids>; open=<ids>). Needs GEMARC_ALLOW_WRITE=1."""
     return core.review(_ws(), project, action, notes)
 
 
@@ -286,7 +292,9 @@ FINISH = (
     "   c. gemarc_atlas_build(project)：写 dist/（页面、文档、图、提示词）和 oracle-sheet.md；报 BLOCK 或 ERROR 时回到第 4 步修复。\n"
     "   d. gemarc_atlas_verify(project)（用默认 widths，只传一个宽度不算通过）：浏览器门，FAIL 照它列出的问题修复后重新 build、verify。回复 SKIPPED 表示没有找到浏览器，页面没有被验证，不算通过："
     "停下（needs-user），告诉用户装 Edge 或 Chrome 后再 verify，或由用户自己把豁免理由写进 atlas/waive-browser.txt（你绝不写这个文件）。\n"
-    "   e. 可选：gemarc_atlas_doc(project) 看文档大纲，markers 大于 0 或某章是 2 说明有 [NOT-AUTHORED] 槽位，补写它提示的行。")
+    "   e. 可选：gemarc_atlas_doc(project) 看文档大纲，markers 大于 0 或某章是 2 说明有 [NOT-AUTHORED] 槽位，补写它提示的行。\n"
+    "   f. 可选：gemarc_atlas_versions(project, view=\"check\") 核对这一轮改了哪些 1D 文档（每个文档一个内容指纹与版本标记），"
+    "在最终报告里说明改了哪些文档、各自的指纹；它只报告，不拒绝任何东西。")
 
 
 def put_budget(nodes: int = BUDGET_DEFAULT_NODES) -> int:

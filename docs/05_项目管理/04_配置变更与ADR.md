@@ -160,6 +160,31 @@
   - 绑定测试：`tests/accounts/test_mcpauth.py` 断言「同一请求下所有失败原因逐字节相同」「响应体含 `error` 与 `hint`」「`hint` 随请求语言变化、且带本部署的账号页地址与变量名」「`?lang=` 优先于 Cookie 与 `Accept-Language`」「不回显任何令牌」；`tests/test_remote_auth.py` 与 `tests/test_http_transport.py` 里**未开账号**的既有断言**未改动且仍为绿**。
   - 语言表新增 `mcp` 段（三语同键），`tests/test_i18n.py` 的「三段同键」检查把它纳入范围。
 
+### ADR-019 指纹、版本标记与更新历史：标记只进台账，核对只报告
+
+- **背景**：Atlas 产物（1D 派生文档、阅读面页面、整站页面）没有版本身份：构建出来的 `dist/` 里只有内容，没有「这是哪一版、什么时候产生的」，也没有「这次更新动了哪些文档」。`slice` 换版时旧版本被归档到 `.atlas/history/`，但**没有任何出口**能看它；`.atlas/history/` 里躺着十个旧版本，工具却一个都列不出来。用户要求：给 1D 每个文档一个指纹、标记版本、预备更新时核对、能通过 MCP 命令查看更新历史、整站一个指纹，指纹附带**精确到分钟**的日期后缀。
+- **决策**：规则全文写在 `docs/atlas/spec/versions.md`（新增规格），核心是三个词与八条规则：
+  - **指纹**（`sha8`）：文件字节的 SHA-256 前 8 位。沿用house rule：切片戳（`slices.sha8`）与阅读面页尾哨兵是同一条。
+  - **版本标记**（`<sha8>-<YYYYMMDD-HHMM>`，UTC）：指纹 + 产生的分钟。
+  - **台账**（`.atlas/versions.json`）：一次构建一条，最多 50 条；损坏的读成空。
+  - **V-1 标记不进产物**：产物必须逐字节可复现（`build.py` 的确定性规则、BD-007 拒时间戳），而分钟不可复现。所以产物里只有**内容指纹**（`dist/build-info.json` 的 `fingerprints` 段），带分钟的标记只在台账与 MCP 回复里。反过来也不成立：产物里不许有任何依赖当前时刻的东西。
+  - **V-2 带指纹的文件不进指纹**：`build-info.json`（它自己装指纹）、`manifest.jsonl`（清单登记每个文件的 sha8，不能登记自己）、`.verify/**`（门的工作目录）、`oracle-sheet.md`（清单只登记它的存在、不登记字节：它在构建之后写，还会再写一次）。这四条与 `reading/manifest.py` 已有的 `SKIP_NAMES` / `SKIP_DIRS` 是同一条规则。
+  - **V-3 站点指纹**：对「路径 指纹」逐行拼接求 SHA-256。同一模型的两次构建同值；不同的站点不同值；一个文件变了值就变。
+  - **V-4 1D 文档指纹**：1D 层 = 派生文档 `docs/<lang>/{REQ,BD,DD}.md` 与阅读面页面 `read/1D/**`，每个文件一个指纹。指纹清单覆盖产出目录里的每一个文件，所以阅读面页面只要写进了 `dist/` 就自动有一个指纹，不必再改规则。派生文档的指纹是模型的纯函数，与磁盘上文件的指纹相等。
+  - **V-5 标记是内容的一个版本，不是一次构建**：内容没变 → 标记与分钟沿用旧的（文档与整站一视同仁）。判据是 **sha8 相等**，不是分钟相等。
+  - **V-6 台账**：工具的状态文件，不是产物，不发布。
+  - **V-7 预备更新时的核对只报告**：给出每个 1D 文档**现在**的指纹与「是否同版」，**不拒绝、不写任何东西、不改任何判据**。核对的对象是**能由模型直接得出**的派生文档；台账里记着但**当前模型给不出指纹**的（阅读面页面由阅读面那条线单独构建）单列为未核对。
+  - **V-8 历史**：构建历史、逐文档版本、切片归档版本（`.atlas/history/` 第一次有了出口）。
+- **原因**：分钟级后缀是用户明确要的（「后缀精确到分钟」），但它与产物可复现这一条直接冲突——把时间戳写进 `dist/`，两次构建就不再逐字节相同，BD-007 的门也就名存实亡。分成「指纹（进产物）」与「标记（进台账）」两个词之后，两个要求同时成立：产物仍然可复现，而用户要的「带日期的版本号」在台账与 MCP 回复里逐字可见。**核对只报告**是另一条边界：核对若能拒绝，就成了新的门，而发布门、浏览器门、证据门、切片校验的规则都是设计的一部分，不该由一个新工具悄悄改变；只报告则让 AI 在报告里能说清「这一轮改了 BD 文档，指纹从 A 变成 B」，把决定权留给用户。
+- **后果**：
+  - **工具集从 13 个变成 14 个**：新增 `gemarc_atlas_versions`（只读，只在 `atlas` 工具集；`atlas_remote` 无状态、不读本地文件，所以远程工具集仍是 `brief` + `check` 两个）。`ATLAS_TOOLS.md` 的工具数、章节与注解表同步更新；`tests/atlas/test_atlas_tool_surface.py` 的「本地工具集」断言从 13 改为 14，并新增一条钉住新工具的输入、注解、章节、技能与提示词引用。
+  - **`tools/list` 的预算因此被挤满**（Atlas 的 `tools/list` 上限 10 KB，测试另留 600 B 余量）。新工具进来后超预算 499 B，**按 `ATLAS_TOOLS.md` 自己写的意图收紧描述**（细节归 `brief` 与 `ATLAS_TOOLS.md`，描述只留操作要点）：14 条描述从 161–367 B 收到 124–241 B，`tools/list` 从 10,139 B 降到 9,625 B（硬上限 10,240 B，余量 615 B；距测试的 9,640 B 预算只剩 15 B，下一个工具进来之前要先处理预算）。**没有改预算常量，也没有改 10 KB 的上限。**
+  - 实现：`src/gemarc_mcp/atlas/versions.py`（新增，指纹与台账）、`src/gemarc_mcp/atlas/build.py`（构建时算指纹并登记台账；发布路径与普通路径都登记）、`src/gemarc_mcp/atlas/tools.py`（`versions()` 三个视图）、`src/gemarc_mcp/atlas_tools.py`（注册 + 入口提示第 6 步 f 引用）、`src/gemarc_mcp/atlas/cli.py`（同名命令行子命令，`python -m gemarc_mcp.atlas versions <项目> --view check`）、`skills/gemarc-atlas/SKILL.md`（工具表 + 收尾第 6 步）。
+  - 联动的既有产物：`docs/atlas/examples/` 的两份无头设置与 `--allowedTools` 清单（工具数 13→14）、`docs/atlas/examples/README.md` 与 `docs/atlas/README.md` 的工具数、`tests/atlas/README.md` 的用例说明、`tests/atlas/kit_names.txt`（工具包的固定文件清单，此前已经陈旧——`protoui/`、`reading/` 两条线的文件没进清单，重新生成后 `test_kit` 少一条红）、`docs/atlas/TOKEN_LEDGER.md` 的实测数字（tools/list 9,452→9,625、brief all 5,958→5,963、入口提示 7,084→7,338；前者本来就与代码差 5 字节，这次一并改正）。
+  - 绑定测试：`tests/atlas/test_versions.py`（新增 40 条）：指纹与标记的形状、清单与信任根、站点指纹、台账（损坏读成空、50 条上限、内容未变则沿用标记）、构建（`build-info.json` 带指纹、台账被写、产物里没有标记也没有时间戳、两次构建同值）、工具三视图（历史、指纹、核对）与「核对不写任何东西」。
+  - 出处登记：`src/gemarc_mcp/atlas/provenance/versions.tsv` 新增一行，`PROVENANCE.md` 重新生成（顺带修回了它此前陈旧的状态）。
+  - **没有改动的**：发布门、浏览器门、证据门、切片校验、`verify_remote` 的既有判据、`test_disabled_unchanged` 的逐字节不变断言，全部原样。台账与 `.atlas/history/` 的读取都是只读的。
+
 ## 变更流程
 
 提交 CR→影响分析 FR/NFR/Schema/View/测试→设计变更评审→实现和测试→QA 审查→基线发布。凡变动稳定 ID 与 Schema major，需要迁移方案与回滚计划。变更决议与审批记在台账，未经审批不改成“已采用”。

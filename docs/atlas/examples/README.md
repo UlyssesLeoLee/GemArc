@@ -1,6 +1,6 @@
 # 接入 GemArc Atlas 工具集
 
-本目录的配置把 GemArc 的 `atlas` 工具集（本地 stdio，13 个工具加一个入口提示：写事实、校验、盲测判定、证据核验、构建、浏览器门、自审）接到 Claude Code、Codex 和 Hermes。工具和提示的契约见 `../ATLAS_TOOLS.md`，使用流程见 `skills/gemarc-atlas/SKILL.md`。
+本目录的配置把 GemArc 的 `atlas` 工具集（本地 stdio，14 个工具加一个入口提示：写事实、校验、盲测判定、证据核验、构建、浏览器门、自审）接到 Claude Code、Codex 和 Hermes。工具和提示的契约见 `../ATLAS_TOOLS.md`，使用流程见 `skills/gemarc-atlas/SKILL.md`。
 
 这些示例故意放在 `docs/atlas/examples/`，不放在 `integration-examples/`：后者是 v1 工具集的示例，由 v1 的测试按 17 个工具逐一核对。
 
@@ -42,12 +42,12 @@ claude mcp add gemarc_atlas -e GEMARC_TOOLSET=atlas -e GEMARC_WORKSPACE_ROOT=<wo
 
 ### 3.1 无头运行：`claude -p`（只给 atlas 工具加 Read、Grep、Glob）
 
-最终验收用的是无头模式：一句话进去，只允许 atlas 的 13 个工具和只读的 `Read`、`Grep`、`Glob`，工作区放在仓库之外，证据根指向被分析的仓库。三份文件配合使用：
+最终验收用的是无头模式：一句话进去，只允许 atlas 的 14 个工具和只读的 `Read`、`Grep`、`Glob`，工作区放在仓库之外，证据根指向被分析的仓库。三份文件配合使用：
 
 | 文件 | 作用 |
 |---|---|
 | `claude-headless.mcp.json` | 给 `--mcp-config` 的服务器配置（只有 `mcpServers`，和 `claude-code.mcp.json` 同一个条目，`GEMARC_ATLAS_ROOTS` 指向 `<repo>`） |
-| `claude-headless.settings.json` | 给 `--settings` 的权限：`allow` 恰好是 13 个 `mcp__gemarc_atlas__gemarc_atlas_*` 加 `Read`、`Grep`、`Glob`；`deny` 禁掉 `Bash`、`Edit`、`Write`、`NotebookEdit`、`WebFetch`、`WebSearch` |
+| `claude-headless.settings.json` | 给 `--settings` 的权限：`allow` 恰好是 14 个 `mcp__gemarc_atlas__gemarc_atlas_*` 加 `Read`、`Grep`、`Glob`；`deny` 禁掉 `Bash`、`Edit`、`Write`、`NotebookEdit`、`WebFetch`、`WebSearch` |
 | `claude-headless-tobe.settings.json` | to-be（从需求短文设计新系统）用的 `--settings`：清单与上一份相同，另外只允许 `Write` 写 `<workspace>/*/atlas/user/**`（保存需求原文；`deny` 里没有整体的 `Write`，因为 `deny` 的优先级高于 `allow`，整体禁掉会让这条允许失效）。路径规则写成 `//` 加小写盘符再加路径，例如 `//c/work/atlas-ws/*/atlas/user/**`，按你的 Claude Code 版本核对写法；**这条路径规则没有在真实客户端上试过** |
 | 命令行里的 `--allowedTools` | 同一份清单，写在命令行上（`allowedTools` 不是 `--mcp-config` 文件里的键，所以单独列出） |
 
@@ -57,11 +57,11 @@ claude mcp add gemarc_atlas -e GEMARC_TOOLSET=atlas -e GEMARC_WORKSPACE_ROOT=<wo
 claude -p "为这个库创建5D设计" \
   --mcp-config docs/atlas/examples/claude-headless.mcp.json --strict-mcp-config \
   --settings docs/atlas/examples/claude-headless.settings.json \
-  --allowedTools "mcp__gemarc_atlas__gemarc_atlas_brief,mcp__gemarc_atlas__gemarc_atlas_init,mcp__gemarc_atlas__gemarc_atlas_put,mcp__gemarc_atlas__gemarc_atlas_check,mcp__gemarc_atlas__gemarc_atlas_status,mcp__gemarc_atlas__gemarc_atlas_index,mcp__gemarc_atlas__gemarc_atlas_simulate,mcp__gemarc_atlas__gemarc_atlas_doc,mcp__gemarc_atlas__gemarc_atlas_outline,mcp__gemarc_atlas__gemarc_atlas_evidence,mcp__gemarc_atlas__gemarc_atlas_build,mcp__gemarc_atlas__gemarc_atlas_verify,mcp__gemarc_atlas__gemarc_atlas_review,Read,Grep,Glob" \
+  --allowedTools "mcp__gemarc_atlas__gemarc_atlas_brief,mcp__gemarc_atlas__gemarc_atlas_init,mcp__gemarc_atlas__gemarc_atlas_put,mcp__gemarc_atlas__gemarc_atlas_check,mcp__gemarc_atlas__gemarc_atlas_status,mcp__gemarc_atlas__gemarc_atlas_index,mcp__gemarc_atlas__gemarc_atlas_simulate,mcp__gemarc_atlas__gemarc_atlas_doc,mcp__gemarc_atlas__gemarc_atlas_outline,mcp__gemarc_atlas__gemarc_atlas_evidence,mcp__gemarc_atlas__gemarc_atlas_build,mcp__gemarc_atlas__gemarc_atlas_verify,mcp__gemarc_atlas__gemarc_atlas_review,mcp__gemarc_atlas__gemarc_atlas_versions,Read,Grep,Glob" \
   --output-format stream-json --verbose
 ```
 
-`--strict-mcp-config` 让这次运行只用上面这一份 MCP 配置。`claude-headless.settings.json` 没有 `Write`，模型不能自己把需求原文存进 `atlas/user/`（as-is 不强制）。**to-be 的无头运行**要么把 `--settings` 换成 `claude-headless-tobe.settings.json`，要么由你或操作者先把需求原文写进 `<工作区>/<项目名>/atlas/user/<名字>.txt`（`init` 先创建目录；工具集里没有保存用户文字的工具）。**这条命令没有在真实的 `claude` 上跑过**：自动测试只验证两份 JSON 能解析、清单与注册的工具逐个一致、服务器按这份配置能起来并列出 13 个工具；真实运行由最终验收阶段做。
+`--strict-mcp-config` 让这次运行只用上面这一份 MCP 配置。`claude-headless.settings.json` 没有 `Write`，模型不能自己把需求原文存进 `atlas/user/`（as-is 不强制）。**to-be 的无头运行**要么把 `--settings` 换成 `claude-headless-tobe.settings.json`，要么由你或操作者先把需求原文写进 `<工作区>/<项目名>/atlas/user/<名字>.txt`（`init` 先创建目录；工具集里没有保存用户文字的工具）。**这条命令没有在真实的 `claude` 上跑过**：自动测试只验证两份 JSON 能解析、清单与注册的工具逐个一致、服务器按这份配置能起来并列出 14 个工具；真实运行由最终验收阶段做。
 
 ## 4. Codex
 

@@ -488,13 +488,16 @@ DESIGN_HINTS = {
     "gemarc_atlas_simulate": (False, False, True), "gemarc_atlas_doc": (True, None, None), "gemarc_atlas_outline": (True, None, None),
     "gemarc_atlas_evidence": (False, False, True), "gemarc_atlas_build": (False, True, True), "gemarc_atlas_verify": (False, False, True),
 }
+#: The tool of ADR-019 (the fingerprints and the version history), with its inputs and hints.
+VERSIONS_INPUTS = {"gemarc_atlas_versions": {"project": None, "view": "history", "scope": ""}}
+VERSIONS_HINTS = {"gemarc_atlas_versions": (True, None, None)}
 
 
 class BatchThreeSurfaceTests(Base):
-    def test_the_local_set_is_the_twelve_design_tools_plus_the_review_tool_and_nothing_is_planned_any_more(self):
+    def test_the_local_set_is_the_design_tools_plus_the_review_and_the_versions_tool_and_nothing_is_planned_any_more(self):
         local = self.at.tool_names("atlas")
-        self.assertEqual(sorted(local), sorted(DESIGN_TOOLS + (self.at.REVIEW_TOOL,)))
-        self.assertEqual(len(local), 13)
+        self.assertEqual(sorted(local), sorted(DESIGN_TOOLS + (self.at.REVIEW_TOOL, "gemarc_atlas_versions")))
+        self.assertEqual(len(local), 14)
         self.assertEqual(self.at.tool_names("atlas_remote"), M2B_REMOTE, "atlas_remote stays the two read-only tools")
         self.assertEqual((self.at.PLANNED_TOOLS, self.at.PENDING_TOOLS), ((), ()))
         live = [t.name for t in self.live("atlas")[1]]
@@ -536,7 +539,7 @@ class BatchThreeSurfaceTests(Base):
         tools = self.live("atlas")[1]
         size = len(json.dumps([_dump(t) for t in tools], ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
         self.assertLessEqual(size, LIST_BYTES)
-        print(f"\n[tools/list] 13 tools {size} B of {LIST_BYTES} B")
+        print(f"\n[tools/list] {len(tools)} tools {size} B of {LIST_BYTES} B")
         longest = max(len((t.description or "").encode("utf-8")) for t in tools)
         self.assertLessEqual(longest, 400, "descriptions are about 300 B each; the details live in brief and ATLAS_TOOLS.md")
 
@@ -560,6 +563,32 @@ class BatchThreeSurfaceTests(Base):
                 self.assertIn(name, prompt, name)
         self.assertIn("waive-browser.txt", doc)
         self.assertIn("waive-browser.txt", skill)
+
+    def test_the_versions_tool_has_a_section_its_row_and_is_cited_by_the_skill_and_the_prompt(self):
+        doc = _text(DOC)
+        skill = _text(SKILL_DIR / "SKILL.md")
+        prompt = self.at.create_prompt_local(requirement="x", project="desk")
+        name = "gemarc_atlas_versions"
+        self.assertIn(f"### `{name}`", doc)
+        self.assertIn(name, skill)
+        self.assertIn(f"{name}(project", prompt)
+        live = self.live("atlas")[1]
+        by_name = {t.name: _dump(t) for t in live}
+        schema = by_name[name]["inputSchema"]
+        for tool_name, expected in VERSIONS_INPUTS.items():
+            self.assertEqual(sorted(schema["properties"]), sorted(expected), tool_name)
+            self.assertEqual(sorted(schema.get("required", [])), sorted(k for k, v in expected.items() if v is None), tool_name)
+            for key, default in expected.items():
+                if default is not None:
+                    self.assertEqual(schema["properties"][key].get("default"), default, f"{tool_name}.{key}")
+        hints = by_name[name]["annotations"]
+        for tool_name, (read_only, destructive, idempotent) in VERSIONS_HINTS.items():
+            self.assertIs(hints["readOnlyHint"], read_only, tool_name)
+            if read_only:
+                self.assertNotIn("destructiveHint", hints)
+                self.assertNotIn("idempotentHint", hints)
+        self.assertIs(hints["openWorldHint"], False)
+        self.assertNotIn(name, self.at.tool_names("atlas_remote"), "the ledger is a local file: the remote set stays read-only and stateless")
 
     def test_the_prompt_walks_the_gates_in_the_status_order_with_one_review(self):
         text = self.at.create_prompt_local(requirement="x", project="desk")

@@ -27,6 +27,7 @@ MCP 提示 `gemarc-atlas-create`（参数 `requirement`、`mode`、`project`、`
 | `gemarc_atlas_index` | 看已经有什么（节点、房间、需求、用例），代替重读切片 |
 | `gemarc_atlas_simulate` | 对已登记的期望做盲测判定（先封存）：只说通过与否和不符的**个数**；`detail=ids`、`trace` 是被记账的揭示 |
 | `gemarc_atlas_doc` | 派生文档的结构大纲（每章一位数字，2 表示有 NOT-AUTHORED 空位）或某章正文；从不显示引擎结果 |
+| `gemarc_atlas_versions` | 产物的指纹与版本历史：`view=history` 看构建历史与逐文档版本，`fingerprints` 看当前整站指纹，`check` 核对这一轮改了哪些 1D 文档（只报告，不拒绝） |
 | `gemarc_atlas_outline` | as-is 读源码的辅助：一个文件的 def、class、标题行，带行号和唯一锚点（`root` 是别名，不是路径） |
 | `gemarc_atlas_evidence` | 把证据行对着真实文件核验并盖印；失败行给修复建议，建议从不自动应用 |
 | `gemarc_atlas_build` | 写 `dist/`：页面、文档、图、提示词，和交给用户的 `oracle-sheet.md` |
@@ -52,6 +53,7 @@ MCP 提示 `gemarc-atlas-create`（参数 `requirement`、`mode`、`project`、`
 3. `gemarc_atlas_build`：写 `dist/` 和 `oracle-sheet.md`。
 4. `gemarc_atlas_verify`（用默认宽度，只传一个宽度不算通过）：浏览器门。FAIL 照它列出的问题修复，重新 build、verify。回复 SKIPPED 表示没有浏览器，页面没有被验证：停下，告诉用户装 Edge 或 Chrome，或由用户把理由写进 `atlas/waive-browser.txt`；你绝不写这个文件。
 5. 可选：`gemarc_atlas_doc` 看大纲，`markers` 大于 0 说明还有 `[NOT-AUTHORED]` 空位。
+6. 可选：`gemarc_atlas_versions`（`view="check"`）核对这一轮改了哪些 1D 文档（每个文档一个内容指纹与版本标记），在最终报告里说明改了哪些文档、各自的指纹；它只报告，不拒绝任何东西。
 
 ## 停止条件
 

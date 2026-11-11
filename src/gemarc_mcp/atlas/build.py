@@ -41,6 +41,7 @@ from . import project as pj
 from . import slices as sl
 from . import status as status_mod
 from . import vocab as vocab_mod
+from . import versions as vrs
 from .derive import docbuild
 from .derive import i18n as T
 
@@ -662,12 +663,16 @@ def build_project(ws: Workspace, project: str, release: bool = False, docs: bool
             blockers.append({"kind": "gate", "rule": "BD", "id": "", "message": f"the browser gate is {verdict['status']}, not PASS"})
         if release and blockers:
             return {**refusal, "verdict": verdict, "blockers": blockers}
+        inventory = vrs.inventory(target)
+        site = vrs.site_of(inventory)
+        doc_rows = [row for row in inventory if row["k"] in ("doc", "read")]
         info = {"schema": "gemarc-atlas-build/1", "projectId": model.get("meta", {}).get("projectId", ""), "modelSha": am.model_sha(model), "modelSha8": am.model_sha8(model),
                 "language": lang, "counts": rendered.bundle["meta"]["counts"], "page": {"bytes": len(rendered.html.encode("utf-8")), "sha256": rendered.sha256},
                 "parts": dict(rendered.breakdown["parts"]), "data": dict(rendered.breakdown["data"]), "viewer": {k: v for k, v in sorted(viewer.hashes.items())},
                 "checks": [{"rule": i["rule"], "severity": i["severity"], "message": i["message"]} for i in rendered.issues],
                 "withheld": rendered.withheld, "oracle": qa["oracle"], "findings": {"warnings": len(rendered.bundle["meta"]["warnings"]), "notes": len(rendered.bundle["meta"]["qa"]["notes"])},
                 "docs": {"files": len(docs_report["files"]), "bytes": sum(f["bytes"] for f in docs_report["files"])} if docs_report else None,
+                "fingerprints": {"site": site, "documents": doc_rows},
                 "gate": gate_summary(verdict) if verdict else {"status": "NOT-RUN", "widths": []},
                 "release": {"requested": bool(release), "ok": bool(release and not blockers), "blockers": blockers[:20]}}
         info_bytes = (json.dumps(info, ensure_ascii=False, indent=1, sort_keys=True) + "\n").encode("utf-8")
@@ -687,8 +692,11 @@ def build_project(ws: Workspace, project: str, release: bool = False, docs: bool
                 _write_lf(stage / "build-info.json", info_bytes)
                 _check_dist_confined(ws, paths)         # repeated where dist is used: a link planted since the first check is refused
                 _swap_into(stage, out)
+                vrs.record(paths, site, doc_rows, info["modelSha8"])   # the build is on disk: the ledger may say so
         else:
             _write_lf(out / "build-info.json", info_bytes)
+            with sl.project_lock(paths):
+                vrs.record(paths, site, doc_rows, info["modelSha8"])
     finally:
         if stage is not None:
             with contextlib.suppress(GemArcError, OSError):

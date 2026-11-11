@@ -177,7 +177,7 @@ Python 测试（`tests/atlas/test_*.py`；运行方式见第 1 节）。按通�
 | `test_release_build.py` | `build release=true`：干净项目放行；每种拒绝（没有门、红门、SKIP、INCONCLUSIVE、被改的期望、未封存、账本被篡改、证据没盖印、盖印对应别的锚点、源码移动、盖印块被改、锚点没了、没有证据根、NOT-AUTHORED、`docs=false`）都不动 `dist/` 里的页面和文档，并有正向对照；被拒绝的发布不记构建揭示、放行前对账本再判一次；证据门按声明而不按配置的模式；`evidence` 说明被改过的块没有重新盖印；暂存目录、换入与回滚、被文件锁住的换入是带码的拒绝（Windows 上用真实打开的文件）、暂存目录是链接；真实浏览器放行一次 |
 | `test_kit.py` | 工具包：压缩包确定性且完整，只用标准库；解压后用不带 site-packages 的 Python（`-I -S`，基础解释器，`mcp` 被绊线绊住）跑 `check`、`status`、`evidence`、`build`，页面与仓库逐字节相同；压缩包里的文件清单由 `kit_names.txt` 逐个钉住（白名单：后缀、点开头的名字、`tests` 目录、链接都不进包，一个放了杂物的包副本证明了这一点）；启动器的 `--help` 叫 `atlas.py`；经工具包的 `build --release --no-docs` 被拒绝 |
 | `test_verify_remote_atlas.py` | `scripts/verify_remote.py --atlas`：只对本地启动的 ASGI 应用（真实 HTTP）测试，`atlas_remote` 应用、有无 kit 标志、atlas 缺席时的 503（`--atlas-kit on` 下算失败，只有 `auto` 接受）、`stateless` 应用上故意失败、不带标志时输出不变 |
-| `test_client_configs.py` | 示例配置（Claude Code、无头、Codex、Hermes）的 JSON、TOML、YAML 语法（没有 PyYAML 时用小的严格解析器）；无头设置恰好是 13 个工具加 Read、Grep、Glob，to-be 设置只多一条写 `atlas/user/` 的规则；按每份配置启动服务器经真实 stdio 列出 13 个工具；`scripts/atlas_mcp.py` 各子命令 |
+| `test_client_configs.py` | 示例配置（Claude Code、无头、Codex、Hermes）的 JSON、TOML、YAML 语法（没有 PyYAML 时用小的严格解析器）；无头设置恰好是 14 个工具加 Read、Grep、Glob，to-be 设置只多一条写 `atlas/user/` 的规则；按每份配置启动服务器经真实 stdio 列出 14 个工具；`scripts/atlas_mcp.py` 各子命令 |
 | `test_asis_probe.py`、`test_ledger_tool.py` | `tools/pilot/asis_probe.py`（只读、不写字节码、数字已知）与 `tools/pilot/ledger.py` 和 `docs/atlas/TOKEN_LEDGER.md`（字节与估算的标注，待实测一节为空；模型数量来自模型而不是常量；报告在任何控制台编码下都是 UTF-8 加 LF；合计行等于各次调用之和） |
 
 Node 测试（`tests/atlas/js/*.test.mjs`，只需要 Node；运行：`node --test tests/atlas/js/*.test.mjs`；纯模块部分的说明在 `tests/atlas/js/README.md`）。

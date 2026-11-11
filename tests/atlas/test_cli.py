@@ -244,6 +244,40 @@ class LendingDeskSessionTests(Base):
         self.assertEqual(emitted["modelSha8"], am.model_sha8(model))
 
 
+    def test_the_versions_command_reports_the_fingerprints_and_the_check(self):
+        reply, code, _ = self.proc("init", "desk", "--title", "Library lending desk", "--repos", "main", "--languages", "en-US")
+        self.assertEqual((reply["status"], code), ("created", 0), reply)
+        for name in DESK_NAMES:
+            reply, code, _ = self.proc("put", "desk", name, "--file", str(DESK_DIR / f"{name}.atl"))
+            self.assertEqual((reply["status"], code), ("committed", 0), reply)
+        built, code, _ = self.proc("build", "desk")
+        self.assertEqual((built["status"], code), ("ok", 0), built)
+        history, code, _ = self.proc("versions", "desk")
+        self.assertEqual((history["status"], code), ("ok", 0), history)
+        self.assertEqual(history["view"], "history")
+        self.assertEqual(len(history["builds"]), 1)
+        self.assertRegex(history["builds"][0]["label"], r"^[0-9a-f]{8}-\d{8}-\d{4}$")
+        prints, code, _ = self.proc("versions", "desk", "--view", "fingerprints")
+        self.assertEqual((prints["status"], code), ("ok", 0), prints)
+        self.assertRegex(prints["site"]["sha8"], r"^[0-9a-f]{8}$")
+        check, code, _ = self.proc("versions", "desk", "--view", "check")
+        self.assertEqual((check["status"], code), ("ok", 0), check)
+        self.assertTrue(check["same"], check)
+        bad, code, err = self.proc("versions", "desk", "--view", "nonsense")
+        self.assertEqual(code, 2)
+        self.assertIn("--view", err)
+
+    def test_the_versions_command_speaks_in_human_text(self):
+        reply, code, _ = self.proc("init", "desk", "--title", "Library lending desk", "--repos", "main", "--languages", "en-US")
+        self.assertEqual((reply["status"], code), ("created", 0), reply)
+        for name in DESK_NAMES:
+            self.proc("put", "desk", name, "--file", str(DESK_DIR / f"{name}.atl"))
+        self.proc("build", "desk")
+        text, code = self.main("versions", "desk", "--view", "check", "--human")
+        self.assertEqual(code, 0)
+        self.assertIn("same version: True", text)
+
+
 class SyntheticSessionTests(Base):
     """A 40-node synthetic atlas through ``cli.main``: init, 6+ puts, one failing put repaired by a patch, status after each."""
 

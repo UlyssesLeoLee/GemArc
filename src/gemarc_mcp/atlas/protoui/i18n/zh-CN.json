@@ -1,0 +1,178 @@
+{
+  "language": "zh-CN",
+  "vocab": {
+    "widgetKinds": {
+      "stack": "纵向排列", "row": "横向排列", "grid": "网格", "card": "卡片", "form": "表单", "header": "页头", "footer": "页脚", "sidebar": "侧栏",
+      "toolbar": "工具栏", "tabs": "标签页组", "list": "列表", "heading": "标题", "text": "文本", "image": "图片", "icon": "图标", "badge": "徽标",
+      "divider": "分隔线", "chart": "图表", "table": "表格", "input": "输入框", "textarea": "多行输入", "select": "下拉选择", "checkbox": "复选框", "radio": "单选框",
+      "switch": "开关", "button": "按钮", "link": "链接", "tab": "标签", "menu": "菜单", "pagination": "分页", "custom": "自定义"
+    },
+    "screenKinds": {"page": "页面", "dialog": "对话框", "sheet": "底部面板", "panel": "侧边面板"},
+    "frames": {"desktop": "桌面", "tablet": "平板", "phone": "手机"},
+    "variantKinds": {"loading": "加载中", "empty": "空状态", "error": "出错", "success": "成功", "locked": "无权限", "other": "其它"},
+    "emphasis": {"primary": "主要", "secondary": "次要", "danger": "危险", "muted": "弱化"},
+    "triggers": {"tap": "点击", "submit": "提交", "change": "变更", "auto": "自动", "back": "返回", "timeout": "超时", "key": "按键"}
+  },
+  "svg": {
+    "band": {
+      "layout": "layout {n}",
+      "ui": "ui {sha}",
+      "wire": "示意线框",
+      "shown": "显示 {k}/{n}"
+    },
+    "placeholder": {
+      "empty": "（空）"
+    },
+    "more_rows": "+{k} 行未画",
+    "title": "{id} {title}（状态: {variant}）",
+    "word": {
+      "contains": "包含:",
+      "excludes": "不含:"
+    },
+    "desc": {
+      "contains": "{n} 个控件（{kinds}）；本状态显示 {k} / 共 {n}",
+      "named": "{id}（{reason}）",
+      "hidden": "，未显示: {list}",
+      "more": " 等 {k} 个",
+      "end": "。",
+      "excludes": "{w} {text}。",
+      "excl": "叠层、绝对定位、动画、响应式断点、主题；一切不在原型模型里的内容",
+      "geometry": "几何为示意（布局 L1.1），规范性内容 = 种类、文字、字段、状态、跳转、父子与顺序。"
+    },
+    "reason": {
+      "in": "仅在其它状态显示",
+      "parent": "父控件未显示",
+      "depth": "嵌套过深未画"
+    }
+  },
+  "card": {
+    "heading": "{title}（{n}）",
+    "heading_part": "{title}（{n} / {m}，第 {a}-{b} 行）",
+    "more": " 等 {k} 个",
+    "t": {
+      "widgets": "控件",
+      "order": "顺序",
+      "states": "状态",
+      "navout": "出向导航",
+      "navin": "入向导航",
+      "derived": "渲染器推导，非作者声明",
+      "texts": "全部可见文字",
+      "sample": "示例数据"
+    },
+    "col": {
+      "attrs": "属性",
+      "kind": "kind",
+      "container": "容器",
+      "children": "子控件的顺序",
+      "state": "状态",
+      "note": "说明",
+      "text": "界面文案",
+      "file": "文件",
+      "shown": "显示控件数",
+      "hidden": "未显示",
+      "from": "起点",
+      "to": "终点",
+      "label": "文字",
+      "guard": "条件",
+      "on": "触发",
+      "links": "链接",
+      "what": "推导物",
+      "widget": "控件",
+      "string": "文字",
+      "source": "来源",
+      "columns": "列",
+      "rows": "行数",
+      "drawn": "画出行数"
+    },
+    "derived": {
+      "skeleton": "加载骨架块",
+      "placeholder": "空态占位",
+      "more": "未画行提示",
+      "bar": "无示例数据的灰条"
+    },
+    "src": {
+      "band": "状态条",
+      "note": "状态说明",
+      "derived": "（渲染器推导）"
+    },
+    "nodata": "未提供示例数据",
+    "ident": "屏幕 `{id}` · {kind} · {frame} {w}x{h}",
+    "purpose": "用途: {purpose}",
+    "props": "属性: {props}",
+    "checkpoints": "核对点 checkpoints={n}（控件表每个非空单元格一个，id 是控件 id 加 @ 加列名；另有 @order、@route 和 #状态@state）",
+    "stamp": "判定戳 sha={sha}（`ui-verdict-*` 的 conform 行抄它；本屏的核对点变了它才变）",
+    "covers": "控件 {w} 个、状态 {s} 个、出向导航 {n} 条、核对点 {c} 个",
+    "excludes": "像素级几何、叠层、动画、响应式断点（几何只是示意）",
+    "howto": "规范性内容: 种类、文字、字段、状态、跳转、父子与顺序；示意性内容: 位置与尺寸。圆标 = 控件序号 = 表里的 #。PNG 有效当且仅当其状态条里的 ui 值等于本卡的 u=。kind 与 DOM 的对照见 ui-schema.md",
+    "all_states": "全部",
+    "cont": "（续）",
+    "note": "见注 [{k}]",
+    "covers_part": "{base}；本页只含其中一部分",
+    "none": "（无）"
+  },
+  "index": {
+    "covers": "界面 {s} 个、状态 {v} 个、控件 {w} 个、核对点 {c} 个、导航 {n} 条",
+    "excludes": "像素级几何；各屏的控件与导航明细见各屏画面卡",
+    "howto": "先看本页选屏，再读该屏画面卡取控件表；导航图见 NAV 页。PNG 由 verify 或 build gate=smoke 渲染到 .verify/screens/，实时状态用 gemarc_atlas_index scope=\"screens\"",
+    "t": {
+      "screens": "界面",
+      "req": "需求覆盖",
+      "shards": "分片"
+    },
+    "col": {
+      "id": "id",
+      "title": "标题",
+      "route": "route",
+      "frame": "frame",
+      "start": "start",
+      "states": "状态数",
+      "widgets": "控件数",
+      "checkpoints": "核对点",
+      "nav": "出/入导航",
+      "svg": "SVG 字节",
+      "card": "画面卡",
+      "req": "需求",
+      "screens": "界面"
+    },
+    "shards": "分片: {list}"
+  },
+  "nav": {
+    "covers": "界面 {s} 个、导航 {n} 条（图里 {k} 条）",
+    "excludes": "控件级明细见各屏画面卡；跨分片的导航只在表里",
+    "howto": "图里的 n1 n2 是别名，对照表给出屏幕 id；起点屏幕在别名表里标 start",
+    "t": {
+      "graph": "导航图",
+      "alias": "别名对照",
+      "table": "导航表",
+      "unreach": "不可达屏幕",
+      "dead": "没有出向导航的屏幕"
+    },
+    "col": {
+      "id": "id",
+      "alias": "别名",
+      "screen": "屏幕",
+      "start": "起点",
+      "from": "起点",
+      "to": "终点",
+      "label": "文字",
+      "guard": "条件",
+      "on": "触发",
+      "links": "链接",
+      "page": "终点所在页"
+    },
+    "start": "start",
+    "nostart": "没有声明起点屏幕，不判断可达性",
+    "shards": "分片: {list}"
+  },
+  "gallery": {
+    "head": "页 §{page} · {title} · {i}/{n} · {counts} · 页类 {cls}",
+    "sentinel": "页尾 §{page} · {counts} · sha8 {sha8} · 以上为全部内容",
+    "counts": "含 {b} 个块、{t} 张表",
+    "state": "状态 {name}",
+    "not_inlined": "未内联: {list}",
+    "card": "画面卡（Markdown）",
+    "index": "索引",
+    "nav": "导航",
+    "start": "入口"
+  }
+}

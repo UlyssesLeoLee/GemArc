@@ -1,24 +1,38 @@
-/* GemArc 5D site - dark, restrained, semantics over decoration. */
+/* GemArc multimedia document site - the gem theme (BD-010 UI style policy).
+   Dark stage, cut faces, bright edges: every surface is a facet, and every
+   bright line is an edge. The palette is the one in the policy document, so
+   the site and the three dimensional scene speak the same colour language. */
 :root {
-  --bg: #0b0f14;
-  --panel: #121821;
-  --line: #22303f;
-  --ink: #dbe6f0;
-  --muted: #8fa3b8;
-  --accent: #4cc2ff;
-  --warn: #ffb454;
-  --bad: #ff6b6b;
-  --good: #6bd68a;
-  --edge: #5a7288;
-  --edge-trust: var(--warn);
+  /* The stage. */
+  --gem-void: #06090e;
+  --gem-bg: #0b0f16;
+  --gem-panel: #111823;
+  --gem-facet: #1b2635;
+  --gem-rim: #2c3d52;
+  /* The ink. */
+  --gem-ink: #e6eef7;
+  --gem-muted: #93a6bd;
+  /* The cut colours. Each one means exactly one thing. */
+  --gem-aqua: #6fe3ff;
+  --gem-violet: #b78cff;
+  --gem-topaz: #ffc46b;
+  --gem-emerald: #6bd68a;
+  --gem-ruby: #ff6b8a;
+  /* Pane geometry. The widths are written by the layout code (and restored
+     from local storage); the main column keeps a floor so the primary content
+     can never be squeezed into an unusable strip. */
+  --sidebar-w: 232px;
+  --inspector-w: 300px;
+  --gutter: 8px;
+  --main-min: 480px;
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--ink);
+  background: var(--gem-bg);
+  color: var(--gem-ink);
   font: 14px/1.6 "Segoe UI", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
 }
 
@@ -27,36 +41,88 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 12px 20px;
-  border-bottom: 1px solid var(--line);
-  background: var(--panel);
+  border-bottom: 1px solid var(--gem-rim);
+  background: var(--gem-panel);
 }
 
 .brand { display: flex; align-items: baseline; gap: 8px; font-size: 17px; font-weight: 600; }
-.brand .gem { color: var(--accent); }
-.brand small { color: var(--muted); font-weight: 400; font-size: 12px; }
+.brand .gem { color: var(--gem-aqua); }
+.brand small { color: var(--gem-muted); font-weight: 400; font-size: 12px; }
+
+.top-actions { display: flex; align-items: center; gap: 12px; }
+.top-actions .action { margin-top: 0; }
 
 .tag {
   padding: 3px 10px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--gem-rim);
   border-radius: 999px;
-  color: var(--muted);
+  color: var(--gem-muted);
   font-size: 12px;
 }
 
+/* Three panes with two draggable gutters. The main column is the primary
+   display area: it takes what is left, and it never falls below its floor. */
 main {
   display: grid;
-  grid-template-columns: 232px minmax(0, 1fr) 300px;
-  gap: 1px;
-  background: var(--line);
-  min-height: calc(100vh - 96px);
+  grid-template-columns:
+    var(--sidebar-w) var(--gutter) minmax(var(--main-min), 1fr) var(--gutter) var(--inspector-w);
+  height: calc(100vh - 96px);
+  min-height: 420px;
+  background: var(--gem-bg);
 }
 
-aside, .mainpane { background: var(--bg); padding: 16px; }
-.sidebar, .inspector { overflow-y: auto; }
+aside, .mainpane { background: var(--gem-bg); padding: 16px; min-width: 0; min-height: 0; }
+.sidebar, .inspector, .mainpane { overflow: auto; }
+.sidebar { border-right: 1px solid var(--gem-rim); }
+.inspector { border-left: 1px solid var(--gem-rim); }
+
+/* A gutter is a real control: focusable, keyboard operable, and it says how
+   wide the neighbouring pane currently is. It stays invisible until the
+   reader reaches for it - an edge that is always there is not an edge. */
+.splitter {
+  position: relative;
+  background: transparent;
+  cursor: col-resize;
+  touch-action: none;
+}
+.splitter::after {
+  content: "";
+  position: absolute;
+  inset: 0 3px;
+  border-radius: 2px;
+  background: var(--gem-rim);
+  transition: background .12s ease;
+}
+.splitter:hover::after, .splitter:focus-visible::after, .splitter.dragging::after { background: var(--gem-aqua); }
+.splitter:focus-visible { outline: 2px solid var(--gem-aqua); outline-offset: -1px; }
+
+/* Focus mode: the side panes collapse and the primary content takes the whole
+   window. The panes keep their grid cells (width 0) on purpose: removing them
+   from the flow would pull the main column into the first, zero-width track
+   and the content would disappear. The sidebar keeps a narrow strip so the
+   navigation is still reachable - a focus mode without navigation is a trap. */
+main.focus { grid-template-columns: 56px 0 minmax(var(--main-min), 1fr) 0 0; }
+main.focus .sidebar { overflow: hidden; padding: 8px 4px; }
+main.focus .sidebar .section-title, main.focus .sidebar .side-foot { display: none; }
+main.focus .sidebar nav button { justify-content: center; padding: 10px 4px; font-size: 0; }
+main.focus .sidebar nav button span { margin: 0; font-size: 11px; }
+main.focus .inspector { overflow: hidden; padding: 0; }
+main.focus .splitter { visibility: hidden; }
+
+@media (max-width: 980px) {
+  main {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    height: auto;
+    min-height: 0;
+  }
+  .splitter { display: none; }
+  aside, .mainpane { overflow: visible; }
+}
 
 .section-title {
   margin: 4px 0 10px;
-  color: var(--muted);
+  color: var(--gem-muted);
   font-size: 11px;
   letter-spacing: .12em;
   text-transform: uppercase;
@@ -71,126 +137,184 @@ nav button {
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
-  color: var(--ink);
+  color: var(--gem-ink);
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: border-color .1s ease, color .1s ease;
 }
-nav button span { color: var(--muted); font-size: 11px; min-width: 20px; }
-nav button:hover { border-color: var(--line); }
-nav button.active { border-color: var(--accent); color: var(--accent); }
+nav button span { color: var(--gem-muted); font-size: 11px; min-width: 20px; }
+nav button:hover { border-color: var(--gem-rim); }
+nav button.active { border-color: var(--gem-aqua); color: var(--gem-aqua); }
+nav button:focus-visible { outline: 2px solid var(--gem-aqua); outline-offset: 1px; }
 
 .side-foot {
   margin-top: 18px;
   padding-top: 12px;
-  border-top: 1px solid var(--line);
-  color: var(--muted);
+  border-top: 1px solid var(--gem-rim);
+  color: var(--gem-muted);
   font-size: 11px;
 }
 
 .heading { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 14px; }
-.kicker { color: var(--muted); font-size: 11px; letter-spacing: .14em; }
+.kicker { color: var(--gem-muted); font-size: 11px; letter-spacing: .14em; }
 h1 { margin: 2px 0 0; font-size: 20px; font-weight: 600; }
-h2 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--muted); letter-spacing: .04em; }
+h2 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--gem-muted); letter-spacing: .04em; }
 h3 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
-h4 { margin: 8px 0 4px; font-size: 13px; color: var(--muted); }
+h4 { margin: 8px 0 4px; font-size: 13px; color: var(--gem-muted); }
 
+/* A panel is a pane of its own: the reader may drag its corner to give it
+   more (or less) width and height. The floor keeps a panel usable.
+   A panel is a cut face: one bright edge, no stack of shadows. */
 .panel {
   margin-bottom: 16px;
   padding: 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--gem-rim);
   border-radius: 8px;
-  background: var(--panel);
+  background: var(--gem-panel);
+  box-shadow: inset 0 1px 0 rgba(230, 238, 247, .04);
+  resize: both;
+  overflow: auto;
+  min-width: 320px;
+  min-height: 140px;
 }
 
+/* The first panel of a view is the primary display area: it reads first. */
+#content > .panel:first-child { border-color: var(--gem-aqua); }
+
 .small { margin: 2px 0; font-size: 12px; }
-.muted { color: var(--muted); }
-.hint { margin: 8px 0; color: var(--muted); font-size: 12px; }
+.muted { color: var(--gem-muted); }
+.hint { margin: 8px 0; color: var(--gem-muted); font-size: 12px; }
 
 .fact {
   margin-bottom: 10px;
   padding: 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--gem-rim);
   border-radius: 6px;
-  background: #0e141c;
+  background: var(--gem-facet);
 }
-.fact small { display: block; color: var(--muted); font-size: 11px; }
+.fact small { display: block; color: var(--gem-muted); font-size: 11px; }
 
 .action {
   margin-top: 8px;
   padding: 5px 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--gem-rim);
   border-radius: 5px;
   background: transparent;
-  color: var(--ink);
+  color: var(--gem-ink);
   font: inherit;
   font-size: 12px;
   cursor: pointer;
+  transition: border-color .1s ease, color .1s ease, background .1s ease;
 }
-.action:hover { border-color: var(--accent); color: var(--accent); }
+.action:hover { border-color: var(--gem-aqua); color: var(--gem-aqua); }
+.action:active { background: var(--gem-facet); }
+.action:focus-visible { outline: 2px solid var(--gem-aqua); outline-offset: 1px; }
+/* The in-document links: a link must read as a link, also inside the muted
+   WBS detail where the plain anchor colour would be overridden. */
+a.link { color: var(--gem-aqua); text-decoration: none; border-bottom: 1px dotted var(--gem-aqua); }
+a.link:hover { border-bottom-style: solid; }
+.wbs-detail li a.link, .small a.link { color: var(--gem-aqua); }
+/* The prototype page tabs: the selected page keeps the accent colour. */
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.tabs .action { margin-top: 0; }
+.action.active { border-color: var(--gem-aqua); color: var(--gem-aqua); }
 
 .graph { overflow: auto; }
 .canvas { width: 100%; min-height: 340px; }
-.canvas .node rect { fill: #16202b; stroke: var(--line); stroke-width: 1; }
-.canvas .node:hover rect, .canvas .node:focus rect { stroke: var(--accent); }
+.canvas .node rect { fill: var(--gem-facet); stroke: var(--gem-rim); stroke-width: 1; }
+.canvas .node:hover rect, .canvas .node:focus rect { stroke: var(--gem-aqua); }
 .canvas .node { cursor: pointer; }
-.canvas .node-label { fill: var(--ink); font-size: 12px; }
-.canvas .edge { fill: none; stroke: var(--edge); stroke-width: 1.4; cursor: pointer; }
-.canvas .edge:hover { stroke: var(--accent); stroke-width: 2.2; }
-.canvas .edge-trust { stroke: var(--edge-trust); stroke-dasharray: 6 4; }
+.canvas .node-label { fill: var(--gem-ink); font-size: 12px; }
+.canvas .edge { fill: none; stroke: var(--gem-rim); stroke-width: 1.4; cursor: pointer; }
+.canvas .edge:hover { stroke: var(--gem-aqua); stroke-width: 2.2; }
+.canvas .edge-trust { stroke: var(--gem-topaz); stroke-dasharray: 6 4; }
 /* An edge needs an independently pickable region; a 1.4px stroke is unhittable. */
 .canvas .edge-group { cursor: pointer; }
 .canvas .edge-hit { fill: none; stroke: transparent; stroke-width: 14; pointer-events: stroke; }
 
-/* The 3D scene needs a box of its own: a canvas without a height collapses. */
+/* The 3D scene needs a box of its own: a canvas without a height collapses.
+   The stage of the scene is the darkest surface of the whole site, so the
+   bright edges of the crystals read as light. */
 .space-3d {
   height: 460px;
   margin: 0 0 14px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
+  border: 1px solid var(--gem-rim);
+  border-radius: 6px;
   overflow: hidden;
-  background: #0b0f14;
+  background: var(--gem-void);
 }
 .space-3d .gemarc-space-canvas { display: block; width: 100%; height: 100%; }
-.space-3d .hint { padding: 14px; color: var(--muted); }
+.space-3d .gemarc-axis-canvas { display: block; width: 100%; height: 100%; }
+.space-3d .hint { padding: 14px; color: var(--gem-muted); }
 .space-3d-status { margin: -8px 0 14px; }
+
+/* The semantic-axis scene: the same stage, the same crystals. */
+.axis-3d {
+  height: 460px;
+  margin: 0 0 14px;
+  border: 1px solid var(--gem-rim);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--gem-void);
+}
+.axis-3d .gemarc-axis-canvas { display: block; width: 100%; height: 100%; }
+.axis-3d .hint { padding: 14px; color: var(--gem-muted); }
+.axis-3d-status { margin: -8px 0 14px; }
+/* The gesture list tells the reader how the scene is driven. It is a line of
+   small text under the canvas, never a panel of its own. */
+.unity-hint { margin: -8px 0 14px; line-height: 1.7; }
+.axis-legend { margin-bottom: 10px; }
+.axis-legend p { margin: 2px 0; }
 
 .timeline { margin: 0; padding-left: 18px; }
 .timeline .event { margin-bottom: 4px; }
-.timeline .time { display: inline-block; min-width: 72px; color: var(--muted); font-size: 12px; }
+.timeline .time { display: inline-block; min-width: 72px; color: var(--gem-muted); font-size: 12px; }
+
+/* The WBS tree sits under the 6D card: a nested list, one indent per level, so
+   the reader can see which work package a node belongs to. */
+.wbs { list-style: none; margin: 6px 0 0; padding-left: 16px; }
+.wbs .wbs { border-left: 1px solid var(--gem-rim); margin-left: 4px; }
+.wbs-item { margin: 6px 0; }
+.wbs-item > p { margin: 0; }
+.wbs-detail { list-style: none; margin: 2px 0 2px 8px; padding-left: 10px; }
+.wbs-detail li { color: var(--gem-muted); font-size: 12px; line-height: 1.7; }
 .timeline .module { display: inline-block; min-width: 96px; font-size: 12px; }
 .timeline .name { display: inline-block; min-width: 120px; }
 .timeline .state { font-size: 11px; }
-.timeline .event-delivered .state { color: var(--good); }
-.timeline .event-blocked .state { color: var(--bad); }
-.timeline .event.current { background: #16202b; }
+.timeline .event-delivered .state { color: var(--gem-emerald); }
+.timeline .event-blocked .state { color: var(--gem-ruby); }
+.timeline .event.current { background: var(--gem-facet); }
 
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 14px; }
 .chip {
   padding: 4px 10px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--gem-rim);
   border-radius: 999px;
   background: transparent;
-  color: var(--ink);
+  color: var(--gem-ink);
   font: inherit;
   font-size: 12px;
   cursor: pointer;
+  transition: border-color .1s ease, color .1s ease;
 }
-.chip.on { border-color: var(--bad); color: var(--bad); }
+.chip:hover { border-color: var(--gem-aqua); }
+.chip.on { border-color: var(--gem-ruby); color: var(--gem-ruby); }
+.chip:focus-visible { outline: 2px solid var(--gem-aqua); outline-offset: 1px; }
 
 .controls { display: flex; gap: 8px; margin-top: 10px; }
 
 .space-building, .space-floor, .space-room {
   margin: 6px 0;
   padding: 8px 10px;
-  border-left: 2px solid var(--line);
+  border-left: 2px solid var(--gem-rim);
 }
-.space-room { border-left-color: var(--accent); }
+.space-room { border-left-color: var(--gem-aqua); }
 
 footer {
   padding: 10px 20px;
-  border-top: 1px solid var(--line);
-  color: var(--muted);
+  border-top: 1px solid var(--gem-rim);
+  color: var(--gem-muted);
   font-size: 11px;
 }
 
@@ -200,10 +324,11 @@ li { font-size: 12px; }
 select {
   margin: 6px 0;
   padding: 5px 8px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--gem-rim);
   border-radius: 5px;
-  background: #0e141c;
-  color: var(--ink);
+  background: var(--gem-facet);
+  color: var(--gem-ink);
   font: inherit;
   font-size: 12px;
 }
+select:focus-visible { outline: 2px solid var(--gem-aqua); outline-offset: 1px; }

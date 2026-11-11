@@ -1,4 +1,4 @@
-# GemArc MCP 源码 v0.1.0 — 可运行 MVP
+# GemArc MCP 源码 v0.3.0 — 可运行 MVP
 
 > 2026-10-25；面向《GemArc MCP IPA 设计资料包 v1.0》的首期实现。**不代表全量 SRS 已完成，也不宣称 IPA 官方认证。**
 
@@ -6,7 +6,7 @@
 
 | 能力 | 状态 | 说明 |
 |---|---|---|
-| 14 个 MCP 工具 | 实现 | 基于 MCP Python SDK v2 的 `MCPServer`。**已用官方客户端完成真实 stdio 与 Streamable HTTP 握手核验**（14 tool / 2 resource / 1 prompt 全部调通） |
+| 17 个 MCP 工具（两个工具集） | 实现 | 基于 MCP Python SDK v2 的 `MCPServer`。`full` 17 个（本地 stdio，含工作区工具）；`stateless` 9 个（远程，模型随调用传入）。工具名只含 `[a-z0-9_]`，每个带 `title` 与安全 `annotations`，失败置 `isError`。**已用官方客户端完成真实 stdio 与公网 Streamable HTTP 握手核验** |
 | 2 个 MCP Resources + 1 Prompt | 实现 | Registry、简化 Schema 和标准设计策略 |
 | 统一模型和安全验证 | 实现 | 稳定 ID、证据等级、Node–Edge、View、Case 约束 |
 | 组件注册中心 | MVP | JSON 检索；无独立 UI 与组件包签名 |
@@ -14,10 +14,11 @@
 | 3D | **实现** | 自带 Three.js 适配器（Building–Floor–Room 真实渲染 + 节点/关系各自可拾取 + 跨维选择同步）；亦可复用用户自行构建的原仓库 `dist/` |
 | 4D | 实现 MVP | 离散事件、步进时间轴、确定性规则传播；无动画流体场景 |
 | 5D | 实现 MVP | 显式规则与模块屏蔽反事实对照；非一般性因果识别引擎 |
+| 6D 工作流（WBS × 执行图层） | 实现 MVP | 工作分解三级树 + 「执行节点归属 X / Y」覆盖率；执行图契约由模型登记，缺失不编造 |
 | 增量编译与缓存 | 未完成 | `diff` 提供影响分析，build 仍全量重建 |
 | Graphology / Dagre / Dexie | 可选适配器 | 运行时**零第三方硬依赖**：这些库一律工厂函数注入 + 内置兜底；不装也能跑 |
 | 浏览器自动化、视觉回归 | 部分 | 有 view-model 结构快照门禁（跑在**构建产物**上）；**像素级视觉回归仍未实现** |
-| 远程 MCP 端点（Vercel） | 实现，**受限形态** | Streamable HTTP + 静态站同在一个函数；写工具默认关闭；文件系统临时，跨调用状态会丢。详见 `docs/09_部署/01_Vercel部署.md` |
+| 远程 MCP 端点（Vercel） | 实现，**已部署并公网实测** | 无状态：模型随调用传入，服务端不保存项目；可选 Bearer 令牌（`GEMARC_MCP_TOKEN`）；`GET /mcp` 返回 405；固定件经 `/kit/<profile>.zip` 下载。`scripts/verify_remote.py` 对公网域名逐项自检（脚本现有 53 个检查点；2026-10-30 那次实测 25 项全通过，是当时的工具面口径，详见 `docs/09_部署/01_Vercel部署.md` 第 12 节）。详见 `docs/09_部署/01_Vercel部署.md` |
 | 安装时完全离线 | 不保证 | Python MCP SDK 需 pip 获取；生成的基础站点不使用 CDN |
 
 ## Windows 11 安装 / PowerShell
@@ -58,7 +59,7 @@ py -3.11 -m http.server 8000 --bind 127.0.0.1
   "mcpServers": {
     "gemarc": {
       "command": "E:\\GemArcMCP\\.venv\\Scripts\\python.exe",
-      "args": ["-m", "gemarc_mcp.server"],
+      "args": ["-m", "gemarc_mcp"],
       "env": {
         "GEMARC_WORKSPACE_ROOT": "E:\\GemArcWork",
         "GEMARC_ALLOW_WRITE": "1"
@@ -68,19 +69,39 @@ py -3.11 -m http.server 8000 --bind 127.0.0.1
 }
 ```
 
-Claude Code、Codex、Cursor 和其他 MCP Host 的配置容器键名可能不同，请以对应客户端当前文档为准；本示例仅说明服务器 command/args/env。
+`GEMARC_WORKSPACE_ROOT` 必须是**已存在**的目录；不设置时默认用 `~/.gemarc/workspace`（自动创建）。
+Claude Code、Codex、Hermes 的配置容器键名各不相同，下一节与 `integration-examples/` 给出逐个客户端、可直接复制的配置。
+
+## 接入 Claude / Codex / Hermes
+
+本地 stdio（17 个工具，写工具默认关）或远程 `/mcp`（9 个无状态工具）。完整说明、兼容矩阵和每项的验证状态见
+`integration-examples/README.md`；先运行 `python scripts/verify_stdio.py` 自检本地服务器，
+运行 `python scripts/verify_remote.py https://<project>.vercel.app` 自检远程端点。
+
+- Claude Code：`claude mcp add --transport http --scope project gemarc 'https://<project>.vercel.app/mcp' --header 'Authorization: Bearer ${GEMARC_MCP_PAT}'`。**用单引号**，否则令牌会明文写进 `.mcp.json`。
+- Codex：`codex mcp add gemarc --url 'https://<project>.vercel.app/mcp' --bearer-token-env-var GEMARC_MCP_PAT`。
+- Hermes：`hermes mcp add gemarc --url https://<project>.vercel.app/mcp`。
+- claude.ai / Claude Desktop 的远程 connector 只支持 OAuth 或无认证（本仓库未实现 OAuth）：要用就得让部署不设 `GEMARC_MCP_TOKEN`，代价是端点对知道 URL 的人开放。
+- **令牌从哪来、装的时候怎么设、装完以后怎么改**：账号制部署里，登录 `https://<project>.vercel.app/account` → 「创建令牌」拿到**个人访问令牌**（明文只显示这一次），放进**客户端**的环境变量 `GEMARC_MCP_PAT`（或写进客户端的 `Authorization: Bearer` 头）；换令牌时改环境变量并重启客户端。服务端的环境变量 `GEMARC_MCP_TOKEN` 是另一侧的事（未开账号部署的共享令牌）。逐个客户端的写法见 `integration-examples/README.md` 的「令牌」一节。
+- **连不上时看哪里**：客户端的报错里就有答案——账号制部署的 401 响应体带一句 `hint`（令牌在账号页拿、填进 `GEMARC_MCP_PAT` 或 `Authorization: Bearer` 头），Claude Code 会把它原样显示在 `claude mcp list` 的失败行里 **[RAN，2026-11-10 实测]**。
+- **Claude Code 连真实远程端点已实测**（2026-11-10）：`claude mcp add --transport http --scope user gemarc 'https://<project>.vercel.app/mcp' --header 'Authorization: Bearer ${GEMARC_MCP_PAT}'` → `claude mcp list` 显示 `√ Connected` → 真调 `mcp__gemarc__gemarc_brief` 拿到工作指令正文。`--scope user` 写进 `~/.claude.json`（本机所有项目可用，不动仓库里的 `.mcp.json`）；`--scope project` 写进项目的 `.mcp.json`（会随仓库提交，**别把令牌明文写进去**）。
+- **连上 MCP 就已经具备「制作多媒体文档」的能力**：多媒体文档制作流程随服务器发布，工具 `gemarc_media_doc_guide`（或资源 `gemarc://skill/gemarc-media-doc`）就是它，模型按 brief → new_model → 填写 → validate → simulate → render 的顺序执行即可，**不必再单独装 skill**（ADR-012）。
+- `skills/gemarc-media-doc/` 是同一份工作流的独立副本（SKILL.md），用于离线查阅或给不读 MCP 资源的客户端；它与服务器发的那份由 `tests/test_skill_pack.py` 断言不会漂移。
+
+> 上述客户端命令中，只有 Claude Code 加载 `.mcp.json` 并调用本地工具、Codex 的 `mcp add/list/get` 与 `--strict-config`
+> 被实际运行过；Codex 真正调用工具、Hermes、Claude Desktop 未验证（见 `integration-examples/README.md` 矩阵）。
 
 **安全提示**：写权限仅应由本地用户在可信配置中授权。设置 `GEMARC_ALLOW_WRITE=1` 后，允许当前 MCP 客户端调用写入工具；生产环境应增加按调用授权、审计和隔离策略。不要将服务无认证直接暴露到公网。
 
-## 5D 脚手架（固定格式 + 共用代码）
+## 脚手架（固定格式 + 共用代码）
 
-本 MCP 的主要用途是**提供制作 5D 设计的脚手架**：把「可被写死的东西」从大模型手里拿走，
+本 MCP 的主要用途是**提供制作多媒体文档的脚手架**：把「可被写死的东西」从大模型手里拿走，
 模型只填事实。脚手架包含三层固定件：
 
 | 层 | 内容 | 位置 |
 |---|---|---|
-| 契约层 | 8 份 JSON Schema（Canonical Model / Node / Edge / Evidence / Space / View / Scenario / Workflow） | `src/gemarc_mcp/scaffold/contracts/` |
-| 词表层 | 6 级证据等级、21 种实体类型、21 种关系类型、19 种图示类型、相关性分级、空间层级、Case 分类 | `src/gemarc_mcp/scaffold/vocab/` |
+| 契约层 | 9 份 JSON Schema（Canonical Model / Node / Edge / Evidence / Space / View / Scenario / Workflow / 6D 执行图）+ 1 份执行图示例 | `src/gemarc_mcp/scaffold/contracts/` |
+| 词表层 | 6 级证据等级、20 种实体类型、20 种关系类型、21 种图示类型、相关性分级、空间层级、Case 分类（5 类分诊轴 + 14 种分析类型）、工作流语义（GWF-IR） | `src/gemarc_mcp/scaffold/vocab/` |
 | 运行层 | 图引擎、Focus 退避、3D 空间、4D/5D 仿真、跨视图状态、工作流语义、互操作适配器 | `src/gemarc_mcp/scaffold/runtime/` |
 
 词表是**提示词、Python 校验器、浏览器运行时三方共用的唯一事实源**；
@@ -106,12 +127,12 @@ E:\GemArc\.venv\Scripts\python.exe -m gemarc_mcp.cli validate demo --strict
 E:\GemArc\.venv\Scripts\python.exe -m gemarc_mcp.cli build demo --profile static
 ```
 
-对应的 MCP 工具是 `gemarc.brief`（精简工作指令）、`gemarc.scaffold`（落固定件与槽位）
-与 `gemarc.contracts`（读取契约与词表内容）。
+对应的 MCP 工具是 `gemarc_brief`（精简工作指令）、`gemarc_scaffold`（落固定件与槽位）
+与 `gemarc_contracts`（读取契约与词表内容）。
 
-`gemarc.brief` 一次性返回：目标、五步流程、六条硬规则、12 个槽位（带 JSON Pointer 与规则）、
-全部允许词值（6 级证据 / 21 实体类型 / 21 关系类型 / 19 图示类型 / Case 分类 / 空间层级）、
-构建命令，以及「哪些固定件已经写好、不要重写」的清单。**实测 8858 字节**，
+`gemarc_brief` 一次性返回：目标、五步流程、六条硬规则、12 个槽位（带 JSON Pointer 与规则）、
+全部允许词值（6 级证据 / 20 实体类型 / 20 关系类型 / 21 图示类型 / Case 分类 / 空间层级）、
+构建命令，以及「哪些固定件已经写好、不要重写」的清单。**实测约 19 KB**（紧凑 JSON 19,280 字节），
 用来替掉原先 13323 字节的提示词规格。
 
 ### 两种交付 profile，共用一份源码
@@ -138,6 +159,9 @@ const renderer = createThreeSpaceRenderer(THREE, { container, model, space, stor
   世界半径不是目标大小——同一条边近处 1px、远处 10px，细管在斜视角下几乎打不中。
 - **取景按视锥精确贴合包围盒**（`fitDistanceToBox()`），不用包围球半径——工程空间通常扁长。
 - **WebGL 不可用时显式降级并说明原因**（`GEMARC_SPACE_010`），绝不用静态图或 2D 伪装三维。
+- **三维操作与 Unity 一致**：Alt + 左键环绕、中键平移、右键飞行（W/A/S/D 与 Q/E）、滚轮推拉、
+  左键选择、Ctrl + 左键加选、空白处拖动框选、Esc 清空、F 聚焦。映射表只有一份，在
+  `runtime/space/unity-controls.js`；两个三维场景共用它，不会各说各话。
 
 设计细节与决策理由见 `docs/02_基本设计/09_脚手架与共用运行时设计.md` §6.4。
 
@@ -152,13 +176,13 @@ const renderer = createThreeSpaceRenderer(THREE, { container, model, space, stor
 
 ## 远程端点（Vercel）
 
-仓库自带一个 Vercel 部署形态：单个 Python Function 同时提供 MCP Streamable HTTP 端点与 5D 静态站。
+仓库自带一个 Vercel 部署形态：单个 Python Function 同时提供 MCP Streamable HTTP 端点与多媒体架构文档站。
 
 ```powershell
 cd E:\GemArc
-npx vercel@65.2.0 login
-npx vercel@65.2.0 link
-npx vercel@65.2.0 deploy --prod
+npx vercel@65.8.0 login
+npx vercel@65.8.0 link
+npx vercel@65.8.0 deploy --prod
 ```
 
 部署后：
@@ -167,8 +191,9 @@ npx vercel@65.2.0 deploy --prod
 |---|---|
 | `https://<domain>/mcp` | MCP Streamable HTTP 端点 |
 | `https://<domain>/healthz` | 健康检查与部署状态 |
-| `https://<domain>/` | **MCP 功能微调控制台**（Web 面板：选工具 → 调参数 → 看真实返回） |
-| `https://<domain>/site/` | 脚手架产出的 5D 架构站（含 3D 适配器，冷启动时从包内源码物化） |
+| `https://<domain>/` | **MCP 功能微调控制台**（Web 面板：选工具 → 调参数 → 看真实返回；设了令牌时需先粘贴令牌） |
+| `https://<domain>/site/` | 脚手架产出的多媒体架构文档（含 3D 适配器，首次访问时从包内源码物化） |
+| `https://<domain>/kit/static.zip` | 站点**固定件**（外壳 + 共用运行时 + 词表）的确定性压缩包；与 `gemarc_render` 返回的 `data/*.json` 合并即是完整站点 |
 
 主页是**控制台**而不是设计图：远程端点的主角是 MCP 本身。面板里列出的工具、参数表单、
 输入契约全部来自 `tools/list` 的真实返回，写工具由服务端下发的名单上锁，
@@ -187,19 +212,91 @@ npx vercel@65.2.0 deploy --prod
 }
 ```
 
-**远程形态是受限的，不是本地模式的等价物**：Vercel 函数文件系统临时，跨调用的项目状态会丢；
-`gemarc.export` 返回的是本地路径而非下载链接；写工具默认关闭（`GEMARC_ALLOW_WRITE` 未设为 `1` 时拒绝执行）。
+**远程形态与本地的区别**：远程默认是 `stateless` 工具集（`gemarc_brief / contracts / assets / new_model / validate / simulate / diff / render`），
+模型随每次调用传入，服务端不保存任何项目，因此没有跨调用状态丢失的问题，也没有写工具。
+`gemarc_render` 只返回随模型变化的 `data/*.json`（内联上限 35 KB，按累计字节逐文件判定：放不下的文件只给清单与摘要）；固定件通过 `/kit/<profile>.zip` 下载。
+需要工作区、扫描本地仓库、`build/export` 时用本地 stdio 模式。
+
+**鉴权**：设置环境变量 `GEMARC_MCP_TOKEN`（可逗号分隔多个，便于轮换）后，`POST /mcp` 必须带 `Authorization: Bearer <token>`；
+不设置则端点对知道 URL 的人开放（claude.ai 自定义 connector 需要这种形态）。`/healthz`、控制台、`/site/`、`/kit/` 始终公开且不含密钥或路径。
 完整说明、已实测/待验证清单见 `docs/09_部署/01_Vercel部署.md`。
+**账号（可选，默认关闭）**：Google 登录、个人访问令牌（PAT）与数据库存储的设计、运营手册见 `docs/09_部署/02_账号与安全.md`。
+开启后本部署变成「登录才能用」：控制台 `/` 需要登录会话；`POST /mcp` 同时认个人访问令牌与登录会话（会话通道要求同源）；
+`/account/admin` 是**仅管理员**的设置区（用户管理、审计日志、站点与工具集、令牌策略）。管理员 = 环境变量
+`GEMARC_ACCOUNTS_ADMIN_EMAILS` 白名单**或**数据库表 `admin_users` 里的运行时授予（两者取并集，收权要两边都做）。
+账号制部署下，`POST /mcp` 的 401 响应体带一句 `hint`（令牌在账号页拿、填进客户端的环境变量 `GEMARC_MCP_PAT` 或 `Authorization: Bearer` 头）；**所有失败原因同一句**，不区分「没带 / 带错 / 过期 / 被撤销」。
 
 ## 复用现有 GemArc Three.js Viewer
 
 现有 GemArc 仓库：`https://github.com/UlyssesLeoLee/GemArc`。本包**未复制**原仓库源文件，避免造成隐含版本漂移。3D 集成流程：
 
 ```powershell
+<<<<<<< HEAD
 git clone https://github.com/UlyssesLeoLee/GemArc.git E:\GemArcWork\upstream
 cd E:\GemArcWork\upstream\skills\ipa-architecture-3d
 python .\scripts\build.py .\assets\examples\illustrative-architecture.json --out E:\GemArcWork\legacy-build
 cd E:\GemArcWork\legacy-build
+=======
+hermes plugins install https://github.com/UlyssesLeoLee/AAArchitect.git --force
+```
+
+当前实测只有 **1 项** finding，逐条核对为启发式误报：
+
+| 判据 | 位置 | 实际情况 |
+| --- | --- | --- |
+| `inline_shell_exec` | `assets/viewer/src/main.js`（`root.replaceChildren()`） | DOM 元素清空方法，被 shell 执行启发式误判。全文件不调用 `exec`/`eval`/`spawn`，也无任何进程创建；所有文本均通过 `textContent` 写入，不存在 HTML 注入 |
+
+早期的 6 项 finding 中，README 里的 `git clone` 文案、`i18n.js` 的中日文字面量、SKILL.md 的 npm 构建步骤，随文档改写已不再触发。该拦截由启发式规则驱动，finding 数量会随源码变化，**以你本机 `hermes plugins validate .` 的实际输出为准**。
+
+| 判据 | 位置 | 实际情况 |
+| --- | --- | --- |
+| `execution` (HIGH) | `assets/viewer/src/main.js:241` | 搜索过滤用的模板字符串，渲染走 `textContent`，不执行任何 shell |
+| `supply_chain` (MEDIUM) | `README.md` 的安装说明 | 文档里的 `git clone` 命令被当成供应链风险 |
+| `supply_chain` (MEDIUM) | `assets/viewer/src/i18n.js:3` / `:6` | 中/日文界面文案被当成可疑非 ASCII 字符串 |
+| `supply_chain` (MEDIUM) | `SKILL.md:28` | `npm install && npm run test && npm run build` 构建步骤被当成包管理器调用 |
+
+这些由文档与多语言资源本身触发，不应为绕过扫描而删改。也可在 `config.yaml` 里设 `plugins.scan_on_install` 关闭拦截。技能通道 `hermes skills install <raw URL>` 不受此拦截影响。
+
+Skill 通道（不经过 PM）：
+
+```powershell
+hermes skills list
+```
+
+Hermes 的 Skill 根目录是 `$env:LOCALAPPDATA\hermes\skills\<分类>\`，不是 `~/.hermes/skills`。
+
+### 4. MiniMax Code —— 本地插件包
+
+```powershell
+.\skills\ipa-architecture-3d\scripts\build_minimax_plugin.ps1
+```
+
+脚本从仓库内容组装 MiniMax 插件包（`.minimax-plugin/plugin.json` + `skills/<name>/SKILL.md` + 明暗图标），写入 `%USERPROFILE%\.minimax\plugins\ipa-architecture-3d\`，MiniMax Code 自动重扫识别。图标优先取本机 MiniMax 自带的分类图标池，取不到时自动生成占位图，因此在没装 MiniMax 的机器上也能构建。版本号与描述直接读仓库根目录 `plugin.json`，不会与源文件脱节。
+
+注意：包根目录**不要**放 Agent Plugins v1 的 `plugin.json`，否则会覆盖 MiniMax 格式；只用 `.minimax-plugin/plugin.json`。
+
+### 只装 Skill（不装插件包）
+
+```powershell
+cd .\skills\ipa-architecture-3d
+.\scripts\install_windows.ps1 -Agents claude,codex,hermes,minimax
+.\scripts\install_windows.ps1 -Agents claude,codex,hermes,minimax -Force   # 覆盖前自动备份
+```
+
+这条路径只做 Skill 目录投递：`hermes` 和 `minimax` 在这里是 **Skill 回退通道**（`$env:LOCALAPPDATA\hermes\skills\<分类>\` 和 `~/.minimax/skills/`），不是它们各自的插件包机制。需要完整插件包请用仓库根目录的 `install.ps1`。
+
+> Windows PowerShell 5.1 注意事项：仓库内 `.ps1` 文件带 UTF-8 BOM。手动编辑后若删掉 BOM，脚本里的中文字面量会被按 ANSI 解析并导致语法错误。
+
+
+## 生成真正的 Three.js 网站
+
+```powershell
+cd .\skills\ipa-architecture-3d
+python .\scripts\validate.py .\assets\examples\illustrative-architecture.json
+python .\scripts\build.py .\assets\examples\illustrative-architecture.json --out E:\arch3d-cn
+# 需要日语时：追加 --lang ja-JP
+cd E:\arch3d-cn
+>>>>>>> d3cb55f3320c45ed462dfd182f817e14446ece8c
 npm install
 npm run build
 
@@ -212,6 +309,12 @@ python -m gemarc_mcp.cli build demo --legacy-dist E:\GemArcWork\legacy-build\dis
 > 上述命令借用原仓库演示数据；**不能将演示 3D 架构错当成当前项目真实架构**。正式使用时，须将目标工程转成原仓库支持的 Architecture Model，严格核对适配和事实证据。
 > 自带的 Three.js 适配器已实现 3D 与 2D 之间的**跨维双向选择同步**（浏览器实测通过）；
 > 复用原仓库 Viewer 的路径仍然保留，作为「已有产物直接接入」的手段。
+
+## GemArc Atlas（仅本地，未部署）
+
+`src/gemarc_mcp/atlas/` 是 Atlas 工具集：AI 只写事实（紧凑的 `.atl` 切片），固定、经过测试的代码负责校验、推导和渲染，产出 5D 设计资料（查看器页面、三层文档、图、提示词、oracle 表）。它**只在本地使用**：`.vercelignore` 把它挡在 Vercel 上传之外，远程默认工具集仍是 `stateless`，默认工具集和远程端点的行为都没有改变。
+
+启用（本地 stdio）：命令仍是 `python -m gemarc_mcp`，在 MCP 配置的环境里设置 `GEMARC_TOOLSET=atlas`、`GEMARC_WORKSPACE_ROOT=<工作区>`、`GEMARC_ALLOW_WRITE=1`、`GEMARC_ATLAS_ROOTS=main=<被分析的仓库>`。Claude Code、Codex、Hermes 的配置示例、怎样说「创建5D设计」、输出目录和限制见 `docs/atlas/README.md`，工具契约见 `docs/atlas/ATLAS_TOOLS.md`。没有 MCP 接入的客户端可以用 `python tools/make_kit.py` 生成 `dist-kit/atlas-kit.zip`（纯标准库命令行工具包，不提交）。
 
 ## 代码模块
 
@@ -230,7 +333,7 @@ $env:PYTHONPATH = 'src'
 python -m unittest discover -s tests -v
 ```
 
-测试包含 **82 项 Python UT/集成检查**（`unittest discover`），另有一批 **125 项 Node 运行时测试**
+测试包含 **192 项 Python UT/集成检查**（`unittest discover`；另有 `tests/test_tool_surface_docs.py` 等守卫工具名与文档不漂移），另有一批 **125 项 Node 运行时测试**
 （`node --test src/gemarc_mcp/scaffold/runtime/tests/*.test.mjs`）覆盖脚手架运行层：图引擎、Focus 退避、
 3D 空间与 **Three.js 适配器**、仿真内核、工作流语义、互操作适配器。
 
@@ -260,5 +363,20 @@ python -m unittest discover -s tests -v
 > `sourceId`/`targetId`/`type` 时，随附站点的 `app.js` 没有一起更新，
 > 浏览器实测显示它**画出 4 个节点、0 条关系**——仓库里的一切测试都是绿的，站点却是坏的。
 
-完整的 5D 脚手架站（含 3D 适配器）请用 `gemarc build --profile static` 生成；
-远程端点提供的也是这一档（冷启动时从包内源码物化，见部署文档）。
+完整的多媒体脚手架站（含 3D 适配器）请用 `gemarc build --profile static` 生成；
+远程端点提供的也是这一档（首次访问 `/site/` 时从包内源码物化，见部署文档）。
+
+### 站点外壳的 UI/UX 基线
+
+产出的站点外壳自带下面这些能力，制作多媒体文档时**直接用**，不要手改固定件：
+
+| 能力 | 表现 |
+|---|---|
+| 主要显示内容占比大 | 主栏是主内容区，结构图/时间轴/工作流图是首屏主体 |
+| 窗格可调宽度 | 两侧窗格之间有可拖拽分隔条（双击复位、方向键微调），尺寸存浏览器本地存储 |
+| 窗格可调高度 | 每个内容面板右下角有拖拽手柄，可单独调整宽与高 |
+| 专注模式 | 顶栏「专注」把两侧窗格收成一条窄导航条，主内容占满窗口，页签仍然可达 |
+| 主内容不被挤小 | 主栏有最小宽度下限，两侧窗格各有最小宽度 |
+
+服务器随包发布的那份流程正文把「一轮 UI/UX 优化」列为**硬规则**：每份产出都要按上面这套基线
+复核一遍，并把这一轮做了什么写进最终说明。

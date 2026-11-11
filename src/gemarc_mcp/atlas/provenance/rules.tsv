@@ -1,0 +1,12 @@
+path	origin	reference_unit	treatment	deviations
+src/gemarc_mcp/atlas/rules/registry.py	new	-	Rule registry ({id, wave, severity, hint template}), check decorator and phase runner authored from design 5.1 and 5.2; the 31 wave-1 entries are registry data written for this repository	-
+src/gemarc_mcp/atlas/rules/context.py	new	-	Rule context: pools, taint bookkeeping, the one diagnostic constructor and the pending / one-edit typo / full-mode reference logic of design 5.3; the design prototype was a seed for the look-alike idea only and everything is rewritten	-
+src/gemarc_mcp/atlas/rules/rf.py	ported-semantic	model validator	Reference rules RF-001..RF-005 walk the expanded model; the integrity checks (spatial chain, edge endpoints, evidence, case, requirement and intervention references) follow the semantics that the analysis of the reference validator describes, re-expressed with rule ids, slice-aware pending handling and file:line locations	the reference reports message text only and stops at 20 errors; here every reference is classified by what it points into, located, and cascade-aware
+src/gemarc_mcp/atlas/rules/st.py	new	-	ST-009 red draft and SZ-001 slice size rules authored from design 5.1	-
+src/gemarc_mcp/atlas/rules/ev.py	new	-	Evidence rules EV-001, EV-002, EV-006..EV-011 authored from design 5.1 and 8.2; EV-001 follows the one integrity rule of the reference validator (Implemented needs source-code evidence), the rest are new; EV-006 calls the evidence lane credential lint	-
+src/gemarc_mcp/atlas/rules/sm.py	new	-	State machine rules SM-001, SM-002, SM-003, SM-005 authored from design 5.1; terminal states are derived here, so the reference rule about leaving a terminal state cannot occur and SM-005 reports the derivation instead	-
+src/gemarc_mcp/atlas/rules/cs.py	new	-	CS-004 case traces a requirement, authored from design 5.1	-
+src/gemarc_mcp/atlas/rules/rq.py	new	-	RQ-001 trace-complete and RQ-002 coverage authored from design 5.1 and 5.4	-
+src/gemarc_mcp/atlas/rules/completeness.py	new	-	Completeness report (slot status and severity per document level) authored from design section 6 and the skeleton specification	-
+src/gemarc_mcp/atlas/slicecheck.py	new	-	Slice-mode and full-mode check entry point (pending, one-edit typo warning, pending-bind, cascade suppression, known ids for the remote check) authored from design 5.3	-
+src/gemarc_mcp/atlas/rules/__init__.py	new	-	Package init that imports the registry, the context and the wave-1 rule families so that importing the package registers every rule	-

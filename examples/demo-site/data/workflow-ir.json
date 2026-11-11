@@ -1,0 +1,321 @@
+{
+  "count": 1,
+  "gates": {
+    "byWorkflow": {
+      "wf-example": []
+    },
+    "note": "命中的门表示该执行图不得放行。门只对声明了执行图的工作流生效：纯设计画布不是执行图，不受 6D 门禁约束。",
+    "rejectOn": [
+      "unbounded_agent_loop",
+      "human_approval_bypass",
+      "unvalidated_state_schema",
+      "missing_route_guard",
+      "unsafe_side_effect_replay",
+      "checkpoint_without_state_integrity",
+      "fake_production_execution",
+      "untraceable_decision",
+      "wbs_orphan_node",
+      "wbs_broken_hierarchy",
+      "wbs_missing_deliverable",
+      "wbs_unbound_package"
+    ],
+    "rejectedWorkflowIds": [],
+    "schemaVersion": "0.2.0"
+  },
+  "gwfVersion": "0.3.0",
+  "note": "designOnly 的节点没有真实执行器；executable=false 表示未声明实现引用。missing 列出 GWF-IR 必填但未给出的字段。gates 是 v6.0 quality_gates_6d 的判定结果：命中的门表示该执行图不得放行。",
+  "schemaVersion": "0.2.0",
+  "workflows": [
+    {
+      "approvalPolicies": [],
+      "checkpointPolicy": null,
+      "dataSchemas": [],
+      "designOnlyNodeIds": [
+        "wf-n-survey"
+      ],
+      "edges": [
+        {
+          "dataMapping": null,
+          "deliverySemantics": null,
+          "direction": "source-to-target",
+          "edgeId": "wf-e0",
+          "edgeType": "ControlFlow",
+          "errorRoute": null,
+          "evidenceIds": [],
+          "guard": null,
+          "policyRef": null,
+          "priority": null,
+          "resumeBehavior": null,
+          "routingExpression": null,
+          "sourceNodeId": "wf-n-start",
+          "sourcePortId": null,
+          "stateMergePolicy": null,
+          "stateProjection": null,
+          "stateSchemaRef": null,
+          "targetNodeId": "wf-n-survey",
+          "targetPortId": null,
+          "verification": null
+        },
+        {
+          "dataMapping": null,
+          "deliverySemantics": null,
+          "direction": "source-to-target",
+          "edgeId": "wf-e1",
+          "edgeType": "ControlFlow",
+          "errorRoute": null,
+          "evidenceIds": [],
+          "guard": null,
+          "policyRef": null,
+          "priority": null,
+          "resumeBehavior": null,
+          "routingExpression": null,
+          "sourceNodeId": "wf-n-survey",
+          "sourcePortId": null,
+          "stateMergePolicy": null,
+          "stateProjection": null,
+          "stateSchemaRef": null,
+          "targetNodeId": "wf-n-end",
+          "targetPortId": null,
+          "verification": null
+        }
+      ],
+      "entryPoints": [
+        "wf-n-start"
+      ],
+      "errorPolicy": null,
+      "evidenceIds": [],
+      "executionCapabilities": [],
+      "executionGraph": {
+        "executionGraphId": "eg-example",
+        "executionMode": "simulation",
+        "stateSchemaVersion": "state-v1",
+        "version": "1.0",
+        "workPackages": [
+          {
+            "completionCriteria": "归集完成且通知送达",
+            "deliverable": "一份可审查的架构文档",
+            "dependsOn": [],
+            "kind": "phase",
+            "nodeIds": [],
+            "packageId": "wp-root",
+            "parentPackageId": null,
+            "title": "示例交付阶段",
+            "verification": "Hypothetical"
+          },
+          {
+            "completionCriteria": "每条结论都能指回来源",
+            "deliverable": "带来源的现状清单",
+            "dependsOn": [],
+            "kind": "work-package",
+            "nodeIds": [],
+            "packageId": "wp-collect",
+            "parentPackageId": "wp-root",
+            "title": "现状归集",
+            "verification": "Hypothetical"
+          },
+          {
+            "completionCriteria": "结论已记录且通知已发出",
+            "deliverable": "可审计的归集结论",
+            "dependsOn": [
+              "wp-collect"
+            ],
+            "kind": "task",
+            "nodeIds": [
+              "wf-n-survey"
+            ],
+            "packageId": "wp-deliver",
+            "parentPackageId": "wp-collect",
+            "title": "归集与通知",
+            "verification": "Hypothetical"
+          }
+        ]
+      },
+      "executionPolicy": null,
+      "gates": [],
+      "gwfIrValid": false,
+      "issues": [],
+      "metadata": {},
+      "missing": [
+        "dataSchemas"
+      ],
+      "name": "示例：事件处理流程",
+      "nodes": [
+        {
+          "approvalPolicyRef": null,
+          "authorityScope": null,
+          "budgetPolicy": null,
+          "canonicalNodeId": null,
+          "checkpointAfter": null,
+          "checkpointBefore": null,
+          "description": null,
+          "designOnly": false,
+          "errorHandlers": [],
+          "evidenceIds": [],
+          "executable": false,
+          "executionMode": null,
+          "executorKind": "none",
+          "idempotency": null,
+          "implementationRef": null,
+          "inputStateSchema": null,
+          "inputs": [],
+          "iterationLimit": null,
+          "name": "事件到达",
+          "nodeId": "wf-n-start",
+          "nodeType": "Start",
+          "outputStateSchema": null,
+          "outputs": [],
+          "ports": [],
+          "postconditions": [],
+          "preconditions": [],
+          "retryPolicy": null,
+          "sideEffects": [],
+          "stateTransitions": [],
+          "stateWritePolicy": null,
+          "timeoutPolicy": null,
+          "toolContractRef": null,
+          "verification": null
+        },
+        {
+          "approvalPolicyRef": null,
+          "authorityScope": "read-only",
+          "budgetPolicy": null,
+          "canonicalNodeId": "sensor",
+          "checkpointAfter": null,
+          "checkpointBefore": null,
+          "description": null,
+          "designOnly": true,
+          "errorHandlers": [],
+          "evidenceIds": [],
+          "executable": false,
+          "executionMode": "simulation",
+          "executorKind": "agentic",
+          "idempotency": null,
+          "implementationRef": null,
+          "inputStateSchema": null,
+          "inputs": [],
+          "iterationLimit": 3,
+          "name": "现状归集",
+          "nodeId": "wf-n-survey",
+          "nodeType": "AgentLoop",
+          "outputStateSchema": null,
+          "outputs": [],
+          "ports": [],
+          "postconditions": [],
+          "preconditions": [],
+          "retryPolicy": null,
+          "sideEffects": [],
+          "stateTransitions": [],
+          "stateWritePolicy": null,
+          "timeoutPolicy": null,
+          "toolContractRef": null,
+          "verification": "Hypothetical"
+        },
+        {
+          "approvalPolicyRef": null,
+          "authorityScope": null,
+          "budgetPolicy": null,
+          "canonicalNodeId": null,
+          "checkpointAfter": null,
+          "checkpointBefore": null,
+          "description": null,
+          "designOnly": false,
+          "errorHandlers": [],
+          "evidenceIds": [],
+          "executable": false,
+          "executionMode": null,
+          "executorKind": "none",
+          "idempotency": null,
+          "implementationRef": null,
+          "inputStateSchema": null,
+          "inputs": [],
+          "iterationLimit": null,
+          "name": "通知发出",
+          "nodeId": "wf-n-end",
+          "nodeType": "End",
+          "outputStateSchema": null,
+          "outputs": [],
+          "ports": [],
+          "postconditions": [],
+          "preconditions": [],
+          "retryPolicy": null,
+          "sideEffects": [],
+          "stateTransitions": [],
+          "stateWritePolicy": null,
+          "timeoutPolicy": null,
+          "toolContractRef": null,
+          "verification": null
+        }
+      ],
+      "permissions": [],
+      "runSecurityPolicy": null,
+      "stateSchemaVersion": "state-v1",
+      "version": "1.0",
+      "wbs": {
+        "assignedNodeCount": 1,
+        "coverageRatio": 1.0,
+        "declared": true,
+        "kinds": {
+          "phase": 1,
+          "task": 1,
+          "work-package": 1
+        },
+        "nodeCount": 1,
+        "packageCount": 3,
+        "rootPackageId": "wp-root"
+      },
+      "workPackages": [
+        {
+          "childPackageIds": [
+            "wp-collect"
+          ],
+          "completionCriteria": "归集完成且通知送达",
+          "deliverable": "一份可审查的架构文档",
+          "dependsOn": [],
+          "evidenceIds": [],
+          "kind": "phase",
+          "nodeCount": 0,
+          "nodeIds": [],
+          "packageId": "wp-root",
+          "parentPackageId": null,
+          "title": "示例交付阶段",
+          "verification": "Hypothetical"
+        },
+        {
+          "childPackageIds": [
+            "wp-deliver"
+          ],
+          "completionCriteria": "每条结论都能指回来源",
+          "deliverable": "带来源的现状清单",
+          "dependsOn": [],
+          "evidenceIds": [],
+          "kind": "work-package",
+          "nodeCount": 0,
+          "nodeIds": [],
+          "packageId": "wp-collect",
+          "parentPackageId": "wp-root",
+          "title": "现状归集",
+          "verification": "Hypothetical"
+        },
+        {
+          "childPackageIds": [],
+          "completionCriteria": "结论已记录且通知已发出",
+          "deliverable": "可审计的归集结论",
+          "dependsOn": [
+            "wp-collect"
+          ],
+          "evidenceIds": [],
+          "kind": "task",
+          "nodeCount": 1,
+          "nodeIds": [
+            "wf-n-survey"
+          ],
+          "packageId": "wp-deliver",
+          "parentPackageId": "wp-collect",
+          "title": "归集与通知",
+          "verification": "Hypothetical"
+        }
+      ],
+      "workflowId": "wf-example"
+    }
+  ]
+}

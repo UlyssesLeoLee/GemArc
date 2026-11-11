@@ -1892,9 +1892,7 @@
         "calls",
         "authenticates",
         "controls"
-      ],
-      "status": "ready",
-      "layout": "zones",
+      ],
       "i18n": {
         "ja-JP": {
           "concerns": [
@@ -1952,8 +1950,7 @@
           "field": "environment"
         }
       },
-      "reviewIntent": "谁处于系统边界内外，跨区依赖有哪些？",
-      "axisPolicy": "categorical"
+      "reviewIntent": "谁处于系统边界内外，跨区依赖有哪些？"
     },
     {
       "id": "usecase",
@@ -1991,9 +1988,7 @@
       "edgeKinds": [
         "uses",
         "calls"
-      ],
-      "status": "ready",
-      "layout": "lanes",
+      ],
       "i18n": {
         "ja-JP": {
           "concerns": [
@@ -2055,8 +2050,7 @@
           "field": "domain"
         }
       },
-      "reviewIntent": "操作主体如何跨越业务与运行环境？",
-      "axisPolicy": "categorical"
+      "reviewIntent": "操作主体如何跨越业务与运行环境？"
     },
     {
       "id": "logical",
@@ -2100,9 +2094,7 @@
         "reads",
         "writes",
         "controls"
-      ],
-      "status": "ready",
-      "layout": "layers",
+      ],
       "i18n": {
         "ja-JP": {
           "concerns": [
@@ -2166,8 +2158,7 @@
           "field": "layer"
         }
       },
-      "reviewIntent": "哪一层职责跨越信任域或运行环境？",
-      "axisPolicy": "categorical"
+      "reviewIntent": "哪一层职责跨越信任域或运行环境？"
     },
     {
       "id": "development",
@@ -2210,9 +2201,7 @@
         "uses",
         "extends",
         "calls"
-      ],
-      "status": "ready",
-      "layout": "lanes",
+      ],
       "i18n": {
         "ja-JP": {
           "concerns": [
@@ -2258,8 +2247,7 @@
           "field": "domain"
         }
       },
-      "reviewIntent": "代码归属、逻辑分层、运行时边界是否一致？",
-      "axisPolicy": "categorical"
+      "reviewIntent": "代码归属、逻辑分层、运行时边界是否一致？"
     },
     {
       "id": "process",
@@ -2302,9 +2290,7 @@
         "controls",
         "hosts",
         "publishes"
-      ],
-      "status": "ready",
-      "layout": "lanes",
+      ],
       "i18n": {
         "ja-JP": {
           "concerns": [
@@ -2366,8 +2352,7 @@
           "field": "failureDomain"
         }
       },
-      "reviewIntent": "进程分布是否跨越信任域、故障域？",
-      "axisPolicy": "categorical"
+      "reviewIntent": "进程分布是否跨越信任域、故障域？"
     },
     {
       "id": "deployment",
@@ -2415,9 +2400,7 @@
         "hosts",
         "writes",
         "publishes"
-      ],
-      "status": "ready",
-      "layout": "zones",
+      ],
       "i18n": {
         "ja-JP": {
           "concerns": [
@@ -2485,8 +2468,7 @@
           "field": "runtime"
         }
       },
-      "reviewIntent": "部署环境、运行时与信任域如何对应？",
-      "axisPolicy": "categorical"
+      "reviewIntent": "部署环境、运行时与信任域如何对应？"
     },
     {
       "id": "data",
@@ -2526,9 +2508,7 @@
         "publishes",
         "exchanges",
         "calls"
-      ],
-      "status": "ready",
-      "layout": "layers",
+      ],
       "i18n": {
         "ja-JP": {
           "concerns": [
@@ -2586,8 +2566,7 @@
           "field": "environment"
         }
       },
-      "reviewIntent": "数据在哪个阶段、信任域与部署环境间流转？",
-      "axisPolicy": "categorical"
+      "reviewIntent": "数据在哪个阶段、信任域与部署环境间流转？"
     },
     {
       "id": "security",
@@ -2632,9 +2611,7 @@
         "uses",
         "calls",
         "hosts"
-      ],
-      "status": "ready",
-      "layout": "zones",
+      ],
       "i18n": {
         "ja-JP": {
           "concerns": [
@@ -2696,8 +2673,7 @@
           "field": "environment"
         }
       },
-      "reviewIntent": "有哪些真实跨信任域的连接，边界控制是否充分？",
-      "axisPolicy": "categorical"
+      "reviewIntent": "有哪些真实跨信任域的连接，边界控制是否充分？"
     },
     {
       "id": "operations",
@@ -2737,9 +2713,7 @@
         "writes",
         "calls",
         "exchanges"
-      ],
-      "status": "ready",
-      "layout": "lanes",
+      ],
       "i18n": {
         "ja-JP": {
           "concerns": [
@@ -2797,8 +2771,7 @@
           "field": "domain"
         }
       },
-      "reviewIntent": "哪些运维职责跨部署环境或故障域？",
-      "axisPolicy": "categorical"
+      "reviewIntent": "哪些运维职责跨部署环境或故障域？"
     },
     {
       "id": "integration",
@@ -2842,9 +2815,7 @@
         "authenticates",
         "uses",
         "controls"
-      ],
-      "status": "ready",
-      "layout": "layers",
+      ],
       "i18n": {
         "ja-JP": {
           "concerns": [
@@ -2906,8 +2877,7 @@
           "field": "runtime"
         }
       },
-      "reviewIntent": "对接端点跨越哪些信任域或运行时？",
-      "axisPolicy": "categorical"
+      "reviewIntent": "对接端点跨越哪些信任域或运行时？"
     },
     {
       "id": "extension",
@@ -2949,9 +2919,7 @@
         "uses",
         "controls",
         "hosts"
-      ],
-      "status": "ready",
-      "layout": "zones",
+      ],
       "i18n": {
         "ja-JP": {
           "concerns": [
@@ -3011,8 +2979,7 @@
           "field": "environment"
         }
       },
-      "reviewIntent": "扩展点在哪些运行时与信任域内生效？",
-      "axisPolicy": "categorical"
+      "reviewIntent": "扩展点在哪些运行时与信任域内生效？"
     },
     {
       "id": "reliability",
@@ -3060,9 +3027,7 @@
         "exchanges",
         "controls",
         "writes"
-      ],
-      "status": "ready",
-      "layout": "layers",
+      ],
       "i18n": {
         "ja-JP": {
           "concerns": [
@@ -3128,8 +3093,7 @@
           "field": "domain"
         }
       },
-      "reviewIntent": "故障域是否跨越部署环境与运行时？",
-      "axisPolicy": "categorical"
+      "reviewIntent": "故障域是否跨越部署环境与运行时？"
     }
   ]
 }

@@ -1,8 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import {dimensionPlan,crossingReport} from '../src/layout.js';
-const model=JSON.parse(fs.readFileSync(new URL('../../examples/illustrative-architecture.json',import.meta.url),'utf8'));
+import {model} from '../tools/load-model.mjs';
 
 test('12 architecture views encode three independently discriminative dimensions',()=>{
   assert.equal(model.views.length,12);

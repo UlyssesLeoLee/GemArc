@@ -152,6 +152,22 @@ export class Vector3 {
   }
 }
 
+/** The rotation of an object: three keeps it as an Euler with three angles. */
+export class Euler {
+  constructor(x = 0, y = 0, z = 0) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+  }
+
+  set(x, y, z) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    return this;
+  }
+}
+
 export class Quaternion {
   constructor(x = 0, y = 0, z = 0, w = 1) {
     this.x = x;
@@ -226,6 +242,7 @@ export class Object3D {
   constructor() {
     this.position = new Vector3();
     this.scale = new Vector3(1, 1, 1);
+    this.rotation = new Euler();
     this.quaternion = new Quaternion();
     this.children = [];
     this.parent = null;
@@ -246,6 +263,16 @@ export class Object3D {
   clear() {
     for (const child of this.children) child.parent = null;
     this.children.length = 0;
+    return this;
+  }
+
+  /** Detach a child, the way three does. */
+  remove(child) {
+    const index = this.children.indexOf(child);
+    if (index >= 0) {
+      this.children.splice(index, 1);
+      child.parent = null;
+    }
     return this;
   }
 
@@ -374,6 +401,12 @@ class CylinderGeometry {
     };
   }
 }
+class OctahedronGeometry {
+  constructor(radius = 1, detail = 0) {
+    this.type = 'OctahedronGeometry';
+    this.parameters = { radius, detail };
+  }
+}
 
 /* ------------------------------------------------------------- materials */
 
@@ -384,6 +417,7 @@ class MeshBasicMaterial {
   }
 }
 class MeshStandardMaterial extends MeshBasicMaterial {}
+class MeshToonMaterial extends MeshBasicMaterial {}
 class LineBasicMaterial extends MeshBasicMaterial {}
 class SpriteMaterial {
   constructor(parameters = {}) {
@@ -394,6 +428,22 @@ class CanvasTexture {
   constructor(image = null) {
     this.image = image;
     this.isCanvasTexture = true;
+  }
+}
+class DataTexture {
+  constructor(data = null, width = 1, height = 1, format = null) {
+    this.data = data;
+    this.width = width;
+    this.height = height;
+    this.format = format;
+    this.isDataTexture = true;
+    this.needsUpdate = false;
+    this.generateMipmaps = true;
+    this.magFilter = null;
+    this.minFilter = null;
+  }
+  dispose() {
+    this.disposed = true;
   }
 }
 
@@ -503,6 +553,40 @@ function intersectCylinder(origin, direction, radius, halfHeight) {
   return t;
 }
 
+/**
+ * The ray/octahedron intersection of three: the solid |x|+|y|+|z| <= radius
+ * is the intersection of eight half spaces, so the ray is clipped against
+ * them one by one.
+ * @returns {number|null} the distance of the entry, or null
+ */
+function intersectOctahedron(origin, direction, radius) {
+  let tmin = -Infinity;
+  let tmax = Infinity;
+  for (const sx of [1, -1]) {
+    for (const sy of [1, -1]) {
+      for (const sz of [1, -1]) {
+        const numerator = radius
+          - (sx * origin.x + sy * origin.y + sz * origin.z);
+        const denominator = sx * direction.x + sy * direction.y + sz * direction.z;
+        if (Math.abs(denominator) < 1e-12) {
+          // The ray runs parallel to this face: it is either inside it or out.
+          if (numerator < 0) return null;
+          continue;
+        }
+        const t = numerator / denominator;
+        if (denominator > 0) {
+          if (t < tmax) tmax = t;
+        } else if (t > tmin) {
+          tmin = t;
+        }
+      }
+    }
+  }
+  if (tmin > tmax) return null;
+  if (tmax < 0) return null;
+  return tmin >= 0 ? tmin : tmax;
+}
+
 export class Raycaster {
   constructor() {
     this.ray = { origin: new Vector3(), direction: new Vector3(0, 0, -1) };
@@ -558,6 +642,25 @@ export class Raycaster {
       return { object, distance, point: null };
     }
 
+    if (geometry.type === 'OctahedronGeometry') {
+      const center = object.worldPosition();
+      const radius = geometry.parameters.radius * Math.max(
+        Math.abs(object.scale.x),
+        Math.abs(object.scale.y),
+        Math.abs(object.scale.z),
+      );
+      // The solid is centred on the object, so the ray is measured from the
+      // centre: the octahedron is |x|+|y|+|z| <= radius around it.
+      const localOrigin = {
+        x: origin.x - center.x,
+        y: origin.y - center.y,
+        z: origin.z - center.z,
+      };
+      const distance = intersectOctahedron(localOrigin, direction, radius);
+      if (distance === null) return null;
+      return { object, distance, point: null };
+    }
+
     if (geometry.type === 'CylinderGeometry') {
       const center = object.worldPosition();
       // Undo the orientation of the tube: the cylinder stands on its own Y
@@ -584,6 +687,8 @@ export class Raycaster {
 
 export const DoubleSide = 2;
 export const FrontSide = 0;
+export const RedFormat = 1023;
+export const NearestFilter = 1003;
 
 /**
  * Build the stub three namespace.
@@ -606,15 +711,20 @@ export function createStubThree() {
     BoxGeometry,
     EdgesGeometry,
     CylinderGeometry,
+    OctahedronGeometry,
     MeshBasicMaterial,
     MeshStandardMaterial,
+    MeshToonMaterial,
     LineBasicMaterial,
     SpriteMaterial,
     CanvasTexture,
+    DataTexture,
     WebGLRenderer,
     Raycaster,
     DoubleSide,
     FrontSide,
+    RedFormat,
+    NearestFilter,
   };
 }
 

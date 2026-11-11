@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">
+<title>我的借阅 · 画面卡</title>
+<meta name="atlas-page" content="CARD-SCR-HOME">
+<meta name="atlas-stamp" content="u=9da9bdd5">
+<meta name="atlas-class" content="page">
+<meta name="atlas-lang" content="zh-CN">
+<meta name="atlas-schema" content="gemarc-atlas-read/1">
+<link rel="alternate" type="text/markdown" href="../../screens/SCR-HOME.card.md">
+<style>
+body{font:14px/1.5 'Microsoft YaHei','PingFang SC',sans-serif;margin:16px;color:#1f2328}
+header,footer{color:#57606a;font-size:12px}
+table{border-collapse:collapse;margin:8px 0}
+th,td{border:1px solid #d0d7de;padding:2px 8px;text-align:left;vertical-align:top}
+figure{margin:12px 0;overflow:auto}
+figcaption{font-size:12px;color:#57606a}
+code{font-family:Consolas,monospace}
+aside{background:#f6f8fa;padding:4px 12px;margin:8px 0}
+</style>
+</head>
+<body>
+<header>
+<p>页 §CARD-SCR-HOME · 我的借阅 · 1/1 · 含 10 个块、8 张表 · 页类 page</p>
+<p>项目 demo · zh-CN · u=9da9bdd5 · 原型界面 · 核对是否过期: gemarc_atlas_index scope="stamp"</p>
+</header>
+<main>
+<h1>我的借阅</h1>
+<aside>
+<p>含: 控件 3 个、状态 2 个、出向导航 1 条、核对点 11 个</p>
+<p>不含: 像素级几何、叠层、动画、响应式断点（几何只是示意）</p>
+<p>读法: 规范性内容: 种类、文字、字段、状态、跳转、父子与顺序；示意性内容: 位置与尺寸。圆标 = 控件序号 = 表里的 #。PNG 有效当且仅当其状态条里的 ui 值等于本卡的 u=。kind 与 DOM 的对照见 ui-schema.md</p>
+</aside>
+<p>屏幕 <code>SCR-HOME</code> · 页面 · 桌面 1280x800</p>
+<p>用途: 列出会员当前借出的书。</p>
+<p>属性: frame=desktop · route=/home · kind=page · start=false · req=RQ-1</p>
+<p>核对点 checkpoints=11（控件表每个非空单元格一个，id 是控件 id 加 @ 加列名；另有 @order、@route 和 #状态@state）</p>
+<p>判定戳 sha=5d9fe578（<code>ui-verdict-*</code> 的 conform 行抄它；本屏的核对点变了它才变）</p>
+<figure id="st-default">
+<figcaption>状态 default</figcaption>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 828" width="1280" height="828" role="group" aria-label="SCR-HOME 我的借阅（状态: default）" data-schema="gemarc-atlas-screen/1" data-screen="SCR-HOME" data-variant="default" data-frame="desktop" data-layout="1" data-ui-sha8="9da9bdd5">
+<title>SCR-HOME 我的借阅（状态: default）</title>
+<desc>包含: 3 个控件（header×1, link×1, table×1）；本状态显示 3 / 共 3。 不含: 叠层、绝对定位、动画、响应式断点、主题；一切不在原型模型里的内容。 几何为示意（布局 L1.1），规范性内容 = 种类、文字、字段、状态、跳转、父子与顺序。</desc>
+<style>
+.p{fill:#f6f7f9}.b{fill:#fff;stroke:#8a8f98}.f{fill:#e9ebee;stroke:#8a8f98}.n{fill:none;stroke:#c3c7cd;stroke-dasharray:3 3}.z{fill:transparent}.k{fill:#1f2328}.s{fill:#fff;stroke:#1f2328;stroke-width:2}.d{fill:#fff;stroke:#c0392b;stroke-width:2}.q{fill:#e5e7eb}.m{fill:#6b7280}.ln{stroke:#8a8f98;fill:none}
+.t,.h,.s2,.mk{font-family:'Microsoft YaHei','PingFang SC','Noto Sans CJK SC',sans-serif;font-size:14px;fill:#1f2328}.h{font-size:20px;font-weight:bold}.s2{font-size:12px}
+.mk{font-size:12px;fill:#fff;text-anchor:middle}.bd{font-weight:bold}.g{fill:#6b7280}.w{fill:#fff}.r{fill:#c0392b}.u{fill:#1a5fb4;text-decoration:underline}.i{font-style:italic}
+</style>
+<g id="SCR-HOME.state" data-kind="state-label" data-box="0 0 1280 28">
+<rect x="0" y="0" width="1280" height="28" class="f"/>
+<text x="8" y="18" class="s2 g">SCR-HOME · default · desktop 1280x800 · layout 1 · ui 9da9bdd5 · 示意线框 · 显示 3/3</text>
+</g>
+<g id="SCR-HOME.root" data-kind="screen" data-box="0 0 1280 800" data-req="RQ-1" transform="translate(0 28)">
+<rect x="0" y="0" width="1280" height="800" class="p"/>
+<g id="SCR-HOME.bar" data-kind="header" data-box="0 0 1280 56" data-n="1" data-parent="SCR-HOME.root" aria-label="借阅台">
+<rect x="0" y="0" width="1280" height="56" class="f"/>
+</g>
+<a href="SCR-LOGIN.html">
+<g id="SCR-HOME.logout" data-kind="link" data-box="20 12 34 32" data-n="2" data-parent="SCR-HOME.bar" aria-label="退出" data-goto="SCR-LOGIN" data-nav="SCR-HOME.logout:go:SCR-LOGIN" data-on="tap">
+<rect x="20" y="12" width="34" height="32" class="z"/>
+<text x="20" y="33" class="t u">退出</text>
+<circle cx="10" cy="22" r="9" class="m"/>
+<text x="10" y="26" class="mk" data-mark="2">2</text>
+</g>
+</a>
+<g id="SCR-HOME.loans" data-kind="table" data-box="24 80 1232 76" data-n="3" data-parent="SCR-HOME.root" aria-label="借出的书" data-sample="none">
+<rect x="24" y="80" width="1232" height="76" class="b"/>
+<rect x="24" y="80" width="1232" height="36" class="f"/>
+<text x="36" y="103" class="t bd">借出的书</text>
+<rect x="36" y="128" width="1208" height="16" rx="4" class="q"/>
+<circle cx="14" cy="90" r="9" class="m"/>
+<text x="14" y="94" class="mk" data-mark="3">3</text>
+</g>
+</g>
+</svg>
+</figure>
+<figure id="st-empty">
+<figcaption>状态 empty · 没有任何借出的书。</figcaption>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 844" width="1280" height="844" role="group" aria-label="SCR-HOME 我的借阅（状态: empty）" data-schema="gemarc-atlas-screen/1" data-screen="SCR-HOME" data-variant="empty" data-frame="desktop" data-layout="1" data-ui-sha8="9da9bdd5">
+<title>SCR-HOME 我的借阅（状态: empty）</title>
+<desc>包含: 3 个控件（header×1, link×1, table×1）；本状态显示 3 / 共 3。 不含: 叠层、绝对定位、动画、响应式断点、主题；一切不在原型模型里的内容。 没有任何借出的书。 几何为示意（布局 L1.1），规范性内容 = 种类、文字、字段、状态、跳转、父子与顺序。</desc>
+<style>
+.p{fill:#f6f7f9}.b{fill:#fff;stroke:#8a8f98}.f{fill:#e9ebee;stroke:#8a8f98}.n{fill:none;stroke:#c3c7cd;stroke-dasharray:3 3}.z{fill:transparent}.k{fill:#1f2328}.s{fill:#fff;stroke:#1f2328;stroke-width:2}.d{fill:#fff;stroke:#c0392b;stroke-width:2}.q{fill:#e5e7eb}.m{fill:#6b7280}.ln{stroke:#8a8f98;fill:none}
+.t,.h,.s2,.mk{font-family:'Microsoft YaHei','PingFang SC','Noto Sans CJK SC',sans-serif;font-size:14px;fill:#1f2328}.h{font-size:20px;font-weight:bold}.s2{font-size:12px}
+.mk{font-size:12px;fill:#fff;text-anchor:middle}.bd{font-weight:bold}.g{fill:#6b7280}.w{fill:#fff}.r{fill:#c0392b}.u{fill:#1a5fb4;text-decoration:underline}.i{font-style:italic}
+</style>
+<g id="SCR-HOME.state" data-kind="state-label" data-box="0 0 1280 44">
+<rect x="0" y="0" width="1280" height="44" class="f"/>
+<text x="8" y="18" class="s2 g">SCR-HOME · empty · desktop 1280x800 · layout 1 · ui 9da9bdd5 · 示意线框 · 显示 3/3</text>
+<text x="8" y="34" class="s2 g">没有任何借出的书。</text>
+</g>
+<g id="SCR-HOME.root" data-kind="screen" data-box="0 0 1280 800" data-req="RQ-1" transform="translate(0 44)">
+<rect x="0" y="0" width="1280" height="800" class="p"/>
+<g id="SCR-HOME.bar" data-kind="header" data-box="0 0 1280 56" data-n="1" data-parent="SCR-HOME.root" aria-label="借阅台">
+<rect x="0" y="0" width="1280" height="56" class="f"/>
+</g>
+<a href="SCR-LOGIN.html">
+<g id="SCR-HOME.logout" data-kind="link" data-box="20 12 34 32" data-n="2" data-parent="SCR-HOME.bar" aria-label="退出" data-goto="SCR-LOGIN" data-nav="SCR-HOME.logout:go:SCR-LOGIN" data-on="tap">
+<rect x="20" y="12" width="34" height="32" class="z"/>
+<text x="20" y="33" class="t u">退出</text>
+<circle cx="10" cy="22" r="9" class="m"/>
+<text x="10" y="26" class="mk" data-mark="2">2</text>
+</g>
+</a>
+<g id="SCR-HOME.loans" data-kind="table" data-box="24 80 1232 92" data-n="3" data-parent="SCR-HOME.root" aria-label="借出的书">
+<rect x="24" y="80" width="1232" height="92" class="b"/>
+<rect x="24" y="80" width="1232" height="36" class="f"/>
+<text x="36" y="103" class="t bd">借出的书</text>
+<text x="640" y="149" text-anchor="middle" class="t g i" data-derived="true">（空）</text>
+<circle cx="14" cy="90" r="9" class="m"/>
+<text x="14" y="94" class="mk" data-mark="3">3</text>
+</g>
+</g>
+</svg>
+</figure>
+<table>
+<caption>控件（3）</caption>
+<tr><th>#</th><th>id</th><th>kind</th><th>label</th><th>parent</th><th>in</th><th>bind</th><th>api</th><th>emph</th><th>goto</th><th>属性</th></tr>
+<tr id="r-SCR-HOME.bar"><td>1</td><td><code>SCR-HOME.bar</code></td><td>header</td><td>借阅台</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr id="r-SCR-HOME.logout"><td>2</td><td><code>SCR-HOME.logout</code></td><td>link</td><td>退出</td><td>bar</td><td></td><td></td><td></td><td></td><td>SCR-LOGIN</td><td></td></tr>
+<tr id="r-SCR-HOME.loans"><td>3</td><td><code>SCR-HOME.loans</code></td><td>table</td><td>借出的书</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+</table>
+<table>
+<caption>顺序（1）</caption>
+<tr><th>容器</th><th>子控件的顺序</th></tr>
+<tr><td><code>SCR-HOME.root</code></td><td>bar,loans</td></tr>
+</table>
+<table>
+<caption>状态（2）</caption>
+<tr><th>状态</th><th>kind</th><th>说明</th><th>界面文案</th><th>文件</th><th>显示控件数</th><th>未显示</th></tr>
+<tr id="r-SCR-HOME~default"><td><code>SCR-HOME#default</code></td><td></td><td></td><td></td><td><code>SCR-HOME.svg</code></td><td>3/3</td><td></td></tr>
+<tr id="r-SCR-HOME~empty"><td><code>SCR-HOME#empty</code></td><td>empty</td><td>没有任何借出的书。</td><td></td><td><code>SCR-HOME~empty.svg</code></td><td>3/3</td><td></td></tr>
+</table>
+<table>
+<caption>出向导航（1）</caption>
+<tr><th>起点</th><th>终点</th><th>文字</th><th>条件</th><th>触发</th><th>链接</th></tr>
+<tr><td><code>SCR-HOME.logout</code></td><td><code>SCR-LOGIN</code></td><td>退出登录</td><td></td><td>tap</td><td></td></tr>
+</table>
+<table>
+<caption>入向导航（1）</caption>
+<tr><th>起点</th><th>终点</th><th>文字</th><th>触发</th></tr>
+<tr><td><code>SCR-LOGIN.submit</code></td><td><code>SCR-HOME</code></td><td>凭证正确,进入首页</td><td>submit</td></tr>
+</table>
+<table>
+<caption>渲染器推导，非作者声明（2）</caption>
+<tr><th>推导物</th><th>控件</th><th>界面文案</th><th>状态</th></tr>
+<tr><td>无示例数据的灰条</td><td><code>SCR-HOME.loans</code></td><td></td><td>default</td></tr>
+<tr><td>空态占位</td><td><code>SCR-HOME.loans</code></td><td>（空）</td><td>empty</td></tr>
+</table>
+<table>
+<caption>全部可见文字（6）</caption>
+<tr><th>文字</th><th>状态</th><th>来源</th></tr>
+<tr><td>退出</td><td>全部</td><td>SCR-HOME.logout</td></tr>
+<tr><td>借出的书</td><td>全部</td><td>SCR-HOME.loans</td></tr>
+<tr><td>SCR-HOME · default · desktop 1280x800 · layout 1 · ui 9da9bdd5 · 示意线框 · 显示 3/3</td><td>default</td><td>状态条</td></tr>
+<tr><td>（空）</td><td>empty</td><td>SCR-HOME.loans （渲染器推导）</td></tr>
+<tr><td>SCR-HOME · empty · desktop 1280x800 · layout 1 · ui 9da9bdd5 · 示意线框 · 显示 3/3</td><td>empty</td><td>状态条</td></tr>
+<tr><td>没有任何借出的书。</td><td>empty</td><td>状态说明</td></tr>
+</table>
+<table>
+<caption>示例数据（1）</caption>
+<tr><th>控件</th><th>列</th><th>行数</th><th>画出行数</th><th>说明</th></tr>
+<tr><td><code>SCR-HOME.loans</code></td><td></td><td>0</td><td></td><td>未提供示例数据</td></tr>
+</table>
+</main>
+<footer>
+<nav>
+<a href="../../screens/SCR-HOME.card.md">画面卡（Markdown）</a> · <a href="INDEX.html">索引</a> · <a href="NAV.html">导航</a> · <a href="../START.html">入口</a>
+</nav>
+<p>页尾 §CARD-SCR-HOME · 含 10 个块、8 张表 · sha8 079b108f · 以上为全部内容</p>
+</footer>
+</body>
+</html>

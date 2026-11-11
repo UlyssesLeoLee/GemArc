@@ -123,6 +123,160 @@
             "class": "hint",
             "tag": "p",
             "text": "仅代表指定模型规则的干预计算结果；不是现实因果识别证明"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "h2",
+                "text": "三维语义轴 · 干预影响"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "干预影响的实体："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "无（当前干预未改变任何事件）"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "关闭："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "无"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "未达所属："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "无"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "新增所属："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "无"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "class": "hint",
+                "tag": "p",
+                "text": "三维场景高亮的是干预触及的实体：被关闭的模块，以及未达或新增事件所属的模块。"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "class": "",
+                        "tag": "b",
+                        "text": "部署层："
+                      },
+                      {
+                        "class": "muted",
+                        "tag": "span",
+                        "text": "设备层、中间件层、应用层"
+                      },
+                      {
+                        "class": "muted",
+                        "tag": "span",
+                        "text": ""
+                      }
+                    ],
+                    "class": "small",
+                    "tag": "p"
+                  },
+                  {
+                    "children": [
+                      {
+                        "class": "",
+                        "tag": "b",
+                        "text": "信任域："
+                      },
+                      {
+                        "class": "muted",
+                        "tag": "span",
+                        "text": "内部域、外部域"
+                      },
+                      {
+                        "class": "muted",
+                        "tag": "span",
+                        "text": ""
+                      }
+                    ],
+                    "class": "small",
+                    "tag": "p"
+                  },
+                  {
+                    "children": [
+                      {
+                        "class": "",
+                        "tag": "b",
+                        "text": "环境："
+                      },
+                      {
+                        "class": "muted",
+                        "tag": "span",
+                        "text": "生产环境"
+                      },
+                      {
+                        "class": "muted",
+                        "tag": "span",
+                        "text": ""
+                      }
+                    ],
+                    "class": "small",
+                    "tag": "p"
+                  }
+                ],
+                "class": "axis-legend",
+                "tag": "div"
+              },
+              {
+                "children": [],
+                "class": "axis-3d",
+                "tag": "div"
+              }
+            ],
+            "class": "panel",
+            "tag": "section"
           }
         ],
         "class": "panel",
@@ -130,8 +284,314 @@
       }
     ],
     "headline": "模块组合与因果干预",
+    "highlight": [],
     "kicker": "5D / CAUSAL SYSTEM",
-    "lostEvents": 0
+    "lostEvents": 0,
+    "mount": "semantic3d"
+  },
+  "causalIntervened": {
+    "body": [
+      {
+        "children": [
+          {
+            "class": "",
+            "tag": "h2",
+            "text": "因果干预对照"
+          },
+          {
+            "action": {
+              "id": "normal",
+              "type": "scenario"
+            },
+            "attrs": {
+              "value": "normal"
+            },
+            "children": [
+              {
+                "attrs": {
+                  "value": "normal"
+                },
+                "class": "",
+                "tag": "option",
+                "text": "正常事件传播"
+              }
+            ],
+            "tag": "select"
+          },
+          {
+            "children": [
+              {
+                "class": "hint",
+                "tag": "p",
+                "text": "选择要屏蔽的模块，然后重新计算反事实结果："
+              },
+              {
+                "action": {
+                  "id": "sensor",
+                  "type": "toggle-disable"
+                },
+                "attrs": {
+                  "type": "button"
+                },
+                "class": "chip",
+                "tag": "button",
+                "text": "事件源"
+              },
+              {
+                "action": {
+                  "id": "queue",
+                  "type": "toggle-disable"
+                },
+                "attrs": {
+                  "type": "button"
+                },
+                "class": "chip on",
+                "tag": "button",
+                "text": "消息队列"
+              },
+              {
+                "action": {
+                  "id": "rule",
+                  "type": "toggle-disable"
+                },
+                "attrs": {
+                  "type": "button"
+                },
+                "class": "chip",
+                "tag": "button",
+                "text": "规则引擎"
+              },
+              {
+                "action": {
+                  "id": "notify",
+                  "type": "toggle-disable"
+                },
+                "attrs": {
+                  "type": "button"
+                },
+                "class": "chip",
+                "tag": "button",
+                "text": "通知服务"
+              }
+            ],
+            "class": "chips",
+            "tag": "div"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "h3",
+                "text": "丢失事件"
+              },
+              {
+                "class": "",
+                "tag": "li",
+                "text": "notify · send"
+              },
+              {
+                "class": "",
+                "tag": "li",
+                "text": "queue · ingest"
+              },
+              {
+                "class": "",
+                "tag": "li",
+                "text": "rule · evaluate"
+              }
+            ],
+            "class": "",
+            "tag": "ul"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "h3",
+                "text": "新增事件"
+              },
+              {
+                "class": "muted",
+                "tag": "li",
+                "text": "无"
+              }
+            ],
+            "class": "",
+            "tag": "ul"
+          },
+          {
+            "class": "hint",
+            "tag": "p",
+            "text": "仅代表指定模型规则的干预计算结果；不是现实因果识别证明"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "h2",
+                "text": "三维语义轴 · 干预影响"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "干预影响的实体："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "queue、notify、rule"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "关闭："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "queue"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "未达所属："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "notify、queue、rule"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "新增所属："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "无"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "class": "hint",
+                "tag": "p",
+                "text": "三维场景高亮的是干预触及的实体：被关闭的模块，以及未达或新增事件所属的模块。"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "class": "",
+                        "tag": "b",
+                        "text": "部署层："
+                      },
+                      {
+                        "class": "muted",
+                        "tag": "span",
+                        "text": "设备层、中间件层、应用层"
+                      },
+                      {
+                        "class": "muted",
+                        "tag": "span",
+                        "text": ""
+                      }
+                    ],
+                    "class": "small",
+                    "tag": "p"
+                  },
+                  {
+                    "children": [
+                      {
+                        "class": "",
+                        "tag": "b",
+                        "text": "信任域："
+                      },
+                      {
+                        "class": "muted",
+                        "tag": "span",
+                        "text": "内部域、外部域"
+                      },
+                      {
+                        "class": "muted",
+                        "tag": "span",
+                        "text": ""
+                      }
+                    ],
+                    "class": "small",
+                    "tag": "p"
+                  },
+                  {
+                    "children": [
+                      {
+                        "class": "",
+                        "tag": "b",
+                        "text": "环境："
+                      },
+                      {
+                        "class": "muted",
+                        "tag": "span",
+                        "text": "生产环境"
+                      },
+                      {
+                        "class": "muted",
+                        "tag": "span",
+                        "text": ""
+                      }
+                    ],
+                    "class": "small",
+                    "tag": "p"
+                  }
+                ],
+                "class": "axis-legend",
+                "tag": "div"
+              },
+              {
+                "children": [],
+                "class": "axis-3d",
+                "tag": "div"
+              }
+            ],
+            "class": "panel",
+            "tag": "section"
+          }
+        ],
+        "class": "panel",
+        "tag": "section"
+      }
+    ],
+    "headline": "模块组合与因果干预",
+    "highlight": [
+      "queue",
+      "notify",
+      "rule"
+    ],
+    "kicker": "5D / CAUSAL SYSTEM",
+    "lostEvents": 3,
+    "mount": "semantic3d"
   },
   "facts": {
     "body": [
@@ -742,6 +1202,119 @@
       }
     ]
   },
+  "prototype": {
+    "body": [
+      {
+        "children": [
+          {
+            "class": "",
+            "tag": "h2",
+            "text": "页面与操作"
+          },
+          {
+            "children": [
+              {
+                "action": {
+                  "index": 0,
+                  "type": "prototype-page"
+                },
+                "attrs": {
+                  "data-page": "overview"
+                },
+                "class": "action active",
+                "tag": "button",
+                "text": "系统概览"
+              },
+              {
+                "action": {
+                  "index": 1,
+                  "type": "prototype-page"
+                },
+                "attrs": {
+                  "data-page": "settings"
+                },
+                "class": "action",
+                "tag": "button",
+                "text": "设置"
+              }
+            ],
+            "class": "tabs",
+            "tag": "div"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "h3",
+                "text": "系统概览"
+              },
+              {
+                "class": "",
+                "tag": "small",
+                "text": "overview"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "说明："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "演示状态查看"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "页面数："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "2"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "action": {
+                  "label": "查看详情",
+                  "type": "prototype-action"
+                },
+                "class": "action",
+                "tag": "button",
+                "text": "查看详情"
+              },
+              {
+                "action": {
+                  "label": "查看历史",
+                  "type": "prototype-action"
+                },
+                "class": "action",
+                "tag": "button",
+                "text": "查看历史"
+              }
+            ],
+            "class": "fact",
+            "tag": "div"
+          }
+        ],
+        "class": "panel",
+        "tag": "section"
+      }
+    ],
+    "headline": "界面原型",
+    "kicker": "UI / MULTI-TAB PROTOTYPE"
+  },
   "space": {
     "body": [
       {
@@ -1081,6 +1654,112 @@
             ],
             "class": "small",
             "tag": "p"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "h2",
+                "text": "三维语义轴 · 当前事件"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "当前事件："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "sensor · emit · delivered"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "class": "hint",
+                "tag": "p",
+                "text": "三维场景高亮的是当前事件作用的实体；推进时间轴，高亮随之移动。"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "class": "",
+                        "tag": "b",
+                        "text": "部署层："
+                      },
+                      {
+                        "class": "muted",
+                        "tag": "span",
+                        "text": "设备层、中间件层、应用层"
+                      },
+                      {
+                        "class": "muted",
+                        "tag": "span",
+                        "text": ""
+                      }
+                    ],
+                    "class": "small",
+                    "tag": "p"
+                  },
+                  {
+                    "children": [
+                      {
+                        "class": "",
+                        "tag": "b",
+                        "text": "信任域："
+                      },
+                      {
+                        "class": "muted",
+                        "tag": "span",
+                        "text": "内部域、外部域"
+                      },
+                      {
+                        "class": "muted",
+                        "tag": "span",
+                        "text": ""
+                      }
+                    ],
+                    "class": "small",
+                    "tag": "p"
+                  },
+                  {
+                    "children": [
+                      {
+                        "class": "",
+                        "tag": "b",
+                        "text": "环境："
+                      },
+                      {
+                        "class": "muted",
+                        "tag": "span",
+                        "text": "生产环境"
+                      },
+                      {
+                        "class": "muted",
+                        "tag": "span",
+                        "text": ""
+                      }
+                    ],
+                    "class": "small",
+                    "tag": "p"
+                  }
+                ],
+                "class": "axis-legend",
+                "tag": "div"
+              },
+              {
+                "children": [],
+                "class": "axis-3d",
+                "tag": "div"
+              }
+            ],
+            "class": "panel",
+            "tag": "section"
           }
         ],
         "class": "panel",
@@ -1088,7 +1767,11 @@
       }
     ],
     "headline": "动态流程与时间轴",
+    "highlight": [
+      "sensor"
+    ],
     "kicker": "4D / EVENT TIME",
+    "mount": "semantic3d",
     "trace": 4
   },
   "views": {
@@ -1199,6 +1882,106 @@
             ],
             "class": "fact",
             "tag": "div"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "h3",
+                "text": "语义视图"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "图示类型："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "logical-view"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "维度："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "3D"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "关注点："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "实体落在哪一层、哪个信任域、哪个环境"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "节点数："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "4"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "关系类型："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "未提供"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "action": {
+                  "id": "semantic-3d",
+                  "type": "view-filter"
+                },
+                "class": "action",
+                "tag": "button",
+                "text": "在 2D 中查看"
+              }
+            ],
+            "class": "fact",
+            "tag": "div"
           }
         ],
         "class": "panel",
@@ -1283,6 +2066,556 @@
                     "class": "muted",
                     "tag": "span",
                     "text": "通过"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "相关维度："
+                  },
+                  {
+                    "action": {
+                      "tab": "3d",
+                      "type": "goto-tab"
+                    },
+                    "attrs": {
+                      "href": "#3d"
+                    },
+                    "class": "link",
+                    "tag": "a",
+                    "text": "3D 语义与空间"
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": " · "
+                  },
+                  {
+                    "action": {
+                      "tab": "views",
+                      "type": "goto-tab"
+                    },
+                    "attrs": {
+                      "href": "#views"
+                    },
+                    "class": "link",
+                    "tag": "a",
+                    "text": "图示定义"
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": " · "
+                  },
+                  {
+                    "action": {
+                      "tab": "1d",
+                      "type": "goto-tab"
+                    },
+                    "attrs": {
+                      "href": "#1d"
+                    },
+                    "class": "link",
+                    "tag": "a",
+                    "text": "1D 事实"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              }
+            ],
+            "class": "fact",
+            "tag": "div"
+          },
+          {
+            "children": [
+              {
+                "class": "",
+                "tag": "h3",
+                "text": "交付流程"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "类型："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "task"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "节点数："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "4"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "边数："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "3"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "执行模式："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "未提供"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "执行图："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "eg-delivery"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "状态契约版本："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "state-v1"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "检查点策略："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "未提供"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "class": "",
+                        "tag": "span",
+                        "text": "agent-loop · simulation · 上限 4 · 权限 read-only"
+                      },
+                      {
+                        "class": "muted",
+                        "tag": "span",
+                        "text": " · "
+                      },
+                      {
+                        "action": {
+                          "id": "sensor",
+                          "type": "locate-node"
+                        },
+                        "attrs": {
+                          "href": "#2d"
+                        },
+                        "class": "link",
+                        "tag": "a",
+                        "text": "在 2D 中定位"
+                      }
+                    ],
+                    "class": "",
+                    "tag": "li"
+                  },
+                  {
+                    "children": [
+                      {
+                        "class": "",
+                        "tag": "span",
+                        "text": "human-approval · simulation · 审批 approval.default · 权限 approver"
+                      },
+                      {
+                        "class": "muted",
+                        "tag": "span",
+                        "text": " · "
+                      },
+                      {
+                        "action": {
+                          "id": "rule",
+                          "type": "locate-node"
+                        },
+                        "attrs": {
+                          "href": "#2d"
+                        },
+                        "class": "link",
+                        "tag": "a",
+                        "text": "在 2D 中定位"
+                      }
+                    ],
+                    "class": "",
+                    "tag": "li"
+                  }
+                ],
+                "class": "",
+                "tag": "ul"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "工作分解（WBS）："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "3 个工作包"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "执行节点归属："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "2 / 2"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "class": "",
+                            "tag": "b",
+                            "text": "阶段 "
+                          },
+                          {
+                            "class": "",
+                            "tag": "span",
+                            "text": "交付阶段"
+                          },
+                          {
+                            "class": "muted",
+                            "tag": "span",
+                            "text": " · wp-delivery"
+                          }
+                        ],
+                        "class": "small",
+                        "tag": "p"
+                      },
+                      {
+                        "children": [
+                          {
+                            "class": "",
+                            "tag": "li",
+                            "text": "交付物：一份可审查的架构文档"
+                          },
+                          {
+                            "class": "",
+                            "tag": "li",
+                            "text": "完成条件：检查点通过且审批通过"
+                          },
+                          {
+                            "children": [
+                              {
+                                "class": "",
+                                "tag": "span",
+                                "text": "归属执行节点："
+                              },
+                              {
+                                "class": "muted",
+                                "tag": "span",
+                                "text": "0"
+                              }
+                            ],
+                            "class": "",
+                            "tag": "li"
+                          }
+                        ],
+                        "class": "wbs-detail",
+                        "tag": "ul"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "class": "",
+                                    "tag": "b",
+                                    "text": "工作包 "
+                                  },
+                                  {
+                                    "class": "",
+                                    "tag": "span",
+                                    "text": "现状调查"
+                                  },
+                                  {
+                                    "class": "muted",
+                                    "tag": "span",
+                                    "text": " · wp-survey"
+                                  }
+                                ],
+                                "class": "small",
+                                "tag": "p"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "class": "",
+                                    "tag": "li",
+                                    "text": "交付物：带来源的现状清单"
+                                  },
+                                  {
+                                    "class": "",
+                                    "tag": "li",
+                                    "text": "完成条件：每条结论都能指回来源"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "class": "",
+                                        "tag": "span",
+                                        "text": "归属执行节点："
+                                      },
+                                      {
+                                        "action": {
+                                          "id": "sensor",
+                                          "type": "locate-node"
+                                        },
+                                        "attrs": {
+                                          "href": "#2d"
+                                        },
+                                        "class": "link",
+                                        "tag": "a",
+                                        "text": "现状调查"
+                                      }
+                                    ],
+                                    "class": "",
+                                    "tag": "li"
+                                  }
+                                ],
+                                "class": "wbs-detail",
+                                "tag": "ul"
+                              }
+                            ],
+                            "class": "wbs-item",
+                            "tag": "li"
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "class": "",
+                                    "tag": "b",
+                                    "text": "任务 "
+                                  },
+                                  {
+                                    "class": "",
+                                    "tag": "span",
+                                    "text": "交付审批"
+                                  },
+                                  {
+                                    "class": "muted",
+                                    "tag": "span",
+                                    "text": " · wp-approve"
+                                  }
+                                ],
+                                "class": "small",
+                                "tag": "p"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "class": "",
+                                    "tag": "li",
+                                    "text": "交付物：可审计的审批结论"
+                                  },
+                                  {
+                                    "class": "",
+                                    "tag": "li",
+                                    "text": "完成条件：审批决定已记录"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "class": "",
+                                        "tag": "span",
+                                        "text": "归属执行节点："
+                                      },
+                                      {
+                                        "action": {
+                                          "id": "rule",
+                                          "type": "locate-node"
+                                        },
+                                        "attrs": {
+                                          "href": "#2d"
+                                        },
+                                        "class": "link",
+                                        "tag": "a",
+                                        "text": "交付审批"
+                                      }
+                                    ],
+                                    "class": "",
+                                    "tag": "li"
+                                  }
+                                ],
+                                "class": "wbs-detail",
+                                "tag": "ul"
+                              }
+                            ],
+                            "class": "wbs-item",
+                            "tag": "li"
+                          }
+                        ],
+                        "class": "wbs",
+                        "tag": "ul"
+                      }
+                    ],
+                    "class": "wbs-item",
+                    "tag": "li"
+                  }
+                ],
+                "class": "wbs",
+                "tag": "ul"
+              },
+              {
+                "children": [
+                  {
+                    "class": "",
+                    "tag": "b",
+                    "text": "语义校验："
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "通过"
+                  }
+                ],
+                "class": "small",
+                "tag": "p"
+              },
+              {
+                "children": [
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": "相关维度："
+                  },
+                  {
+                    "action": {
+                      "tab": "3d",
+                      "type": "goto-tab"
+                    },
+                    "attrs": {
+                      "href": "#3d"
+                    },
+                    "class": "link",
+                    "tag": "a",
+                    "text": "3D 语义与空间"
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": " · "
+                  },
+                  {
+                    "action": {
+                      "tab": "views",
+                      "type": "goto-tab"
+                    },
+                    "attrs": {
+                      "href": "#views"
+                    },
+                    "class": "link",
+                    "tag": "a",
+                    "text": "图示定义"
+                  },
+                  {
+                    "class": "muted",
+                    "tag": "span",
+                    "text": " · "
+                  },
+                  {
+                    "action": {
+                      "tab": "1d",
+                      "type": "goto-tab"
+                    },
+                    "attrs": {
+                      "href": "#1d"
+                    },
+                    "class": "link",
+                    "tag": "a",
+                    "text": "1D 事实"
                   }
                 ],
                 "class": "small",

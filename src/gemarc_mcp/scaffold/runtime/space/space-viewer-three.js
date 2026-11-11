@@ -27,11 +27,17 @@
  *      There is no `Math.random()` anywhere in this file.
  *   7. **The retreat never moves real coordinates.** A relation class only
  *      changes opacity, outline, labels and line weight of the rendering.
+ *   8. **The gestures are Unity's.** The camera and the selection follow the
+ *      Unity 2022.3 scene view, and the mapping is shared with the
+ *      semantic-axis scene through `unity-controls.js`, so the two scenes
+ *      cannot disagree about how the reader drives them.
  */
 import { GemArcError } from '../core/errors.js';
 import { RELATION_CLASS_IDS, relationClassSpec } from '../core/vocab.js';
 import { treatmentForRelationClass } from '../focus/retreat-animation.js';
 import { SpaceModel } from './space-model.js';
+import { UnityControls, boundsOfPoints } from './unity-controls.js';
+import { createToonGradient, createToonMaterial } from './toon-material.js';
 
 /**
  * The diagnostic codes this module raises.
@@ -74,23 +80,31 @@ export const LAYOUT_CONSTANTS = Object.freeze({
  * visually distinct from an ordinary edge.
  */
 const EDGE_COLORS = Object.freeze({
-  'same-room': 0x5a7288,
+  'same-room': 0x7f8fa6,
   'cross-room': 0x6bd68a,
-  'cross-floor': 0x4cc2ff,
-  'cross-building': 0xb48ead,
-  'unassigned': 0x8fa3b8,
-  'trust-boundary': 0xffb454,
+  'cross-floor': 0x6fe3ff,
+  'cross-building': 0xb78cff,
+  'unassigned': 0x93a6bd,
+  'trust-boundary': 0xffc46b,
 });
 
-const NODE_COLOR = 0x4cc2ff;
-const NODE_COLOR_HIGHLIGHT = 0xffb454;
-const CONTAINER_COLOR = 0x22303f;
-const CONTAINER_COLOR_VIRTUAL = 0x3a4353;
+const NODE_COLOR = 0x6fe3ff;
+const NODE_COLOR_HIGHLIGHT = 0xffc46b;
+const CONTAINER_COLOR = 0x2c3d52;
+const CONTAINER_COLOR_VIRTUAL = 0x44536b;
+/**
+ * The body of a crystal is never fully opaque (BD-010 section 4.2). The
+ * retreat still decides how strong the emphasis is; it only scales this
+ * value, so the body keeps its translucency in every state.
+ */
+const CRYSTAL_BODY_OPACITY = 0.62;
 const OUTLINE_STRENGTH = Object.freeze({
   strong: { opacity: 1, scale: 1.42 },
   normal: { opacity: 0.8, scale: 1.22 },
   weak: { opacity: 0.35, scale: 1.1 },
-  none: { opacity: 0, scale: 1 },
+  // A crystal keeps a hint of its edge even when it steps back: without the
+  // edge it stops being a crystal and becomes a colored blob.
+  none: { opacity: 0.18, scale: 1 },
 });
 
 const LINE_WEIGHT_SCALE = Object.freeze({
@@ -807,153 +821,6 @@ function createWebGLContext(canvas) {
 }
 
 /**
- * A small, dependency-free orbit camera.
- *
- * Mouse drag rotates, the wheel zooms, a right drag or a shift drag pans.
- * `three/addons` is not portable across the two profiles, so the controller
- * lives here.
- */
-class SpaceCameraController {
-  constructor(camera, element) {
-    this.camera = camera;
-    this.element = element;
-    this.target = { x: 0, y: 0, z: 0 };
-    this.distance = 80;
-    this.theta = Math.PI * 0.25;
-    this.phi = Math.PI * 0.32;
-    this.minDistance = 4;
-    this.maxDistance = 4000;
-    this.dragging = null;
-    this.moved = 0;
-    this.listeners = [];
-    this._bind();
-  }
-
-  _bind() {
-    const element = this.element;
-    if (!element || typeof element.addEventListener !== 'function') return;
-    const on = (type, handler, options) => {
-      element.addEventListener(type, handler, options);
-      this.listeners.push([type, handler, options]);
-    };
-    on('pointerdown', (event) => this._onDown(event));
-    on('pointermove', (event) => this._onMove(event));
-    on('pointerup', (event) => this._onUp(event));
-    on('pointercancel', () => this._endDrag());
-    on('wheel', (event) => this._onWheel(event), { passive: false });
-    on('contextmenu', (event) => event.preventDefault());
-  }
-
-  _onDown(event) {
-    if (!event || typeof event.button !== 'number') return;
-    const pan = event.button === 2 || event.button === 1 || event.shiftKey === true;
-    this.dragging = {
-      mode: pan ? 'pan' : 'rotate',
-      x: event.clientX ?? 0,
-      y: event.clientY ?? 0,
-    };
-    this.moved = 0;
-    if (typeof this.element.setPointerCapture === 'function' && event.pointerId !== undefined) {
-      try {
-        this.element.setPointerCapture(event.pointerId);
-      } catch {
-        // A stub element may not support pointer capture.
-      }
-    }
-  }
-
-  _onMove(event) {
-    if (!this.dragging) return;
-    const dx = (event.clientX ?? 0) - this.dragging.x;
-    const dy = (event.clientY ?? 0) - this.dragging.y;
-    this.dragging.x = event.clientX ?? 0;
-    this.dragging.y = event.clientY ?? 0;
-    this.moved += Math.abs(dx) + Math.abs(dy);
-    if (this.dragging.mode === 'rotate') {
-      this.theta -= dx * 0.006;
-      this.phi = Math.max(0.05, Math.min(Math.PI - 0.05, this.phi - dy * 0.006));
-    } else {
-      this._pan(dx, dy);
-    }
-    this.apply();
-  }
-
-  _onWheel(event) {
-    if (!event) return;
-    if (typeof event.preventDefault === 'function') event.preventDefault();
-    const delta = event.deltaY ?? 0;
-    const factor = Math.exp(delta * 0.0012);
-    this.distance = Math.max(
-      this.minDistance,
-      Math.min(this.maxDistance, this.distance * factor),
-    );
-    this.apply();
-  }
-
-  _endDrag() {
-    this.dragging = null;
-  }
-
-  _onUp(event) {
-    const wasDragging = Boolean(this.dragging);
-    const moved = this.moved;
-    this._endDrag();
-    if (wasDragging && moved < 5 && typeof this.onClick === 'function') {
-      this.onClick(event);
-    }
-  }
-
-  _pan(dx, dy) {
-    const scale = this.distance * 0.0016;
-    const cos = Math.cos(this.theta);
-    const sin = Math.sin(this.theta);
-    // The camera right vector lies in the XZ plane.
-    this.target.x -= (dx * cos) * scale;
-    this.target.z += (dx * sin) * scale;
-    this.target.y += dy * scale;
-  }
-
-  /**
-   * Move the camera to an explicit position and target.
-   * @param {{position: object, target: object}} placement
-   */
-  set(placement) {
-    const target = placement.target;
-    const position = placement.position;
-    this.target = { x: target.x, y: target.y, z: target.z };
-    const dx = position.x - target.x;
-    const dy = position.y - target.y;
-    const dz = position.z - target.z;
-    this.distance = Math.max(this.minDistance, Math.sqrt(dx * dx + dy * dy + dz * dz));
-    if (this.distance > 0) {
-      this.theta = Math.atan2(dx, dz);
-      this.phi = Math.max(0.05, Math.min(Math.PI - 0.05, Math.acos(dy / this.distance)));
-    }
-    this.apply();
-  }
-
-  apply() {
-    const sinPhi = Math.sin(this.phi);
-    this.camera.position.set(
-      this.target.x + this.distance * sinPhi * Math.sin(this.theta),
-      this.target.y + this.distance * Math.cos(this.phi),
-      this.target.z + this.distance * sinPhi * Math.cos(this.theta),
-    );
-    this.camera.lookAt(this.target.x, this.target.y, this.target.z);
-    this.camera.updateMatrixWorld();
-  }
-
-  dispose() {
-    for (const [type, handler, options] of this.listeners) {
-      if (this.element && typeof this.element.removeEventListener === 'function') {
-        this.element.removeEventListener(type, handler, options);
-      }
-    }
-    this.listeners = [];
-  }
-}
-
-/**
  * Draw a text label as a sprite. The label states what the model states: a
  * container without a semantic source is marked as such, so the scene never
  * implies more than the model does.
@@ -964,7 +831,7 @@ class SpaceCameraController {
  */
 function createLabel(THREE, text, options = {}) {
   if (typeof document === 'undefined' || typeof document.createElement !== 'function') return null;
-  const color = options.color || '#dbe6f0';
+  const color = options.color || '#e6eef7';
   const background = options.background || 'rgba(11,15,20,0.82)';
   const fontSize = 44;
   const canvas = document.createElement('canvas');
@@ -1027,6 +894,7 @@ function placeCylinder(THREE, mesh, a, b) {
  * @param {object} THREE the injected three namespace
  * @param {{container: object, model: object, space: object, store?: object|null,
  *          onSelectNode?: Function|null, onSelectEdge?: Function|null,
+ *          onClearSelection?: Function|null,
  *          onHover?: Function|null, onNavigate?: Function|null}} options
  * @returns {object} the renderer api
  */
@@ -1038,6 +906,7 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
     store = null,
     onSelectNode = null,
     onSelectEdge = null,
+    onClearSelection = null,
     onHover = null,
     onNavigate = null,
   } = options || {};
@@ -1070,10 +939,25 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
   renderer.setPixelRatio(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0b0f14);
+  scene.background = new THREE.Color(0x06090e);
 
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 6000);
-  const controls = new SpaceCameraController(camera, canvas);
+  // The camera and the selection follow the Unity gestures. The mapping is
+  // shared with the semantic-axis scene, so the two can never disagree.
+  const controls = new UnityControls(camera, canvas, {
+    distance: 80,
+    pick: (event) => pick(event),
+    pickInRect: (rect) => pickInRect(rect),
+    onSelect: (hit, selection) => {
+      if (hit.kind === 'node' && onSelectNode) onSelectNode(hit.id, selection);
+      if (hit.kind === 'edge' && onSelectEdge) onSelectEdge(hit.id, selection);
+    },
+    onClear: () => {
+      if (onClearSelection) onClearSelection();
+    },
+    getBounds: () => getLayout().bounds,
+    getSelectionBounds: () => selectionBounds(),
+  });
 
   const ambient = new THREE.AmbientLight(0xffffff, 0.62);
   scene.add(ambient);
@@ -1221,7 +1105,7 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
     // explicitly, so a virtual organisation never masquerades as a real one.
     const suffix = virtual ? '（未声明语义来源）' : '';
     const label = createLabel(THREE, `${record.name}${suffix}`, {
-      color: virtual ? '#8fa3b8' : '#dbe6f0',
+      color: virtual ? '#93a6bd' : '#e6eef7',
       height: record.level === 'Room' ? 3.0 : 4.2,
     });
     if (label) {
@@ -1249,19 +1133,23 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
     return group;
   };
 
+  // One gradient map for the whole scene (BD-010 section 13): the light is
+  // banded into three steps on the cut faces, and the map never changes, so
+  // the same model renders the same pixels twice.
+  const toonGradient = track(createToonGradient(THREE));
+
   const buildNode = (node, parent, localPosition) => {
-    const geometry = new THREE.BoxGeometry(
-      LAYOUT_CONSTANTS.nodeSize,
-      LAYOUT_CONSTANTS.nodeSize,
-      LAYOUT_CONSTANTS.nodeSize,
+    // A crystal is a cut polyhedron, not a ball: the cut planes are what
+    // catch the light (BD-010 section 4.1).
+    const geometry = new THREE.OctahedronGeometry(
+      LAYOUT_CONSTANTS.nodeSize * 0.74,
+      0,
     );
     track(geometry);
-    const material = new THREE.MeshStandardMaterial({
+    const material = createToonMaterial(THREE, {
       color: NODE_COLOR,
-      transparent: true,
-      opacity: 1,
-      roughness: 0.55,
-      metalness: 0.15,
+      opacity: CRYSTAL_BODY_OPACITY,
+      gradient: toonGradient,
     });
     track(material);
     const mesh = new THREE.Mesh(geometry, material);
@@ -1270,7 +1158,7 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
     const outlineGeometry = new THREE.EdgesGeometry(geometry);
     track(outlineGeometry);
     const outlineMaterial = new THREE.LineBasicMaterial({
-      color: 0xdbe6f0,
+      color: 0xe6eef7,
       transparent: true,
       opacity: 0,
     });
@@ -1508,8 +1396,10 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
       const treatment = treatments[nodeId] || null;
       const isHighlighted = highlight.nodeIds.has(nodeId);
       const opacity = treatment?.opacity ?? 1;
-      record.material.opacity = opacity;
-      record.material.transparent = opacity < 1;
+      // The retreat scales the translucency of the body; it never makes the
+      // crystal opaque again.
+      record.material.opacity = opacity * CRYSTAL_BODY_OPACITY;
+      record.material.transparent = true;
       record.material.color.setHex(isHighlighted ? NODE_COLOR_HIGHLIGHT : NODE_COLOR);
 
       const outlineName = treatment?.outline
@@ -1684,18 +1574,43 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
         : [],
     );
   };
-  controls.onClick = (event) => {
-    const hit = pick(event);
-    if (!hit) {
-      if (onNavigate) onNavigate('back-to-overview');
-      return;
+  /**
+   * Everything the marquee rectangle covers.
+   *
+   * A node is inside the rectangle when its own position is. A relation is
+   * inside when both of its ends are: half a relation is not a relation.
+   * @param {{left: number, top: number, right: number, bottom: number}} rect
+   *   the rectangle in client coordinates
+   * @returns {Array<{kind: string, id: string}>} the hits
+   */
+  const pickInRect = (rect) => {
+    const hits = [];
+    const covered = new Set();
+    for (const [nodeId, node] of Object.entries(getLayout().nodes)) {
+      const point = projectToClient(nodeDisplayPosition(nodeId));
+      if (!point.onScreen) continue;
+      if (point.x < rect.left || point.x > rect.right) continue;
+      if (point.y < rect.top || point.y > rect.bottom) continue;
+      covered.add(nodeId);
+      hits.push({ kind: 'node', id: nodeId });
     }
-    if (hit.kind === 'node') {
-      if (onSelectNode) onSelectNode(hit.id);
-    } else if (hit.kind === 'edge') {
-      // An edge click selects the edge, never its source node.
-      if (onSelectEdge) onSelectEdge(hit.id);
+    for (const [edgeId, record] of edgeRecords) {
+      if (!covered.has(record.sourceId) || !covered.has(record.targetId)) continue;
+      hits.push({ kind: 'edge', id: edgeId });
     }
+    return hits;
+  };
+
+  /**
+   * The bounds of the selected nodes, so that F can frame them.
+   * @returns {{center: object, radius: number}|null} the bounds
+   */
+  const selectionBounds = () => {
+    const points = [];
+    for (const nodeId of highlight.nodeIds) {
+      points.push(nodeDisplayPosition(nodeId));
+    }
+    return boundsOfPoints(points);
   };
 
   const onPointerMove = (event) => {
@@ -1749,6 +1664,8 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
   let animationHandle = null;
   const animate = () => {
     if (disposed) return;
+    // The fly keys move the camera only while the right button is held.
+    controls.tick();
     // The loop only draws. Every position change belongs to `refreshVisuals`,
     // which owns the display-only z offset. A per-frame position write would
     // fight the layout and could silently move a node off its room floor.
@@ -1946,6 +1863,7 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
     renderer,
     scene,
     camera,
+    controls,
   };
 
   build();

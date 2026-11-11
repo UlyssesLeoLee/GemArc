@@ -1,0 +1,664 @@
+{
+  "$defs": {
+    "checkpoint": {
+      "additionalProperties": true,
+      "properties": {
+        "checkpointId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "createdAt": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "currentNodeIds": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "pendingEdgeIds": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "runId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "stateDigest": {
+          "default": null,
+          "description": "状态摘要。用于恢复时校验状态完整性。",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stateSchemaVersion": {
+          "description": "检查点记录的状态 schema 版本。缺失即无法校验状态完整性。",
+          "minLength": 1,
+          "type": "string"
+        },
+        "workflowVersion": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "checkpointId",
+        "runId",
+        "workflowVersion",
+        "stateSchemaVersion"
+      ],
+      "type": "object"
+    },
+    "evidenceRefs": {
+      "default": [],
+      "description": "证据 ID 列表，指向顶层 evidence 数组。",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "executionEdge": {
+      "additionalProperties": true,
+      "properties": {
+        "checkpointBoundary": {
+          "default": null,
+          "description": "该边是否是检查点边界。边界存在但状态 schema 未声明时必须被拒绝。",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "dataMapping": {
+          "default": null,
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "deliverySemantics": {
+          "default": null,
+          "enum": [
+            "at-most-once",
+            "at-least-once",
+            "exactly-once",
+            null
+          ],
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "edgeId": {
+          "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$",
+          "type": "string"
+        },
+        "evidenceIds": {
+          "$ref": "#/$defs/evidenceRefs"
+        },
+        "guardExpression": {
+          "default": null,
+          "description": "路由条件。条件边缺失时必须被拒绝（missing_route_guard）。",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "description": "取值见 vocab/workflow-kinds.json edgeKinds。",
+          "enum": [
+            "control-flow",
+            "data-flow",
+            "event-flow",
+            "error-flow",
+            "conditional-flow",
+            "compensation-flow",
+            "dependency",
+            "state-transition",
+            "approval-transition",
+            "tool-result",
+            "retry-transition",
+            "timeout-transition",
+            "resume-transition"
+          ],
+          "type": "string"
+        },
+        "onError": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "onTimeout": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "policyRef": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "priority": {
+          "default": null,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "sourceNodeId": {
+          "type": "string"
+        },
+        "sourcePortId": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stateMergePolicy": {
+          "default": null,
+          "description": "并行分支的状态归并策略。缺失时无法检测归并冲突。",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stateProjection": {
+          "default": null,
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "stateSchemaRef": {
+          "default": null,
+          "description": "该边传递的状态 schema 引用。缺失时该边不得携带状态。",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "targetNodeId": {
+          "type": "string"
+        },
+        "targetPortId": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "edgeId",
+        "sourceNodeId",
+        "targetNodeId",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "executionNode": {
+      "additionalProperties": true,
+      "properties": {
+        "approvalPolicyRef": {
+          "default": null,
+          "description": "审批策略引用。人工审批节点缺失时必须被拒绝（human_approval_bypass）。",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "authorityPolicyRef": {
+          "default": null,
+          "description": "权限策略引用。工具调用与审批节点缺失时必须被拒绝。",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "budgetPolicy": {
+          "default": null,
+          "description": "预算策略：token / 时间 / 调用次数上限。",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "evidenceIds": {
+          "$ref": "#/$defs/evidenceRefs"
+        },
+        "executorRef": {
+          "default": null,
+          "description": "执行器引用。缺失表示没有真实执行器：节点必须标 Design-only。",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "idempotencyKeyStrategy": {
+          "default": null,
+          "description": "幂等键策略。有副作用的节点缺失时必须被拒绝（unsafe_side_effect_replay）。",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "inputSchema": {
+          "default": null,
+          "description": "输入契约。必须可被程序读取。",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "iterationLimit": {
+          "default": null,
+          "description": "Agent 循环的最大迭代次数。缺失即判为无界循环（unbounded_agent_loop）。",
+          "minimum": 1,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "kind": {
+          "description": "§25 node_kinds。",
+          "enum": [
+            "agent-loop",
+            "deterministic-program",
+            "human-approval",
+            "tool-call",
+            "policy-gate",
+            "checkpoint",
+            "join-fork",
+            "retry-timeout",
+            "compensation",
+            "end"
+          ],
+          "type": "string"
+        },
+        "name": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "nodeId": {
+          "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$",
+          "type": "string"
+        },
+        "outputSchema": {
+          "default": null,
+          "description": "输出契约。必须可被程序读取。",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "retry": {
+          "default": null,
+          "description": "重试策略：次数与退避。",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "stateReadSet": {
+          "default": [],
+          "description": "该节点获准读取的状态字段。",
+          "items": {
+            "$ref": "#/$defs/stateFieldRef"
+          },
+          "type": "array"
+        },
+        "stateWriteSet": {
+          "default": [],
+          "description": "该节点获准写入的状态字段。节点只能修改自己获准的字段。",
+          "items": {
+            "$ref": "#/$defs/stateFieldRef"
+          },
+          "type": "array"
+        },
+        "timeout": {
+          "default": null,
+          "description": "超时策略：时长与超时后的处理。",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "toolContractRef": {
+          "default": null,
+          "description": "工具契约引用。工具调用节点缺失时不得发起真实调用。",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "verification": {
+          "$ref": "#/$defs/verification"
+        }
+      },
+      "required": [
+        "nodeId",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "run": {
+      "additionalProperties": true,
+      "properties": {
+        "actorId": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "checkpointId": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "correlationId": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "currentNodeIds": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "logicalTime": {
+          "default": null,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "mode": {
+          "enum": [
+            "simulation",
+            "dry-run",
+            "real"
+          ],
+          "type": "string"
+        },
+        "pendingEdgeIds": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "runId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "stateSchemaVersion": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "running",
+            "waiting-approval",
+            "paused",
+            "completed",
+            "failed",
+            "rejected",
+            "compensated",
+            "cancelled"
+          ],
+          "type": "string"
+        },
+        "traceId": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "workflowId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "workflowVersion": {
+          "description": "恢复时必须与检查点记录的版本一致；不一致必须拒绝恢复。",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "runId",
+        "workflowId",
+        "workflowVersion",
+        "mode",
+        "status"
+      ],
+      "type": "object"
+    },
+    "stateFieldRef": {
+      "description": "共享状态里的一个字段路径。",
+      "minLength": 1,
+      "type": "string"
+    },
+    "verification": {
+      "default": null,
+      "description": "事实等级，取值见 vocab/evidence-levels.json",
+      "enum": [
+        "Implemented",
+        "Observed",
+        "Designed",
+        "Inferred",
+        "Hypothetical",
+        "Unknown",
+        null
+      ],
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "workPackage": {
+      "additionalProperties": true,
+      "properties": {
+        "completionCriteria": {
+          "default": null,
+          "description": "完成条件。何时算做完。缺失即不构成 WBS（wbs_missing_deliverable）。",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "deliverable": {
+          "default": null,
+          "description": "交付物。这一层产出什么。缺失即不构成 WBS（wbs_missing_deliverable）。",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dependsOn": {
+          "default": [],
+          "description": "跨包依赖的工作包 ID。依赖与执行边是两件事，不得互相替代。",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "evidenceIds": {
+          "$ref": "#/$defs/evidenceRefs"
+        },
+        "kind": {
+          "description": "WBS 层级：阶段 / 工作包 / 任务。",
+          "enum": [
+            "phase",
+            "work-package",
+            "task"
+          ],
+          "type": "string"
+        },
+        "nodeIds": {
+          "default": [],
+          "description": "归属的执行节点 ID（指向本图 nodes[].nodeId）。空包即不构成 WBS（wbs_unbound_package）。",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "packageId": {
+          "description": "工作包稳定 ID。",
+          "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$",
+          "type": "string"
+        },
+        "parentPackageId": {
+          "default": null,
+          "description": "父工作包 ID。顶层阶段为 null。有且只有一个根，且不得成环。",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "verification": {
+          "$ref": "#/$defs/verification"
+        }
+      },
+      "required": [
+        "packageId",
+        "kind"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://gemarc.dev/schemas/0.3.0/execution-graph.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "description": "v6.0 提示词 §25 的 6D 执行图 IR 契约，以及 §17 GWF-IR 6D 扩展里的执行节点/边/运行字段。这是**模型层契约**：它规定执行图必须声明什么，不提供执行能力。真实执行必须另有获授权的后端（orchestration_6d.real_execution_requires_authorized_backend）；在只有静态交付物时必须标明生产执行不支持。",
+  "properties": {
+    "capabilities": {
+      "default": [],
+      "description": "本执行图需要的能力。与执行器能力匹配后才能真实运行。",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "checkpoints": {
+      "default": [],
+      "description": "检查点目录。跨重启的持久化由明确的检查点与存储层负责；边上带状态不等于可恢复。",
+      "items": {
+        "$ref": "#/$defs/checkpoint"
+      },
+      "type": "array"
+    },
+    "edges": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/executionEdge"
+      },
+      "type": "array"
+    },
+    "executionGraphId": {
+      "description": "执行图稳定 ID。",
+      "pattern": "^[A-Za-z0-9][\\w.:-]{0,127}$",
+      "type": "string"
+    },
+    "executionMode": {
+      "default": "simulation",
+      "description": "运行模式。默认 simulation（无真实副作用）。real 必须存在获授权的执行后端。",
+      "enum": [
+        "simulation",
+        "dry-run",
+        "real"
+      ],
+      "type": "string"
+    },
+    "nodes": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/executionNode"
+      },
+      "type": "array"
+    },
+    "runs": {
+      "default": [],
+      "description": "运行记录。审计轨迹必须可回溯到 runId 与 traceId。",
+      "items": {
+        "$ref": "#/$defs/run"
+      },
+      "type": "array"
+    },
+    "stateSchemaVersion": {
+      "default": null,
+      "description": "共享状态的 schema 版本。§25：状态提交在明确的持久化边界发生；状态提交必须可校验。",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "version": {
+      "default": null,
+      "description": "执行图版本。§17 要求版本化：恢复时必须拒绝不兼容的版本。",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "workPackages": {
+      "default": [],
+      "description": "WBS 分解层（6D = WBS × 执行图）。工作包说明做什么、产出什么、何时算完成；nodeIds 把工作包绑定到本图的执行节点。",
+      "items": {
+        "$ref": "#/$defs/workPackage"
+      },
+      "type": "array"
+    },
+    "workflowId": {
+      "default": null,
+      "description": "来源工作流 ID。执行图必须能回溯到它。",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "executionGraphId",
+    "version",
+    "nodes"
+  ],
+  "title": "6D Execution Graph IR",
+  "type": "object"
+}

@@ -27,6 +27,8 @@ import {
   WORKFLOW_NODE_KIND_IDS,
   WORKFLOW_EDGE_KIND_IDS,
   WORKFLOW_CONSTRAINT_IDS,
+  workflowNodeKindBySpec,
+  workflowEdgeKindBySpec,
 } from '../core/vocab.js';
 
 /** Port kinds, taken from the generated vocabulary so they cannot drift. */
@@ -52,15 +54,23 @@ function asObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
+/** An absent or empty value: an alias may fill it. */
+function isEmpty(value) {
+  return value === undefined || value === null || value === '';
+}
+
 function optionalString(value) {
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
 function normalizePort(port) {
   const source = asObject(port);
+  // v5.0 §17 calls the port id "portId"; the canonical spelling is "id".
+  const portId = typeof source.id === 'string' ? source.id
+    : (typeof source.portId === 'string' ? source.portId : '');
   return {
     ...source,
-    id: typeof source.id === 'string' ? source.id : '',
+    id: portId,
     kind: typeof source.kind === 'string' ? source.kind : 'input',
     name: optionalString(source.name),
     schemaRef: optionalString(source.schemaRef),
@@ -93,10 +103,19 @@ function normalizeCanvas(canvas) {
 
 function normalizeNode(node) {
   const source = asObject(node);
+  // v5.0 §17 calls the node type "nodeType"; the canonical spelling is "kind".
+  // A §17 type name ("Task") is mapped back onto its canonical id.
+  // An empty string counts as "not given", exactly like the Python side.
+  let kind = source.kind;
+  if (isEmpty(kind) && typeof source.nodeType === 'string') {
+    kind = workflowNodeKindBySpec(source.nodeType) || source.nodeType;
+  }
+  let id = source.id;
+  if (isEmpty(id) && typeof source.nodeId === 'string') id = source.nodeId;
   return {
     ...source,
-    id: typeof source.id === 'string' ? source.id : '',
-    kind: typeof source.kind === 'string' ? source.kind : 'task',
+    id,
+    kind,
     name: typeof source.name === 'string' ? source.name : '',
     canonicalNodeId: optionalString(source.canonicalNodeId),
     ports: asArray(source.ports).map(normalizePort),
@@ -110,17 +129,40 @@ function normalizeNode(node) {
 
 function normalizeEdge(edge) {
   const source = asObject(edge);
-  const condition = source.condition === '' ? null : (source.condition ?? null);
+  // v5.0 §17 calls the edge type "edgeType" and the condition "guard"; the
+  // canonical spellings are "kind" and "condition".
+  let kind = source.kind;
+  if (isEmpty(kind) && typeof source.edgeType === 'string') {
+    kind = workflowEdgeKindBySpec(source.edgeType) || source.edgeType;
+  }
+  let id = source.id;
+  if (isEmpty(id) && typeof source.edgeId === 'string') id = source.edgeId;
+  let sourceId = source.sourceId;
+  if (isEmpty(sourceId) && typeof source.sourceNodeId === 'string') sourceId = source.sourceNodeId;
+  let targetId = source.targetId;
+  if (isEmpty(targetId) && typeof source.targetNodeId === 'string') targetId = source.targetNodeId;
+  // An empty condition counts as "not given": the guard alias fills it.
+  let condition = source.condition;
+  if (isEmpty(condition)) {
+    condition = typeof source.guard === 'string' && source.guard ? source.guard : null;
+  }
+  // §17 direction: "both" means the edge is not directed.
+  const rawDirected = source.directed ?? undefined;
+  const directed = rawDirected === undefined
+    ? (typeof source.direction === 'string'
+      ? source.direction !== 'both' && source.direction !== 'undirected'
+      : true)
+    : Boolean(rawDirected);
   return {
     ...source,
-    id: typeof source.id === 'string' ? source.id : '',
-    sourceId: typeof source.sourceId === 'string' ? source.sourceId : '',
-    targetId: typeof source.targetId === 'string' ? source.targetId : '',
+    id,
+    sourceId,
+    targetId,
     sourcePortId: optionalString(source.sourcePortId),
     targetPortId: optionalString(source.targetPortId),
-    kind: typeof source.kind === 'string' ? source.kind : 'sequence',
-    directed: source.directed === undefined ? true : Boolean(source.directed),
-    condition: condition === null ? null : String(condition),
+    kind,
+    directed,
+    condition: condition === null || condition === undefined ? null : String(condition),
     dataContract: source.dataContract ? asObject(source.dataContract) : null,
     canvas: source.canvas ? asObject(source.canvas) : null,
     properties: asObject(source.properties),
@@ -133,9 +175,12 @@ function normalizeEdge(edge) {
  */
 export function normalizeWorkflow(workflow) {
   const source = asObject(workflow);
+  // v5.0 §17 calls the workflow id "workflowId"; the canonical spelling is "id".
+  const id = typeof source.id === 'string' ? source.id
+    : (typeof source.workflowId === 'string' ? source.workflowId : '');
   return {
     ...source,
-    id: typeof source.id === 'string' ? source.id : '',
+    id,
     name: typeof source.name === 'string' ? source.name : '',
     kind: optionalString(source.kind),
     description: optionalString(source.description),

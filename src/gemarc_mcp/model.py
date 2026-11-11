@@ -43,9 +43,21 @@ ENTITY_KINDS = frozenset(item["id"] for item in _vocab("entity-kinds")["kinds"])
 EDGE_TYPES = frozenset(item["id"] for item in _vocab("edge-types")["types"])
 DIAGRAM_TYPES = {item["id"]: item for item in _vocab("diagram-types")["types"]}
 CASE_CATEGORIES = frozenset(item["id"] for item in _vocab("case-categories")["categories"])
+CASE_TYPES = frozenset(item["id"] for item in _vocab("case-types")["types"])
+CASE_REALITIES = frozenset(_vocab("case-types")["reality"]["values"])
 WORKFLOW_NODE_KINDS = frozenset(item["id"] for item in _vocab("workflow-kinds")["nodeKinds"])
 WORKFLOW_EDGE_KINDS = frozenset(item["id"] for item in _vocab("workflow-kinds")["edgeKinds"])
 WORKFLOW_CONSTRAINTS = frozenset(item["id"] for item in _vocab("workflow-kinds")["executionConstraints"])
+
+#: v5.0 §17 names the workflow node and edge types in PascalCase ("Task",
+#: "ControlFlow"). The canonical ids are lower case, so a workflow written in
+#: the specification's spelling has to be mapped back onto them.
+WORKFLOW_NODE_KIND_BY_SPEC = {item["specType"]: item["id"]
+                              for item in _vocab("workflow-kinds")["nodeKinds"]
+                              if item.get("specType")}
+WORKFLOW_EDGE_KIND_BY_SPEC = {item["specType"]: item["id"]
+                              for item in _vocab("workflow-kinds")["edgeKinds"]
+                              if item.get("specType")}
 
 #: A strict model must be backed by implemented or observed facts.
 STRICT_MINIMUM_RANK = 5
@@ -91,6 +103,11 @@ def normalized_model(model: dict) -> dict:
     2. evidence levels are canonicalised
     3. every collection gets a default empty array
     4. meta gets schemaVersion / language / evidenceState defaults
+    5. the field spellings of v5.0 §3 / §17 are accepted as aliases:
+       node ``type`` -> ``kind``, node ``label`` -> ``name``,
+       edge ``direction`` -> ``directed``, workflow node ``nodeType`` -> ``kind``,
+       workflow edge ``edgeType`` -> ``kind`` and ``guard`` -> ``condition``,
+       port ``portId`` -> ``id``, workflow ``workflowId`` -> ``id``
     """
     copied = copy.deepcopy(model if isinstance(model, dict) else {})
     meta = _as_dict(copied.get("meta"))
@@ -102,14 +119,120 @@ def normalized_model(model: dict) -> dict:
     copied["nodes"] = [_normalize_node(item) for item in _as_array(copied.get("nodes"))]
     copied["edges"] = [_normalize_edge(item) for item in _as_array(copied.get("edges"))]
     copied["evidence"] = [_normalize_evidence(item) for item in _as_array(copied.get("evidence"))]
-    for key in ("views", "scenarios", "cases", "workflows", "prototypes"):
+    for key in ("views", "scenarios", "prototypes"):
         copied[key] = _as_array(copied.get(key))
+    copied["cases"] = [_normalize_case(item) for item in _as_array(copied.get("cases"))]
+    copied["workflows"] = [_normalize_workflow(item) for item in _as_array(copied.get("workflows"))]
     copied["space"] = _as_dict(copied.get("space")) if copied.get("space") else None
     return copied
 
 
+def _normalize_workflow(workflow) -> dict:
+    """Accept the GWF-IR field spellings of v5.0 §17 as aliases.
+
+    The canonical spelling stays ``kind`` / ``condition`` / ``id``; the §17
+    spellings (``nodeType`` / ``edgeType`` / ``guard`` / ``portId`` /
+    ``workflowId``) are read and rewritten so the rest of the code - and the
+    browser runtime - only ever sees one spelling.
+    """
+    item = _as_dict(workflow)
+    if not item.get("id") and isinstance(item.get("workflowId"), str):
+        item["id"] = item["workflowId"]
+    nodes = []
+    for node in _as_array(item.get("nodes")):
+        record = _as_dict(node)
+        if not record.get("id") and isinstance(record.get("nodeId"), str):
+            record["id"] = record["nodeId"]
+        if not record.get("kind") and isinstance(record.get("nodeType"), str):
+            record["kind"] = WORKFLOW_NODE_KIND_BY_SPEC.get(record["nodeType"], record["nodeType"])
+        record["ports"] = [_normalize_port(port) for port in _as_array(record.get("ports"))]
+        nodes.append(record)
+    item["nodes"] = nodes
+    edges = []
+    for edge in _as_array(item.get("edges")):
+        record = _as_dict(edge)
+        if not record.get("id") and isinstance(record.get("edgeId"), str):
+            record["id"] = record["edgeId"]
+        if not record.get("kind") and isinstance(record.get("edgeType"), str):
+            record["kind"] = WORKFLOW_EDGE_KIND_BY_SPEC.get(record["edgeType"], record["edgeType"])
+        if not record.get("sourceId") and isinstance(record.get("sourceNodeId"), str):
+            record["sourceId"] = record["sourceNodeId"]
+        if not record.get("targetId") and isinstance(record.get("targetNodeId"), str):
+            record["targetId"] = record["targetNodeId"]
+        # An empty condition counts as "not given": the guard alias fills it.
+        # The browser runtime applies the same rule; the two must not differ.
+        condition = record.get("condition")
+        if condition is None or (isinstance(condition, str) and not condition):
+            guard = record.get("guard")
+            condition = guard if (isinstance(guard, str) and guard) else None
+        record["condition"] = None if condition is None else str(condition)
+        # §17 direction: "both" means the edge is not directed. Without this the
+        # value was silently rewritten to "source-to-target".
+        directed = record.get("directed")
+        if directed is None:
+            direction = record.get("direction")
+            record["directed"] = (direction not in ("both", "undirected")
+                                  if isinstance(direction, str) else True)
+        else:
+            record["directed"] = bool(directed)
+        edges.append(record)
+    item["edges"] = edges
+    # 6D: the WBS layer of an execution graph. The canonical spellings are the
+    # contract's ("packageId" / "parentPackageId" / "nodeIds"); the model layer
+    # also accepts the short forms.
+    if item.get("executionGraph") is not None:
+        graph = _as_dict(item.get("executionGraph"))
+        graph["workPackages"] = [_normalize_work_package(package)
+                                 for package in _as_array(graph.get("workPackages"))]
+        item["executionGraph"] = graph
+    return item
+
+
+def _normalize_work_package(package) -> dict:
+    """Accept the WBS field spellings of the execution-graph contract.
+
+    ``packageId`` / ``parentPackageId`` / ``nodeIds`` are canonical; ``id`` /
+    ``parentId`` / ``nodes`` are the model-layer spellings.
+    """
+    record = _as_dict(package)
+    if not record.get("packageId") and isinstance(record.get("id"), str):
+        record["packageId"] = record["id"]
+    if not record.get("parentPackageId"):
+        parent = record.get("parentId")
+        record["parentPackageId"] = parent if isinstance(parent, str) else None
+    if not _as_array(record.get("nodeIds")) and isinstance(record.get("nodes"), list):
+        record["nodeIds"] = [item for item in record["nodes"] if isinstance(item, str)]
+    return record
+
+
+def _normalize_port(port) -> dict:
+    record = _as_dict(port)
+    if not record.get("id") and isinstance(record.get("portId"), str):
+        record["id"] = record["portId"]
+    return record
+
+
+def _normalize_case(case) -> dict:
+    """Accept the case field spellings of v5.0 §13 as aliases.
+
+    The canonical spelling stays ``id``; the §13 spelling (``caseId``) is
+    read and rewritten. Without this the specification's own spelling was
+    rejected by the validator, and the case library the MCP derives could not
+    be fed back into the model.
+    """
+    record = _as_dict(case)
+    if not record.get("id") and isinstance(record.get("caseId"), str):
+        record["id"] = record["caseId"]
+    return record
+
+
 def _normalize_node(node) -> dict:
     item = _as_dict(node)
+    # v5.0 §3 names the entity type "type" and the display name "label".
+    if not item.get("kind") and isinstance(item.get("type"), str):
+        item["kind"] = item["type"]
+    if not item.get("name") and isinstance(item.get("label"), str):
+        item["name"] = item["label"]
     item["properties"] = _as_dict(item.get("properties"))
     item["parentId"] = item.get("parentId")
     item["role"] = item.get("role")
@@ -139,7 +262,14 @@ def _normalize_edge(edge) -> dict:
         edge_type = item.get("kind")
     item["type"] = edge_type
     item.pop("kind", None)
-    item["directed"] = bool(item.get("directed", True))
+    # v5.0 §17 names the flow direction "direction"; the canonical spelling is
+    # the boolean "directed". Read the raw value first: the default must not
+    # shadow the alias.
+    raw_directed = item.get("directed")
+    direction = item.get("direction")
+    if raw_directed is None and isinstance(direction, str):
+        raw_directed = direction not in ("undirected", "both")
+    item["directed"] = True if raw_directed is None else bool(raw_directed)
     condition = item.get("condition")
     item["condition"] = None if condition == "" else condition
     item["weight"] = item.get("weight")
@@ -222,9 +352,9 @@ def validate(model: dict, strict: bool = False) -> dict:
             else:
                 warn("GEMARC_MODEL_022", "未登记的实体类型", ident)
         _check_evidence_refs(node, evidence_ids, err, warn)
-        if strict and (evidence_rank(node.get("verification")) < STRICT_MINIMUM_RANK or not node.get("evidence")):
+        if strict and (evidence_rank(node.get("verification")) < STRICT_MINIMUM_RANK or not _has_evidence_refs(node)):
             err("GEMARC_EVIDENCE_002", "节点缺少可确认的证据", ident)
-        elif not node.get("evidence"):
+        elif not _has_any_evidence(node):
             warn("GEMARC_EVIDENCE_003", "节点无证据，必须在页面标注", ident)
 
     edge_ids = set()
@@ -246,9 +376,9 @@ def validate(model: dict, strict: bool = False) -> dict:
             if not isinstance(edge.get(key), str) or edge.get(key) not in ids:
                 err("GEMARC_MODEL_012", f"{key} 节点不存在", str(eid))
         _check_evidence_refs(edge, evidence_ids, err, warn)
-        if strict and (evidence_rank(edge.get("verification")) < STRICT_MINIMUM_RANK or not edge.get("evidence")):
+        if strict and (evidence_rank(edge.get("verification")) < STRICT_MINIMUM_RANK or not _has_evidence_refs(edge)):
             err("GEMARC_EVIDENCE_004", "边缺少可确认的证据", str(eid))
-        elif not edge.get("evidence"):
+        elif not _has_any_evidence(edge):
             warn("GEMARC_EVIDENCE_005", "关系无证据", str(eid))
 
     view_ids = set()
@@ -267,6 +397,16 @@ def validate(model: dict, strict: bool = False) -> dict:
     _validate_workflows(canonical.get("workflows"), ids, err, warn)
     _validate_scenarios(canonical.get("scenarios"), ids, err, warn, strict)
     return _result(issues)
+
+
+def _has_evidence_refs(entity) -> bool:
+    """True when the entity cites evidence records through the canonical ``evidenceIds`` field."""
+    return bool(_as_array(entity.get("evidenceIds")))
+
+
+def _has_any_evidence(entity) -> bool:
+    """Lenient (non-strict) test: cited records, or the legacy free-text ``evidence`` note."""
+    return _has_evidence_refs(entity) or bool(entity.get("evidence"))
 
 
 def _check_evidence_refs(entity, evidence_ids, err, warn) -> None:
@@ -351,6 +491,12 @@ def _validate_cases(cases, scenarios, node_ids, err, warn) -> None:
             err("GEMARC_CASE_001", "Case 引用的场景不存在", str(cid))
         if case.get("category") not in CASE_CATEGORIES:
             err("GEMARC_CASE_002", "无效的 Case 分类", str(cid))
+        case_type = case.get("caseType")
+        if case_type is not None and case_type not in CASE_TYPES:
+            err("GEMARC_CASE_006", "未登记的 Case 分析类型", str(cid))
+        reality = case.get("reality")
+        if reality is not None and reality not in CASE_REALITIES:
+            err("GEMARC_CASE_007", "未登记的 Case 现实标记", str(cid))
         for node_id in _as_array(case.get("disabledNodeIds")):
             if node_id not in node_ids:
                 err("GEMARC_CASE_003", "Case 屏蔽的节点不存在", str(cid))
@@ -388,8 +534,44 @@ def _validate_workflows(workflows, node_ids, err, warn) -> None:
             for key in ("sourceId", "targetId"):
                 if edge.get(key) not in local_ids:
                     err("GEMARC_WORKFLOW_002", "工作流边引用不存在的节点", str(edge.get("id", "")))
-            if edge.get("kind") == "conditional" and not edge.get("condition"):
+            if edge.get("kind") in ("conditional", "conditional-flow") and not edge.get("condition"):
                 err("GEMARC_WORKFLOW_003", "条件流必须声明可判断的条件", str(edge.get("id", "")))
+        _validate_execution_gates(workflow, err)
+
+
+#: v6.0 ``quality_gates_6d.reject_on``: the gate name and the error code it raises.
+EXECUTION_GATE_CODES = {
+    "unbounded_agent_loop": "GEMARC_EXEC_001",
+    "human_approval_bypass": "GEMARC_EXEC_002",
+    "unvalidated_state_schema": "GEMARC_EXEC_003",
+    "missing_route_guard": "GEMARC_EXEC_004",
+    "unsafe_side_effect_replay": "GEMARC_EXEC_005",
+    "checkpoint_without_state_integrity": "GEMARC_EXEC_006",
+    "fake_production_execution": "GEMARC_EXEC_007",
+    "untraceable_decision": "GEMARC_EXEC_008",
+    "wbs_orphan_node": "GEMARC_EXEC_009",
+    "wbs_broken_hierarchy": "GEMARC_EXEC_010",
+    "wbs_missing_deliverable": "GEMARC_EXEC_011",
+    "wbs_unbound_package": "GEMARC_EXEC_012",
+}
+
+
+def _validate_execution_gates(workflow: dict, err) -> None:
+    """Apply the v6.0 6D quality gates to a workflow that declares an execution graph.
+
+    The gate rules live with the derivation (one implementation, one source of
+    truth); this only turns a hit into an error. A workflow that is not an
+    execution graph is never gated - that is what keeps the 6D rules an
+    optional increment on top of the 5D contract.
+    """
+    from .scaffold.derive import _execution_gates
+
+    for hit in _execution_gates(workflow):
+        code = EXECUTION_GATE_CODES.get(hit.get("gate"))
+        if not code:
+            continue
+        targets = hit.get("targets") or []
+        err(code, hit.get("message", "6D 质量门未通过"), str(targets[0]) if targets else str(workflow.get("id", "")))
 
 
 def _validate_scenarios(scenarios, node_ids, err, warn, strict) -> None:

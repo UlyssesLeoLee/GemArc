@@ -1,0 +1,46 @@
+#atlas-ui 1
+## screens: id | title | purpose | opts
+SCR-LOGIN | 登录 | 会员用邮箱和密码进入借阅台。 | kind=page frame=desktop route=/login start=true actor=usr.member req=RQ-1
+SCR-RESET | 重设密码 | 会员收邮件重设密码的入口。 | kind=dialog frame=desktop route=/reset
+SCR-HOME | 我的借阅 | 列出会员当前借出的书,可续借或去还书。 | kind=page frame=desktop route=/home req=RQ-1 actor=usr.member
+## variants: screen | name | note | opts
+SCR-LOGIN | loading | 提交后等待服务器响应。 | kind=loading
+SCR-LOGIN | error | 邮箱或密码不正确。 | kind=error
+SCR-RESET | success | 已发送重设邮件。 | kind=success
+SCR-HOME | loading | 正在读取借阅记录。 | kind=loading
+SCR-HOME | empty | 没有任何借出的书。 | kind=empty
+## widgets: local | label | opts
+@set screen=SCR-LOGIN
+form | 登录表单 | kind=form
+email | 邮箱 | kind=input parent=form bind=email
+pwd | 密码 | kind=input parent=form bind=password
+err | 邮箱或密码不正确 | kind=text parent=form in=error emph=danger
+submit | 登录 | kind=button parent=form emph=primary api=svc.loan
+forgot | 忘记密码 | kind=link parent=form
+@set screen=SCR-RESET
+msg | 输入注册邮箱,我们会发送重设链接 | kind=text
+email | 邮箱 | kind=input bind=email
+send | 发送 | kind=button emph=primary
+cancel | 取消 | kind=link
+@set screen=SCR-HOME
+bar | 借阅台 | kind=header
+find | 找书 | kind=link parent=bar
+fines | 罚款 | kind=link parent=bar
+profile | 资料 | kind=link parent=bar
+notice | 通知 | kind=link parent=bar
+logout | 退出 | kind=link parent=bar
+due | 3 本即将到期 | kind=badge emph=danger
+loans | 借出的书 | kind=table w=fill api=tbl.loan
+renew | 续借 | kind=button emph=secondary api=svc.loan
+## nav: from | to | label | opts
+SCR-LOGIN.submit | SCR-HOME | 凭证正确,进入首页 | on=submit guard=凭证正确 case=CS-BORROW-OK rule=R-BORROW
+SCR-LOGIN.forgot | SCR-RESET | 去重设密码 | on=tap
+SCR-RESET.send | SCR-RESET#success | 发送成功 | on=submit
+SCR-RESET.cancel | SCR-LOGIN | 放弃 | on=tap
+SCR-HOME.find | SCR-SEARCH | 去找书 | on=tap
+SCR-HOME.fines | SCR-FINES | 去看罚款 | on=tap
+SCR-HOME.profile | SCR-PROFILE | 去改资料 | on=tap
+SCR-HOME.notice | SCR-NOTICE | 去看通知 | on=tap
+SCR-HOME.logout | SCR-LOGIN | 退出登录 | on=tap
+SCR-HOME.loans | SCR-BOOK | 点一行看书籍详情 | on=tap
+SCR-HOME.renew | SCR-RENEW | 续借选中的书 | on=tap

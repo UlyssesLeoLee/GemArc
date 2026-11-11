@@ -1,0 +1,2 @@
+path	origin	reference_unit	treatment	deviations
+src/gemarc_mcp/atlas/versions.py	new	-	authored from docs/atlas/spec/versions.md (ADR-019): the content fingerprint (the first eight hex digits of the SHA-256), the version label (the fingerprint plus the minute), the site fingerprint and the ledger of .atlas/versions.json; no reference code read or copied	-

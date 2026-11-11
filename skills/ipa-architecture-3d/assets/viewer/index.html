@@ -1,59 +1,186 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0d1727"><title>Architecture Dimension Studio</title></head>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a1119">
+<title>Architecture Dimension Studio</title>
+</head>
 <body>
 <div class="app-shell">
- <header class="header">
-  <div class="logo"><span class="logo-emblem">◈</span><div><div class="eyebrow">SPATIAL ARCHITECTURE · THREE.JS</div><div class="brand">Architecture <b>Dimension Studio</b></div></div></div>
-  <div class="header-right"><span id="language-pill" class="header-chip">中文</span><span id="model-tag" class="header-chip">—</span><span class="version">v2.1</span></div>
- </header>
- <div class="layout">
-  <aside class="sidebar-left">
-   <div class="side-intro"><span class="eyebrow" data-t="perspectives">ARCHITECTURE VIEWS</span><h2 data-t="views">架构视图</h2><p data-t="viewsHint">切换视点，重新映射真实的 X/Y/Z 架构属性。</p></div>
-   <nav id="view-nav" aria-label="View selection"></nav>
-   <div class="left-foot"><span class="dot cyan"></span><span id="view-count">12 Views</span><span data-t="sourceIsolated">单一模型</span></div>
-  </aside>
-  <main class="center">
-   <section class="intro"><div><div class="kicker" id="view-index">01 / 12 · VIEW</div><h1 id="view-title">—</h1><p id="view-desc">—</p></div><div class="intro-stat"><span data-t="spatialFidelity">有效空间维数</span><strong id="depth-metric">—</strong></div></section>
-   <section class="scene-card">
-    <div class="scene-tools">
-      <div class="tool-tabs">
-        <div class="mode-tabs" role="group" aria-label="render mode">
-          <button type="button" data-mode="3d" class="selected" data-t="mode3d">3D 立体</button><button type="button" data-mode="2d" data-t="mode2d">2D 平面</button>
-        </div>
-        <div class="camera-tabs" role="group" aria-label="camera projection">
-        <button type="button" data-camera="3d" class="selected" data-t="camera3d">3D 透视</button><button type="button" data-camera="top" data-t="cameraTop">俯视 XZ</button><button type="button" data-camera="front" data-t="cameraFront">正视 XY</button><button type="button" data-camera="side" data-t="cameraSide">侧视 ZY</button>
-        </div>
+
+  <header class="header">
+    <div class="brand">
+      <span class="brand-mark" data-t="brandMark">SPA</span>
+      <span class="brand-name" data-t="brandName">Architecture Dimension Studio</span>
+    </div>
+    <div class="header-meta">
+      <span id="model-tag" class="chip chip-state">—</span>
+      <span id="language-pill" class="chip">—</span>
+    </div>
+  </header>
+
+  <div class="layout">
+
+    <!-- views -->
+    <aside class="sidebar sidebar-l">
+      <div class="section-head">
+        <span class="eyebrow" data-t="views">架构视图</span>
       </div>
-      <div class="tool-actions"><button id="fit" type="button" data-t="fit">适配全图</button><button id="edge-toggle" type="button" aria-pressed="true" data-t="edges">关系线：显示</button><button id="layers-toggle" type="button" aria-pressed="true" data-t="layers">分层面：显示</button></div>
-    </div>
-    <div id="scene" role="group">
-      <svg id="flat" class="flat-canvas" role="img" aria-label="2D architecture view" hidden></svg>
-      <div class="fallback" id="webgl-error" hidden></div>
-    </div>
-    <div class="flat-note" id="flat-note" hidden></div>
-    <div class="scene-footer"><span id="scene-summary">—</span><span data-t="mouseHint">左键旋转 · 滚轮缩放 · 右键平移 · 点击节点查看证据</span></div>
-   </section>
-   <section class="axes-card">
-    <div class="axes-head"><div><div class="eyebrow" data-t="semantics">SEMANTIC AXES</div><h2 data-t="dimMapping">三维语义映射</h2></div><button id="reset-axes" type="button" data-t="resetAxes">恢复视图默认轴</button></div>
-    <div class="axes">
-      <label class="axis axis-x"><span>X <small data-t="xRole">横向分组</small></span><select id="axis-x" aria-label="X field"></select><span class="axis-info" id="axis-x-count"></span><select class="axis-filter" id="axis-x-filter" aria-label="X category focus"></select></label>
-      <label class="axis axis-y"><span>Y <small data-t="yRole">垂直层次</small></span><select id="axis-y" aria-label="Y field"></select><span class="axis-info" id="axis-y-count"></span><select class="axis-filter" id="axis-y-filter" aria-label="Y category focus"></select></label>
-      <label class="axis axis-z"><span>Z <small data-t="zRole">纵深区分</small></span><select id="axis-z" aria-label="Z field"></select><span class="axis-info" id="axis-z-count"></span><select class="axis-filter" id="axis-z-filter" aria-label="Z category focus"></select></label>
-    </div>
-    <div class="axis-note" id="axis-note">—</div>
-   </section>
-   <section class="review-grid"><article class="review-cell"><span data-t="stakeholders">相关人员</span><p id="stakeholders">—</p></article><article class="review-cell"><span data-t="concerns">审查关注点</span><p id="concerns">—</p></article><article class="review-cell"><span data-t="questions">关键审查问题</span><p id="questions">—</p></article></section>
-  </main>
-  <aside class="sidebar-right">
-   <div class="right-header"><div class="eyebrow" data-t="evidence">TRACEABLE EVIDENCE</div><h2 data-t="inspectorTitle">结构与证据</h2><p data-t="inspectorHint">选择节点，查看属性、关系及证据；跨视图保留对象 ID。</p></div>
-   <div class="metric-row"><div><strong id="node-stat">—</strong><span data-t="elements">节点</span></div><div><strong id="edge-stat">—</strong><span data-t="relations">关系</span></div><div><strong id="cross-stat">—</strong><span data-t="crossing">跨信任域</span></div></div>
-   <div class="detail" id="detail" aria-live="polite"></div>
-   <div class="node-explorer"><label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="搜索节点 / ID" aria-label="Search nodes"></label><div id="nodes" class="node-list"></div></div>
-   <div class="review-warning" id="review-warning"></div>
-  </aside>
- </div>
- <footer class="footer"><span id="system-title">—</span><span data-t="disclaimer">以 IPA 参考资料与 ISO 42010 架构描述原则审查；非官方认证 · 演示数据为虚构</span></footer>
+      <nav id="view-nav" aria-label="View selection"></nav>
+      <div class="nav-foot">
+        <span id="view-count">—</span>
+        <span data-t="spatialFidelityShort">有效维数</span>
+      </div>
+    </aside>
+
+    <!-- stage -->
+    <main class="center">
+
+      <section class="intro">
+        <div>
+          <div class="kicker" id="view-index">—</div>
+          <h1 id="view-title">—</h1>
+          <p id="view-desc"></p>
+        </div>
+        <div class="intro-stat">
+          <span data-t="spatialFidelity">有效空间维数</span>
+          <strong id="depth-metric">—</strong>
+        </div>
+      </section>
+
+      <section class="scene-card">
+        <div class="toolbar">
+          <div class="toolbar-group">
+            <div class="toolbar-group" role="group" aria-label="render mode">
+              <button type="button" class="ctl selected" data-mode="3d" data-t="mode3d">3D 立体</button>
+              <button type="button" class="ctl" data-mode="2d" data-t="mode2d">2D 平面</button>
+            </div>
+            <span class="toolbar-divider" aria-hidden="true"></span>
+            <div class="toolbar-group" id="camera-tabs" role="group" aria-label="review viewpoints"></div>
+          </div>
+          <div class="toolbar-group">
+            <button id="fit" type="button" class="ctl" data-t="fit">适配全图</button>
+            <button id="edge-toggle" type="button" class="ctl" aria-pressed="true" data-t="edges">关系线：显示</button>
+            <button id="layers-toggle" type="button" class="ctl" aria-pressed="true" data-t="layers">分层面：显示</button>
+          </div>
+        </div>
+
+        <div id="scene" role="group">
+          <svg id="flat" role="img" hidden></svg>
+          <div class="fallback" id="webgl-error" hidden></div>
+          <div class="gizmo-host" id="gizmo-host"></div>
+        </div>
+
+        <div class="strip strip-rig" id="rig-note" hidden></div>
+        <div class="strip" id="flat-note" hidden></div>
+        <div class="strip">
+          <span id="scene-summary">—</span>
+          <span data-t="mouseHint">左键旋转 · 滚轮缩放 · 右键平移 · 点击节点查看证据</span>
+        </div>
+      </section>
+
+      <section class="axes-card">
+        <div class="axes-head">
+          <h2 data-t="dimMapping">三维语义映射</h2>
+          <button id="reset-axes" type="button" class="ctl" data-t="resetAxes">恢复默认轴</button>
+        </div>
+        <div class="axes">
+          <div class="axis" data-axis="x">
+            <div class="axis-top">
+              <span class="axis-key">X</span>
+              <span class="axis-role" data-t="xRole">横向分组</span>
+            </div>
+            <select id="axis-x" aria-label="X field"></select>
+            <span class="axis-meta" id="axis-x-count"></span>
+            <select class="axis-filter" id="axis-x-filter" aria-label="X category focus"></select>
+          </div>
+          <div class="axis" data-axis="y">
+            <div class="axis-top">
+              <span class="axis-key">Y</span>
+              <span class="axis-role" data-t="yRole">垂直层次</span>
+            </div>
+            <select id="axis-y" aria-label="Y field"></select>
+            <span class="axis-meta" id="axis-y-count"></span>
+            <select class="axis-filter" id="axis-y-filter" aria-label="Y category focus"></select>
+          </div>
+          <div class="axis" data-axis="z">
+            <div class="axis-top">
+              <span class="axis-key">Z</span>
+              <span class="axis-role" data-t="zRole">纵深区分</span>
+            </div>
+            <select id="axis-z" aria-label="Z field"></select>
+            <span class="axis-meta" id="axis-z-count"></span>
+            <select class="axis-filter" id="axis-z-filter" aria-label="Z category focus"></select>
+          </div>
+        </div>
+        <div class="axis-note" id="axis-note"></div>
+      </section>
+
+      <section class="review-grid">
+        <article class="review-cell">
+          <span data-t="stakeholders">相关人员</span>
+          <p id="stakeholders">—</p>
+        </article>
+        <article class="review-cell">
+          <span data-t="concerns">审查关注点</span>
+          <p id="concerns">—</p>
+        </article>
+        <article class="review-cell">
+          <span data-t="questions">关键审查问题</span>
+          <p id="questions">—</p>
+        </article>
+      </section>
+
+      <!-- Design intent declared in the model but not visible anywhere in space.
+           IPA review expects scope, constraints, decisions and quality attributes to
+           be stated; parking them in unused JSON fields hides them from the reader. -->
+      <section class="intent" id="intent">
+        <span class="eyebrow" data-t="designIntent">设计意图</span>
+        <div class="intent-grid">
+          <div class="intent-cell"><span data-t="intentScope">范围</span><p id="intent-scope">—</p></div>
+          <div class="intent-cell"><span data-t="intentConstraints">约束</span><p id="intent-constraints">—</p></div>
+          <div class="intent-cell"><span data-t="intentDecisions">决策</span><p id="intent-decisions">—</p></div>
+          <div class="intent-cell"><span data-t="intentQuality">质量属性</span><p id="intent-quality">—</p></div>
+        </div>
+        <div class="intent-sources"><span data-t="intentSources">依据来源</span><p id="intent-sources">—</p></div>
+      </section>
+
+    </main>
+
+    <!-- inspector -->
+    <aside class="sidebar sidebar-r">
+      <div class="right-head">
+        <span class="eyebrow" data-t="evidence">TRACEABLE EVIDENCE</span>
+        <h2 data-t="inspectorTitle">结构与证据</h2>
+      </div>
+
+      <div class="metrics">
+        <div class="metric"><strong id="node-stat">—</strong><span data-t="elements">节点</span></div>
+        <div class="metric"><strong id="edge-stat">—</strong><span data-t="relations">关系</span></div>
+        <div class="metric" data-kind="cross"><strong id="cross-stat">—</strong><span data-t="crossing">跨信任域</span></div>
+      </div>
+
+      <div class="strip" id="impact-bar" hidden></div>
+      <div class="detail" id="detail" aria-live="polite"></div>
+
+      <div class="node-explorer">
+        <input id="search" type="search" data-t="search" placeholder="搜索节点 / ID" aria-label="Search nodes">
+        <div id="nodes" class="node-list"></div>
+      </div>
+
+      <div class="alert" id="review-warning"></div>
+    </aside>
+
+  </div>
+
+  <footer class="footer">
+    <span id="system-title">—</span>
+    <span data-t="disclaimer">参考 IPA 与 ISO 42010 · 非官方认证 · 演示数据为虚构</span>
+  </footer>
+
 </div>
 <script type="module" src="/src/main.js"></script>
-</body></html>
+</body>
+</html>

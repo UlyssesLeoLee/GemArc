@@ -1,9 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import {dimensionPlan} from '../src/layout.js';
 import {plan2d,flatEdgePath,flatCounts,FLAT_METRICS} from '../src/flat.js';
-const model=JSON.parse(fs.readFileSync(new URL('../../examples/illustrative-architecture.json',import.meta.url),'utf8'));
+import {model} from '../tools/load-model.mjs';
 
 test('every view keeps all nodes in the 2D plan',()=>{
  for(const view of model.views){

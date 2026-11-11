@@ -42,6 +42,22 @@ export function action(label, payload) {
   return { ...textNode('button', 'action', label), action: payload };
 }
 
+/**
+ * A link inside the document.
+ *
+ * The href is the target and the payload carries the state the target needs
+ * (the entity to select, the dimension to show). A link stays a link: it can
+ * be copied, opened in a new tab and read by a screen reader.
+ *
+ * @param {string} label the text of the link
+ * @param {object} payload the action the click carries
+ * @param {string} href the target of the link
+ * @returns {object} the view node
+ */
+export function link(label, payload, href) {
+  return { ...textNode('a', 'link', label), attrs: { href: href || '#' }, action: payload };
+}
+
 /* ------------------------------------------------------------------- 1D */
 
 export function buildFactsView(model, store) {
@@ -196,6 +212,82 @@ export function buildGraphView(model, viewState) {
 
 /* ------------------------------------------------------------------- 3D */
 
+/**
+ * The semantic-axis scene: three categorical axes taken from the model
+ * itself. The dataset is derived from the model, so nothing here invents an
+ * axis. A model without axes says so instead of drawing an arbitrary cube.
+ * @param {object|null} threeD the derived 3D dataset
+ * @returns {object} the view body
+ */
+/**
+ * The legend of the semantic axes: what the three axes are and which values
+ * they take. It is shared by every dimension that carries the scene, so the
+ * reader reads the same axis description everywhere.
+ *
+ * @param {object} threeD the derived 3D dataset
+ * @returns {{view: object, legend: object}|null} the legend, or null when the
+ *   model declares no axes - a scene without axes would be an invented one
+ */
+export function axisLegend(threeD) {
+  const views = threeD && threeD.present && Array.isArray(threeD.views) ? threeD.views : [];
+  if (!views.length) return null;
+  const view = views[0];
+  const axisFields = Object.values(view.axes || {}).map((axis) => ({
+    key: axis.field,
+    label: axis.label || axis.field,
+    values: (axis.values || []).join('、') || '未提供',
+    independent: axis.independent !== false,
+    count: axis.valueCount,
+  }));
+  const legend = element('div', 'axis-legend', axisFields.map((axis) => element('p', 'small', [
+    textNode('b', '', `${axis.label}：`),
+    textNode('span', 'muted', axis.values),
+    textNode('span', 'muted', axis.independent ? '' : '（该轴不提供独立信息）'),
+  ])));
+  return { view, legend };
+}
+
+export function buildAxisView(threeD) {
+  const body = [];
+  const legend = axisLegend(threeD);
+  if (!legend) {
+    body.push(panel('三维语义轴', [
+      hint('模型没有声明带取值的三根坐标轴。坐标轴是类别而不是度量，'
+        + '因此这里不生成一个没有来源的三维结构。'),
+    ]));
+    return { body, mount: 'semantic3d', hasAxis: false };
+  }
+  body.push(panel(`三维语义轴 · ${legend.view.title || legend.view.viewId || ''}`, [
+    legend.legend,
+    element('div', 'axis-3d', []),
+  ]));
+  return { body, mount: 'semantic3d', hasAxis: true };
+}
+
+/**
+ * The panel that carries the scene into a dimension of change.
+ *
+ * 4D and 5D are about what moves and what changes, so they show the crystal
+ * and mark the entities the change acts on. The axes stay the ones the model
+ * declares: a scene without declared axes is never invented.
+ *
+ * @param {object} threeD the derived 3D dataset
+ * @param {string} title the title of the panel
+ * @param {object[]} extra the lines that describe the current change
+ * @returns {object} the panel
+ */
+function scenePanel(threeD, title, extra) {
+  const legend = axisLegend(threeD);
+  if (!legend) {
+    return panel(title, [
+      ...extra,
+      hint('模型没有声明带取值的三根坐标轴，因此这一维不展示三维结构；'
+        + '上面的时间轴与因果对照仍然成立。'),
+    ]);
+  }
+  return panel(title, [...extra, legend.legend, element('div', 'axis-3d', [])]);
+}
+
 export function buildSpaceView(model, spaceModel) {
   const body = [];
   const space = model.space;
@@ -244,7 +336,7 @@ export function buildSpaceView(model, spaceModel) {
 
 /* ------------------------------------------------------------------- 4D */
 
-export function buildTimelineView(model, scenarioId, disabled, step) {
+export function buildTimelineView(model, scenarioId, disabled, step, threeD) {
   const scenarios = model.scenarios || [];
   if (!scenarios.length) {
     return {
@@ -298,17 +390,28 @@ export function buildTimelineView(model, scenarioId, disabled, step) {
   ]));
   children.push(field('送达 / 阻断', `${report.summary.delivered} / ${report.summary.blocked}`));
 
+  // 4D is a dimension of change, so it carries the scene: the crystal shows
+  // where the running event acts. The focus follows the step.
+  const focus = trace.length ? trace[Math.min(Math.max(step, 0), trace.length - 1)] : null;
+  const focusIds = focus && focus.module ? [focus.module] : [];
+  children.push(scenePanel(threeD, '三维语义轴 · 当前事件', [
+    field('当前事件', focus ? `${focus.module} · ${focus.event} · ${focus.status}` : '尚未推进到任何事件'),
+    hint('三维场景高亮的是当前事件作用的实体；推进时间轴，高亮随之移动。'),
+  ]));
+
   return {
     headline: '动态流程与时间轴',
     kicker: '4D / EVENT TIME',
     body: [panel('事件时间轴', children)],
     trace: trace.length,
+    mount: 'semantic3d',
+    highlight: focusIds,
   };
 }
 
 /* ------------------------------------------------------------------- 5D */
 
-export function buildCausalView(model, scenarioId, disabled) {
+export function buildCausalView(model, scenarioId, disabled, threeD) {
   const scenarios = model.scenarios || [];
   if (!scenarios.length) {
     return {
@@ -329,6 +432,14 @@ export function buildCausalView(model, scenarioId, disabled) {
   const lost = (delta.lostEvents || []).map((event) => textNode('li', '', `${event.module} · ${event.event}`));
   const gained = (delta.gainedEvents || []).map((event) => textNode('li', '', `${event.module} · ${event.event}`));
 
+  // 5D is a dimension of change, so it carries the scene: the crystal shows
+  // which entities the intervention touches - the ones that were switched off
+  // and the ones that lost or gained an event.
+  const moduleOf = (event) => String(event.module || '').split('::')[0];
+  const lostModules = new Set((delta.lostEvents || []).map(moduleOf));
+  const gainedModules = new Set((delta.gainedEvents || []).map(moduleOf));
+  const focusIds = [...new Set([...(disabled || []), ...lostModules, ...gainedModules])].filter(Boolean);
+
   const children = [
     {
       tag: 'select',
@@ -346,6 +457,13 @@ export function buildCausalView(model, scenarioId, disabled) {
     element('ul', '', [textNode('h3', '', '丢失事件'), ...(lost.length ? lost : [textNode('li', 'muted', '无')])]),
     element('ul', '', [textNode('h3', '', '新增事件'), ...(gained.length ? gained : [textNode('li', 'muted', '无')])]),
     hint(delta.notice),
+    scenePanel(threeD, '三维语义轴 · 干预影响', [
+      field('干预影响的实体', focusIds.length ? focusIds.join('、') : '无（当前干预未改变任何事件）'),
+      field('关闭', (disabled || []).join('、') || '无'),
+      field('未达所属', [...lostModules].join('、') || '无'),
+      field('新增所属', [...gainedModules].join('、') || '无'),
+      hint('三维场景高亮的是干预触及的实体：被关闭的模块，以及未达或新增事件所属的模块。'),
+    ]),
   ];
 
   return {
@@ -353,6 +471,8 @@ export function buildCausalView(model, scenarioId, disabled) {
     kicker: '5D / CAUSAL SYSTEM',
     body: [panel('因果干预对照', children)],
     lostEvents: (delta.lostEvents || []).length,
+    mount: 'semantic3d',
+    highlight: focusIds,
   };
 }
 
@@ -386,6 +506,93 @@ export function buildViewsView(model) {
   };
 }
 
+/* ------------------------------------------------------------- 6D work breakdown */
+
+// The execution nodes of a workflow, by the rule the derivation uses: a node
+// that carries an execution capability, in the canvas or in the standalone
+// execution graph. The coverage number must not depend on which shell renders
+// it, so this mirrors the derivation rule exactly.
+const EXECUTION_NODE_KINDS = new Set([
+  'deterministic-program', 'agent-loop', 'tool-call', 'policy-gate',
+  'checkpoint', 'resume', 'manual-review', 'escalation', 'audit-event',
+]);
+const EXECUTION_NODE_FIELDS = [
+  'executorKind', 'authorityScope', 'executionMode', 'inputStateSchema',
+  'outputStateSchema', 'stateWritePolicy', 'checkpointBefore', 'checkpointAfter',
+  'budgetPolicy', 'iterationLimit', 'approvalPolicyRef', 'toolContractRef',
+];
+
+function executionNodeId(node) {
+  return node.id || node.nodeId || '';
+}
+
+export function executionNodesOf(workflow) {
+  const canvas = (workflow.nodes || []).filter((node) =>
+    EXECUTION_NODE_KINDS.has(node.kind || node.legacyKind)
+    || EXECUTION_NODE_FIELDS.some((field) => node[field] !== undefined && node[field] !== null));
+  const graph = workflow.executionGraph || {};
+  const contract = Array.isArray(graph.nodes) ? graph.nodes : [];
+  return canvas.concat(contract);
+}
+
+/**
+ * The work breakdown of one execution graph: 阶段 → 工作包 → 任务.
+ *
+ * The execution graph says how a run is wired; the WBS says what work that
+ * run performs, what each level delivers and when it counts as done. A
+ * breakdown without deliverables and done criteria is not a breakdown, so the
+ * missing ones are shown as missing instead of being invented.
+ */
+export function buildWbsView(packages, knownIds, nodeById) {
+  const rows = (Array.isArray(packages) ? packages : []).filter((item) => item && item.packageId);
+  if (!rows.length) return null;
+  const known = new Set(rows.map((row) => row.packageId));
+  const childrenOf = new Map();
+  for (const row of rows) {
+    const parent = row.parentPackageId || '';
+    if (!childrenOf.has(parent)) childrenOf.set(parent, []);
+    childrenOf.get(parent).push(row);
+  }
+  const kindLabel = { phase: '阶段', 'work-package': '工作包', task: '任务' };
+  const render = (row) => {
+    const children = (childrenOf.get(row.packageId) || []).map(render);
+    const bound = (row.nodeIds || []).filter((id) => !knownIds || knownIds.has(id));
+    // The work package and the execution node are bound by the model, so the
+    // binding is a link: it takes the reader to the entity the work runs on.
+    const owner = [textNode('span', '', '归属执行节点：')];
+    if (!bound.length) {
+      owner.push(textNode('span', 'muted', '0'));
+    } else {
+      bound.forEach((id, index) => {
+        if (index) owner.push(textNode('span', 'muted', '、'));
+        const execution = nodeById ? nodeById.get(id) : null;
+        const canonical = execution && execution.canonicalNodeId;
+        const name = execution && execution.name ? execution.name : id;
+        owner.push(canonical
+          ? link(name, { type: 'locate-node', id: canonical }, '#2d')
+          : textNode('span', '', name));
+      });
+    }
+    const detail = element('ul', 'wbs-detail', [
+      textNode('li', '', `交付物：${row.deliverable || '未提供'}`),
+      textNode('li', '', `完成条件：${row.completionCriteria || '未提供'}`),
+      element('li', '', owner),
+    ]);
+    const inner = [
+      element('p', 'small', [
+        textNode('b', '', `${kindLabel[row.kind] || row.kind || '工作包'} `),
+        textNode('span', '', row.title || row.packageId),
+        textNode('span', 'muted', ` · ${row.packageId}`),
+      ]),
+      detail,
+    ];
+    if (children.length) inner.push(element('ul', 'wbs', children));
+    return element('li', 'wbs-item', inner);
+  };
+  const roots = rows.filter((row) => !row.parentPackageId || !known.has(row.parentPackageId));
+  return element('ul', 'wbs', roots.map(render));
+}
+
 /* -------------------------------------------------------------- workflow */
 
 export function buildWorkflowView(model) {
@@ -403,6 +610,68 @@ export function buildWorkflowView(model) {
       field('节点数', (workflow.nodes || []).length),
       field('边数', (workflow.edges || []).length),
     ];
+    // 6D: a workflow that declares an execution graph says so on the card.
+    // The reader must see the mode, the state contract and the gates.
+    const graph = workflow.executionGraph;
+    if (graph || workflow.executionMode || workflow.stateSchemaVersion) {
+      children.push(field('执行模式', workflow.executionMode));
+      children.push(field('执行图', graph && (graph.executionGraphId || graph.id)));
+      children.push(field('状态契约版本', workflow.stateSchemaVersion));
+      children.push(field('检查点策略', workflow.checkpointPolicy));
+    }
+    // The execution nodes of this workflow: the ones that carry an execution
+    // capability, in the canvas or in the standalone execution graph. Same
+    // rule as the derivation, so the list and the coverage below cannot
+    // disagree about what counts as an execution node.
+    const executionNodes = executionNodesOf(workflow);
+    if (executionNodes.length) {
+      children.push(element('ul', '', executionNodes.map((node) => {
+        const parts = [node.kind || node.nodeType || '节点'];
+        if (node.executorKind) parts.push(`执行器 ${node.executorKind}`);
+        if (node.executionMode) parts.push(node.executionMode);
+        if (node.iterationLimit) parts.push(`上限 ${node.iterationLimit}`);
+        if (node.approvalPolicyRef) parts.push(`审批 ${node.approvalPolicyRef}`);
+        if (node.toolContractRef) parts.push(`工具契约 ${node.toolContractRef}`);
+        if (node.authorityScope) parts.push(`权限 ${node.authorityScope}`);
+        const line = [textNode('span', '', parts.join(' · '))];
+        // The execution node names the entity it runs on. The link takes the
+        // reader to that entity in the 2D graph.
+        const canonical = node.canonicalNodeId;
+        const known = (model.nodes || []).some((item) => item.id === canonical);
+        if (canonical && known) {
+          line.push(textNode('span', 'muted', ' · '));
+          line.push(link('在 2D 中定位', { type: 'locate-node', id: canonical }, '#2d'));
+        }
+        return element('li', '', line);
+      })));
+    }
+    // 6D = WBS × 执行图: the work breakdown says what work the graph performs,
+    // the execution nodes say which capability does it. Both are shown so the
+    // reader can see whether the two halves actually meet.
+    const packages = (graph && graph.workPackages) || [];
+    // The coverage counts the execution nodes of THIS workflow, by the same
+    // rule the derivation uses, so the site and workflow-ir.json cannot
+    // disagree about how many nodes the breakdown has to account for.
+    const nodes = executionNodesOf(workflow);
+    const knownNodeIds = new Set(nodes.map(executionNodeId));
+    const nodeById = new Map();
+    for (const node of nodes) nodeById.set(executionNodeId(node), node);
+    const assigned = new Set();
+    for (const row of packages) {
+      for (const nodeId of row.nodeIds || []) {
+        if (knownNodeIds.has(nodeId)) assigned.add(nodeId);
+      }
+    }
+    const wbs = buildWbsView(packages, knownNodeIds, nodeById);
+    if (wbs) {
+      const uncovered = [...knownNodeIds].filter((id) => id && !assigned.has(id));
+      children.push(field('工作分解（WBS）', `${packages.length} 个工作包`));
+      children.push(field('执行节点归属', `${assigned.size} / ${nodes.length}`));
+      if (uncovered.length) {
+        children.push(field('未归属执行节点', uncovered.join('、')));
+      }
+      children.push(wbs);
+    }
     const report = validateWorkflow(workflow);
     const issues = report.issues || report.errors || [];
     if (issues.length) {
@@ -411,12 +680,78 @@ export function buildWorkflowView(model) {
     } else {
       children.push(field('语义校验', '通过'));
     }
+    // 6D is one dimension of the same document: the reader can move to the
+    // dimension that draws the entities or the one that explains them.
+    children.push(element('p', 'small', [
+      textNode('span', 'muted', '相关维度：'),
+      link('3D 语义与空间', { type: 'goto-tab', tab: '3d' }, '#3d'),
+      textNode('span', 'muted', ' · '),
+      link('图示定义', { type: 'goto-tab', tab: 'views' }, '#views'),
+      textNode('span', 'muted', ' · '),
+      link('1D 事实', { type: 'goto-tab', tab: '1d' }, '#1d'),
+    ]));
     return element('div', 'fact', [textNode('h3', '', workflow.name || workflow.id), ...children]);
   });
   return {
     headline: '工作流语义',
     kicker: 'WORKFLOW / MACHINE READABLE',
     body: [panel('工作流', cards)],
+  };
+}
+
+/* ------------------------------------------------------------- prototype */
+
+/**
+ * The prototype pages the model registers.
+ *
+ * The prototype is model-driven: it shows the pages, their descriptions and
+ * their declared actions, and nothing else. The actions are demonstrations -
+ * the site never submits anything, so the feedback says so.
+ *
+ * @param {object} model the canonical model
+ * @param {{page?: number, feedback?: string|null}} [ui] the prototype state
+ * @returns {object} the view
+ */
+export function buildPrototypeView(model, ui) {
+  const pages = model.prototypes || [];
+  if (!pages.length) {
+    return {
+      headline: '界面原型',
+      kicker: 'UI / MULTI-TAB PROTOTYPE',
+      body: [panel('页面与操作', [hint('模型没有登记 prototypes；默认不编造业务界面。')])],
+    };
+  }
+  const state = ui || {};
+  const index = Math.min(Math.max(Number(state.page) || 0, 0), pages.length - 1);
+  const current = pages[index];
+  const tabs = element('div', 'tabs', pages.map((page, position) => ({
+    tag: 'button',
+    class: position === index ? 'action active' : 'action',
+    text: page.title || page.id,
+    attrs: { 'data-page': page.id || '' },
+    action: { type: 'prototype-page', index: position },
+  })));
+  const actions = (current.actions || []).map((label) => ({
+    tag: 'button',
+    class: 'action',
+    text: label,
+    action: { type: 'prototype-action', label },
+  }));
+  const feedback = state.feedback
+    ? hint(`已触发原型动作：${state.feedback}（演示，不提交实际业务数据）`)
+    : null;
+  const card = element('div', 'fact', [
+    textNode('h3', '', current.title || current.id),
+    textNode('small', '', current.id),
+    field('说明', current.description),
+    field('页面数', pages.length),
+    ...actions,
+    feedback,
+  ].filter(Boolean));
+  return {
+    headline: '界面原型',
+    kicker: 'UI / MULTI-TAB PROTOTYPE',
+    body: [panel('页面与操作', [tabs, card])],
   };
 }
 

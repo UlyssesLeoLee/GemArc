@@ -3,93 +3,241 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="color-scheme" content="dark">
-  <title>GemArc MCP · 功能微调控制台</title>
+  <meta name="color-scheme" content="light">
+  <!-- The title is filled by the server in the language of the request; the same
+       value is replaced again by the panel when the reader switches language. -->
+  <title data-i18n="title">{{title}}</title>
   <link rel="stylesheet" href="./console.css">
+  <!--
+    The crystal scene of the tool surface needs the three-dimensional library.
+    It is optional: when it cannot be loaded the panel says "not loaded" and the
+    rest of the console keeps working. Same import map as the public site.
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://esm.sh/three@0.180.0"
+    }
+  }
+  </script>
 </head>
 <body>
   <header class="top">
     <div class="brand">
-      <span class="gem">◆</span><span>GemArc MCP</span><small>功能微调控制台</small>
+      <span class="gem">◆</span><span>GemArc MCP</span><small data-i18n="brand.sub">{{brand.sub}}</small>
+    </div>
+    <!-- The language switcher. Every option is written in its own language
+         (BD-010 section 12.7), so it reads the same in every language. -->
+    <div class="head-right">
+      <div class="lang" role="group" aria-label="Language">
+        <button type="button" class="lang-btn" data-uilang="zh-CN">中文</button>
+        <button type="button" class="lang-btn" data-uilang="ja-JP">日本語</button>
+        <button type="button" class="lang-btn" data-uilang="en-US">English</button>
+      </div>
+      <!-- The settings of the signed-in account (DD-010). The button appears only when the
+           deployment has accounts: without an account there is nothing to personalise. -->
+      <button id="settings-open" class="ghost" type="button" hidden
+              data-i18n="settings.button">{{settings.button}}</button>
+      <!-- Signing out ends the session, so it is a POST with the CSRF token: a plain form works
+           without any script, and a link can never trigger it (BD-010 section 12.8). The panel
+           shows it only when there is a session; without one the token is empty and there is
+           nothing to end. -->
+      <form id="signout" class="signout" method="post" action="__LOGOUT_PATH__" hidden>
+        <input type="hidden" name="csrf" value="__CSRF__">
+        <button type="submit" class="ghost" data-i18n="session.logout">{{session.logout}}</button>
+      </form>
     </div>
     <div class="conn">
       <span class="dot" id="conn-dot"></span>
-      <span id="conn-text">正在连接 MCP…</span>
+      <span id="conn-text" data-i18n="conn.connecting">{{conn.connecting}}</span>
+      <!-- The role of the signed-in caller. The server decides both, so the badge can never claim a
+           privilege the server would not grant. -->
+      <span id="role-badge" class="chip" hidden></span>
     </div>
   </header>
 
-  <section class="statbar" id="statbar">
-    <span class="stat muted">等待 /healthz…</span>
+  <!-- The status line answers one question only: what is the server right now.
+       The technical values (transport, protocol path, toolset, seed) live in
+       the folded "details" panel, not on the first screen (BD-010 section 12.6). -->
+  <section class="statusbar">
+    <div class="facts" id="statbar">
+      <span class="fact muted" data-i18n="status.waiting">{{status.waiting}}</span>
+    </div>
+    <details class="detail">
+      <summary data-i18n="status.details">{{status.details}}</summary>
+      <div class="detail-body" id="facts-detail"></div>
+    </details>
+  </section>
+
+  <!-- Shown only when /healthz says authRequired. The token is held in this
+       tab's session storage only (never in the persistent store of the browser,
+       never in a URL) and is sent only as an Authorization header with /mcp
+       calls. The token is issued by the website (the account page); the panel
+       only fills it in. -->
+  <section class="authbar" id="authbar" hidden>
+    <div class="auth-head">
+      <label for="token-input" data-i18n="auth.label">{{auth.label}}</label>
+      <span class="auth-source" id="token-source">
+        <span data-i18n="auth.source">{{auth.source}}</span>
+        <a href="/account" id="account-link" data-i18n="auth.sourcelink">{{auth.sourcelink}}</a>
+      </span>
+    </div>
+    <input id="token-input" type="password" autocomplete="off" spellcheck="false"
+           placeholder="{{auth.placeholder}}" data-i18n-placeholder="auth.placeholder">
+    <div class="auth-row">
+      <button id="token-save" class="primary" type="button" data-i18n="auth.use">{{auth.use}}</button>
+      <button id="token-clear" class="ghost" type="button" data-i18n="auth.clear">{{auth.clear}}</button>
+      <span id="token-msg" class="muted" role="status"></span>
+    </div>
+    <p class="auth-note muted" id="token-note" data-i18n="auth.sourcenote">{{auth.sourcenote}}</p>
   </section>
 
   <main>
     <aside class="pane col-tools">
-      <p class="section-title">TOOLS · 工具</p>
-      <input id="tool-filter" class="filter" type="search" placeholder="过滤工具名或说明…" autocomplete="off">
+      <p class="section-title" data-i18n="section.tools">{{section.tools}}</p>
+      <input id="tool-filter" class="filter" type="search" placeholder="{{filter.placeholder}}"
+             data-i18n-placeholder="filter.placeholder" autocomplete="off">
       <nav id="tool-list" class="tool-list"></nav>
-      <p class="section-title" style="margin-top:14px">ENDPOINTS</p>
+      <p class="section-title" style="margin-top:14px" data-i18n="section.endpoints">{{section.endpoints}}</p>
       <div class="endpoints">
         <div><code>POST /mcp</code><span>Streamable HTTP · JSON-RPC</span></div>
-        <div><code>GET /healthz</code><span>服务器状态</span></div>
-        <div><code><a href="__SITE_PATH__">/__SITE_PATH__</a></code><span>脚手架产出的 5D 站</span></div>
+        <div><code>GET /healthz</code><span data-i18n="endpoint.health">{{endpoint.health}}</span></div>
+        <div><code><a href="__SITE_PATH__">__SITE_PATH__</a></code><span data-i18n="endpoint.site">{{endpoint.site}}</span></div>
+        <div><code>GET /kit/static.zip</code><span data-i18n="endpoint.kit">{{endpoint.kit}}</span></div>
+        <div id="admin-entry" hidden><code><a href="__ADMIN_PATH__">__ADMIN_PATH__</a></code><span data-i18n="endpoint.admin">{{endpoint.admin}}</span></div>
+        <div id="account-entry" hidden><code><a href="/account">/account</a></code><span data-i18n="endpoint.account">{{endpoint.account}}</span></div>
       </div>
     </aside>
 
     <section class="pane col-stage">
+      <!-- The tool surface: one crystal per tool the server really registers.
+           The scene is filled by console-space.js; until it is there the panel
+           states plainly that the three-dimensional part is not loaded. -->
+      <p class="section-title" data-i18n="section.surface">{{section.surface}}</p>
+      <div class="space-3d" id="space-host">
+        <p class="hint" id="space-hint" data-i18n="space.loading">{{space.loading}}</p>
+        <span class="tip" id="space-tip" hidden></span>
+      </div>
+      <p class="space-legend">
+        <span class="read"><i></i><span data-i18n="legend.read">{{legend.read}}</span></span>
+        <span class="write"><i></i><span data-i18n="legend.write">{{legend.write}}</span></span>
+      </p>
+
       <div class="stage-head">
         <div class="stage-title">
-          <h1 id="tool-name">选择一个工具</h1>
-          <p id="tool-desc" class="muted">左侧列表里的每一项都是 MCP 协议里真实注册的工具。选中后可调整参数并直接调用。</p>
+          <h1 id="tool-name" data-i18n="tool.none">{{tool.none}}</h1>
+          <p id="tool-desc" class="muted" data-i18n="tool.hint">{{tool.hint}}</p>
         </div>
         <div class="stage-actions">
           <span id="tool-kind" class="chip"></span>
-          <button id="call-btn" class="primary" type="button" disabled>调用</button>
+          <button id="call-btn" class="primary" type="button" disabled data-i18n="call.button">{{call.button}}</button>
         </div>
       </div>
 
-      <p class="section-title">PARAMETERS · 参数</p>
+      <p class="section-title" data-i18n="section.params">{{section.params}}</p>
       <form id="params" class="params" autocomplete="off"></form>
 
-      <p class="section-title">RESULT · 结果</p>
+      <p class="section-title" data-i18n="section.result">{{section.result}}</p>
       <div class="result-bar">
-        <span id="result-meta" class="muted">尚未调用</span>
-        <button id="copy-btn" class="ghost" type="button" hidden>复制 JSON</button>
+        <span id="result-meta" class="muted" data-i18n="result.idle">{{result.idle}}</span>
+        <button id="copy-btn" class="ghost" type="button" hidden data-i18n="result.copy">{{result.copy}}</button>
       </div>
-      <div id="result" class="result"><p class="muted">调用结果会显示在这里。出错时显示原始 JSON-RPC 错误,不做美化。</p></div>
+      <div id="result" class="result"><p class="muted" data-i18n="result.empty">{{result.empty}}</p></div>
     </section>
 
     <aside class="pane col-side">
-      <p class="section-title">SCHEMA · 输入契约</p>
+      <p class="section-title" data-i18n="section.schema">{{section.schema}}</p>
       <div id="schema" class="code muted">—</div>
 
-      <p class="section-title">RESOURCES · 资源</p>
+      <p class="section-title" data-i18n="section.resources">{{section.resources}}</p>
       <div id="resources" class="list"></div>
 
-      <p class="section-title">PROMPTS · 提示词</p>
+      <p class="section-title" data-i18n="section.prompts">{{section.prompts}}</p>
       <div id="prompts" class="list"></div>
 
-      <p class="section-title">HISTORY · 调用历史</p>
+      <p class="section-title" data-i18n="section.history">{{section.history}}</p>
       <div id="history" class="list"></div>
     </aside>
   </main>
 
+  <!-- The settings of the signed-in account (DD-010). The panel fills it from the
+       server: the account's own language, the tools it keeps and the render form it
+       prefers. The server is the only source of truth; the panel never invents a value. -->
+  <dialog id="settings" class="settings">
+    <div class="settings-head">
+      <h2 data-i18n="settings.title">{{settings.title}}</h2>
+      <button id="settings-close" class="ghost" type="button" data-i18n="settings.close">{{settings.close}}</button>
+    </div>
+    <div class="settings-body">
+      <div class="settings-row">
+        <label class="fname" for="settings-lang" data-i18n="settings.lang">{{settings.lang}}</label>
+        <select id="settings-lang">
+          <option value="" data-i18n="settings.langreader">{{settings.langreader}}</option>
+          <option value="zh-CN">中文</option>
+          <option value="ja-JP">日本語</option>
+          <option value="en-US">English</option>
+        </select>
+      </div>
+      <div class="settings-row">
+        <label class="fname" for="settings-profile" data-i18n="settings.profile">{{settings.profile}}</label>
+        <select id="settings-profile">
+          <option value="" data-i18n="settings.profiledefault">{{settings.profiledefault}}</option>
+          <option value="mvp">mvp</option>
+          <option value="static">static</option>
+          <option value="vite">vite</option>
+        </select>
+      </div>
+      <div class="settings-row">
+        <span class="fname" data-i18n="settings.tools">{{settings.tools}}</span>
+        <div class="seg" id="settings-mode" role="group">
+          <button type="button" class="seg-btn" data-mode="all" data-i18n="settings.toolsall">{{settings.toolsall}}</button>
+          <button type="button" class="seg-btn" data-mode="some" data-i18n="settings.toolssome">{{settings.toolssome}}</button>
+        </div>
+      </div>
+      <p class="hint" data-i18n="settings.toolsnote">{{settings.toolsnote}}</p>
+      <div id="settings-tools" class="checks"></div>
+    </div>
+    <div class="settings-foot">
+      <span id="settings-msg" class="muted" role="status"></span>
+      <button id="settings-save" class="primary" type="button" data-i18n="settings.save">{{settings.save}}</button>
+    </div>
+  </dialog>
+
   <footer class="foot">
     <span id="foot-meta"></span>
-    <span>控制台只调用本服务器上真实注册的 MCP 工具;它不模拟任何能力。</span>
+    <span data-i18n="foot.note">{{foot.note}}</span>
   </footer>
 
   <!-- Injected by the server: paths and the write-tool list come from the
        running server, so the panel can never claim a tool the server does
-       not actually register. -->
+       not actually register. `admin` and `write` describe THIS caller: the
+       operator role, and the write permission of the signed-in session.
+       `lang` is the language of this page, `accountLang` the language of the
+       signed-in account (it wins over the local choice, DD-010), and `csrf` is
+       the token that lets the panel save a change of the settings.
+       The three language tables come from the same place, so the panel has
+       no text of its own (BD-010 section 12.7). -->
   <script>
     window.GEMARC = {
       mcpPath: "__MCP_PATH__",
       healthPath: "__HEALTH_PATH__",
       sitePath: "__SITE_PATH__",
       writeTools: __WRITE_TOOLS__,
-      version: "__VERSION__"
+      version: "__VERSION__",
+      admin: __ADMIN__,
+      write: __WRITE__,
+      adminPath: "__ADMIN_PATH__",
+      accounts: __ACCOUNTS__,
+      lang: "__LANG__",
+      accountLang: "__ACCOUNT_LANG__",
+      csrf: "__CSRF__",
+      settingsPath: "__SETTINGS_PATH__",
+      i18n: __I18N__
     };
   </script>
   <script type="module" src="./console.js"></script>
+  <!-- The crystal scene is a module of its own: it needs the three-dimensional
+       library, and the console has to keep working when it is missing. -->
+  <script type="module" src="./console-space/boot.js"></script>
 </body>
 </html>

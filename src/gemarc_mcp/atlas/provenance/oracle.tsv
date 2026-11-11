@@ -1,0 +1,5 @@
+path	origin	reference_unit	treatment	deviations
+src/gemarc_mcp/atlas/oracle.py	new	-	Oracle ledger (.atlas/oracle.json), sealing and the revised rule, blind verdicts and ledgered reveals, time-boxed mutant run, sealed-runs provider, oracle sheet and attestation badge, release gate; written from design section 7 and addendum A1	-
+src/gemarc_mcp/atlas/rules/or_.py	new	-	Assertion normalisation and hashing, the state of an item under a ledger entry, coverage floor and abnormal-all-Completed arithmetic, and the rules OR-000..OR-005 (static ones and the ones that read the ledger view); written from design 7.2 to 7.5	-
+src/gemarc_mcp/atlas/rules/iv.py	new	-	IV-001 (compile status equals expect.status, through the engine compile) and IV-002 (the sealed prediction, counts from the ledger); written from design 5.1 and 7.3	-
+src/gemarc_mcp/atlas/rules/pt.py	new	-	PT-003 port type compatibility as a WARN with the Any wildcard; written from design 5.1	-

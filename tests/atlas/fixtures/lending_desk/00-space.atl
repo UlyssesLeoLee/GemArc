@@ -1,0 +1,11 @@
+#atlas 1
+// Library lending desk: a synthetic example, not a real system.
+## buildings: id | name | opts
+zone.lib | Library system | trust=internal
+zone.ext | Outside | trust=external
+## floors: id | building | name | level
+lvl.core | zone.lib | Core services | 1
+lvl.out | zone.ext | Visitors | 0
+## rooms: id | floor | name | opts
+rm.desk | lvl.core | Lending desk | tier=T2
+rm.vis | lvl.out | Members | tier=T1

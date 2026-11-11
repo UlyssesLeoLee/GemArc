@@ -71,7 +71,11 @@
       "methods": [],
       "name": "事件源",
       "parentId": null,
-      "properties": {},
+      "properties": {
+        "environment": "生产环境",
+        "owner": "示例团队",
+        "trustZone": "外部域"
+      },
       "role": null,
       "spaceRef": null,
       "verification": "Hypothetical"
@@ -87,7 +91,11 @@
       "methods": [],
       "name": "消息队列",
       "parentId": null,
-      "properties": {},
+      "properties": {
+        "environment": "生产环境",
+        "owner": "示例团队",
+        "trustZone": "内部域"
+      },
       "role": null,
       "spaceRef": null,
       "verification": "Hypothetical"
@@ -103,7 +111,11 @@
       "methods": [],
       "name": "规则引擎",
       "parentId": null,
-      "properties": {},
+      "properties": {
+        "environment": "生产环境",
+        "owner": "示例团队",
+        "trustZone": "内部域"
+      },
       "role": null,
       "spaceRef": null,
       "verification": "Hypothetical"
@@ -119,7 +131,11 @@
       "methods": [],
       "name": "通知服务",
       "parentId": null,
-      "properties": {},
+      "properties": {
+        "environment": "生产环境",
+        "owner": "示例团队",
+        "trustZone": "外部域"
+      },
       "role": null,
       "spaceRef": null,
       "verification": "Hypothetical"
@@ -184,26 +200,150 @@
   "space": null,
   "views": [
     {
+      "axes": {
+        "x": {
+          "field": "layer",
+          "label": "部署层",
+          "values": [
+            "设备层",
+            "中间件层",
+            "应用层"
+          ]
+        },
+        "y": {
+          "field": "properties.trustZone",
+          "label": "信任域"
+        },
+        "z": {
+          "field": "properties.environment",
+          "label": "环境"
+        }
+      },
+      "caseIds": [],
       "concerns": [
-        "事件依赖"
+        "实体落在哪一层、哪个信任域、哪个环境"
       ],
       "diagramType": "logical-view",
-      "edgeKinds": [
-        "sends"
+      "dimension": "3D",
+      "edgeIds": [
+        "e1",
+        "e2",
+        "e3"
       ],
-      "id": "logical",
+      "id": "semantic-3d",
+      "legend": null,
+      "missing": [],
       "nodeIds": [
         "sensor",
         "queue",
         "rule",
         "notify"
       ],
-      "reviewIntent": "识别单点故障",
+      "reviewQuestions": [
+        "跨信任域的调用是否都标了出来？"
+      ],
+      "scenarioId": null,
       "stakeholders": [
         "架构师"
       ],
-      "title": "逻辑架构"
+      "title": "语义视图"
     }
   ],
-  "workflows": []
+  "workflows": [
+    {
+      "edges": [
+        {
+          "condition": null,
+          "directed": true,
+          "id": "wf-e0",
+          "kind": "control-flow",
+          "sourceId": "wf-n-start",
+          "targetId": "wf-n-survey"
+        },
+        {
+          "condition": null,
+          "directed": true,
+          "id": "wf-e1",
+          "kind": "control-flow",
+          "sourceId": "wf-n-survey",
+          "targetId": "wf-n-end"
+        }
+      ],
+      "executionGraph": {
+        "executionGraphId": "eg-example",
+        "executionMode": "simulation",
+        "stateSchemaVersion": "state-v1",
+        "version": "1.0",
+        "workPackages": [
+          {
+            "completionCriteria": "归集完成且通知送达",
+            "deliverable": "一份可审查的架构文档",
+            "dependsOn": [],
+            "kind": "phase",
+            "nodeIds": [],
+            "packageId": "wp-root",
+            "parentPackageId": null,
+            "title": "示例交付阶段",
+            "verification": "Hypothetical"
+          },
+          {
+            "completionCriteria": "每条结论都能指回来源",
+            "deliverable": "带来源的现状清单",
+            "dependsOn": [],
+            "kind": "work-package",
+            "nodeIds": [],
+            "packageId": "wp-collect",
+            "parentPackageId": "wp-root",
+            "title": "现状归集",
+            "verification": "Hypothetical"
+          },
+          {
+            "completionCriteria": "结论已记录且通知已发出",
+            "deliverable": "可审计的归集结论",
+            "dependsOn": [
+              "wp-collect"
+            ],
+            "kind": "task",
+            "nodeIds": [
+              "wf-n-survey"
+            ],
+            "packageId": "wp-deliver",
+            "parentPackageId": "wp-collect",
+            "title": "归集与通知",
+            "verification": "Hypothetical"
+          }
+        ]
+      },
+      "id": "wf-example",
+      "kind": "task",
+      "name": "示例：事件处理流程",
+      "nodes": [
+        {
+          "id": "wf-n-start",
+          "kind": "start",
+          "name": "事件到达",
+          "ports": []
+        },
+        {
+          "authorityScope": "read-only",
+          "canonicalNodeId": "sensor",
+          "executionMode": "simulation",
+          "id": "wf-n-survey",
+          "iterationLimit": 3,
+          "kind": "agent-loop",
+          "name": "现状归集",
+          "ports": [],
+          "verification": "Hypothetical"
+        },
+        {
+          "id": "wf-n-end",
+          "kind": "end",
+          "name": "通知发出",
+          "ports": []
+        }
+      ],
+      "stateSchemaVersion": "state-v1",
+      "version": "1.0"
+    }
+  ]
 }

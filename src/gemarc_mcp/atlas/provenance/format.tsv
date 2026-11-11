@@ -1,0 +1,16 @@
+path	origin	reference_unit	treatment	deviations
+src/gemarc_mcp/atlas/diag.py	new	-	Diagnostic record, constructors and structural rule registry (ST-001..ST-008, DV-001) authored for this repository from design 5.2; no reference counterpart	-
+src/gemarc_mcp/atlas/format/rows.py	new	-	Section schema, Row object and typed value coercion shared by both front-ends; authored from design 3.1 and 3.2, the design prototype was used only as a seed and rewritten	-
+src/gemarc_mcp/atlas/format/atl.py	new	-	The .atl parser and writer helpers authored from the grammar of design 3.1 (positional text cells, options cell, @set, ~, quoting, escapes); rewritten from the design prototype, nothing pasted	-
+src/gemarc_mcp/atlas/format/jsonl.py	new	-	The .jsonl front-end producing the same Row objects; authored for this repository	-
+src/gemarc_mcp/atlas/expand.py	new	-	Expander from rows to the expanded model with a provenance map; every derivation is a call into model.py, no derivation is duplicated here	-
+src/gemarc_mcp/atlas/encode.py	new	-	Encoder from an expanded model to .atl and .jsonl text (inverse of expand); authored for round-trip tests and for tools that show records	-
+tests/atlas/test_format.py	new	-	Format core tests (front-ends, expander, encoder, golden, round trip, size); synthetic id families only	-
+tests/atlas/test_format_fuzz.py	new	-	Fuzz gate of the format core: mutated rows never crash and never change a model silently; synthetic models only	-
+tests/atlas/fixtures/lending_desk/00-space.atl	new	-	The worked example of design 3.4 as three .atl slices (spatial part); synthetic library lending desk	-
+tests/atlas/fixtures/lending_desk/10-structure.atl	new	-	The worked example of design 3.4 as three .atl slices (nodes, edges, evidences); synthetic library lending desk	-
+tests/atlas/fixtures/lending_desk/20-scenarios.atl	new	-	The worked example of design 3.4 as three .atl slices (tests, cases, events, expectations, interventions, requirements); synthetic library lending desk	-
+tests/atlas/fixtures/lending_desk/meta.json	new	-	The init-time meta of the worked example (project id, title, languages, profile, repos)	-
+tests/atlas/fixtures/lending_desk/expected.model.json	new	-	Stored golden expansion of the worked example; byte-equal to fixtures/lending_desk.model.json	-
+tests/atlas/fixtures/lending_desk/expected.provenance.json	new	-	Stored golden provenance map (model path to file:line) of the worked example	-
+tests/atlas/test_format_hardening.py	new	-	Regression tests for the hardening of the format core: option keys that repeat a cell, a deleted section header, hostile numbers and JSON, project mode flips, size verdicts, quadratic scans, and the renderer clipping of at and rule	-

@@ -1,0 +1,166 @@
+{
+  "missing": [],
+  "note": "三轴字段是类别而不是度量：派生结果只登记模型里真实存在的取值。视图没有声明三轴时 present=false，界面必须说明未建立轴语义，不得用任意坐标伪造三维结构。",
+  "present": true,
+  "rules": [
+    "坐标轴字段是类别，不是度量：不得把风险级别之类的排序伪装成可比较数值。",
+    "一根视图的三根轴必须指向三个不同的类别字段，且每个字段在该视图的节点上至少有两个取值，否则这根轴不提供独立信息。",
+    "映射表里的每条对应都是显式登记的：没有登记的类型不被悄悄塞进某一类，派生结果会把它列进 unmapped。",
+    "派生结果保留节点的原始类型（mcpKind）与边的原始类型（mcpType），映射关系可被逐条复核。"
+  ],
+  "schemaVersion": "0.3.0",
+  "skippedViews": [],
+  "unmappedKinds": [],
+  "views": [
+    {
+      "axes": {
+        "x": {
+          "declaredValues": [
+            "设备层",
+            "中间件层",
+            "应用层"
+          ],
+          "field": "layer",
+          "label": "部署层",
+          "source": "layer",
+          "unmappedNodeIds": [],
+          "valueCount": 3,
+          "values": [
+            "设备层",
+            "中间件层",
+            "应用层"
+          ]
+        },
+        "y": {
+          "declaredValues": [],
+          "field": "properties.trustZone",
+          "label": "信任域",
+          "source": "trustZone",
+          "unmappedNodeIds": [],
+          "valueCount": 2,
+          "values": [
+            "内部域",
+            "外部域"
+          ]
+        },
+        "z": {
+          "declaredValues": [],
+          "field": "properties.environment",
+          "label": "环境",
+          "source": "environment",
+          "unmappedNodeIds": [],
+          "valueCount": 1,
+          "values": [
+            "生产环境"
+          ]
+        }
+      },
+      "dimension": "3D",
+      "edges": [
+        {
+          "description": "上传事件",
+          "id": "e1",
+          "mcpType": "sends",
+          "sourceId": "sensor",
+          "targetId": "queue",
+          "threeDType": "exchanges"
+        },
+        {
+          "description": "传递事件",
+          "id": "e2",
+          "mcpType": "sends",
+          "sourceId": "queue",
+          "targetId": "rule",
+          "threeDType": "exchanges"
+        },
+        {
+          "description": "规则触发通知",
+          "id": "e3",
+          "mcpType": "sends",
+          "sourceId": "rule",
+          "targetId": "notify",
+          "threeDType": "exchanges"
+        }
+      ],
+      "gains": {
+        "x": 2,
+        "y": 1,
+        "z": 0
+      },
+      "independent": {
+        "x": true,
+        "y": true,
+        "z": false
+      },
+      "nodes": [
+        {
+          "domain": null,
+          "evidenceIds": [],
+          "id": "sensor",
+          "mcpKind": "Component",
+          "name": "事件源",
+          "role": null,
+          "threeDKind": "module",
+          "unmappedAxes": [],
+          "values": {
+            "x": "设备层",
+            "y": "外部域",
+            "z": "生产环境"
+          },
+          "verification": "Hypothetical"
+        },
+        {
+          "domain": null,
+          "evidenceIds": [],
+          "id": "queue",
+          "mcpKind": "Service",
+          "name": "消息队列",
+          "role": null,
+          "threeDKind": "service",
+          "unmappedAxes": [],
+          "values": {
+            "x": "中间件层",
+            "y": "内部域",
+            "z": "生产环境"
+          },
+          "verification": "Hypothetical"
+        },
+        {
+          "domain": null,
+          "evidenceIds": [],
+          "id": "rule",
+          "mcpKind": "Service",
+          "name": "规则引擎",
+          "role": null,
+          "threeDKind": "service",
+          "unmappedAxes": [],
+          "values": {
+            "x": "应用层",
+            "y": "内部域",
+            "z": "生产环境"
+          },
+          "verification": "Hypothetical"
+        },
+        {
+          "domain": null,
+          "evidenceIds": [],
+          "id": "notify",
+          "mcpKind": "Service",
+          "name": "通知服务",
+          "role": null,
+          "threeDKind": "service",
+          "unmappedAxes": [],
+          "values": {
+            "x": "应用层",
+            "y": "外部域",
+            "z": "生产环境"
+          },
+          "verification": "Hypothetical"
+        }
+      ],
+      "title": "语义视图",
+      "unmappedKinds": [],
+      "viewId": "semantic-3d"
+    }
+  ]
+}

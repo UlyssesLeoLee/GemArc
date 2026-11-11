@@ -1,0 +1,780 @@
+{
+  "designOnlyNodeTypes": [
+    "Agent",
+    "HumanApproval",
+    "ManualReview",
+    "AgentLoop",
+    "ToolCall"
+  ],
+  "edgeFields": [
+    "edgeId",
+    "sourceNodeId",
+    "sourcePortId",
+    "targetNodeId",
+    "targetPortId",
+    "edgeType",
+    "direction",
+    "guard",
+    "dataMapping",
+    "priority",
+    "errorRoute",
+    "verification",
+    "evidenceIds",
+    "stateSchemaRef",
+    "stateProjection",
+    "stateMergePolicy",
+    "routingExpression",
+    "deliverySemantics",
+    "resumeBehavior",
+    "policyRef"
+  ],
+  "edgeTypes": [
+    "ControlFlow",
+    "DataFlow",
+    "EventFlow",
+    "ErrorFlow",
+    "ConditionalFlow",
+    "CompensationFlow",
+    "Dependency",
+    "StateTransition",
+    "ApprovalTransition",
+    "ToolResult",
+    "RetryTransition",
+    "TimeoutTransition",
+    "ResumeTransition"
+  ],
+  "gwfVersion": "0.3.0",
+  "jsonSchema": {
+    "$defs": {
+      "edge": {
+        "additionalProperties": true,
+        "properties": {
+          "dataMapping": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "deliverySemantics": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "direction": {
+            "enum": [
+              "source-to-target",
+              "both"
+            ],
+            "type": "string"
+          },
+          "edgeId": {
+            "type": "string"
+          },
+          "edgeType": {
+            "enum": [
+              "ControlFlow",
+              "DataFlow",
+              "EventFlow",
+              "ErrorFlow",
+              "ConditionalFlow",
+              "CompensationFlow",
+              "Dependency",
+              "StateTransition",
+              "ApprovalTransition",
+              "ToolResult",
+              "RetryTransition",
+              "TimeoutTransition",
+              "ResumeTransition"
+            ],
+            "type": "string"
+          },
+          "errorRoute": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidenceIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "guard": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "policyRef": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "resumeBehavior": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "routingExpression": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceNodeId": {
+            "type": "string"
+          },
+          "sourcePortId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stateMergePolicy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stateProjection": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "stateSchemaRef": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "targetNodeId": {
+            "type": "string"
+          },
+          "targetPortId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "verification": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "edgeId",
+          "sourceNodeId",
+          "targetNodeId",
+          "edgeType"
+        ],
+        "type": "object"
+      },
+      "node": {
+        "additionalProperties": true,
+        "properties": {
+          "approvalPolicyRef": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "authorityScope": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "budgetPolicy": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "checkpointAfter": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "checkpointBefore": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "designOnly": {
+            "type": "boolean"
+          },
+          "errorHandlers": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "evidenceIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "executable": {
+            "type": "boolean"
+          },
+          "executionMode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "executorKind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "idempotency": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "implementationRef": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "inputStateSchema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "inputs": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "iterationLimit": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "nodeId": {
+            "type": "string"
+          },
+          "nodeType": {
+            "enum": [
+              "Start",
+              "End",
+              "Task",
+              "Input",
+              "Output",
+              "Decision",
+              "ParallelFork",
+              "ParallelJoin",
+              "Event",
+              "Timer",
+              "Wait",
+              "Agent",
+              "HumanApproval",
+              "APICall",
+              "DataTransform",
+              "Subflow",
+              "ErrorHandler",
+              "Retry",
+              "Compensation",
+              "DeterministicProgram",
+              "AgentLoop",
+              "ToolCall",
+              "PolicyGate",
+              "Checkpoint",
+              "Resume",
+              "ManualReview",
+              "Escalation",
+              "AuditEvent"
+            ],
+            "type": "string"
+          },
+          "outputStateSchema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "outputs": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "ports": {
+            "items": {
+              "$ref": "#/$defs/port"
+            },
+            "type": "array"
+          },
+          "postconditions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "preconditions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "retryPolicy": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "sideEffects": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "stateTransitions": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "stateWritePolicy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timeoutPolicy": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "toolContractRef": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "verification": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "nodeId",
+          "nodeType",
+          "name"
+        ],
+        "type": "object"
+      },
+      "port": {
+        "additionalProperties": true,
+        "properties": {
+          "acceptedTypes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "cardinality": {
+            "enum": [
+              "1",
+              "0..1",
+              "0..N",
+              "1..N",
+              "N",
+              null
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "direction": {
+            "enum": [
+              "in",
+              "out",
+              "inout",
+              null
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "enum": [
+              "input",
+              "output",
+              "control",
+              "error"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "portId": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "schema": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "portId",
+          "kind"
+        ],
+        "type": "object"
+      },
+      "workPackage": {
+        "additionalProperties": true,
+        "properties": {
+          "childPackageIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "completionCriteria": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "deliverable": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dependsOn": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "evidenceIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "phase",
+              "work-package",
+              "task"
+            ],
+            "type": "string"
+          },
+          "nodeCount": {
+            "type": "integer"
+          },
+          "nodeIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "packageId": {
+            "type": "string"
+          },
+          "parentPackageId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "verification": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "packageId",
+          "kind"
+        ],
+        "type": "object"
+      }
+    },
+    "$id": "https://gemarc.dev/gwf-ir/0.3.0/workflow-ir.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": true,
+    "properties": {
+      "approvalPolicies": {
+        "items": {
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "checkpointPolicy": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "dataSchemas": {
+        "items": {
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "edges": {
+        "items": {
+          "$ref": "#/$defs/edge"
+        },
+        "type": "array"
+      },
+      "entryPoints": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "errorPolicy": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "evidenceIds": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "executionCapabilities": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "executionGraph": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "executionPolicy": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "metadata": {
+        "type": "object"
+      },
+      "name": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "nodes": {
+        "items": {
+          "$ref": "#/$defs/node"
+        },
+        "type": "array"
+      },
+      "permissions": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "runSecurityPolicy": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "stateSchemaVersion": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "version": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "wbs": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "workPackages": {
+        "items": {
+          "$ref": "#/$defs/workPackage"
+        },
+        "type": "array"
+      },
+      "workflowId": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "workflowId",
+      "name",
+      "nodes",
+      "edges"
+    ],
+    "title": "GWF-IR",
+    "type": "object"
+  },
+  "nodeFields": [
+    "nodeId",
+    "nodeType",
+    "name",
+    "description",
+    "inputs",
+    "outputs",
+    "ports",
+    "preconditions",
+    "postconditions",
+    "stateTransitions",
+    "timeoutPolicy",
+    "retryPolicy",
+    "errorHandlers",
+    "sideEffects",
+    "idempotency",
+    "implementationRef",
+    "evidenceIds",
+    "verification",
+    "executorKind",
+    "authorityScope",
+    "executionMode",
+    "inputStateSchema",
+    "outputStateSchema",
+    "stateWritePolicy",
+    "checkpointBefore",
+    "checkpointAfter",
+    "budgetPolicy",
+    "iterationLimit",
+    "approvalPolicyRef",
+    "toolContractRef"
+  ],
+  "nodeTypes": [
+    "Start",
+    "End",
+    "Task",
+    "Input",
+    "Output",
+    "Decision",
+    "ParallelFork",
+    "ParallelJoin",
+    "Event",
+    "Timer",
+    "Wait",
+    "Agent",
+    "HumanApproval",
+    "APICall",
+    "DataTransform",
+    "Subflow",
+    "ErrorHandler",
+    "Retry",
+    "Compensation",
+    "DeterministicProgram",
+    "AgentLoop",
+    "ToolCall",
+    "PolicyGate",
+    "Checkpoint",
+    "Resume",
+    "ManualReview",
+    "Escalation",
+    "AuditEvent"
+  ],
+  "note": "GWF-IR 是规范化中间格式；第三方画布快照不得当作唯一的工作流真相。",
+  "portFields": [
+    "portId",
+    "direction",
+    "schema",
+    "cardinality",
+    "required",
+    "acceptedTypes"
+  ],
+  "schemaVersion": "0.2.0",
+  "title": "GWF-IR",
+  "validity": [
+    "Port 应通过类型、方向和约束校验；Node/Edge 必须具有稳定 ID。",
+    "不适用的超时、重试或副作用字段可使用有明确定义的 null/omission 语义。",
+    "没有真实执行器的类型标为 Design-only，不得伪称可执行。",
+    "ControlFlow、DataFlow、EventFlow、ErrorFlow 等不得混淆。",
+    "GWF-IR 是规范化中间格式，不得把第三方画布快照当作唯一的工作流真相。",
+    "6D 必须明确定义哪些节点是 agentic、deterministic 或 human-gated，并对每条执行边定义路由、状态投影与约束。",
+    "所有执行状态具有版本化 schema；边上传递的是结构化状态/事件，跨重启的持久化由明确检查点和存储层负责。",
+    "可恢复运行需要 runId、workflowVersion、checkpointId 和幂等策略；断点恢复时拒绝不兼容的工作流版本。"
+  ],
+  "workflowFields": [
+    "workflowId",
+    "name",
+    "version",
+    "entryPoints",
+    "nodes",
+    "edges",
+    "dataSchemas",
+    "executionPolicy",
+    "errorPolicy",
+    "permissions",
+    "evidenceIds",
+    "metadata",
+    "executionGraph",
+    "stateSchemaVersion",
+    "checkpointPolicy",
+    "approvalPolicies",
+    "executionCapabilities",
+    "runSecurityPolicy"
+  ]
+}

@@ -1,0 +1,52 @@
+#atlas-ui 1
+## screens: id | title | purpose | opts
+SCR-SEARCH | 找书 | 按书名或作者搜索馆藏。 | kind=page frame=desktop route=/search
+SCR-BOOK | 书籍详情 | 显示一本书的信息和可借状态。 | kind=page frame=desktop route=/book/{id}
+SCR-BORROW | 借阅确认 | 借书前让会员确认到期日。 | kind=dialog frame=desktop
+SCR-RENEW | 续借 | 为一本借出的书选择续借天数。 | kind=dialog frame=desktop
+## variants: screen | name | note | opts
+SCR-SEARCH | loading | 搜索中。 | kind=loading
+SCR-SEARCH | empty | 没有找到符合的书。 | kind=empty
+SCR-SEARCH | error | 搜索服务暂时不可用。 | kind=error
+SCR-BOOK | loading | 读取书籍信息。 | kind=loading
+SCR-BOOK | locked | 这本书暂不外借。 | kind=locked
+SCR-BORROW | error | 这本书刚被借走。 | kind=error
+SCR-RENEW | error | 这本书已有人预约,不能续借。 | kind=error
+## widgets: local | label | opts
+@set screen=SCR-SEARCH
+bar | 借阅台 | kind=header
+home | 我的借阅 | kind=link parent=bar
+query | 书名或作者 | kind=input bind=query
+cat | 分类 | kind=select bind=category
+results | 搜索结果 | kind=list w=fill api=svc.stock
+pager | 分页 | kind=pagination
+@set screen=SCR-BOOK
+title | 书名 | kind=heading
+cover | 封面 | kind=image
+meta | 作者、出版社、ISBN | kind=text
+status | 可借 | kind=badge emph=primary api=svc.stock
+borrow | 借这本 | kind=button emph=primary api=svc.loan req=RQ-1
+reserve | 预约 | kind=button emph=secondary api=svc.stock
+back | 返回 | kind=link
+@set screen=SCR-BORROW
+title | 确认借阅 | kind=heading
+msg | 你将借下这本书 | kind=text
+due | 到期日 30 天后 | kind=text
+err | 这本书刚被借走 | kind=text in=error emph=danger
+ok | 确认 | kind=button emph=primary api=svc.loan
+cancel | 取消 | kind=link
+@set screen=SCR-RENEW
+title | 续借 | kind=heading
+days | 续借天数 | kind=select bind=days
+err | 已有人预约,不能续借 | kind=text in=error emph=danger
+ok | 确认续借 | kind=button emph=primary api=svc.loan
+cancel | 取消 | kind=link
+## nav: from | to | label | opts
+SCR-SEARCH.home | SCR-HOME | 回到我的借阅 | on=tap
+SCR-SEARCH.results | SCR-BOOK | 点一本看详情 | on=tap
+SCR-BOOK.borrow | SCR-BORROW | 确认借阅 | on=tap
+SCR-BOOK.back | SCR-SEARCH | 返回搜索 | on=back
+SCR-BORROW.ok | SCR-HOME | 借阅成功 | on=submit case=CS-BORROW-OK rule=R-BORROW
+SCR-BORROW.cancel | SCR-BOOK | 放弃借阅 | on=tap
+SCR-RENEW.ok | SCR-HOME | 续借成功 | on=submit
+SCR-RENEW.cancel | SCR-HOME | 放弃续借 | on=tap

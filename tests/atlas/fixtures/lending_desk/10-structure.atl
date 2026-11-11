@@ -1,0 +1,19 @@
+#atlas 1
+## nodes: id | name | sub | opts
+@set room=rm.desk kind=Module
+svc.loan | Loan service | Creates a loan and takes returns. | ev=EVD-1,EVD-2
+svc.stock | Stock service | Knows which copy is on the shelf. | ev=EVD-2
+@set kind=Storage
+tbl.loan | Loan table | One row per open loan. | ev=EVD-1
+@set room=rm.vis kind=Actor
+usr.member | Member | Borrower using the web page. | ev=EVD-3 verif=Inferred
+## edges: from | rel | to | label | opts
+usr.member | calls | svc.loan | borrow a copy | ev=EVD-3
+svc.loan | calls | svc.stock | check copy status | ev=EVD-2
+svc.loan | writes | tbl.loan | write loan row | ev=EVD-1
+@final edges
+## evidences: id | file | anchor | topic | opts
+@set repo=main
+EVD-1 | src/loan.py | def create_loan( | creates the loan row
+EVD-2 | src/stock.py | def find_copy( | shelf lookup
+EVD-3 | docs/lending.md | borrower opens the page | the borrower actor

@@ -1,10 +1,10 @@
 {
-  "name": "gemarc-5d-site",
+  "name": "gemarc-media-doc-site",
   "version": "0.2.0",
   "private": true,
   "license": "MIT",
   "type": "module",
-  "description": "GemArc 5D architecture site. The runtime has no hard dependency on any library below; the adapters activate only when the library is present.",
+  "description": "GemArc multimedia architecture document site. The runtime has no hard dependency on any library below; the adapters activate only when the library is present.",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",

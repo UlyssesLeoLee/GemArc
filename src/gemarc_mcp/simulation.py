@@ -9,15 +9,23 @@ MAX_EVENTS = 512
 MAX_TIME_MS = 3_600_000
 
 
-def simulate(model: dict, scenario_id: str, disabled_nodes: list[str] | None = None) -> dict:
-    check = validate(model)
-    if check["status"] != "ok":
+def _require_valid(model: dict) -> None:
+    if validate(model)["status"] != "ok":
         raise GemArcError("GEMARC_MODEL_020", "模型校验失败，不可模拟")
-    scenarios = {x["id"]: x for x in model.get("scenarios", [])}
+
+
+def simulate(model: dict, scenario_id: str, disabled_nodes: list[str] | None = None,
+             *, validated: bool = False) -> dict:
+    """Run one scenario. ``validated=True`` skips the model validation for a caller that has just done it."""
+    if not validated:
+        _require_valid(model)
+    # ``validate`` treats a missing or non-list collection as empty, so read it the same way here.
+    raw_scenarios, raw_nodes = model.get("scenarios"), model.get("nodes")
+    scenarios = {x["id"]: x for x in (raw_scenarios if isinstance(raw_scenarios, list) else [])}
     if scenario_id not in scenarios:
         raise GemArcError("GEMARC_DYNAMIC_006", "场景不存在")
     scenario = scenarios[scenario_id]
-    ids = {node["id"] for node in model["nodes"]}
+    ids = {node["id"] for node in (raw_nodes if isinstance(raw_nodes, list) else [])}
     disabled = set(disabled_nodes or [])
     if disabled - ids:
         raise GemArcError("GEMARC_DYNAMIC_007", "屏蔽的模块不存在")
@@ -58,9 +66,15 @@ def simulate(model: dict, scenario_id: str, disabled_nodes: list[str] | None = N
                         "blocked": sum(e["status"] == "blocked" for e in trace)}}
 
 
-def compare(model: dict, scenario_id: str, disabled_nodes: list[str]) -> dict:
-    baseline = simulate(model, scenario_id)
-    counterfactual = simulate(model, scenario_id, disabled_nodes)
+def compare(model: dict, scenario_id: str, disabled_nodes: list[str], *, validated: bool = False,
+            baseline: dict | None = None) -> dict:
+    """Baseline versus intervention. The model is validated once, not once per run; a caller that already
+    holds ``simulate(model, scenario_id)`` can pass it as ``baseline`` instead of having it computed again."""
+    if not validated:
+        _require_valid(model)
+    if baseline is None:
+        baseline = simulate(model, scenario_id, validated=True)
+    counterfactual = simulate(model, scenario_id, disabled_nodes, validated=True)
     # Derive comparison from actual execution traces rather than visual guesses.
     def observed(trace):
         return sorted({(e["module"], e["event"]) for e in trace if e["status"] == "delivered"})

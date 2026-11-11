@@ -16,7 +16,8 @@
         "uml-class", "uml-component", "uml-package", "uml-sequence", "uml-state-machine",
         "uml-activity", "uml-deployment", "uml-use-case", "er-diagram", "dfd",
         "dependency-diagram", "logical-view", "development-view", "process-view",
-        "deployment-view", "data-view", "security-view", "operations-view", "causal-view"
+        "deployment-view", "data-view", "security-view", "operations-view", "causal-view",
+        "data-dependency", "event-flow"
       ]
     },
     "dimension": {

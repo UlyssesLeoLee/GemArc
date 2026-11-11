@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gate fixture: no-result</title>
+<!--ATLAS_SELFTEST-->
+<style>
+  body { margin: 0; font: 14px/1.4 sans-serif; background: #fff; color: #123; }
+  header { display: flex; gap: 4px; padding: 6px 8px; border-bottom: 1px solid #ccc; }
+  header button { width: 84px; height: 30px; }
+  main { padding: 8px; }
+</style>
+</head>
+<body>
+<header data-gate="header">
+  <button type="button">One</button>
+  <button type="button">Two</button>
+</header>
+<main><p>This page looks fine but never starts the walker, so no result element is ever written.</p></main>
+<script>
+(function () {
+  "use strict";
+  // Deliberately no AtlasGate.run(...) call: a missing result must FAIL, never PASS.
+  document.body.setAttribute("data-ready", "1");
+})();
+</script>
+</body>
+</html>

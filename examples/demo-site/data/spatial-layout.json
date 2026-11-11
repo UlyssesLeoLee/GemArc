@@ -1,0 +1,21 @@
+{
+  "buildings": [],
+  "crossSpaceEdges": [],
+  "floors": [],
+  "missing": [
+    "building",
+    "floor",
+    "room"
+  ],
+  "note": "模型没有空间结构时 present=false：界面必须显示未建立空间语义，不得虚构楼层或房间。",
+  "placements": [],
+  "present": false,
+  "rooms": [],
+  "schemaVersion": "0.2.0",
+  "unplacedNodeIds": [
+    "notify",
+    "queue",
+    "rule",
+    "sensor"
+  ]
+}

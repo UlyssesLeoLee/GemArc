@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gate fixture: settab-noop</title>
+<!--ATLAS_SELFTEST-->
+<style>
+  body { margin: 0; font: 14px/1.4 sans-serif; background: #fff; color: #123; }
+  header { display: flex; gap: 4px; padding: 6px 8px; border-bottom: 1px solid #ccc; }
+  header button { width: 84px; height: 30px; }
+  main { padding: 8px; }
+</style>
+</head>
+<body>
+<header data-gate="header">
+  <button type="button">One</button>
+  <button type="button">Two</button>
+</header>
+<main><p>setTab is a no-op, so every tab measures the same view.</p></main>
+<script>
+(function () {
+  "use strict";
+  var frame = 0;
+  AtlasGate.run({
+    tabs: ["a", "b", "c"],
+    setTab: function () {},
+    tabState: function () { return document.body.getAttribute("data-tab") || ""; },
+    renderOnce: function () { frame += 1; return { frame: frame }; },
+    frame: function () { return frame; }
+  });
+})();
+</script>
+</body>
+</html>

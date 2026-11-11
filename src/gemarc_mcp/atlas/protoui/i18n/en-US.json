@@ -1,0 +1,178 @@
+{
+  "language": "en-US",
+  "vocab": {
+    "widgetKinds": {
+      "stack": "Vertical stack", "row": "Horizontal row", "grid": "Grid", "card": "Card", "form": "Form", "header": "Header", "footer": "Footer", "sidebar": "Sidebar",
+      "toolbar": "Toolbar", "tabs": "Tab group", "list": "List", "heading": "Heading", "text": "Text", "image": "Image", "icon": "Icon", "badge": "Badge",
+      "divider": "Divider", "chart": "Chart", "table": "Table", "input": "Text input", "textarea": "Text area", "select": "Select", "checkbox": "Checkbox", "radio": "Radio",
+      "switch": "Switch", "button": "Button", "link": "Link", "tab": "Tab", "menu": "Menu", "pagination": "Pagination", "custom": "Custom block"
+    },
+    "screenKinds": {"page": "Page", "dialog": "Dialog", "sheet": "Bottom sheet", "panel": "Side panel"},
+    "frames": {"desktop": "Desktop", "tablet": "Tablet", "phone": "Phone"},
+    "variantKinds": {"loading": "Loading", "empty": "Empty", "error": "Error", "success": "Success", "locked": "Locked", "other": "Other"},
+    "emphasis": {"primary": "Primary", "secondary": "Secondary", "danger": "Danger", "muted": "Muted"},
+    "triggers": {"tap": "Tap", "submit": "Submit", "change": "Change", "auto": "Auto", "back": "Back", "timeout": "Timeout", "key": "Key"}
+  },
+  "svg": {
+    "band": {
+      "layout": "layout {n}",
+      "ui": "ui {sha}",
+      "wire": "wireframe sketch",
+      "shown": "shows {k}/{n}"
+    },
+    "placeholder": {
+      "empty": "(empty)"
+    },
+    "more_rows": "+{k} rows not drawn",
+    "title": "{id} {title} (state: {variant})",
+    "word": {
+      "contains": "Contains:",
+      "excludes": "Excludes:"
+    },
+    "desc": {
+      "contains": "{n} widgets ({kinds}); this state shows {k} of {n}",
+      "named": "{id} ({reason})",
+      "hidden": ", not shown: {list}",
+      "more": " and {k} more",
+      "end": ".",
+      "excludes": "{w} {text}.",
+      "excl": "layered elements, absolute positioning, animation, responsive breakpoints, themes, and anything that is not in the prototype model",
+      "geometry": "The geometry is only a sketch (layout L1.1); the normative content is kind, text, field, state, jump, parent and order."
+    },
+    "reason": {
+      "in": "shown in other states only",
+      "parent": "its parent is not shown",
+      "depth": "nested too deep to draw"
+    }
+  },
+  "card": {
+    "heading": "{title} ({n})",
+    "heading_part": "{title} ({n} of {m}, rows {a}-{b})",
+    "more": " and {k} more",
+    "t": {
+      "widgets": "Widgets",
+      "order": "Order",
+      "states": "States",
+      "navout": "Outgoing navigation",
+      "navin": "Incoming navigation",
+      "derived": "Derived by the renderer, not authored",
+      "texts": "All visible text",
+      "sample": "Sample data"
+    },
+    "col": {
+      "attrs": "attrs",
+      "kind": "kind",
+      "container": "container",
+      "children": "children in order",
+      "state": "state",
+      "note": "note",
+      "text": "text",
+      "file": "file",
+      "shown": "shown",
+      "hidden": "hidden",
+      "from": "from",
+      "to": "to",
+      "label": "label",
+      "guard": "guard",
+      "on": "on",
+      "links": "links",
+      "what": "what",
+      "widget": "widget",
+      "string": "string",
+      "source": "source",
+      "columns": "columns",
+      "rows": "rows",
+      "drawn": "drawn"
+    },
+    "derived": {
+      "skeleton": "loading skeleton",
+      "placeholder": "empty-state placeholder",
+      "more": "rows-not-drawn hint",
+      "bar": "grey bar without sample data"
+    },
+    "src": {
+      "band": "state band",
+      "note": "state note",
+      "derived": "(derived by the renderer)"
+    },
+    "nodata": "no sample data provided",
+    "ident": "Screen `{id}` · {kind} · {frame} {w}x{h}",
+    "purpose": "Purpose: {purpose}",
+    "props": "Properties: {props}",
+    "checkpoints": "Check points checkpoints={n} (one per non-empty cell of the widget table, id = widget id + @ + column; also @order, @route and #state@state)",
+    "stamp": "Verdict stamp sha={sha} (a conform row of a ui-verdict-* slice quotes it; it changes only when a check point of this screen changes)",
+    "covers": "{w} widgets, {s} states, {n} outgoing navigations, {c} check points",
+    "excludes": "pixel geometry, layered elements, animation, responsive breakpoints (geometry is only a sketch)",
+    "howto": "Normative: kind, text, field, state, jump, parent and order; indicative: position and size. A circle number = widget number = the # of the table. A PNG is valid only when the ui value in its state band equals this card's u=. kind to DOM: see ui-schema.md",
+    "all_states": "all",
+    "cont": "(cont.)",
+    "note": "see note [{k}]",
+    "covers_part": "{base}; this page holds one part of them",
+    "none": "(none)"
+  },
+  "index": {
+    "covers": "{s} screens, {v} states, {w} widgets, {c} check points, {n} navigations",
+    "excludes": "pixel geometry; widgets and navigation of a screen are in its screen card",
+    "howto": "Pick a screen here, then read its screen card for the widget table; the navigation graph is on the NAV page. PNGs are rendered by verify or build gate=smoke into .verify/screens/; live state: gemarc_atlas_index scope=\"screens\"",
+    "t": {
+      "screens": "Screens",
+      "req": "Requirement coverage",
+      "shards": "Parts"
+    },
+    "col": {
+      "id": "id",
+      "title": "title",
+      "route": "route",
+      "frame": "frame",
+      "start": "start",
+      "states": "states",
+      "widgets": "widgets",
+      "checkpoints": "check points",
+      "nav": "nav out/in",
+      "svg": "SVG bytes",
+      "card": "card",
+      "req": "requirement",
+      "screens": "screens"
+    },
+    "shards": "Parts: {list}"
+  },
+  "nav": {
+    "covers": "{s} screens, {n} navigations ({k} in the graph)",
+    "excludes": "widget detail is in the screen cards; navigation across parts is in the tables only",
+    "howto": "n1 n2 in the graph are aliases, the alias table gives the screen id; start screens are marked start in the alias table",
+    "t": {
+      "graph": "Navigation graph",
+      "alias": "Alias table",
+      "table": "Navigation table",
+      "unreach": "Unreachable screens",
+      "dead": "Screens without outgoing navigation"
+    },
+    "col": {
+      "id": "id",
+      "alias": "alias",
+      "screen": "screen",
+      "start": "start",
+      "from": "from",
+      "to": "to",
+      "label": "label",
+      "guard": "guard",
+      "on": "on",
+      "links": "links",
+      "page": "page of the target"
+    },
+    "start": "start",
+    "nostart": "no start screen is declared, reachability is not judged",
+    "shards": "Parts: {list}"
+  },
+  "gallery": {
+    "head": "Page §{page} · {title} · {i}/{n} · {counts} · class {cls}",
+    "sentinel": "End of §{page} · {counts} · sha8 {sha8} · that is the whole page",
+    "counts": "{b} blocks, {t} tables",
+    "state": "State {name}",
+    "not_inlined": "Not inlined: {list}",
+    "card": "Screen card (Markdown)",
+    "index": "Index",
+    "nav": "Navigation",
+    "start": "Start"
+  }
+}

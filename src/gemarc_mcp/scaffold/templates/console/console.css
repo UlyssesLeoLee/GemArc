@@ -1,15 +1,40 @@
-/* GemArc MCP console — a tuning panel for the server itself, not a design view. */
+/* GemArc MCP console - the gem theme of BD-010 (UI style policy).
+   The console is the same product as the public site, so it uses the one
+   palette of section 3: the dark band (3.1) for the three-dimensional stage
+   and the light band (3.2) for the crystal shell around it.
+
+   The look is a crystal cabinet in daylight: a pale, misty air layer, three
+   static halos of light behind everything, crystal panes with one bright edge
+   and one very light shadow, and a dark showcase inset where the crystals
+   burn. The stage stays dark on purpose - a gem only shows its edges in the
+   dark. Nothing here invents a colour: every value is a token of section 3. */
 :root {
-  --bg: #0b0f14;
-  --panel: #121821;
-  --panel-2: #0e141c;
-  --line: #22303f;
-  --ink: #dbe6f0;
-  --muted: #8fa3b8;
-  --accent: #4cc2ff;
-  --warn: #ffb454;
-  --bad: #ff6b6b;
-  --good: #6bd68a;
+  color-scheme: light;
+  /* The dark band (section 3.1): the site and the three-dimensional scenes. */
+  --gem-void: #06090e;
+  --gem-bg: #0b0f16;
+  --gem-panel: #111823;
+  --gem-facet: #1b2635;
+  --gem-rim: #2c3d52;
+  --gem-ink: #e6eef7;
+  --gem-muted: #93a6bd;
+  --gem-aqua: #6fe3ff;
+  --gem-violet: #b78cff;
+  --gem-topaz: #ffc46b;
+  --gem-emerald: #6bd68a;
+  --gem-ruby: #ff6b8a;
+  /* The light band (section 3.2): the crystal cabinet of the backend. */
+  --gem-air: #e9eff8;
+  --gem-sheen: #ffffff;
+  --gem-halo-aqua: #c9ecf7;
+  --gem-halo-violet: #ded3fb;
+  --gem-halo-topaz: #ffe6c4;
+  --gem-ink-deep: #16233a;
+  --gem-muted-deep: #5a6b84;
+  --gem-aqua-deep: #0c6d84;
+  --gem-topaz-deep: #96601a;
+  --gem-emerald-deep: #2a7048;
+  --gem-ruby-deep: #a8324f;
   --mono: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
@@ -17,97 +42,291 @@
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--ink);
+  min-height: 100vh;
+  color: var(--gem-ink-deep);
   font: 14px/1.6 "Segoe UI", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+  /* The air layer and the three halos. They are static: a slow drift would be
+     a loop animation, and the policy allows the light to be still. */
+  background:
+    radial-gradient(60rem 36rem at 4% -14%,
+      color-mix(in srgb, var(--gem-halo-aqua) 62%, transparent), transparent 68%),
+    radial-gradient(48rem 32rem at 98% 0%,
+      color-mix(in srgb, var(--gem-halo-violet) 55%, transparent), transparent 70%),
+    radial-gradient(68rem 42rem at 52% 114%,
+      color-mix(in srgb, var(--gem-halo-topaz) 50%, transparent), transparent 72%),
+    var(--gem-air);
+  background-attachment: fixed;
 }
 
+/* --- the crystal shell: one bright edge, one very light shadow ----------- */
+/* --- the shell: a crystal bar with the brand on it ------------------------ */
 .top {
+  position: sticky;
+  top: 0;
+  z-index: 5;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 11px 20px;
-  border-bottom: 1px solid var(--line);
-  background: var(--panel);
+  padding: 10px 22px;
+  background: color-mix(in srgb, var(--gem-sheen) 72%, transparent);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  border-bottom: 1px solid color-mix(in srgb, var(--gem-sheen) 76%, var(--gem-rim));
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--gem-ink-deep) 7%, transparent);
 }
 
-.brand { display: flex; align-items: baseline; gap: 8px; font-size: 17px; font-weight: 600; }
-.brand .gem { color: var(--accent); }
-.brand small { color: var(--muted); font-weight: 400; font-size: 12px; }
+.brand { display: flex; align-items: baseline; gap: 9px; font-size: 17px; font-weight: 600; }
+.brand .gem {
+  color: var(--gem-aqua-deep);
+  /* The brand mark is a brand, not a fact: it stays still (section 12.3). */
+  text-shadow: 0 1px 0 color-mix(in srgb, var(--gem-sheen) 90%, transparent);
+}
+.brand small { color: var(--gem-muted-deep); font-weight: 400; font-size: 12px; }
 
-.conn { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+/* The language switcher: three options in one row, each written in its own
+   language (section 12.7). It is a switch, not a menu: the current language is
+   marked, the other two are not. */
+.lang { display: flex; align-items: center; gap: 2px; }
+.lang-btn {
+  padding: 3px 9px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--gem-muted-deep);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.lang-btn:hover { color: var(--gem-aqua-deep); border-color: color-mix(in srgb, var(--gem-aqua-deep) 40%, transparent); }
+.lang-btn.on {
+  color: var(--gem-ink-deep);
+  border-color: color-mix(in srgb, var(--gem-aqua-deep) 50%, transparent);
+  background: color-mix(in srgb, var(--gem-sheen) 70%, transparent);
+}
+.lang-btn:focus-visible { outline: 2px solid var(--gem-aqua-deep); outline-offset: 1px; }
+
+.conn { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--gem-muted-deep); }
+/* A state is a dot AND a word: the colour never carries the fact alone. */
 .dot {
   width: 9px; height: 9px; border-radius: 50%;
-  background: var(--muted); box-shadow: 0 0 0 3px rgba(143, 163, 184, .12);
+  background: var(--gem-muted-deep);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gem-muted-deep) 14%, transparent);
 }
-.dot.on { background: var(--good); box-shadow: 0 0 0 3px rgba(107, 214, 138, .16); }
-.dot.off { background: var(--bad); box-shadow: 0 0 0 3px rgba(255, 107, 107, .16); }
+.dot.on { background: var(--gem-emerald-deep); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gem-emerald-deep) 16%, transparent); }
+.dot.off { background: var(--gem-ruby-deep); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gem-ruby-deep) 16%, transparent); }
 
-/* --- status bar --- */
-.statbar {
+/* --- the status line: five phrases, the values live in the details ----- */
+.statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 8px 22px;
+  background: color-mix(in srgb, var(--gem-sheen) 46%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--gem-sheen) 62%, var(--gem-rim));
+  font-size: 12.5px;
+}
+.facts { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; }
+.fact {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  color: var(--gem-muted-deep);
+}
+.fact b { color: var(--gem-ink-deep); font-weight: 600; }
+.fact.good { color: var(--gem-emerald-deep); }
+.fact.warn { color: var(--gem-topaz-deep); }
+.fact.bad { color: var(--gem-ruby-deep); }
+
+/* The technical values are folded away: the first screen answers one
+   question only (section 12.6). */
+.statusbar details { position: relative; flex: none; }
+.statusbar summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 2px 10px;
+  border: 1px solid color-mix(in srgb, var(--gem-ink-deep) 14%, transparent);
+  border-radius: 999px;
+  color: var(--gem-muted-deep);
+  font-size: 12px;
+}
+.statusbar summary::-webkit-details-marker { display: none; }
+.statusbar summary:hover { border-color: var(--gem-aqua-deep); color: var(--gem-aqua-deep); }
+.statusbar summary:focus-visible { outline: 2px solid var(--gem-aqua-deep); outline-offset: 1px; }
+.statusbar .detail-body {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 6;
+  min-width: 260px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--gem-sheen) 94%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gem-sheen) 74%, var(--gem-rim));
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--gem-ink-deep) 14%, transparent);
+  font-size: 12px;
+}
+.statusbar .detail-body div { display: flex; justify-content: space-between; gap: 18px; padding: 2px 0; }
+.statusbar .detail-body span { color: var(--gem-muted-deep); }
+.statusbar .detail-body b { color: var(--gem-ink-deep); font-family: var(--mono); font-weight: 500; }
+
+/* --- bearer token bar (only when the server requires one) --------------- */
+.authbar {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
-  padding: 9px 20px;
-  border-bottom: 1px solid var(--line);
-  background: var(--panel-2);
+  margin: 12px 22px 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--gem-sheen) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gem-topaz-deep) 42%, var(--gem-sheen));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--gem-sheen) 86%, transparent);
+  font-size: 12.5px;
 }
-.stat {
-  display: inline-flex; align-items: baseline; gap: 6px;
-  padding: 3px 9px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  font-size: 12px;
-  background: #0b1219;
+.authbar[hidden] { display: none; }
+.authbar label { color: var(--gem-topaz-deep); font-family: var(--mono); font-size: 11.5px; }
+/* The token bar says where the token comes from: the website issues it, the
+   panel only fills it in (OPS-002 section 3.15). */
+.auth-head { flex: 1 1 100%; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.auth-row { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; flex-wrap: wrap; }
+.auth-note { flex: 1 1 100%; margin: 0; font-size: 12px; }
+.auth-source { color: var(--gem-muted-deep); font-size: 12px; }
+.auth-source a { color: var(--gem-aqua-deep); }
+.auth-source[hidden], .auth-note[hidden] { display: none; }
+.authbar input {
+  flex: 1 1 280px;
+  max-width: 460px;
+  padding: 6px 10px;
+  background: var(--gem-sheen);
+  border: 1px solid color-mix(in srgb, var(--gem-ink-deep) 16%, transparent);
+  border-radius: 6px;
+  color: var(--gem-ink-deep);
+  font-family: var(--mono);
+  font-size: 12.5px;
 }
-.stat b { color: var(--ink); font-weight: 600; font-family: var(--mono); }
-.stat.warn { border-color: #5a4526; color: var(--warn); }
-.stat.bad { border-color: #5c2b2b; color: var(--bad); }
-.stat.good { border-color: #2b5c3a; color: var(--good); }
-.muted { color: var(--muted); }
+.authbar input:focus-visible { outline: 2px solid var(--gem-aqua-deep); outline-offset: 1px; border-color: var(--gem-aqua-deep); }
+.authbar #token-msg.bad { color: var(--gem-ruby-deep); }
+.authbar #token-msg.good { color: var(--gem-emerald-deep); }
 
-/* --- layout --- */
+/* --- layout: three crystal panes on the air layer ------------------------ */
 main {
   display: grid;
-  grid-template-columns: 264px minmax(0, 1fr) 330px;
-  gap: 1px;
-  background: var(--line);
-  min-height: calc(100vh - 122px);
+  grid-template-columns: 272px minmax(0, 1fr) 320px;
+  gap: 14px;
+  padding: 14px 22px 18px;
+  align-items: start;
 }
-.pane { background: var(--bg); padding: 14px 16px; }
-.col-tools, .col-side { overflow-y: auto; max-height: calc(100vh - 122px); }
-.col-stage { overflow-y: auto; max-height: calc(100vh - 122px); }
+.pane {
+  padding: 14px 16px 16px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--gem-sheen) 62%, transparent);
+  backdrop-filter: blur(16px) saturate(1.15);
+  -webkit-backdrop-filter: blur(16px) saturate(1.15);
+  border: 1px solid color-mix(in srgb, var(--gem-sheen) 74%, var(--gem-rim));
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--gem-ink-deep) 8%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--gem-sheen) 86%, transparent);
+}
+.col-tools, .col-side, .col-stage { max-height: calc(100vh - 132px); overflow-y: auto; }
 
 .section-title {
-  margin: 4px 0 9px;
-  color: var(--muted);
+  margin: 2px 0 9px;
+  color: var(--gem-muted-deep);
   font-size: 11px;
-  letter-spacing: .12em;
+  letter-spacing: .14em;
   text-transform: uppercase;
   font-family: var(--mono);
 }
 
-/* --- tool list --- */
+/* --- the crystal scene of the tool surface ---------------------------- */
+/* The stage is a dark showcase inset in the crystal cabinet: the crystals are
+   the only light source there. When the three-dimensional library cannot be
+   loaded the panel says so; it never fakes a picture. */
+.space-3d {
+  position: relative;
+  height: 292px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--gem-void);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--gem-sheen) 26%, transparent),
+    inset 0 18px 40px color-mix(in srgb, var(--gem-void) 72%, transparent);
+}
+/* The light of the showcase: a soft pool behind the crystals and a shadow at
+   the bottom. It is light, not scenery - no floor, no reflection, no object
+   that is not a tool (section 12.4). */
+.space-3d::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(72% 58% at 50% 40%,
+      color-mix(in srgb, var(--gem-aqua) 9%, transparent), transparent 72%),
+    linear-gradient(to bottom,
+      transparent 52%, color-mix(in srgb, var(--gem-void) 82%, transparent) 100%);
+}
+.space-3d .gemarc-console-canvas { display: block; width: 100%; height: 100%; }
+.space-3d .hint { padding: 16px; color: var(--gem-muted); font-size: 12.5px; }
+/* The name of the crystal under the pointer: the scene never relies on colour
+   alone, and it never relies on a hover-only colour either. */
+.space-3d .tip {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  max-width: 62%;
+  padding: 3px 9px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--gem-sheen) 28%, transparent);
+  background: color-mix(in srgb, var(--gem-void) 72%, transparent);
+  color: var(--gem-ink);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  pointer-events: none;
+}
+.space-3d .tip[hidden] { display: none; }
+.space-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 0 0 14px;
+  color: var(--gem-muted-deep);
+  font-size: 11.5px;
+}
+.space-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.space-legend i {
+  width: 9px; height: 9px;
+  transform: rotate(45deg);
+  border: 1px solid color-mix(in srgb, var(--gem-ink-deep) 22%, transparent);
+}
+.space-legend .read i { background: var(--gem-aqua); }
+.space-legend .write i { background: var(--gem-topaz); }
+
+/* --- tool list -------------------------------------------------------- */
 .filter {
   width: 100%;
-  padding: 7px 9px;
-  margin-bottom: 8px;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  color: var(--ink);
+  padding: 8px 10px;
+  margin-bottom: 9px;
+  background: var(--gem-sheen);
+  border: 1px solid color-mix(in srgb, var(--gem-ink-deep) 14%, transparent);
+  border-radius: 6px;
+  color: var(--gem-ink-deep);
   font: inherit;
   font-size: 13px;
 }
-.filter:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+.filter::placeholder { color: var(--gem-muted-deep); }
+.filter:focus-visible { outline: 2px solid var(--gem-aqua-deep); outline-offset: 1px; border-color: var(--gem-aqua-deep); }
 
-.tool-list { display: flex; flex-direction: column; gap: 2px; }
+.tool-list { display: flex; flex-direction: column; gap: 3px; }
 .tool-group {
-  margin: 10px 0 4px;
-  color: var(--muted);
+  margin: 12px 0 4px;
+  color: var(--gem-muted-deep);
   font-size: 10.5px;
-  letter-spacing: .1em;
+  letter-spacing: .12em;
   text-transform: uppercase;
   font-family: var(--mono);
 }
@@ -115,148 +334,175 @@ main {
   display: block;
   width: 100%;
   text-align: left;
-  padding: 6px 9px;
+  padding: 7px 10px;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: 8px;
   background: transparent;
-  color: var(--ink);
+  color: var(--gem-ink-deep);
   cursor: pointer;
   font: inherit;
+  transition: border-color .12s ease, color .12s ease, background-color .12s ease;
 }
-.tool-item:hover { background: var(--panel); border-color: var(--line); }
-.tool-item.active { background: #10222e; border-color: #1f4a63; }
+.tool-item:hover {
+  border-color: color-mix(in srgb, var(--gem-aqua-deep) 38%, transparent);
+  background: color-mix(in srgb, var(--gem-sheen) 52%, transparent);
+}
+.tool-item:focus-visible { outline: 2px solid var(--gem-aqua-deep); outline-offset: 1px; }
+/* The selection is an edge and a colour of the word, never a filled block. */
+.tool-item.active { border-color: var(--gem-aqua-deep); color: var(--gem-aqua-deep); }
 .tool-item .tname { font-family: var(--mono); font-size: 12.5px; }
 .tool-item .tdesc {
-  display: block;
-  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--gem-muted-deep);
   font-size: 11.5px;
   line-height: 1.45;
   margin-top: 1px;
 }
-.tool-item.write .tname { color: var(--warn); }
-.tool-item.write.active .tname { color: var(--warn); }
+.tool-item.write .tname { color: var(--gem-topaz-deep); }
+.tool-item.write.active .tname { color: var(--gem-topaz-deep); }
 .tool-item .tag {
   float: right;
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--muted);
+  color: var(--gem-muted-deep);
 }
 
 .endpoints div { margin-bottom: 5px; font-size: 11.5px; }
-.endpoints code { font-family: var(--mono); color: var(--accent); }
-.endpoints span { color: var(--muted); margin-left: 6px; }
+.endpoints code { font-family: var(--mono); color: var(--gem-aqua-deep); }
+.endpoints span { color: var(--gem-muted-deep); margin-left: 6px; }
 
-/* --- stage --- */
+/* --- stage ------------------------------------------------------------ */
 .stage-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid color-mix(in srgb, var(--gem-ink-deep) 12%, transparent);
   padding-bottom: 11px;
   margin-bottom: 12px;
 }
-.stage-title h1 { margin: 0; font-size: 19px; font-family: var(--mono); }
+.stage-title h1 { margin: 0; font-size: 19px; font-family: var(--mono); letter-spacing: -.01em; }
 .stage-title p { margin: 4px 0 0; font-size: 12.5px; max-width: 70ch; }
 .stage-actions { display: flex; align-items: center; gap: 10px; flex: none; }
 
 .chip {
   font-family: var(--mono);
   font-size: 11px;
-  padding: 2px 8px;
-  border: 1px solid var(--line);
+  padding: 3px 9px;
   border-radius: 999px;
-  color: var(--muted);
+  border: 1px solid color-mix(in srgb, var(--gem-ink-deep) 16%, transparent);
+  color: var(--gem-muted-deep);
+  background: color-mix(in srgb, var(--gem-sheen) 58%, transparent);
 }
-.chip.write { border-color: #5a4526; color: var(--warn); }
-.chip.read { border-color: #234; color: var(--accent); }
+.chip.write { border-color: var(--gem-topaz-deep); color: var(--gem-topaz-deep); }
+.chip.read { border-color: var(--gem-aqua-deep); color: var(--gem-aqua-deep); }
+.chip.admin { border-color: var(--gem-emerald-deep); color: var(--gem-emerald-deep); }
 
 button.primary {
-  padding: 7px 18px;
-  border: 1px solid #1f6d94;
-  border-radius: 4px;
-  background: #10384c;
-  color: #d6f0ff;
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--gem-ink-deep) 18%, transparent);
+  background: color-mix(in srgb, var(--gem-sheen) 72%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--gem-sheen) 90%, transparent);
+  color: var(--gem-ink-deep);
   cursor: pointer;
   font: inherit;
   font-weight: 600;
+  transition: border-color .12s ease, color .12s ease, background-color .12s ease;
 }
-button.primary:hover:not(:disabled) { background: #164a66; }
-button.primary:disabled { opacity: .4; cursor: not-allowed; }
+button.primary:hover:not(:disabled) {
+  border-color: var(--gem-aqua-deep);
+  color: var(--gem-aqua-deep);
+  background: color-mix(in srgb, var(--gem-sheen) 88%, transparent);
+}
+button.primary:active:not(:disabled) { background: color-mix(in srgb, var(--gem-air) 70%, transparent); }
+button.primary:disabled { opacity: .45; cursor: not-allowed; }
+button.primary:focus-visible { outline: 2px solid var(--gem-aqua-deep); outline-offset: 1px; }
 button.ghost {
-  padding: 3px 9px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--gem-ink-deep) 14%, transparent);
   background: transparent;
-  color: var(--muted);
+  color: var(--gem-muted-deep);
   cursor: pointer;
   font: inherit;
   font-size: 12px;
+  transition: border-color .12s ease, color .12s ease;
 }
-button.ghost:hover { color: var(--ink); border-color: #35506b; }
+button.ghost:hover { color: var(--gem-ink-deep); border-color: var(--gem-aqua-deep); }
+button.ghost:focus-visible { outline: 2px solid var(--gem-aqua-deep); outline-offset: 1px; }
 button.mini {
-  padding: 2px 8px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: var(--panel);
-  color: var(--ink);
+  padding: 2px 9px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--gem-ink-deep) 14%, transparent);
+  background: color-mix(in srgb, var(--gem-sheen) 54%, transparent);
+  color: var(--gem-ink-deep);
   cursor: pointer;
   font: inherit;
   font-size: 12px;
+  transition: border-color .12s ease, color .12s ease;
 }
-button.mini:hover { border-color: #35506b; }
+button.mini:hover { border-color: var(--gem-aqua-deep); color: var(--gem-aqua-deep); }
+button.mini:focus-visible { outline: 2px solid var(--gem-aqua-deep); outline-offset: 1px; }
 
-/* --- parameter form --- */
-.params { display: grid; gap: 11px; margin-bottom: 16px; }
+/* --- parameter form --------------------------------------------------- */
+.params { display: grid; gap: 12px; margin-bottom: 16px; }
 .field { display: grid; gap: 4px; }
 .field label { font-size: 12.5px; display: flex; align-items: baseline; gap: 7px; }
-.field .fname { font-family: var(--mono); color: var(--ink); }
-.field .req { color: var(--bad); font-size: 11px; }
-.field .ftype { color: var(--muted); font-size: 11px; font-family: var(--mono); }
-.field .fhint { color: var(--muted); font-size: 11.5px; }
+.field .fname { font-family: var(--mono); color: var(--gem-ink-deep); }
+.field .req { color: var(--gem-ruby-deep); font-size: 11px; }
+.field .ftype { color: var(--gem-muted-deep); font-size: 11px; font-family: var(--mono); }
+.field .fhint { color: var(--gem-muted-deep); font-size: 11.5px; }
 .field input[type="text"], .field input[type="number"], .field select, .field textarea {
   width: 100%;
-  padding: 7px 9px;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  color: var(--ink);
+  padding: 8px 10px;
+  background: var(--gem-sheen);
+  border: 1px solid color-mix(in srgb, var(--gem-ink-deep) 15%, transparent);
+  border-radius: 6px;
+  color: var(--gem-ink-deep);
   font: inherit;
   font-size: 13px;
 }
 .field textarea { min-height: 74px; resize: vertical; font-family: var(--mono); font-size: 12.5px; }
-.field input:focus, .field select:focus, .field textarea:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+.field input:focus-visible, .field select:focus-visible, .field textarea:focus-visible {
+  outline: 2px solid var(--gem-aqua-deep);
+  outline-offset: 1px;
+  border-color: var(--gem-aqua-deep);
+}
 .field .check { display: flex; align-items: center; gap: 8px; }
-.field .check input { width: 15px; height: 15px; accent-color: var(--accent); }
-.empty { color: var(--muted); font-size: 12.5px; padding: 6px 0; }
+.field .check input { width: 15px; height: 15px; accent-color: var(--gem-aqua-deep); }
+.empty { color: var(--gem-muted-deep); font-size: 12.5px; padding: 6px 0; }
 
-/* --- result --- */
+/* --- result: opaque. No blur ever sits on top of data. ---------------- */
 .result-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .result {
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  padding: 10px 12px;
+  background: var(--gem-sheen);
+  border: 1px solid color-mix(in srgb, var(--gem-ink-deep) 13%, transparent);
+  border-radius: 8px;
+  padding: 11px 13px;
   max-height: 46vh;
   overflow: auto;
   font-family: var(--mono);
   font-size: 12.5px;
   white-space: pre-wrap;
   word-break: break-word;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--gem-ink-deep) 7%, transparent);
 }
-.result.error { border-color: #5c2b2b; color: #ffc9c9; }
-.result.ok { border-color: #234; }
+.result.error { border-color: var(--gem-ruby-deep); color: var(--gem-ruby-deep); }
 
-/* --- json tree --- */
+/* --- json tree -------------------------------------------------------- */
 .code { font-family: var(--mono); font-size: 11.5px; max-height: 260px; overflow: auto; }
 .j { padding-left: 14px; }
-.jk { color: var(--accent); }
-.jv-s { color: #9fe0a5; }
-.jv-n { color: var(--warn); }
-.jv-b { color: #c39bff; }
-.jv-nil { color: var(--muted); }
-.jtoggle { cursor: pointer; color: var(--muted); user-select: none; }
-.jtoggle:hover { color: var(--ink); }
+.jk { color: var(--gem-aqua-deep); }
+.jv-s { color: var(--gem-emerald-deep); }
+.jv-n { color: var(--gem-topaz-deep); }
+.jv-b { color: var(--gem-muted-deep); }
+.jv-nil { color: var(--gem-muted-deep); }
+.jtoggle { cursor: pointer; color: var(--gem-muted-deep); user-select: none; }
+.jtoggle:hover { color: var(--gem-ink-deep); }
 .jrow { line-height: 1.55; }
 
 .list { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; }
@@ -265,28 +511,136 @@ button.mini:hover { border-color: #35506b; }
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 5px 8px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: var(--panel-2);
+  padding: 6px 9px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--gem-ink-deep) 12%, transparent);
+  background: color-mix(in srgb, var(--gem-sheen) 54%, transparent);
 }
-.list .item code { font-family: var(--mono); font-size: 11.5px; color: var(--accent); }
-.list .item .ok { color: var(--good); font-family: var(--mono); font-size: 11px; }
-.list .item .fail { color: var(--bad); font-family: var(--mono); font-size: 11px; }
+.list .item code { font-family: var(--mono); font-size: 11.5px; color: var(--gem-aqua-deep); }
+.list .item .ok { color: var(--gem-emerald-deep); font-family: var(--mono); font-size: 11px; }
+.list .item .fail { color: var(--gem-ruby-deep); font-family: var(--mono); font-size: 11px; }
 .list .empty { border: none; background: transparent; padding: 2px 0; }
 
 .foot {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  padding: 8px 20px;
-  border-top: 1px solid var(--line);
-  background: var(--panel);
-  color: var(--muted);
+  padding: 9px 22px;
+  border-top: 1px solid color-mix(in srgb, var(--gem-sheen) 62%, var(--gem-rim));
+  background: color-mix(in srgb, var(--gem-sheen) 46%, transparent);
+  color: var(--gem-muted-deep);
   font-size: 11.5px;
 }
 
-@media (max-width: 1100px) {
-  main { grid-template-columns: 220px minmax(0, 1fr); }
+.muted { color: var(--gem-muted-deep); }
+
+/* --- the settings of the signed-in account (DD-010) ------------------------ */
+/* The switcher and the settings button share one row on the right of the bar. */
+.head-right { display: flex; align-items: center; gap: 12px; }
+
+/* Signing out is a boundary, not one more setting: a hairline separates it from the
+   settings button, and it is the last item of the row (BD-010 section 12.8). */
+.head-right .signout {
+  margin: 0;
+  padding-left: 12px;
+  border-left: 1px solid color-mix(in srgb, var(--gem-ink-deep) 12%, transparent);
+}
+
+/* The dialog is a crystal pane over the panel: the same edges, the same air. */
+dialog.settings {
+  width: min(560px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--gem-ink-deep) 14%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--gem-sheen) 92%, transparent);
+  color: var(--gem-ink-deep);
+  box-shadow: 0 18px 48px color-mix(in srgb, var(--gem-ink-deep) 26%, transparent);
+}
+dialog.settings::backdrop { background: color-mix(in srgb, var(--gem-ink-deep) 38%, transparent); }
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px 8px;
+}
+.settings-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.settings-body { display: grid; gap: 12px; padding: 6px 18px 14px; }
+.settings-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.settings-row .fname { font-size: 12.5px; color: var(--gem-ink-deep); }
+.settings-row select {
+  padding: 6px 10px;
+  background: var(--gem-sheen);
+  border: 1px solid color-mix(in srgb, var(--gem-ink-deep) 15%, transparent);
+  border-radius: 6px;
+  color: var(--gem-ink-deep);
+  font: inherit;
+  font-size: 13px;
+}
+.settings-row select:focus-visible { outline: 2px solid var(--gem-aqua-deep); outline-offset: 1px; }
+.settings-body .hint { margin: 0; color: var(--gem-muted-deep); font-size: 11.5px; line-height: 1.5; }
+
+/* One segmented switch: the current choice is marked, the other one is not. */
+.seg { display: flex; align-items: center; gap: 2px; }
+.seg-btn {
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--gem-muted-deep);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.seg-btn:hover { color: var(--gem-aqua-deep); border-color: color-mix(in srgb, var(--gem-aqua-deep) 40%, transparent); }
+.seg-btn.on {
+  color: var(--gem-ink-deep);
+  border-color: color-mix(in srgb, var(--gem-aqua-deep) 50%, transparent);
+  background: color-mix(in srgb, var(--gem-sheen) 70%, transparent);
+}
+.seg-btn:focus-visible { outline: 2px solid var(--gem-aqua-deep); outline-offset: 1px; }
+
+/* The tool list: one line per tool, in a grid so it stays readable. */
+.checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 4px 12px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--gem-ink-deep) 12%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--gem-sheen) 54%, transparent);
+}
+.checks label { display: flex; align-items: center; gap: 7px; font-size: 12px; }
+.checks input { width: 14px; height: 14px; accent-color: var(--gem-aqua-deep); }
+.checks code { font-family: var(--mono); font-size: 11.5px; color: var(--gem-aqua-deep); }
+
+.settings-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 18px 14px;
+  border-top: 1px solid color-mix(in srgb, var(--gem-ink-deep) 10%, transparent);
+}
+.settings-foot .muted { font-size: 12px; }
+
+/* --- narrow viewports: one column, then the stage first ---------------- */
+@media (max-width: 1160px) {
+  main { grid-template-columns: 250px minmax(0, 1fr); }
   .col-side { grid-column: 1 / -1; max-height: none; }
+}
+@media (max-width: 820px) {
+  main { grid-template-columns: minmax(0, 1fr); padding: 12px 14px 16px; }
+  .col-tools, .col-side, .col-stage { max-height: none; }
+  /* On one column the stage comes first: the crystal surface is the hero, and
+     the tool list is one scroll away. */
+  .col-stage { order: -1; }
+  .top { padding: 10px 14px; }
+  /* The bar has grown a fourth item (the sign-out): let the row wrap instead of
+     squeezing the words (BD-010 section 12.5). */
+  .top, .head-right { flex-wrap: wrap; }
+  .statusbar { padding: 8px 14px; }
 }

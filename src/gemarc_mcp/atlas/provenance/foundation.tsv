@@ -1,0 +1,17 @@
+path	origin	reference_unit	treatment	deviations
+src/gemarc_mcp/atlas/model.py	ported-semantic	model validator and field contract	Python module written from the analysis of the reference model schema and validator: field names that engine and viewer code read are kept, the integrity checks follow the semantics of the reference validator, every derivation is a new single-source helper; no reference code copied	32 listed differences in docs/atlas/spec/model-schema.md section 10: derived edge ids with hash fallback, ports <node>:in/out, ranks in GemArc order, one default-policy constant, tests registry, policies, tbdIds list
+src/gemarc_mcp/atlas/vocab.py	new	-	Profile loader, indexes and profile checker authored for this repository; no reference counterpart	-
+src/gemarc_mcp/atlas/profiles/software.json	ported-semantic	engine vocabulary	Engine-facing enum ids (event types, node states, event outcomes, guard operators, intervention types, element kinds) are kept so the ported engine semantics are unchanged; kinds, relations, views, trust zones, tiers, colours and three-locale labels are generic data shared with the canonical GemArc vocabulary where an id exists	relation ids canonical camelCase with runtime/static flags in data; trust zones generic; additive kinds API Storage Workflow Element; category combination instead of combined
+docs/atlas/spec/model-schema.md	new	-	Normative contract text (zh-CN prose, English identifiers) written for this repository	-
+tests/atlas/test_model_contract.py	new	-	Contract tests authored for this repository; synthetic lending-desk id family only	-
+tests/atlas/synth.py	new	-	Seeded synthetic model generator (SplitMix64, generic word pools, random id families); shape numbers from the design document only, no reference data read or copied	-
+tests/atlas/fixtures/lending_desk.model.json	new	-	Canonical expansion of the 4-node synthetic worked example of the design (written by synth.py write-fixture)	-
+tests/atlas/test_synth.py	new	-	Tests of the generator and the .atl size estimator; synthetic ids only	-
+tests/atlas/test_provenance.py	new	-	Provenance harness tests authored for this repository	-
+tests/atlas/test_denylist.py	new	-	Hashed denylist scan: tokenises repository text and compares sha256 digests only; the token list lives outside the repository	-
+tests/atlas/denylist.sha256	new	-	SHA-256 digests of lower-cased reference tokens built by a maintainer script kept outside the repository; contains no reference string	-
+tests/atlas/test_atlas_v1_frozen.py	new	-	Pins the v1 toolsets, the simulation golden file hash and the v1 vocabulary digests	-
+tests/atlas/test_atlas_publication_gate.py	new	-	Asserts the publication gate (.vercelignore line, no atlas route, unchanged default toolsets)	-
+tests/atlas/test_strict_evidence_regression.py	new	-	Regression test for strict-mode evidence handling in the canonical validator	-
+tests/atlas/README.md	new	-	How to run and maintain the atlas tests (zh-CN)	-
+tools/gen_provenance.py	new	-	Generator of PROVENANCE.md from the lane tables	-

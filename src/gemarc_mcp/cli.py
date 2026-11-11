@@ -28,7 +28,8 @@ def main(argv=None):
     ct.add_argument("--query", default="")
     br = commands.add_parser("brief")
     br.add_argument("--project", default="")
-    br.add_argument("--section", default="")
+    br.add_argument("--section", default="",
+                    help="只取一个分段（不区分大小写）: " + ", ".join(service.BRIEF_SECTIONS))
     sim = commands.add_parser("simulate")
     sim.add_argument("project")
     sim.add_argument("scenario")

@@ -1,9 +1,23 @@
 {
-  "name":"ipa-architecture-3d-viewer",
-  "version":"2.1.0",
-  "private":true,
-  "type":"module",
-  "scripts":{"dev":"vite --host 127.0.0.1","build":"vite build","preview":"vite preview --host 127.0.0.1","test":"node --test tests/*.test.mjs"},
-  "dependencies":{"three":"0.180.0"},
-  "devDependencies":{"vite":"7.1.10"}
+  "name": "ipa-architecture-3d-viewer",
+  "version": "2.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "preinstall": "node tools/check-build-env.mjs",
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "dagre": "0.8.5",
+    "dexie": "4.4.6",
+    "graphology": "0.26.0",
+    "three": "0.180.0"
+  },
+  "devDependencies": {
+    "vite": "7.1.10"
+  }
 }

@@ -25,6 +25,7 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
+from . import derive
 from . import sync
 
 SCAFFOLD_ROOT = Path(__file__).resolve().parent
@@ -148,8 +149,9 @@ def _copy_tree(source: Path, target: Path, skip: set[str] | None = None) -> list
 
 def _write_json(path: Path, payload) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
+    # newline="\n": text mode would write CRLF on Windows, and render + kit must equal a build byte for byte.
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-                    encoding="utf-8")
+                    encoding="utf-8", newline="\n")
     return path.name
 
 
@@ -223,9 +225,9 @@ def _commands(profile: str) -> dict:
 
 def build_site(target: Path, model: dict, profile: str, scenarios: dict | None = None,
                capabilities: dict | None = None) -> list[str]:
-    """Materialise a runnable 5D site into ``target``.
+    """Materialise a runnable multimedia document site into ``target``.
 
-    Used by ``gemarc.build`` when the caller asks for the ``static`` or the
+    Used by ``gemarc_build`` when the caller asks for the ``static`` or the
     ``vite`` profile. The output is a self-contained project: the site shell,
     the shared runtime and the model data.
     """
@@ -244,6 +246,16 @@ def build_site(target: Path, model: dict, profile: str, scenarios: dict | None =
         _write_json(target / "data" / "scenarios.json", scenarios)
     if capabilities is not None:
         _write_json(target / "data" / "capabilities.json", capabilities)
+    # The v5.0 deliverables (§3 output_files, §25 output directory). They are
+    # derived from the same model, so render and build stay byte for byte equal.
+    for relative, payload in derive.derived_files(model).items():
+        _write_json(target / relative, payload)
+    # The GWF-IR schema depends on the vocabulary, not on the model: it is a
+    # fixed part and travels inside the site kit. The same holds for the 6D
+    # execution graph contract (v6.0 §25) and its example.
+    _write_json(target / "data" / "workflow-schema.json", derive.workflow_schema())
+    _write_json(target / "data" / "execution-graph.schema.json", derive.execution_graph_schema())
+    _write_json(target / "data" / "execution-graph.example.json", derive.execution_graph_example())
     return written
 
 
@@ -277,7 +289,7 @@ def fill_in_document(project: str, profile: str) -> str:
         f"# {project} — 脚手架填空说明",
         "",
         "本目录由 GemArc MCP 生成。**固定件**（契约、词表、共通代码、站点外壳）不要改动；",
-        "你只需要填下面列出的槽位。填完运行校验：`gemarc validate <project> --strict`。",
+        "你只需要填下面列出的槽位。填完运行校验：`gemarc validate <project>`；要宣称“已确认”时再加 `--strict`（strict 要求已实现或已观测的证据）。",
         "",
         "## 槽位",
         "",

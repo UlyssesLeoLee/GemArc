@@ -1,0 +1,34 @@
+path	origin	reference_unit	treatment	deviations
+src/gemarc_mcp/atlas/gate/smoke.py	new	-	authored from DESIGN.md 9.3 and 10-M0, then hardened after verification; stdlib subprocess runner; no reference code read or copied	calibration keyed per browser family (Edge 24 px, Chrome 16 px) instead of one +24; stderr console channel matches page-origin 'Uncaught'/WebGL error text because Edge logs console.error at INFO; per-attempt result nonce; canvases, renderer, GL errors and draw calls judged from the self-test's own reads; blank-canvas floor and renderer substring come from calibration.json; header, late errors and clientWidth overflow are fail-closed; pinned browser never replaced; start failures are coded findings; browser temp directory redirected into the work directory
+src/gemarc_mcp/atlas/gate/selftest.js	new	-	authored from DESIGN.md 9.3 page contract, then hardened after verification; timer-driven walker; no reference code read or copied	measures only (no in-page verdicts); verdicts live in smoke.py; adds the nonce echo, draw-call counters, its own canvas/pixel/getError reads, clientWidth, a post-finish error mirror (data-late-errors) and an attribute text scan; wraps extension draw methods (ANGLE_instanced_arrays, WEBGL_multi_draw) when getExtension hands them out
+src/gemarc_mcp/atlas/gate/calibration.json	new	-	measured on this machine with smoke.py --calibrate (Edge 152.0.4191.53, Chrome 156.0.8078.73)	-
+src/gemarc_mcp/atlas/gate/README.md	new	-	authored (zh-CN) from the measured behaviour of this task and the fix round	-
+tests/atlas/gate_spike.py	new	-	authored from DESIGN.md 10-M0 acceptance (b); CLI matrix runner	-
+tests/atlas/test_gate_smoke.py	new	-	authored; browser-free unit tests plus real-browser integration tests that SKIP loudly without a browser	-
+tests/atlas/gate_fixtures/ok-stub.html	new	-	synthetic page with a raw WebGL triangle; the gate reads the canvas back itself in the same task	-
+tests/atlas/gate_fixtures/bad-header-overlap.html	new	-	synthetic absolutely positioned header groups that collide below 1450 px	-
+tests/atlas/gate_fixtures/frozen-scene.html	new	-	synthetic scene whose swallowed tick throw freezes the frame counter	-
+tests/atlas/gate_fixtures/no-result.html	new	-	synthetic page that never starts the walker	-
+tests/atlas/gate_fixtures/console-error.html	new	-	synthetic page that calls console.error once	-
+tests/atlas/gate_fixtures/wide-overflow.html	new	-	synthetic page 2400 px wide	-
+tests/atlas/gate_fixtures/early-error.html	new	-	synthetic page with a syntax error before the self-test is inlined	-
+tests/atlas/gate_fixtures/multi-defect.html	new	-	synthetic page with header-outside, clipped fit element and 'undefined' text	-
+tests/atlas/gate_fixtures/page-errors.html	new	-	synthetic page with a missing image, an unhandled rejection and an uncaught throw after the self-test is armed	-
+tests/atlas/gate_fixtures/beyond-budget.html	new	-	synthetic page that throws at 25000 ms, beyond the virtual-time budget (pinned known limit)	-
+tests/atlas/gate_fixtures/canvas-2d-blank.html	new	-	synthetic 2D canvas with a context and no drawing	-
+tests/atlas/gate_fixtures/canvas-declared-hidden.html	new	-	synthetic canvas declared with data-gate=canvas but hidden	-
+tests/atlas/gate_fixtures/canvas-gl-blank-lying.html	new	-	synthetic WebGL canvas that is only cleared while renderOnce claims pixels and a renderer	-
+tests/atlas/gate_fixtures/canvas-no-context.html	new	-	synthetic canvas element that never obtains a context	-
+tests/atlas/gate_fixtures/console-error-late.html	new	-	synthetic page that logs console.error 1000 ms after load, after the walker finished	-
+tests/atlas/gate_fixtures/counter-bump-only.html	new	-	synthetic canvas-less page whose renderOnce only bumps the frame counter (pinned known limit)	-
+tests/atlas/gate_fixtures/fake-static.html	new	-	synthetic page with a hard-coded passing result element and no self-test run	-
+tests/atlas/gate_fixtures/frame-counts-reads.html	new	-	synthetic canvas-less page whose frame() counts its own calls (fake heartbeat)	-
+tests/atlas/gate_fixtures/gl-error.html	new	-	synthetic WebGL page that draws a triangle and leaves an INVALID_ENUM error behind	-
+tests/atlas/gate_fixtures/header-unmarked.html	new	-	synthetic page whose two controls sit on top of each other but no element carries data-gate=header	-
+tests/atlas/gate_fixtures/late-throw.html	new	-	synthetic page that throws an uncaught error 1000 ms after load	-
+tests/atlas/gate_fixtures/nan-in-attr.html	new	-	synthetic page with NaN and undefined only in title and aria-label attributes	-
+tests/atlas/gate_fixtures/ok-canvas-2d.html	new	-	synthetic 2D canvas with a fillRect per renderOnce (positive control)	-
+tests/atlas/gate_fixtures/ok-gl-fbo-left-bound.html	new	-	synthetic WebGL page that leaves an incomplete framebuffer bound after drawing (positive control)	-
+tests/atlas/gate_fixtures/overflow-vscroll.html	new	-	synthetic tall page with a 100vw-wide block: overflow that hides behind the scrollbar width	-
+tests/atlas/gate_fixtures/settab-noop.html	new	-	synthetic page whose setTab does nothing while a tabState hook is provided	-
+tests/atlas/gate_fixtures/ok-gl1-instanced.html	new	-	synthetic WebGL1 page that draws only through ANGLE_instanced_arrays (positive control: extension draw calls must be counted)	-

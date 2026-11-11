@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gate fixture: frozen-scene</title>
+<!--ATLAS_SELFTEST-->
+<style>
+  body { margin: 0; font: 14px/1.4 sans-serif; background: #fff; color: #123; }
+  header { display: flex; gap: 4px; padding: 6px 8px; border-bottom: 1px solid #ccc; }
+  header button { width: 84px; height: 30px; }
+  main { padding: 8px; }
+</style>
+</head>
+<body>
+<header data-gate="header">
+  <button type="button">One</button>
+  <button type="button">Two</button>
+</header>
+<main><p>The scene loop died after one swallowed throw.</p></main>
+<script>
+(function () {
+  "use strict";
+  // The tick throws once. The page's own error boundary swallows it (no console.error, no onerror)
+  // and marks the scene dead, so every later renderOnce() is a silent no-op: only the heartbeat
+  // (frame counter must advance across two renderOnce calls) can notice.
+  var frame = 0;
+  var dead = false;
+  var ticks = 0;
+
+  function tick() {
+    ticks += 1;
+    if (ticks === 1) throw new Error("synthetic tick failure");
+    frame += 1;
+  }
+
+  function renderOnce() {
+    if (dead) return { frozen: true };
+    try {
+      tick();
+    } catch (e) {
+      dead = true;
+    }
+    return { frozen: dead };
+  }
+
+  renderOnce();
+  AtlasGate.run({
+    tabs: ["main"],
+    renderOnce: renderOnce,
+    frame: function () { return frame; }
+  });
+})();
+</script>
+</body>
+</html>

@@ -16,7 +16,7 @@ project:
   name: auto
   summary: ""
   language: zh-CN
-  output: ./gemarc-5d-output
+  output: ./gemarc-media-doc-output
 
 generation:
   mode: IMPLEMENT_AND_VERIFY

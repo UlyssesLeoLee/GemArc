@@ -1,0 +1,22 @@
+#atlas-ui 1
+## screens: id | title | purpose | opts
+SCR-STOCK | 入库 | 馆员登记新到的书。 | kind=page frame=desktop route=/admin/stock start=true
+## variants: screen | name | note | opts
+SCR-STOCK | loading | 读取趋势和库存。 | kind=loading
+SCR-STOCK | error | ISBN 已存在。 | kind=error
+SCR-STOCK | success | 已入库。 | kind=success
+## widgets: local | label | opts
+@set screen=SCR-STOCK
+side | 管理菜单 | kind=sidebar
+m1 | 入库 | kind=menu parent=side
+m2 | 盘点 | kind=menu parent=side
+m3 | 报表 | kind=menu parent=side
+stats | 本月借阅趋势 | kind=chart
+form | 入库表单 | kind=form
+isbn | ISBN | kind=input parent=form bind=isbn
+copies | 册数 | kind=input parent=form bind=copies
+add | 入库 | kind=button parent=form emph=primary api=svc.stock
+## nav: from | to | label | opts
+SCR-STOCK.add | SCR-STOCK#success | 入库成功 | on=submit
+SCR-STOCK.m1 | SCR-STOCK | 入库菜单项 | on=tap
+SCR-STOCK.m2 | SCR-HOME | 回首页(占位) | on=tap

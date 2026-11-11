@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gate fixture: sparse-scene</title>
+<!--ATLAS_SELFTEST-->
+<style>
+  body { margin: 0; font: 14px/1.4 sans-serif; background: #fff; color: #123; }
+  header { display: flex; gap: 4px; padding: 6px 8px; border-bottom: 1px solid #ccc; }
+  header button { width: 84px; height: 30px; }
+  main { padding: 8px; }
+  canvas { display: block; width: 320px; height: 200px; border: 1px solid #999; }
+</style>
+</head>
+<body>
+<!--
+  A 3D scene whose nodes are tiny dots inside very large frames: everything is inside the canvas but the nodes fill a sliver of the frame
+  area (0.0005). The gate must FAIL it on the occupancy floor (SCENE_SPARSE, design 9.3); calibration.json holds the floor.
+-->
+<header data-gate="header">
+  <button type="button">One</button>
+  <button type="button">Two</button>
+</header>
+<main><canvas id="scene" width="320" height="200" data-gate="canvas"></canvas></main>
+<script>
+(function () {
+  "use strict";
+  var canvas = document.getElementById("scene");
+  var ctx = canvas.getContext("2d");
+  var frame = 0;
+  var scene = { frames: [{ id: "building", x: 4, y: 4, w: 310, h: 190 }, { id: "floor", x: 8, y: 8, w: 300, h: 180 }], nodes: [{ id: "n1", x: 150, y: 90 }, { id: "n2", x: 158, y: 94 }] };
+  function renderOnce() {
+    frame += 1;
+    ctx.fillStyle = "#0d1b2a";
+    ctx.fillRect(0, 0, 320, 200);
+    ctx.strokeStyle = "#ffcc33";
+    scene.frames.forEach(function (f) { ctx.strokeRect(f.x, f.y, f.w, f.h); });
+    ctx.fillStyle = "#ff6633";
+    scene.nodes.forEach(function (n) { ctx.fillRect(n.x, n.y, 4, 4); });
+    return { frame: frame };
+  }
+  renderOnce();
+  AtlasGate.run({
+    tabs: ["main"],
+    renderOnce: renderOnce,
+    frame: function () { return frame; },
+    sceneBounds: function () { return scene; }
+  });
+})();
+</script>
+</body>
+</html>

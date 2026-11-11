@@ -1,0 +1,398 @@
+{
+  "$comment": "v6.0 提示词 §25 / §30 的执行图契约示例。这是**示例数据**，不是任何目标项目的真实业务事实：evidenceIds 为空、verification 一律 Hypothetical、executorRef 只指向示例实现。真实执行必须另有获授权的后端（orchestration_6d.real_execution_requires_authorized_backend）。",
+  "capabilities": [
+    "agent-loop",
+    "deterministic-program",
+    "human-approval",
+    "checkpoint",
+    "resume"
+  ],
+  "checkpoints": [
+    {
+      "checkpointId": "cp-example-1",
+      "createdAt": "2026-11-03T00:00:00Z",
+      "currentNodeIds": [
+        "n-checkpoint"
+      ],
+      "pendingEdgeIds": [
+        "e-checkpoint-resume"
+      ],
+      "runId": "run-example-2",
+      "stateDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "stateSchemaVersion": "state-v1",
+      "workflowVersion": "0.3.0"
+    }
+  ],
+  "edges": [
+    {
+      "checkpointBoundary": false,
+      "dataMapping": {
+        "findings": "agent.findings"
+      },
+      "deliverySemantics": "at-least-once",
+      "edgeId": "e-agent-program",
+      "evidenceIds": [],
+      "guardExpression": null,
+      "kind": "data-flow",
+      "onError": "n-error",
+      "onTimeout": "n-error",
+      "policyRef": null,
+      "priority": 1,
+      "sourceNodeId": "n-agent",
+      "sourcePortId": null,
+      "stateMergePolicy": null,
+      "stateProjection": null,
+      "stateSchemaRef": "state-v1",
+      "targetNodeId": "n-program",
+      "targetPortId": null
+    },
+    {
+      "checkpointBoundary": false,
+      "dataMapping": null,
+      "deliverySemantics": "exactly-once",
+      "edgeId": "e-program-approve",
+      "evidenceIds": [],
+      "guardExpression": "program.valid == true",
+      "kind": "approval-transition",
+      "onError": "n-error",
+      "onTimeout": "n-error",
+      "policyRef": "policy.approver",
+      "priority": 1,
+      "sourceNodeId": "n-program",
+      "sourcePortId": null,
+      "stateMergePolicy": null,
+      "stateProjection": {
+        "valid": "approval.valid"
+      },
+      "stateSchemaRef": "state-v1",
+      "targetNodeId": "n-approve",
+      "targetPortId": null
+    },
+    {
+      "checkpointBoundary": true,
+      "dataMapping": null,
+      "deliverySemantics": "exactly-once",
+      "edgeId": "e-approve-checkpoint",
+      "evidenceIds": [],
+      "guardExpression": "approval.decision == 'approve'",
+      "kind": "state-transition",
+      "onError": "n-error",
+      "onTimeout": "n-error",
+      "policyRef": null,
+      "priority": 1,
+      "sourceNodeId": "n-approve",
+      "sourcePortId": null,
+      "stateMergePolicy": null,
+      "stateProjection": {
+        "decision": "approval.decision"
+      },
+      "stateSchemaRef": "state-v1",
+      "targetNodeId": "n-checkpoint",
+      "targetPortId": null
+    },
+    {
+      "checkpointBoundary": false,
+      "dataMapping": null,
+      "deliverySemantics": "exactly-once",
+      "edgeId": "e-checkpoint-resume",
+      "evidenceIds": [],
+      "guardExpression": null,
+      "kind": "resume-transition",
+      "onError": "n-error",
+      "onTimeout": "n-error",
+      "policyRef": null,
+      "priority": 1,
+      "sourceNodeId": "n-checkpoint",
+      "sourcePortId": null,
+      "stateMergePolicy": null,
+      "stateProjection": null,
+      "stateSchemaRef": "state-v1",
+      "targetNodeId": "n-resume",
+      "targetPortId": null
+    },
+    {
+      "checkpointBoundary": false,
+      "dataMapping": null,
+      "deliverySemantics": "at-most-once",
+      "edgeId": "e-approve-reject",
+      "evidenceIds": [],
+      "guardExpression": "approval.decision == 'reject'",
+      "kind": "error-flow",
+      "onError": "n-error",
+      "onTimeout": "n-error",
+      "policyRef": null,
+      "priority": 2,
+      "sourceNodeId": "n-approve",
+      "sourcePortId": null,
+      "stateMergePolicy": null,
+      "stateProjection": null,
+      "stateSchemaRef": null,
+      "targetNodeId": "n-error",
+      "targetPortId": null
+    }
+  ],
+  "executionGraphId": "example-execution-graph",
+  "executionMode": "simulation",
+  "nodes": [
+    {
+      "authorityPolicyRef": null,
+      "evidenceIds": [],
+      "executorRef": null,
+      "idempotencyKeyStrategy": null,
+      "inputSchema": null,
+      "kind": "end",
+      "name": "结束",
+      "nodeId": "n-start",
+      "outputSchema": null,
+      "retry": null,
+      "stateReadSet": [],
+      "stateWriteSet": [],
+      "timeout": null,
+      "verification": "Hypothetical"
+    },
+    {
+      "authorityPolicyRef": "policy.read-only",
+      "budgetPolicy": {
+        "maxCalls": 5,
+        "maxTokens": 20000
+      },
+      "evidenceIds": [],
+      "executorRef": null,
+      "idempotencyKeyStrategy": null,
+      "inputSchema": {
+        "required": [
+          "topic"
+        ],
+        "type": "object"
+      },
+      "iterationLimit": 3,
+      "kind": "agent-loop",
+      "name": "智能体收集结构化数据",
+      "nodeId": "n-agent",
+      "outputSchema": {
+        "required": [
+          "findings"
+        ],
+        "type": "object"
+      },
+      "retry": null,
+      "stateReadSet": [
+        "request.topic"
+      ],
+      "stateWriteSet": [
+        "agent.findings"
+      ],
+      "timeout": {
+        "onTimeout": "n-approve",
+        "timeoutMs": 30000
+      },
+      "verification": "Hypothetical"
+    },
+    {
+      "authorityPolicyRef": "policy.read-only",
+      "evidenceIds": [],
+      "executorRef": "example:validate-findings",
+      "idempotencyKeyStrategy": "hash(findings)",
+      "inputSchema": {
+        "required": [
+          "findings"
+        ],
+        "type": "object"
+      },
+      "kind": "deterministic-program",
+      "name": "校验并投影状态",
+      "nodeId": "n-program",
+      "outputSchema": {
+        "required": [
+          "valid"
+        ],
+        "type": "object"
+      },
+      "retry": {
+        "backoffMs": 100,
+        "maxAttempts": 2
+      },
+      "stateReadSet": [
+        "agent.findings"
+      ],
+      "stateWriteSet": [
+        "program.valid"
+      ],
+      "timeout": {
+        "onTimeout": "n-error",
+        "timeoutMs": 5000
+      },
+      "verification": "Hypothetical"
+    },
+    {
+      "approvalPolicyRef": "approval.default",
+      "authorityPolicyRef": "policy.approver",
+      "evidenceIds": [],
+      "executorRef": null,
+      "idempotencyKeyStrategy": null,
+      "inputSchema": {
+        "type": "object"
+      },
+      "kind": "human-approval",
+      "name": "人工审批",
+      "nodeId": "n-approve",
+      "outputSchema": {
+        "required": [
+          "decision"
+        ],
+        "type": "object"
+      },
+      "retry": null,
+      "stateReadSet": [
+        "program.valid"
+      ],
+      "stateWriteSet": [
+        "approval.decision"
+      ],
+      "timeout": {
+        "onTimeout": "n-error",
+        "timeoutMs": 86400000
+      },
+      "verification": "Hypothetical"
+    },
+    {
+      "authorityPolicyRef": "policy.read-only",
+      "evidenceIds": [],
+      "executorRef": "example:checkpoint-store",
+      "idempotencyKeyStrategy": "runId+nodeId",
+      "inputSchema": null,
+      "kind": "checkpoint",
+      "name": "提交检查点",
+      "nodeId": "n-checkpoint",
+      "outputSchema": null,
+      "retry": null,
+      "stateReadSet": [
+        "approval.decision"
+      ],
+      "stateWriteSet": [],
+      "timeout": null,
+      "verification": "Hypothetical"
+    },
+    {
+      "authorityPolicyRef": null,
+      "evidenceIds": [],
+      "executorRef": null,
+      "idempotencyKeyStrategy": null,
+      "inputSchema": null,
+      "kind": "end",
+      "name": "恢复后继续",
+      "nodeId": "n-resume",
+      "outputSchema": null,
+      "retry": null,
+      "stateReadSet": [
+        "approval.decision"
+      ],
+      "stateWriteSet": [],
+      "timeout": null,
+      "verification": "Hypothetical"
+    },
+    {
+      "authorityPolicyRef": null,
+      "evidenceIds": [],
+      "executorRef": null,
+      "idempotencyKeyStrategy": null,
+      "inputSchema": null,
+      "kind": "end",
+      "name": "异常终止",
+      "nodeId": "n-error",
+      "outputSchema": null,
+      "retry": null,
+      "stateReadSet": [],
+      "stateWriteSet": [],
+      "timeout": null,
+      "verification": "Hypothetical"
+    }
+  ],
+  "runs": [
+    {
+      "actorId": "agent-1",
+      "checkpointId": null,
+      "correlationId": "corr-1",
+      "currentNodeIds": [
+        "n-approve"
+      ],
+      "logicalTime": 1200,
+      "mode": "simulation",
+      "pendingEdgeIds": [
+        "e-program-approve"
+      ],
+      "runId": "run-example-1",
+      "stateSchemaVersion": "state-v1",
+      "status": "waiting-approval",
+      "traceId": "trace-1",
+      "workflowId": "example-workflow",
+      "workflowVersion": "0.3.0"
+    }
+  ],
+  "stateSchemaVersion": "state-v1",
+  "version": "0.3.0",
+  "workPackages": [
+    {
+      "completionCriteria": "运行进入 completed 状态，且检查点已提交",
+      "deliverable": "一次可审计的结构化交付",
+      "dependsOn": [],
+      "evidenceIds": [],
+      "kind": "phase",
+      "nodeIds": [],
+      "packageId": "wp-delivery",
+      "parentPackageId": null,
+      "title": "交付阶段",
+      "verification": "Hypothetical"
+    },
+    {
+      "completionCriteria": "findings 已通过校验，program.valid 为真",
+      "deliverable": "结构化发现与校验结论",
+      "dependsOn": [],
+      "evidenceIds": [],
+      "kind": "work-package",
+      "nodeIds": [
+        "n-agent",
+        "n-program"
+      ],
+      "packageId": "wp-collect",
+      "parentPackageId": "wp-delivery",
+      "title": "收集与校验",
+      "verification": "Hypothetical"
+    },
+    {
+      "completionCriteria": "审批决定已记录，检查点已提交并可恢复",
+      "deliverable": "审批结论与检查点",
+      "dependsOn": [
+        "wp-collect"
+      ],
+      "evidenceIds": [],
+      "kind": "work-package",
+      "nodeIds": [
+        "n-approve",
+        "n-checkpoint",
+        "n-resume"
+      ],
+      "packageId": "wp-approve",
+      "parentPackageId": "wp-delivery",
+      "title": "审批与固化",
+      "verification": "Hypothetical"
+    },
+    {
+      "completionCriteria": "运行进入 failed 状态并写明原因",
+      "deliverable": "终止原因与可追溯的失败记录",
+      "dependsOn": [
+        "wp-collect"
+      ],
+      "evidenceIds": [],
+      "kind": "task",
+      "nodeIds": [
+        "n-error"
+      ],
+      "packageId": "wp-fallback",
+      "parentPackageId": "wp-delivery",
+      "title": "异常终止",
+      "verification": "Hypothetical"
+    }
+  ],
+  "workflowId": "example-workflow"
+}

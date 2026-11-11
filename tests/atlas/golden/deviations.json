@@ -1,0 +1,132 @@
+{
+  "format": 1,
+  "about": "Deviations of the Atlas engine from the reference engine it was ported from. The four `recorded` ones are the design's fixes (design 9.2); the `contract` ones follow from the gemarc-atlas/1 contract (docs/atlas/spec/model-schema.md section 10); `preserved` lists a reference behaviour the port keeps on purpose. Each names the test that exercises it and the golden entries that show it.",
+  "deviations": [
+    {
+      "id": "D1", "category": "recorded", "title": "Trace alignment pairs suffixed event ids by (step, attempt)",
+      "description": "Events of retried, timed-out or failed deliveries carry suffixes (C#6@1, C#6!). The reference read the text after the first # as a number, which is NaN for them, so such rows sorted wrongly and could not pair with the event they replaced.",
+      "reference": "pairing and sorting by Number(text after the first #); NaN for suffixed ids",
+      "port": "step = integer after the first #; inside a gap a B entry pairs with the unused A entry of the same step that has the same attempt (no attempt counts as 1), else the first unused one",
+      "test": "DeviationTests.test_d1_suffixed_event_ids_pair_by_step_and_attempt",
+      "evidence": ["align-vectors::suffix-timeout-to-ok", "align-vectors::suffix-retry-recovered", "core::iv-to", "core::iv-dly-edge", "elements::iv-retry-slow"]
+    },
+    {
+      "id": "D2", "category": "recorded", "title": "cause is a structured {code, args} with a text renderer",
+      "description": "The reference passed free text between engine and causal view and the causal view parsed it by prefix. The port records {code, args}; the sentences are rendered per locale (zh-CN, ja-JP, en-US). via, root facts and prediction mismatches are structured the same way. Codes are the port's own vocabulary.",
+      "reference": "cause strings such as a prefix plus a node id; Japanese sentences in the chain",
+      "port": "cause = {code, args}; why / question / headline / summary / assumptions are rendered text and are not compared against the reference",
+      "test": "DeviationTests.test_d2_cause_is_structured_and_every_code_has_text_in_every_locale",
+      "evidence": ["core::iv-dis-s2", "core::iv-res", "core::base-agg"]
+    },
+    {
+      "id": "D3", "category": "recorded", "title": "seed removed",
+      "description": "The reference recorded opts.seed in the run and in the explanation and never used it.",
+      "reference": "run.seed and explanation.baselineConditions.seed",
+      "port": "no seed option, no seed key anywhere",
+      "test": "DeviationTests.test_d3_no_seed_anywhere",
+      "evidence": ["core::iv-dis-s2"]
+    },
+    {
+      "id": "D4", "category": "recorded", "title": "one DEFAULT_POLICY constant",
+      "description": "The timeout default was written twice in the reference (engine and causal view).",
+      "reference": "two copies of {timeoutMs 2000, retryMax 0, retryBackoffMs 0}",
+      "port": "model.DEFAULT_POLICY, shared by generator, expander and engine; no other copy in the engine sources",
+      "test": "DeviationTests.test_d4_one_default_policy_constant",
+      "evidence": ["core::iv-to"]
+    },
+    {
+      "id": "C1", "category": "contract", "title": "keep and disable carry no chain; chain checks run for replace only",
+      "description": "Spec 4.9: the reference required a two-edge chain for keep although resolve treats keep as a no-op. The golden adapter fed the reference a derived chain (and typeless element ports) for keep entries so that it validates; the port never checks a keep chain.",
+      "reference": "validateRewrite returns early only for disable",
+      "port": "keep and disable: only the target edge is checked (exists, not an owns edge); a keep entry still counts as a rewrite of its edge",
+      "test": "DeviationTests.test_c1_keep_and_disable_carry_no_chain_and_only_replace_is_chain_checked",
+      "evidence": ["elements::iv-keep-one", "elements::iv-disable-one"]
+    },
+    {
+      "id": "C2", "category": "contract", "title": "element kinds are the profile ids",
+      "description": "Kinds have no spaces (NewService, StorageAdapter ...); the adapter maps the 14 ids to the reference names one to one.",
+      "reference": "kinds written with spaces, for example two words",
+      "port": "kind must be a profile elementKinds id",
+      "test": "DeviationTests.test_c2_element_kinds_are_the_profile_ids",
+      "evidence": ["elements::iv-val-one"]
+    },
+    {
+      "id": "C3", "category": "contract", "title": "the static flag of an edge decides routing",
+      "description": "The reference looked relation names up in a fixed set; the contract stores edge.static (derived from the profile). The adapter renames every static edge to a static reference relation.",
+      "reference": "STATIC_RELATIONS membership of edge.relation",
+      "port": "edge.static (fallback: the profile's static relations when the field is missing)",
+      "test": "DeviationTests.test_c3_the_static_flag_of_an_edge_decides_routing",
+      "evidence": ["core::base-starve"]
+    },
+    {
+      "id": "C4", "category": "contract", "title": "verification grades compare by the contract rank",
+      "description": "Implemented is stronger than Observed in GemArc; the reference listed Observed first. confidence.weakest differs when both appear. The golden shared layer was produced with the contract order patched into the reference copy; the entries below were also run on the pristine copy and differ in exactly this field.",
+      "reference": "weakest by position in a list that starts with Observed",
+      "port": "model.weakest (rank 6 Implemented ... 1 Unknown)",
+      "test": "DeviationTests.test_c4_grades_are_compared_by_the_contract_rank",
+      "evidence": ["core::iv-idn", "core::iv-retry-heals", "core::iv-dis-gw-starve"]
+    },
+    {
+      "id": "C5", "category": "contract", "title": "a combined record the contract rejects is an error",
+      "description": "An empty or malformed parts array (and nesting deeper than six levels) is flattened by model.flatten_parts or reported; the reference silently produced no part.",
+      "reference": "flatten of a missing or empty parts array is empty, the intervention is OK",
+      "port": "INVALID with a combined_intervention error",
+      "test": "DeviationTests.test_c5_a_malformed_combined_record_is_an_error",
+      "evidence": []
+    },
+    {
+      "id": "C6", "category": "contract", "title": "rendered text constants",
+      "description": "The marker sentence of the causal explanation is the constant model-defined; the element display name is the profile kind id plus the role in parentheses. Both are text-level renames the golden adapter maps.",
+      "reference": "a fixed English marker sentence; a full-width parenthesis name",
+      "port": "epistemic = model-defined; name = kind (role)",
+      "test": "DeviationTests.test_c6_text_rendering_constants",
+      "evidence": ["elements::iv-val-one"]
+    },
+    {
+      "id": "C7", "category": "contract", "title": "the version stamp is model_sha8",
+      "description": "The contract has no hand-written version or revision fields; runs carry modelVersion = model_sha8(model) and no revision stamp.",
+      "reference": "the model's own version and revision fields copied into every run",
+      "port": "modelVersion = sha256 of the canonical model bytes, first 8 hex digits",
+      "test": "DeviationTests.test_c7_the_version_stamp_is_the_model_hash_and_there_is_no_revision_field",
+      "evidence": ["core::base-ok"]
+    },
+    {
+      "id": "P1", "category": "preserved", "title": "seek() misses a lifecycle change an element makes after its entry was snapshotted",
+      "description": "An element that drops or fails a request changes its own lifecycle state after the hop entry was recorded. When that entry closes a snapshot interval, seek() at that index lacks the change that the full replay has. The reference behaves the same. Kept so that the goldens stay equal; reported to the lead as a candidate fifth fix.",
+      "reference": "seek(run, i) differs from the full replay at the snapshotted index",
+      "port": "identical (pinned by a test)",
+      "test": "ElementTests.test_the_snapshot_quirk_of_an_element_that_changes_a_snapshotted_entry_is_pinned",
+      "evidence": ["elements::sim-quirk-drop", "elements::sim-quirk-fail"]
+    },
+    {
+      "id": "C8",
+      "category": "contract",
+      "title": "a complete element body with an empty rewrite is a draft",
+      "description": "Spec 4.9: an insert_element may carry an empty rewrite because a draft element is not connected yet, and an unconnected draft pairs with expect.status = DRAFT. The reference reported INVALID for it (and could only reach DRAFT through a broken body). The golden shared layer keeps the reference status out (withheld) and the diverged layer holds the reviewed one.",
+      "reference": "INVALID with 'element X is not connected to any formal edge'",
+      "port": "DRAFT with the same error text (every error of a draft starts with 'element ')",
+      "test": "DeviationTests.test_c8_an_unconnected_complete_element_is_a_draft",
+      "evidence": ["elements::compile-no-rewrite", "elements::compile-missing-rewrite-key"]
+    },
+    {
+      "id": "H1",
+      "category": "hardening",
+      "title": "a truncated causal pair is LIMIT_EXCEEDED, not OK",
+      "description": "When either run stops at maxEvents the pair says nothing about the rest of the case, yet the reference returned status OK and could classify the pair NO_DIFFERENCE. The port returns status LIMIT_EXCEEDED and marks diff, explanation and chain with truncated: true (the key is absent for a complete pair); the chain headline says the comparison is not conclusive. The golden harness maps the port output back to the reference shape before the shared comparison.",
+      "reference": "status OK, no marker",
+      "port": "status LIMIT_EXCEEDED, truncated: true on diff, explanation and chain",
+      "test": "DeviationTests.test_h1_a_truncated_pair_is_limit_exceeded",
+      "evidence": ["core::causal-limit"]
+    },
+    {
+      "id": "H2",
+      "category": "hardening",
+      "title": "the retry loop is bounded; hostile numbers are errors",
+      "description": "The retry loop of a delivery was not covered by the per-event maxEvents check: a change_retry with a huge retryMax (or a case policy with one) made a run spin and grow the trace without bound. The loop now stops at maxEvents (status LIMIT_EXCEEDED), retryMax above 1000 is INVALID, a non-numeric element latencyMs is INVALID, a non-string replaceEdgeId is an error, and opts.interventionTime / opts.maxEvents of a wrong type raise ENGINE_002. Input that breaks the model contract raises ENGINE_003.",
+      "reference": "unbounded loop; JavaScript coercion of the options; uncaught errors",
+      "port": "bounded loop, validated numbers, coded errors",
+      "test": "DeviationTests.test_h2_the_retry_loop_is_bounded_and_hostile_numbers_are_errors",
+      "evidence": []
+    }
+  ]
+}

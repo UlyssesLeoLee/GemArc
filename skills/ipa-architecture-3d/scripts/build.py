@@ -44,7 +44,9 @@ def run(argv=None):
     if out.exists() and any(out.iterdir()):print('ERROR 输出目录必须为空',file=sys.stderr);return 2
     shutil.copytree(template,out,dirs_exist_ok=True,ignore=shutil.ignore_patterns('node_modules','dist','.vite','__pycache__'))
     (out/'architecture.json').write_text(json.dumps(normalized,ensure_ascii=False,indent=2)+'\n',encoding='utf8')
-    (out/'viewer-config.json').write_text(json.dumps({'language':args.lang,'renderer':'Three.js/WebGL + SVG 2D','flatRenderer':'SVG (no WebGL)','isSample':normalized['meta'].get('evidenceState')=='illustrative'},ensure_ascii=False,indent=2)+'\n',encoding='utf8')
+    # Only keys the viewer actually reads. A flag nobody consumes is worse than a
+    # missing one: it invites the next person to trust a setting that does nothing.
+    (out/'viewer-config.json').write_text(json.dumps({'language':args.lang},ensure_ascii=False,indent=2)+'\n',encoding='utf8')
     html=(out/'index.html').read_text(encoding='utf8')
     html=re.sub(r'<html lang="[^"]+">',f'<html lang="{args.lang}">',html,count=1)
     (out/'index.html').write_text(html,encoding='utf8')

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gate fixture: ok-gl-fbo-left-bound</title>
+<!--ATLAS_SELFTEST-->
+<style>
+  body { margin: 0; font: 14px/1.4 sans-serif; background: #fff; color: #123; }
+  header { display: flex; gap: 4px; padding: 6px 8px; border-bottom: 1px solid #ccc; }
+  header button { width: 84px; height: 30px; }
+  main { padding: 8px; }
+  canvas { display: block; width: 320px; height: 200px; border: 1px solid #999; }
+</style>
+</head>
+<body>
+<header data-gate="header">
+  <button type="button">One</button>
+  <button type="button">Two</button>
+</header>
+<main><canvas id="scene" width="320" height="200"></canvas></main>
+<script>
+(function () {
+  "use strict";
+  var gl = document.getElementById("scene").getContext("webgl", { antialias: false });
+  var frame = 0;
+  var program = null;
+  function compile(type, source) {
+    var shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error("shader: " + gl.getShaderInfoLog(shader));
+    return shader;
+  }
+  var offscreen = gl.createFramebuffer();
+  function setup() {
+    program = gl.createProgram();
+    gl.attachShader(program, compile(gl.VERTEX_SHADER, "attribute vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }"));
+    gl.attachShader(program, compile(gl.FRAGMENT_SHADER, "precision mediump float; void main(){ gl_FragColor = vec4(0.2, 0.9, 0.4, 1.0); }"));
+    gl.linkProgram(program);
+    gl.useProgram(program);
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-0.6, -0.6, 0.6, -0.6, 0.0, 0.6]), gl.STATIC_DRAW);
+    var loc = gl.getAttribLocation(program, "p");
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  }
+  function renderOnce() {
+    frame += 1;
+    if (!program) setup();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.clearColor(0.05, 0.1, 0.16, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, offscreen); // left bound and incomplete: reading it would fail
+    return { frame: frame };
+  }
+  renderOnce();
+  AtlasGate.run({
+    tabs: ["main"],
+    renderOnce: renderOnce,
+    frame: function () { return frame; }
+  });
+})();
+</script>
+</body>
+</html>

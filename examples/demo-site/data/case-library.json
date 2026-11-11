@@ -1,0 +1,264 @@
+{
+  "caseContract": [
+    "caseId",
+    "name",
+    "description",
+    "category",
+    "initialState",
+    "inputEvents",
+    "preconditions",
+    "executionRules",
+    "expectedOutcomes",
+    "terminationConditions",
+    "assertions",
+    "evidenceIds",
+    "assumptions"
+  ],
+  "caseTypes": [
+    {
+      "animationPrimitives": [
+        "Propagation",
+        "StateTransition",
+        "Parallel",
+        "Convergence"
+      ],
+      "category": "normal",
+      "count": 0,
+      "id": "Normal",
+      "label": "正常",
+      "requiresIntervention": false
+    },
+    {
+      "animationPrimitives": [
+        "Propagation",
+        "Blocking",
+        "OutcomeComparison"
+      ],
+      "category": "boundary",
+      "count": 0,
+      "id": "Boundary",
+      "label": "边界",
+      "requiresIntervention": true
+    },
+    {
+      "animationPrimitives": [
+        "Propagation",
+        "Blocking",
+        "FailurePropagation",
+        "Recovery"
+      ],
+      "category": "abnormal",
+      "count": 0,
+      "id": "Error",
+      "label": "错误",
+      "requiresIntervention": true
+    },
+    {
+      "animationPrimitives": [
+        "Propagation",
+        "Waiting",
+        "Timeout",
+        "Retry"
+      ],
+      "category": "abnormal",
+      "count": 0,
+      "id": "Timeout",
+      "label": "超时",
+      "requiresIntervention": true
+    },
+    {
+      "animationPrimitives": [
+        "Propagation",
+        "Waiting",
+        "Retry"
+      ],
+      "category": "abnormal",
+      "count": 0,
+      "id": "Retry",
+      "label": "重试",
+      "requiresIntervention": true
+    },
+    {
+      "animationPrimitives": [
+        "Propagation",
+        "FailurePropagation",
+        "Retry",
+        "Recovery"
+      ],
+      "category": "recovery",
+      "count": 0,
+      "id": "Recovery",
+      "label": "恢复",
+      "requiresIntervention": true
+    },
+    {
+      "animationPrimitives": [
+        "Propagation",
+        "Compensation",
+        "Recovery",
+        "OutcomeComparison"
+      ],
+      "category": "abnormal",
+      "count": 0,
+      "id": "Compensation",
+      "label": "补偿",
+      "requiresIntervention": true
+    },
+    {
+      "animationPrimitives": [
+        "Propagation",
+        "Parallel",
+        "Waiting",
+        "Convergence"
+      ],
+      "category": "combination",
+      "count": 0,
+      "id": "Concurrency",
+      "label": "并发",
+      "requiresIntervention": true
+    },
+    {
+      "animationPrimitives": [
+        "Propagation",
+        "Parallel",
+        "Branching",
+        "OutcomeComparison"
+      ],
+      "category": "combination",
+      "count": 0,
+      "id": "RaceCondition",
+      "label": "竞争条件",
+      "requiresIntervention": true
+    },
+    {
+      "animationPrimitives": [
+        "Propagation",
+        "Waiting",
+        "Blocking",
+        "Escalation"
+      ],
+      "category": "boundary",
+      "count": 0,
+      "id": "ResourceContention",
+      "label": "资源竞争",
+      "requiresIntervention": true
+    },
+    {
+      "animationPrimitives": [
+        "Propagation",
+        "FailurePropagation",
+        "Compensation",
+        "OutcomeComparison"
+      ],
+      "category": "abnormal",
+      "count": 0,
+      "id": "PartialFailure",
+      "label": "局部故障",
+      "requiresIntervention": true
+    },
+    {
+      "animationPrimitives": [
+        "FailurePropagation",
+        "Propagation",
+        "Blocking",
+        "Escalation",
+        "OutcomeComparison"
+      ],
+      "category": "abnormal",
+      "count": 0,
+      "id": "CascadingFailure",
+      "label": "级联故障",
+      "requiresIntervention": true
+    },
+    {
+      "animationPrimitives": [
+        "Propagation",
+        "Blocking",
+        "Escalation",
+        "OutcomeComparison"
+      ],
+      "category": "abnormal",
+      "count": 0,
+      "id": "Security",
+      "label": "安全",
+      "requiresIntervention": true
+    },
+    {
+      "animationPrimitives": [
+        "Propagation",
+        "Branching",
+        "Parallel",
+        "Convergence",
+        "OutcomeComparison"
+      ],
+      "category": "combination",
+      "count": 0,
+      "id": "Combined",
+      "label": "组合",
+      "requiresIntervention": true
+    }
+  ],
+  "cases": [],
+  "categories": [
+    {
+      "count": 0,
+      "id": "normal",
+      "label": "正常",
+      "requiresIntervention": false,
+      "specType": "Normal"
+    },
+    {
+      "count": 0,
+      "id": "abnormal",
+      "label": "异常",
+      "requiresIntervention": true,
+      "specType": null
+    },
+    {
+      "count": 0,
+      "id": "boundary",
+      "label": "边界",
+      "requiresIntervention": true,
+      "specType": "Boundary"
+    },
+    {
+      "count": 0,
+      "id": "combination",
+      "label": "组合",
+      "requiresIntervention": true,
+      "specType": "Combined"
+    },
+    {
+      "count": 0,
+      "id": "recovery",
+      "label": "恢复",
+      "requiresIntervention": true,
+      "specType": "Recovery"
+    }
+  ],
+  "count": 0,
+  "coverage": {
+    "byScenario": {},
+    "missingInterventions": [],
+    "scenariosWithoutCase": [
+      "normal"
+    ]
+  },
+  "note": "缺证据的 Case 不得被描述为真实运行事实；missingInterventions 列出需要干预却没有给出 disabledNodeIds 的 Case。animationPrimitives 只是动画语法提示，不是该 Case 实际发生过的轨迹。",
+  "realityValues": [
+    "Observed",
+    "ImplementedModel",
+    "DesignedModel",
+    "Hypothetical"
+  ],
+  "scenarios": [
+    {
+      "eventCount": 1,
+      "evidenceClass": "hypothetical",
+      "name": "示例：正常事件传播",
+      "ruleCount": 3,
+      "scenarioId": "normal"
+    }
+  ],
+  "schemaVersion": "0.2.0"
+}

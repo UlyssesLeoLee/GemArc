@@ -20,6 +20,7 @@ import threading
 import time
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
+from urllib.parse import quote
 
 import anyio
 from starlette.datastructures import Headers
@@ -27,6 +28,7 @@ from starlette.datastructures import Headers
 from .. import i18n
 from . import admin as admin_mod
 from . import audit as audit_mod
+from . import oauth as oauth_mod
 from . import oidc, pages, retention, schema, security
 from . import settings as settings_mod
 from . import users as users_mod
@@ -61,6 +63,27 @@ ADMIN_USER_PATH = re.compile(r"^/account/admin/users/([A-Za-z0-9_-]{1,64})/"
                              r"(enable|disable|grant-admin|revoke-admin|revoke-tokens)\Z")
 ADMIN_SETTINGS_PATH = "/account/admin/settings"
 ADMIN_SITE_PATH = "/account/admin/site"
+# -- OAuth 2.1 (design 3.16, ADR-020). The paths are public; they exist only in the account mode.
+OAUTH_RESOURCE_PATH = "/.well-known/oauth-protected-resource"
+OAUTH_RESOURCE_MCP_PATH = "/.well-known/oauth-protected-resource/mcp"
+OAUTH_SERVER_PATH = "/.well-known/oauth-authorization-server"
+OAUTH_REGISTER_PATH = "/register"
+OAUTH_AUTHORIZE_PATH = "/authorize"
+OAUTH_TOKEN_PATH = "/token"
+#: The RFC 6749 error codes this deployment answers with, and the one sentence each of them carries.
+#: The internal reason never leaves the server: it goes to the audit log (design 3.16.4).
+OAUTH_ERROR_TEXT = {
+    "invalid_request": "The request is not valid. Start the authorisation again.",
+    "unauthorized_client": "This client may not ask for that.",
+    "invalid_scope": "The requested scope is not available.",
+    "invalid_target": "The requested audience is not this server.",
+    "invalid_redirect_uri": "The redirect URI is not registered for this client.",
+    "invalid_client_metadata": "The client metadata is not valid.",
+    "invalid_grant": "The grant is not valid. Start the authorisation again.",
+    "unsupported_response_type": "Only the authorization code flow is supported.",
+    "unsupported_grant_type": "Only the authorization code and refresh token grants are supported.",
+    "server_error": "The server could not complete the request.",
+}
 DRAIN_TIMEOUT_S = 2.0
 DRAIN_LIMIT = 1 << 20
 #: How long the cookie that remembers the language of the reader lives (one year).
@@ -159,6 +182,7 @@ class AccountsRuntime:
         self.tokens = TokenStore(self.db, self.crypto, TokenPolicy.from_config(config),
                                  policy_provider=self._token_policy)
         self.settings = settings_mod.SettingsStore(self.db)
+        self.oauth = oauth_mod.OAuthStore(self.db)
         self.audit = audit_mod.Audit(self.db, self.crypto, config.audit_retention_days)
         self.limiter = RateLimiter(self.db, self.crypto)
         self.states = OAuthStates(self.db)
@@ -294,7 +318,7 @@ class AccountsRuntime:
         self._last_housekeeping = now
         try:
             retention.run_once(self.db, sessions=self.sessions, tokens=self.tokens, limiter=self.limiter,
-                               retention_days=self.config.audit_retention_days, now=now)
+                               retention_days=self.config.audit_retention_days, now=now, oauth=self.oauth)
         except Exception:  # best effort: a clean-up problem must never fail a login or hide a new token
             pass
 
@@ -403,6 +427,12 @@ class AccountsRuntime:
             ADMIN_PATH: (("GET", "HEAD"), self._admin_page),
             ADMIN_SETTINGS_PATH: (("POST",), self._admin_settings),
             ADMIN_SITE_PATH: (("POST",), self._admin_site),
+            OAUTH_RESOURCE_PATH: (("GET",), self._oauth_resource_metadata),
+            OAUTH_RESOURCE_MCP_PATH: (("GET",), self._oauth_resource_metadata),
+            OAUTH_SERVER_PATH: (("GET",), self._oauth_server_metadata),
+            OAUTH_REGISTER_PATH: (("POST",), self._oauth_register),
+            OAUTH_AUTHORIZE_PATH: (("GET", "POST"), self._authorize),
+            OAUTH_TOKEN_PATH: (("POST",), self._oauth_token),
         }
         if path in fixed:
             return fixed[path]
@@ -450,7 +480,7 @@ class AccountsRuntime:
         url = oidc.authorization_url(self.google.endpoints, client_id=self.config.google_client_id,
                                      redirect_uri=self.google.redirect_uri, state=state, nonce=nonce,
                                      challenge=oidc.code_challenge(verifier))
-        await self.run_db(self.states.create, state, nonce, binding, now)
+        await self.run_db(self.states.create, state, nonce, binding, now, None, self._safe_return_to(req))
         cookie = security.cookie_header(self.bind_cookie, binding, secure=self.config.secure_cookies,
                                         max_age=oidc.STATE_TTL_S)
         return pages.redirect(url, 302, hsts=self.hsts, cookies=[cookie])
@@ -520,7 +550,10 @@ class AccountsRuntime:
         if outcome.status != "ok":
             return self.error(403, "GEMARC_ACCT_013", email=claims.email, cookies=clear)
         session_cookie = security.cookie_header(self.sid_cookie, outcome.sid, secure=self.config.secure_cookies)
-        return pages.redirect(POST_LOGIN_PATH, 303, hsts=self.hsts, cookies=[session_cookie, *clear])
+        # The reader came here for a reason: the OAuth authorisation page sends them to the sign-in and
+        # back again. The pending path travelled with the one-time state, so it cannot be forged.
+        target = record.return_to or POST_LOGIN_PATH
+        return pages.redirect(target, 303, hsts=self.hsts, cookies=[session_cookie, *clear])
 
     def _validate(self, token: str, nonce_hash: str) -> oidc.Claims:
         """Claim checks (and, with VERIFY_SIG, the signature check which may fetch the JWKS): blocking."""
@@ -697,6 +730,227 @@ class AccountsRuntime:
             message = MESSAGES.get(lang, {}).get(code) or MESSAGES.get(i18n.DEFAULT_LANG, {}).get(code) or code
             return pages.json_response(status, {"error": code, "message": message}, hsts=self.hsts)
         return self.error(status, code, relogin=False)
+
+    # -- OAuth 2.1 (design 3.16, ADR-020) -----------------------------------------------------------------------
+    def _oauth_error(self, status: int, error: str, *, headers=None):
+        """The RFC 6749 error shape. One sentence per error code; the reason stays in the audit log."""
+        text = OAUTH_ERROR_TEXT.get(error, OAUTH_ERROR_TEXT["server_error"])
+        return pages.json_response(status, {"error": error, "error_description": text}, hsts=self.hsts,
+                                   headers=headers)
+
+    async def _oauth_resource_metadata(self, req: Req):
+        """RFC 9728: what this resource is and which server may issue for it."""
+        return pages.json_response(200, oauth_mod.resource_metadata(self.config.base_url), hsts=self.hsts,
+                                   headers={"Cache-Control": "no-store"})
+
+    async def _oauth_server_metadata(self, req: Req):
+        """RFC 8414: the endpoints and the shapes this server speaks."""
+        return pages.json_response(200, oauth_mod.authorization_server_metadata(self.config.base_url), hsts=self.hsts,
+                                   headers={"Cache-Control": "no-store"})
+
+    async def _read_json(self, req: Req) -> "Optional[dict]":
+        try:
+            body = await req.reader.read(security.MAX_FORM_BYTES)
+        except security.BodyTooLarge:
+            return None
+        try:
+            payload = json.loads(body.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError):
+            return None
+        return payload if isinstance(payload, dict) else None
+
+    async def _oauth_register(self, req: Req):
+        """RFC 7591: register a public client. No secret is issued; a client id is not a consent."""
+        now = self.now()
+        await self._limit_ip("oauth_register", req, now)
+        payload = await self._read_json(req)
+        if payload is None:
+            return self._oauth_error(400, "invalid_client_metadata")
+        name = payload.get("client_name")
+        if not isinstance(name, str) or not name.strip() or len(name) > 100:
+            return self._oauth_error(400, "invalid_client_metadata")
+        uris = payload.get("redirect_uris")
+        if not isinstance(uris, list) or not uris or len(uris) > 8:
+            return self._oauth_error(400, "invalid_redirect_uri")
+        if any(not oauth_mod.valid_redirect_uri(uri) for uri in uris):
+            return self._oauth_error(400, "invalid_redirect_uri")
+        client = await self.run_db(self.oauth.register_client, name.strip(), [str(uri) for uri in uris], now)
+        return pages.json_response(
+            201,
+            {
+                "client_id": client.id,
+                "client_id_issued_at": client.created_at,
+                "redirect_uris": list(client.redirect_uris),
+                "grant_types": list(client.grant_types),
+                "response_types": list(client.response_types),
+                "token_endpoint_auth_method": "none",
+            },
+            hsts=self.hsts,
+            headers={"Cache-Control": "no-store"},
+        )
+
+    async def _authorize_request(self, query: dict) -> "tuple[Optional[dict], Optional[str]]":
+        """The request of ``/authorize``, or the reason it is not usable.
+
+        The client and its redirect URI are checked FIRST: only then may an error travel back to
+        the client (RFC 6749 section 4.1.2.1).
+        """
+        if query.get("response_type") != "code":
+            return None, "unsupported_response_type"
+        client = await self.run_db(self.oauth.get_client, query.get("client_id", ""))
+        if client is None:
+            return None, "unauthorized_client"
+        redirect_uri = query.get("redirect_uri", "")
+        if redirect_uri not in client.redirect_uris:
+            return None, "invalid_redirect_uri"
+        challenge = query.get("code_challenge", "")
+        if query.get("code_challenge_method") != "S256" or not challenge or len(challenge) > 128:
+            return None, "invalid_request"
+        scope = query.get("scope") or "read"
+        if scope not in oauth_mod.SCOPES:
+            return None, "invalid_scope"
+        resource = query.get("resource") or self.config.base_url
+        if resource not in (self.config.base_url, self.config.base_url + "/mcp"):
+            return None, "invalid_target"
+        return {
+            "client": client,
+            "redirect_uri": redirect_uri,
+            "scope": scope,
+            "resource": self.config.base_url,
+            "state": query.get("state", ""),
+            "code_challenge": challenge,
+        }, None
+
+    def _oauth_redirect(self, redirect_uri: str, params: dict) -> str:
+        parts = [quote(key, safe="") + "=" + quote(str(value), safe="")
+                 for key, value in params.items() if value not in (None, "")]
+        if not parts:
+            return redirect_uri
+        return redirect_uri + ("&" if "?" in redirect_uri else "?") + "&".join(parts)
+
+    def _safe_return_to(self, req: Req) -> str:
+        """Only the OAuth authorisation path may be the target of a sign-in round trip."""
+        raw = (req.query or {}).get("return_to", "")
+        if not isinstance(raw, str) or not raw.startswith(OAUTH_AUTHORIZE_PATH + "?"):
+            return ""
+        if len(raw) > 2048 or "\n" in raw or "\r" in raw:
+            return ""
+        return raw
+
+    async def _authorize(self, req: Req):
+        now = self.now()
+        await self._limit_ip("oauth_authorize", req, now)
+        if req.method == "POST":
+            return await self._authorize_submit(req, now)
+        query = req.query or {}
+        request, error = await self._authorize_request(query)
+        if request is None:
+            return self._oauth_error(400, error)
+        info, sid = await self._session(req, now)
+        if info is None:
+            # Not signed in: the reader goes to the Google sign-in and comes back here.
+            raw = req.scope.get("query_string", b"").decode("latin-1", "replace")
+            target = OAUTH_AUTHORIZE_PATH + "?" + raw if raw else OAUTH_AUTHORIZE_PATH
+            return pages.redirect("/auth/google/start?return_to=" + quote(target, safe=""), 302, hsts=self.hsts)
+        csrf = self.crypto.csrf_token(sid)
+        settings = await self.run_db(self.settings.load, info.user_id)
+        lang = req.lang if req.lang_chosen else (settings.lang or req.lang)
+        return self._html(200, lambda n: pages.oauth_consent(
+            n, lang=lang, client_name=request["client"].name, scope=request["scope"], resource=request["resource"],
+            redirect_uri=request["redirect_uri"], state=request["state"], code_challenge=request["code_challenge"],
+            client_id=request["client"].id, csrf=csrf, expires_in=oauth_mod.ACCESS_TTL_S,
+            refresh_in=oauth_mod.REFRESH_TTL_S),
+            lang=lang, lang_cookie=req.lang_chosen)
+
+    async def _authorize_submit(self, req: Req, now: int):
+        """The consent: the reader presses "allow" or "deny". Only "allow" issues a code."""
+        if not security.origin_ok(req.headers, self.config.origin):
+            return self.error(403, "GEMARC_ACCT_021")
+        info, sid = await self._session(req, now)
+        if info is None:
+            return self.error(401, "GEMARC_ACCT_020")
+        ctype = (req.headers.get("content-type") or "").split(";")[0].strip().lower()
+        if ctype != security.FORM_CONTENT_TYPE:
+            return self.error(415, "GEMARC_ACCT_050")
+        try:
+            body = await req.reader.read(security.MAX_FORM_BYTES)
+        except security.BodyTooLarge:
+            return self.error(413, "GEMARC_ACCT_050")
+        form = security.parse_form(body)
+        if form is None:
+            return self.error(400, "GEMARC_ACCT_050")
+        if not self.crypto.verify_csrf(sid, form.get("csrf", "")):
+            return self.error(403, "GEMARC_ACCT_021")
+        await self._limit("oauth_consent", info.user_id, now)
+        query = {key: form.get(key, "") for key in
+                 ("response_type", "client_id", "redirect_uri", "scope", "state", "code_challenge",
+                  "code_challenge_method", "resource")}
+        request, error = await self._authorize_request(query)
+        if request is None:
+            return self._oauth_error(400, error)
+        if form.get("decision") != "allow":
+            return pages.redirect(self._oauth_redirect(request["redirect_uri"],
+                                                      {"error": "access_denied", "state": request["state"]}),
+                                  302, hsts=self.hsts)
+        code = await self.run_db(self.oauth.issue_code, request["client"].id, info.user_id,
+                                  request["redirect_uri"], request["scope"], request["resource"],
+                                  request["code_challenge"], now)
+        return pages.redirect(self._oauth_redirect(request["redirect_uri"],
+                                                  {"code": code.code, "state": request["state"]}),
+                              302, hsts=self.hsts)
+
+    async def _oauth_token(self, req: Req):
+        """RFC 6749 section 6: the authorization code grant and the refresh token grant."""
+        now = self.now()
+        await self._limit_ip("oauth_token", req, now)
+        ctype = (req.headers.get("content-type") or "").split(";")[0].strip().lower()
+        if ctype != security.FORM_CONTENT_TYPE:
+            return self._oauth_error(400, "invalid_request")
+        try:
+            body = await req.reader.read(security.MAX_FORM_BYTES)
+        except security.BodyTooLarge:
+            return self._oauth_error(400, "invalid_request")
+        form = security.parse_form(body)
+        if form is None:
+            return self._oauth_error(400, "invalid_request")
+        grant = form.get("grant_type", "")
+        if grant == "authorization_code":
+            try:
+                authorization = await self.run_db(self.oauth.consume_code, form.get("code", ""),
+                                                  form.get("client_id", ""), form.get("redirect_uri", ""),
+                                                  form.get("code_verifier", ""), now)
+            except oauth_mod.OAuthError as exc:
+                await self._audit_denied(now, exc.reason, self.client_ip(req.headers))
+                return self._oauth_error(400, "invalid_grant")
+            tokens = await self.run_db(self._issue_tokens, authorization, now)
+            return self._oauth_token_response(tokens)
+        if grant == "refresh_token":
+            try:
+                tokens = await self.run_db(self.oauth.rotate, form.get("refresh_token", ""), now)
+            except oauth_mod.OAuthError as exc:
+                await self._audit_denied(now, exc.reason, self.client_ip(req.headers))
+                return self._oauth_error(400, "invalid_grant")
+            return self._oauth_token_response(tokens)
+        return self._oauth_error(400, "unsupported_grant_type")
+
+    def _issue_tokens(self, authorization, now: int):
+        return self.oauth.issue_tokens(authorization.client_id, authorization.user_id, authorization.scope, now,
+                                       resource=authorization.resource)
+
+    def _oauth_token_response(self, tokens):
+        """The plaintext pair, once. It is never written to a log or an audit field."""
+        return pages.json_response(
+            200,
+            {
+                "access_token": tokens.access_token,
+                "token_type": "Bearer",
+                "expires_in": tokens.expires_in,
+                "refresh_token": tokens.refresh_token,
+                "scope": tokens.scope,
+            },
+            hsts=self.hsts,
+            headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+        )
 
     # -- state-changing routes --------------------------------------------------------------------------------------
     async def _post(self, req: Req, action: Callable, *, recent: bool, limit_scope: Optional[str] = None,

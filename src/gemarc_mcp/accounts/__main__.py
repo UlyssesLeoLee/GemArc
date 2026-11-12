@@ -27,7 +27,7 @@ import sys
 import time
 from typing import Callable, Mapping, Optional, Sequence, TextIO
 
-from . import audit, config, retention, schema
+from . import audit, config, oauth as oauth_mod, retention, schema
 from .admin import AdminService
 from .crypto import Crypto, KeyRing, KeyRingError, b64u
 from .db import Database, DBError
@@ -303,7 +303,7 @@ def cmd_gc(args, environ, out, err, clock) -> int:
     try:
         removed_sum = retention.run_until_empty(
             db, sessions=SessionStore(db, crypto), tokens=TokenStore(db, crypto), limiter=RateLimiter(db, crypto),
-            retention_days=retention_days, now=int(clock()))
+            retention_days=retention_days, now=int(clock()), oauth=oauth_mod.OAuthStore(db))
     except (DBError, schema.MigrationError) as exc:
         print(_describe_error(exc), file=err)
         return 1

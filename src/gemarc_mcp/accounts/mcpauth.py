@@ -33,6 +33,7 @@ from urllib.parse import parse_qs
 from starlette.responses import JSONResponse, Response
 
 from .. import i18n
+from . import oauth as oauth_mod
 from . import security
 from . import settings as settings_mod
 from . import tokens as tokens_mod
@@ -53,18 +54,23 @@ READ_METHODS = frozenset({
 })
 
 
-def unauthorized_response(hint: Optional[str] = None) -> Response:
+def unauthorized_response(hint: Optional[str] = None, resource_metadata: Optional[str] = None) -> Response:
     """The 401 of the account modes.
 
     Every failure reason answers the very same body: it says *that* a token is needed, never
     *why* the request was refused. ``hint`` (ADR-018) is the one sentence that tells the caller
     where to get a token and where to put it; it is the same sentence for every reason.
+    ``resource_metadata`` (RFC 9728 section 5.1) points a client that only speaks OAuth at the
+    metadata document, so it can discover the authorisation endpoints on its own.
     """
     body: "dict[str, str]" = {"error": "unauthorized"}
     if hint:
         body["hint"] = hint
+    challenge = "Bearer"
+    if resource_metadata:
+        challenge += ' resource_metadata="%s"' % resource_metadata
     return JSONResponse(body, status_code=401,
-                        headers={"WWW-Authenticate": "Bearer", "Cache-Control": "no-store"})
+                        headers={"WWW-Authenticate": challenge, "Cache-Control": "no-store"})
 
 
 def unavailable_response(code: str, retry_after: Optional[int] = None) -> Response:
@@ -303,7 +309,7 @@ class McpAuth:
             return Decision(True, scope="env")
         rt = self.runtime
         if rt.config.mcp_host_only and (headers.get("host") or "").lower() != rt.config.host.lower():
-            return Decision(False, unauthorized_response(self._hint(scope, headers)))
+            return Decision(False, self._refused(scope, headers))
         if presented is None:
             # No bearer token: this may be the browser console, which carries the login session instead.
             decision = await self._session_grant(scope, headers, receive)
@@ -312,15 +318,18 @@ class McpAuth:
         token = None
         if presented is not None and presented.isascii():
             token = presented.decode("ascii")
+        if token is not None and token.startswith(oauth_mod.ACCESS_PREFIX):
+            # The OAuth channel: a short-lived access token instead of a personal access token.
+            return await self._authenticate_oauth(token, scope, receive, headers)
         parsed = tokens_mod.parse(token) if token is not None else None
         if parsed is None:  # no cache, no database
             self._note_failure(scope)
-            return Decision(False, unauthorized_response(self._hint(scope, headers)))
+            return Decision(False, self._refused(scope, headers))
         pid, secret = parsed
         key = (pid, tokens_mod.hash_secret(secret))
         state, grant = rt.pat_cache.get(key)
         if state == "neg":
-            return Decision(False, unauthorized_response(self._hint(scope, headers)))
+            return Decision(False, self._refused(scope, headers))
         if state == "pos" and grant is not None:
             return await self._admit(grant.user_id, grant.scope, scope, receive, pid, grant.settings)
         # cache miss: slow lane when this client is already failing a lot
@@ -342,7 +351,7 @@ class McpAuth:
         if not verification.ok:
             rt.pat_cache.put_negative(key)
             await self._record_failure(scope)
-            return Decision(False, unauthorized_response(self._hint(scope, headers)))
+            return Decision(False, self._refused(scope, headers))
         now = rt.now()
         remaining = max(int(verification.expires_at or 0) - now, 0)
         ttl = min(rt.pat_cache.ttl, remaining)
@@ -366,7 +375,32 @@ class McpAuth:
         lang = i18n.resolve(query=_query_lang(scope),
                             cookie_header=headers.get("cookie"),
                             accept_language=headers.get("accept-language"))
-        return i18n.text(lang, "mcp", "unauthorized.hint", url=f"{rt.config.base_url}/account")
+        return i18n.text(lang, "mcp", "unauthorized.hint", url=f"{rt.config.base_url}/account",
+                         oauth_url=f"{rt.config.base_url}/authorize")
+
+    def _refused(self, scope: Any, headers: Any) -> Response:
+        """The 401 of this request: the one hint and the metadata pointer (RFC 9728)."""
+        rt = self.runtime
+        return unauthorized_response(self._hint(scope, headers),
+                                     f"{rt.config.base_url}/.well-known/oauth-protected-resource")
+
+    async def _authenticate_oauth(self, token: str, scope: dict, receive: Callable, headers: Any) -> Decision:
+        """The OAuth access token: short-lived and bound to this deployment (design 3.16.5).
+
+        The failure is the same sentence as the token channel: the client cannot tell an expired
+        access token from a wrong one, so it has to start the authorisation again.
+        """
+        rt = self.runtime
+        try:
+            verification = await rt.run_pat_db(rt.oauth.verify_access_token, token, rt.config.base_url, rt.now())
+        except DBError as exc:
+            return Decision(False, unavailable_response(exc.code))
+        if not verification.ok:
+            self._note_failure(scope)
+            return Decision(False, self._refused(scope, headers))
+        settings = await rt.run_pat_db(rt.settings.load, verification.user_id)
+        return await self._admit(verification.user_id or "", verification.scope or "read", scope, receive,
+                                 verification.token_id or "", settings)
 
     async def _session_grant(self, scope: dict, headers: Any, receive: Callable) -> Optional[Decision]:
         """The browser case: a signed-in session may call ``/mcp`` without a bearer token.

@@ -33,7 +33,8 @@ AAD_PREFIX = b"gemarc-acct-v1|"
 #: The only (table, column) pairs that are ever encrypted. Anything else is a programming error.
 ENCRYPTED_FIELDS = frozenset({("users", "sub_enc"), ("users", "email_enc")})
 #: Domain prefixes of the unkeyed hashes (section 4.5). Each is followed by a NUL byte.
-HASH_DOMAINS = frozenset({"session", "pat", "state", "nonce", "bind", "pkce"})
+HASH_DOMAINS = frozenset({"session", "pat", "state", "nonce", "bind", "pkce",
+                           "oauth-code", "oauth-access", "oauth-refresh"})
 BLIND_FIELDS = frozenset({"sub", "email", "domain"})
 KEY_BYTES = 32
 NONCE_BYTES = 12

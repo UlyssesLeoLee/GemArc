@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "gemarc": {
+      "type": "http",
+      "url": "https://<project>.vercel.app/mcp",
+      "headers": {
+        "Authorization": "Bearer <token>"
+      },
+      "enabled": true
+    },
+    "gemarc_local": {
+      "type": "stdio",
+      "description": "GemArc 本地 stdio MCP（17 个工具，含工作区写工具）",
+      "command": "<python>",
+      "args": [
+        "-m",
+        "gemarc_mcp"
+      ],
+      "env": {
+        "GEMARC_WORKSPACE_ROOT": "<workspace>",
+        "GEMARC_ALLOW_WRITE": "0",
+        "PYTHONUTF8": "1"
+      }
+    }
+  }
+}

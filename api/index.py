@@ -929,8 +929,12 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
         elif path.startswith("/kit/"):
             await kit_endpoint(scope, receive, send, path)
         elif path.startswith("/.well-known/"):
-            # OAuth discovery probes: a clean negative, not the HTML console.
-            await reply(_json(404, {"error": "not_found"}), scope, receive, send)
+            # OAuth discovery probes: a clean negative, not the HTML console. The account mode
+            # serves the two metadata documents (design 3.16.1); without accounts it stays 404.
+            if owns_account_path is None or not owns_account_path(path):
+                await reply(_json(404, {"error": "not_found"}), scope, receive, send)
+            else:
+                await accounts_endpoint(scope, receive, send)
         elif _is_health_path(path):
             await health_endpoint(scope, receive, send)
         elif _is_mcp_path(path):

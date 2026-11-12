@@ -256,6 +256,50 @@ def deleted_page(nonce: str, lang: str = "") -> str:
     return page(t(lang, "deleted.title"), body, nonce, lang)
 
 
+def oauth_consent(nonce: str, *, lang: str = "", client_name: str, scope: str, resource: str,
+                   redirect_uri: str, state: str, code_challenge: str, client_id: str, csrf: str,
+                   expires_in: int, refresh_in: int) -> str:
+    """The consent page of the OAuth authorisation (design 3.16.3).
+
+    Two buttons and nothing else: the reader either allows this client or denies it. The request
+    travels in hidden fields, so the page cannot be turned into a different request by hand.
+    """
+    hidden = (
+        f"<input type=\"hidden\" name=\"csrf\" value=\"{esc(csrf)}\">"
+        f"<input type=\"hidden\" name=\"response_type\" value=\"code\">"
+        f"<input type=\"hidden\" name=\"client_id\" value=\"{esc(client_id)}\">"
+        f"<input type=\"hidden\" name=\"redirect_uri\" value=\"{esc(redirect_uri)}\">"
+        f"<input type=\"hidden\" name=\"scope\" value=\"{esc(scope)}\">"
+        f"<input type=\"hidden\" name=\"state\" value=\"{esc(state)}\">"
+        f"<input type=\"hidden\" name=\"code_challenge\" value=\"{esc(code_challenge)}\">"
+        f"<input type=\"hidden\" name=\"code_challenge_method\" value=\"S256\">"
+        f"<input type=\"hidden\" name=\"resource\" value=\"{esc(resource)}\">"
+    )
+    body = (
+        "<h1>" + esc(t(lang, "oauth.consent.title")) + "</h1>"
+        "<div class=\"card\">"
+        "<p>" + esc(t(lang, "oauth.consent.intro")) + "</p>"
+        "<ul>"
+        "<li><b>" + esc(t(lang, "oauth.consent.client")) + "</b>: " + esc(client_name) + "</li>"
+        "<li><b>" + esc(t(lang, "oauth.consent.scope")) + "</b>: " + esc(scope) + "</li>"
+        "<li><b>" + esc(t(lang, "oauth.consent.audience")) + "</b>: " + esc(resource) + "</li>"
+        "<li><b>" + esc(t(lang, "oauth.consent.lifetime")) + "</b>: "
+        + esc(t(lang, "oauth.consent.access")) + " " + str(int(expires_in) // 60) + " "
+        + esc(t(lang, "oauth.consent.minutes")) + "; " + esc(t(lang, "oauth.consent.refresh")) + " "
+        + str(int(refresh_in) // 86400) + " " + esc(t(lang, "oauth.consent.days")) + "</li>"
+        "</ul>"
+        "<p class=\"mute\">" + esc(t(lang, "oauth.consent.redirect")) + ": " + esc(redirect_uri) + "</p>"
+        "</div>"
+        "<form method=\"post\" action=\"/authorize\">" + hidden
+        + "<button class=\"btn\" type=\"submit\" name=\"decision\" value=\"allow\">"
+        + esc(t(lang, "oauth.consent.allow")) + "</button> "
+        + "<button class=\"btn\" type=\"submit\" name=\"decision\" value=\"deny\">"
+        + esc(t(lang, "oauth.consent.deny")) + "</button>"
+        "</form>"
+    )
+    return page(t(lang, "oauth.consent.title"), body, nonce, lang)
+
+
 def _csrf(csrf: str) -> str:
     return f"<input type=\"hidden\" name=\"csrf\" value=\"{esc(csrf)}\">"
 

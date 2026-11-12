@@ -304,8 +304,18 @@ def run_checks(probe: Probe) -> None:
         response = probe.request(method, "/mcp", token=False, timeout=GET_MCP_BUDGET_S)
         probe.check(f"{method} /mcp -> 405", response.status == 405, describe(response))
     response = probe.request("GET", "/.well-known/oauth-protected-resource", token=False)
-    probe.check("OAuth discovery probe -> clean 404 JSON",
-                response.status == 404 and "json" in response.header("content-type").lower(), describe(response))
+    # Two legal answers (ADR-020): without the accounts feature the path does not exist (a clean
+    # 404 JSON); with it the deployment serves the OAuth metadata document.
+    metadata = response.json() if response.status == 200 else None
+    if response.status == 404:
+        probe.check("OAuth discovery probe -> clean 404 JSON (no accounts feature)",
+                    "json" in response.header("content-type").lower(), describe(response))
+    elif response.status == 200 and isinstance(metadata, dict) and metadata.get("authorization_servers"):
+        probe.check("OAuth discovery probe -> the metadata document (accounts feature)",
+                    "json" in response.header("content-type").lower(),
+                    f"{describe(response)} authorization_servers={metadata.get('authorization_servers')}")
+    else:
+        probe.check("OAuth discovery probe -> 404 JSON or the metadata document", False, describe(response))
 
     # -- authentication ------------------------------------------------------------
     response, _ = probe.rpc("initialize", {"protocolVersion": PROTOCOL_VERSION, "capabilities": {},

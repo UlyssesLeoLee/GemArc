@@ -191,6 +191,10 @@ def brief(project: str = "", section: str = "", stateless: bool = False) -> dict
             "4. 运行 gemarc_validate <project>，修掉所有 error；要宣称“已确认”时再加 --strict"
             "（strict 要求节点和边有已实现或已观测的证据，标 Unknown/Hypothetical 的事实必然不过，不要为此改证据等级）。",
             "5. 运行 gemarc_build <project> --profile static（或 vite），产出站点。",
+            "6. 做一次**整体** UI/UX 优化（硬规则，不是可选项）：按流程里的 UI/UX 基线复核整个站点——"
+            "主内容是否第一眼就突出、两侧窗格与内容面板是否可调宽高、主内容区会不会被挤小、"
+            "全站是不是只有一套视觉语言；风格基准是美漫卡通渲染的宝石主题（固定件已预置，"
+            "这一轮是把这一版主题落到这份产出上）；把这一轮做了什么写进最终说明。",
         ],
         "rules": [
             "事实不可臆造：节点与关系必须能指回 evidence 实体。",
@@ -267,8 +271,10 @@ def brief(project: str = "", section: str = "", stateless: bool = False) -> dict
             "（strict 要求节点和边有已实现或已观测的证据，标 Unknown/Hypothetical 的事实必然不过，不要为此改证据等级）。",
             "5. gemarc_simulate(model=…, scenario_id=…, compare_baseline=true) 核对 4D/5D 场景。",
             "6. gemarc_render(model=…) 取得 data/*.json 与固定件下载地址，在本地合并成站点。",
-            "7. 按流程里的 UI/UX 基线复核一遍：主内容是否突出、两侧窗格与内容面板是否可调宽高、"
-            "主内容区会不会被挤小；把这一轮做了什么写进最终说明。",
+            "7. 做一次**整体** UI/UX 优化（硬规则，不是可选项）：按流程里的 UI/UX 基线复核一遍整个站点——"
+            "主内容是否第一眼就突出、两侧窗格与内容面板是否可调宽高、主内容区会不会被挤小、"
+            "全站是不是只有一套视觉语言；风格基准是美漫卡通渲染的宝石主题（固定件已预置，"
+            "这一轮是把这一版主题落到这份产出上）；把这一轮做了什么写进最终说明。",
         ]
         payload["commands"] = {"render": "gemarc_render", "kit": "/kit/static.zip",
                                "note": "远程端点无状态：模型每次随调用传入，服务端不保存任何项目。"}

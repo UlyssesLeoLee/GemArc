@@ -14,9 +14,10 @@ from gemarc_mcp.accounts.db import Database, SchemaOutdated
 from .support import T0, DbCase
 
 EXPECTED_TABLES = {"users", "sessions", "api_tokens", "audit_log", "rate_limits", "oauth_states", "schema_migrations",
-                    "admin_users", "operator_settings", "user_settings"}
+                    "admin_users", "operator_settings", "user_settings",
+                    "oauth_clients", "oauth_codes", "oauth_access_tokens", "oauth_refresh_tokens"}
 #: The migrations this product ships, in order.
-SHIPPED = ("0001_init", "0002_admin", "0003_user_settings")
+SHIPPED = ("0001_init", "0002_admin", "0003_user_settings", "0004_oauth")
 
 
 class Migrate(DbCase):
@@ -89,20 +90,20 @@ class Migrate(DbCase):
         folder = Path(self.tmp) / "two"
         shutil.copytree(schema.migrations_dir(), folder)
         schema.migrate(self.db, T0, directory=folder)
-        (folder / "0004_extra.sql").write_text("CREATE TABLE IF NOT EXISTS extra (id TEXT PRIMARY KEY);\n", encoding="utf-8")
-        self.assertEqual(schema.migrate(self.db, T0 + 1, directory=folder), ["0004_extra"])
+        (folder / "0005_extra.sql").write_text("CREATE TABLE IF NOT EXISTS extra (id TEXT PRIMARY KEY);\n", encoding="utf-8")
+        self.assertEqual(schema.migrate(self.db, T0 + 1, directory=folder), ["0005_extra"])
         self.assertIn("extra", self.tables())
 
     def test_failed_migration_rolls_back_completely(self):
         folder = Path(self.tmp) / "bad"
         shutil.copytree(schema.migrations_dir(), folder)
         schema.migrate(self.db, T0, directory=folder)
-        (folder / "0004_bad.sql").write_text(
+        (folder / "0005_bad.sql").write_text(
             "CREATE TABLE half_done (id TEXT PRIMARY KEY);\nINSERT INTO no_such_table VALUES (1);\n", encoding="utf-8")
         with self.assertRaises(Exception):
             schema.migrate(self.db, T0 + 1, directory=folder)
         self.assertNotIn("half_done", self.tables())
-        self.assertEqual(schema.status(self.db, folder).pending, ("0004_bad",))
+        self.assertEqual(schema.status(self.db, folder).pending, ("0005_bad",))
 
     def test_concurrent_runners_apply_once(self):
         results, errors = [], []

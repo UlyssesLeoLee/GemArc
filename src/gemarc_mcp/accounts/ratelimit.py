@@ -25,9 +25,13 @@ LIMITS = {
     "account_post": (60, 600),
     "export": (5, 86400),
     "delete_attempt": (5, 86400),
+    "oauth_register": (30, 3600),
+    "oauth_authorize": (60, 600),
+    "oauth_token": (60, 600),
+    "oauth_consent": (60, 600),
 }
 #: Scopes keyed by user id: their rows are deleted with the account.
-USER_SCOPES = ("pat_create", "account_post", "export", "delete_attempt")
+USER_SCOPES = ("pat_create", "account_post", "export", "delete_attempt", "oauth_consent")
 GLOBAL_SUBJECT = "global"
 RETENTION_SECONDS = 2 * 86400
 CLEANUP_BATCH = 200

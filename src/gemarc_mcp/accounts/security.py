@@ -27,9 +27,23 @@ MAX_FORM_BYTES = 8192
 B64U43_RE = re.compile(r"^[A-Za-z0-9_-]{43}\Z")
 
 
+#: The public OAuth paths (design 3.16.1). They exist only when the accounts feature is on;
+#: without it they are ordinary 404s, like every other path of the application.
+OAUTH_PATHS = frozenset({
+    "/.well-known/oauth-protected-resource",
+    "/.well-known/oauth-protected-resource/mcp",
+    "/.well-known/oauth-authorization-server",
+    "/register",
+    "/authorize",
+    "/token",
+})
+
+
 def owns(path: str) -> bool:
-    """True for ``/account``, ``/account/...`` and ``/auth/...`` (never a bare prefix such as ``/accounting``)."""
-    return path == "/account" or path.startswith("/account/") or path.startswith("/auth/")
+    """True for ``/account``, ``/account/...``, ``/auth/...`` and the OAuth paths
+    (never a bare prefix such as ``/accounting``)."""
+    return (path == "/account" or path.startswith("/account/") or path.startswith("/auth/")
+            or path in OAUTH_PATHS)
 
 
 # -- client address ------------------------------------------------------------------------------------------------

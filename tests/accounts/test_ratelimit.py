@@ -36,7 +36,8 @@ class RateLimit(DbCase):
         self.assertEqual(R.LIMITS, {
             "login_start": (20, 600), "login_callback": (30, 600), "signup_global": (60, 3600), "signup_ip": (3, 3600),
             "pat_create": (10, 3600), "pat_auth_fail": (30, 300), "account_post": (60, 600), "export": (5, 86400),
-            "delete_attempt": (5, 86400)})
+            "delete_attempt": (5, 86400), "oauth_register": (30, 3600), "oauth_authorize": (60, 600),
+            "oauth_token": (60, 600), "oauth_consent": (60, 600)})
         results = [self.rl.hit(T0, "signup_ip", "ip").allowed for _ in range(5)]
         self.assertEqual(results, [True, True, True, False, False])
         with self.assertRaises(ValueError):
@@ -99,7 +100,7 @@ class RateLimit(DbCase):
         R.RateLimiter(self.db, rotated).hit(T0, "export", "user-1")
         with self.db.transaction() as tx:
             removed = R.delete_user_keys(tx, rotated, "user-1")
-        self.assertEqual(removed, 5)
+        self.assertEqual(removed, 6)
         self.assertEqual(self.count("rate_limits"), 2)
 
 

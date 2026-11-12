@@ -21,3 +21,23 @@ a.link:hover{color:#a9f0ff;border-bottom-style:solid}
 .wbs-item>p{margin:0}
 .wbs-detail{list-style:none;margin:2px 0 2px 8px;padding-left:10px}
 .wbs-detail li{color:#93a6bd;font-size:12px;line-height:1.7}
+
+/* The flat layer in the comic language (BD-010 section 14): flat colour, an
+   ink line on every structural element, a hard offset shadow instead of a
+   blurred one, and the paper texture behind the frames. The palette does not
+   change - the ink line is the rim colour, the shadow is the void colour, and
+   colour still only encodes facts. */
+:root{--gem-void:#06090e;--gem-bg:#0b0f16;--gem-panel:#111823;--gem-facet:#1b2635;--gem-rim:#2c3d52;--gem-ink:#e6eef7;--gem-muted:#93a6bd;--gem-aqua:#6fe3ff;--gem-violet:#b78cff;--gem-topaz:#ffc46b;--gem-emerald:#6bd68a;--gem-ruby:#ff6b8a}
+body{background-color:var(--gem-bg);background-image:radial-gradient(color-mix(in srgb,var(--gem-rim) 70%,transparent) 1px,transparent 1px);background-size:7px 7px}
+.panel{border:2px solid var(--gem-muted);border-radius:10px;background:var(--gem-panel);box-shadow:inset 0 1px 0 rgba(230,238,247,.05),4px 4px 0 var(--gem-void)}
+.panel h2{margin:0 0 14px;padding:6px 10px;border:2px solid var(--gem-muted);border-radius:4px;background:var(--gem-facet);box-shadow:3px 3px 0 var(--gem-void);color:var(--gem-ink);font-size:14px}
+.fact{border:1px solid var(--gem-muted);background:var(--gem-facet);border-radius:8px;box-shadow:3px 3px 0 var(--gem-void)}
+.chart{border:2px solid var(--gem-muted);border-radius:10px;box-shadow:4px 4px 0 var(--gem-void)}
+.badge{border:1px solid var(--gem-muted);background:var(--gem-facet);color:var(--gem-aqua)}
+.tag,.chip{border:1px solid var(--gem-muted);background:var(--gem-facet)}
+.tabs button{border:1px solid var(--gem-muted);background:var(--gem-facet);box-shadow:2px 2px 0 var(--gem-void)}
+.control select{border:1px solid var(--gem-muted);background:var(--gem-facet)}
+.node rect{fill:var(--gem-facet);stroke:var(--gem-muted);stroke-width:2}
+.edge{stroke:var(--gem-rim);stroke-width:2}
+.axis-3d{border:2px solid var(--gem-muted);border-radius:8px;box-shadow:4px 4px 0 var(--gem-void)}
+.timeline-item{border-left:2px solid var(--gem-muted)}

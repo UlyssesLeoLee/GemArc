@@ -24,7 +24,8 @@
 | `/` | GET/HEAD | **MCP 功能微调控制台**（Web 面板） | 公开（静态外壳，无机密） |
 | `/site/*` | GET/HEAD | 脚手架产出的 5D 架构站（首次访问时才物化） | 公开 |
 | `/kit/static.zip` `/kit/vite.zip` | GET/HEAD | 站点**固定件**，一份确定性 zip（带 ETag，支持 304） | 公开 |
-| `/.well-known/*` | 任意 | 一律返回 404 JSON（OAuth 发现探测得到干净的否定答案，而不是控制台 HTML） | 公开 |
+| `/.well-known/*` | 任意 | **未开账号**的部署一律返回 404 JSON（OAuth 发现探测得到干净的否定答案，而不是控制台 HTML）；**开了账号**的部署在三个发现路径上返回 OAuth 元数据（ADR-020） | 公开 |
+| `/register` `/authorize` `/token` | 任意 | OAuth 端点，**只有开了账号**的部署才有（ADR-020） | 公开（同意要人点「允许」） |
 | 其他路径 | 任意 | 404 JSON（**不再**把站点挂在根路径下） | — |
 
 **远程默认工具集是 `stateless`**（9 个工具，模型随调用内联传入，不需要工作区）。
@@ -215,7 +216,7 @@ catch-all 路由下函数收到的路径可能是 `/mcp`，也可能是重写产
 |---|---|---|---|
 | **authless**（默认） | 不设或留空 `GEMARC_MCP_TOKEN` | `/mcp` 对任何知道 URL 的人开放；`/healthz.authRequired:false` | claude.ai 自定义连接器；纯计算、无机密的演示部署 |
 | **Bearer 令牌** | `GEMARC_MCP_TOKEN=<token>`（可逗号分隔多个，便于轮换） | `POST /mcp` 必须带 `Authorization: Bearer <token>`，否则 401 | Claude Code、Codex、Hermes Agent（它们都能配静态请求头） |
-| OAuth | **未实现** | 对 `/.well-known/*` 返回干净的 404 JSON | — |
+| OAuth | **账号模式下已实现**（v3.4 起，ADR-020）：三个发现文档 + `/register` `/authorize` `/token`；未开账号的部署仍旧对 `/.well-known/*` 返回干净的 404 JSON | 只会说 OAuth 的客户端（claude.ai 连接器、MiniMax Code 的「授权」按钮） |
 
 **claude.ai 的限制（UNVERIFIED，来自调研，未在 claude.ai 上试过）**：自定义连接器只支持
 OAuth 或「无认证」；静态请求头只是部分组织可用的 beta。所以要给 claude.ai 用，就只能 authless；
@@ -234,7 +235,7 @@ OAuth 或「无认证」；静态请求头只是部分组织可用的 beta。所
   令牌里不能含逗号（十六进制令牌没有此问题）。
 - 令牌是环境变量，**改了之后必须重新部署才生效**（UNVERIFIED：Vercel 对环境变量变更的生效时机以其文档为准）。
 
-**账号制部署下的 401（`GEMARC_MCP_AUTH=pat` / `pat-or-env` 或 `GEMARC_REQUIRE_LOGIN=1`）**：401 的响应体多一句 `hint`：`{"error":"unauthorized","hint":"令牌在账号页签发……放进客户端的环境变量 GEMARC_MCP_PAT……"}`（ADR-018）。**所有失败原因同一句**（没带 / 带错 / 过期 / 被撤销不区分），hint 的语言按请求判定。上面这条「失败：HTTP 401 … `{"error":"unauthorized"}`」说的是**未开账号**的部署，那里的响应体逐字节不变。详见 `docs/09_部署/02_账号与安全.md` 第 3.6 节。
+**账号制部署下的 401（`GEMARC_MCP_AUTH=pat` / `pat-or-env` 或 `GEMARC_REQUIRE_LOGIN=1`）**：401 的响应体多一句 `hint`：`{"error":"unauthorized","hint":"令牌在账号页签发……放进客户端的环境变量 GEMARC_MCP_PAT……"}`（ADR-018）。**所有失败原因同一句**（没带 / 带错 / 过期 / 被撤销不区分），hint 的语言按请求判定。401 的 `WWW-Authenticate` 在账号模式下是 `Bearer resource_metadata="<基址>/.well-known/oauth-protected-resource"`（RFC 9728 §5.1，ADR-020），**未开账号的部署仍是裸 `Bearer`**。上面这条「失败：HTTP 401 … `{"error":"unauthorized"}`」说的是**未开账号**的部署，那里的响应体逐字节不变。详见 `docs/09_部署/02_账号与安全.md` 第 3.6 节与第 3.16 节。
 
 ### 4.1 生成与轮换（PowerShell 5.1）
 
@@ -442,7 +443,7 @@ python scripts/verify_remote.py --local                                         
 
 1. `/healthz` 为 ok，且**不含路径形状的值**；`/` 是 HTML 控制台；`/site/` 200；
 2. `GET /mcp` 在 5 秒内返回 405（`Allow: POST`），`HEAD`/`DELETE` 也是 405；
-   `/.well-known/oauth-protected-resource` 是 404 JSON；
+   `/.well-known/oauth-protected-resource` 是 404 JSON（**未开账号**）或 OAuth 元数据文档（**开了账号**，ADR-020）；
 3. 无令牌 `POST /mcp`：要求令牌时 401（并检查错误令牌也是 401；401 的响应体必须是 `{"error":"unauthorized"}`，
    或是账号模式下带 `hint` 的同形），否则 200；
 4. `initialize` 回报服务器名与协议版本；`tools/list` 与 `/healthz.tools` 一致（stateless 时恰好是那 9 个名字），

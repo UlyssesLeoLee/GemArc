@@ -38,6 +38,12 @@ SPACE_VIEWER = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "spac
 UNITY_CONTROLS = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space" / "unity-controls.js"
 SHARED_SHELL = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "templates" / "shared" / "app.js"
 PREVIEW_SHELL = REPO_ROOT / "src" / "gemarc_mcp" / "web" / "app.js"
+PREVIEW_CSS = REPO_ROOT / "src" / "gemarc_mcp" / "web" / "style.css"
+SKILL_MD = REPO_ROOT / "skills" / "gemarc-media-doc" / "SKILL.md"
+PACKED_SKILL_MD = (REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "skills"
+                   / "gemarc-media-doc" / "SKILL.md")
+SERVICE_PY = REPO_ROOT / "src" / "gemarc_mcp" / "service.py"
+SERVER_PY = REPO_ROOT / "src" / "gemarc_mcp" / "server.py"
 
 
 def _palette_section(policy: str, section: str) -> str:
@@ -243,6 +249,138 @@ class StylePolicyBindingTests(unittest.TestCase):
                 self.assertNotIn("Math.random", _without_comments(source),
                                  f"{name} randomises the scene: the same model must "
                                  "always produce the same picture")
+
+
+class ComicLayerBindingTests(unittest.TestCase):
+    """Sections 14 and 15: the comic flat layer and the one overall pass.
+
+    A style policy is a design document. These two sections are only worth
+    something if the code carries them: the site must draw the ink line and
+    the hard shadow (a blurred one would break section 14.3), the palette
+    must not grow a second set of colours (section 14.6), and the flow text
+    that tells an agent what to do must say what the policy says.
+    """
+
+    def _policy_text(self):
+        return STYLE_POLICY.read_text(encoding="utf-8")
+
+    def _palette(self):
+        policy = self._policy_text()
+        tokens = dict(re.findall(r"\| `(--gem-[a-z0-9-]+)` \| `(#[0-9a-fA-F]{6})`",
+                                 _palette_section(policy, "3.1")))
+        self.assertTrue(tokens, "the policy does not list the dark band")
+        return tokens
+
+    def _rule(self, css, selector):
+        """The body of one CSS rule, or a failure that says the rule is gone."""
+        found = re.search(rf"^{re.escape(selector)} \{{(.*?)\}}", css, re.S | re.M)
+        self.assertIsNotNone(found, f"the site has no rule for {selector}")
+        return found.group(1)
+
+    def test_the_policy_carries_the_comic_layer_and_the_overall_pass(self):
+        policy = self._policy_text()
+        for heading in ("## 14. 平面层的美漫卡通渲染",
+                        "### 14.1 墨线",
+                        "### 14.3 硬边阴影",
+                        "### 14.5 纸面网点",
+                        "## 15. 产出必须经过一次整体 UI/UX 优化（硬约束）",
+                        "### 15.1 硬约束",
+                        "### 15.2 固定件预置主题，降低成本",
+                        "### 15.3 必须写进最终说明"):
+            with self.subTest(heading=heading):
+                self.assertIn(heading, policy,
+                              "the style policy does not carry this section")
+
+    def test_the_site_draws_the_ink_line(self):
+        """Section 14.1 and 14.4: the line is on the element, and the title
+        of a panel is a caption box."""
+        css = SHARED_CSS.read_text(encoding="utf-8")
+        panel = self._rule(css, ".panel")
+        self.assertRegex(panel, r"border:\s*2px solid var\(--gem-muted\)",
+                         "the panel has no ink line")
+        main = self._rule(css, "#content > .panel:first-child")
+        self.assertRegex(main, r"border-color:\s*var\(--gem-ink\)")
+        self.assertRegex(main, r"border-width:\s*3px",
+                         "the main panel must carry the heaviest line")
+        caption = self._rule(css, ".panel > h2")
+        self.assertRegex(caption, r"background:\s*var\(--gem-facet\)")
+        self.assertRegex(caption, r"border:\s*2px solid var\(--gem-muted\)")
+        self.assertRegex(caption, r"box-shadow:[^;]*var\(--gem-void\)")
+
+    def test_the_shadows_are_hard_and_never_blurred(self):
+        """Section 14.3: a hard offset shadow, one layer, blur radius zero."""
+        css = SHARED_CSS.read_text(encoding="utf-8")
+        values = re.findall(r"box-shadow:\s*([^;]+);", css)
+        self.assertTrue(values, "the site casts no shadow at all")
+        for value in values:
+            with self.subTest(shadow=value):
+                self.assertNotIn("blur(", value, "a blurred shadow is not a hard edge")
+        hard = [value for value in values if "var(--gem-void)" in value]
+        self.assertTrue(hard, "no shadow uses the void colour")
+        for value in hard:
+            with self.subTest(shadow=value):
+                self.assertRegex(value, r"\d+px \d+px 0 var\(--gem-void\)",
+                                 "the hard shadow must have a zero blur radius")
+
+    def test_the_site_carries_the_paper_texture(self):
+        """Section 14.5: the sparse dot grid of the printed page."""
+        css = SHARED_CSS.read_text(encoding="utf-8")
+        self.assertIn("background-image: radial-gradient(", css,
+                      "the page has no dot texture")
+        self.assertRegex(css, r"background-size:\s*7px 7px",
+                         "the dot texture must stay very sparse")
+
+    def test_the_site_does_not_grow_a_second_palette(self):
+        """Section 14.6: the palette does not change with the drawing style."""
+        palette = {colour.lower() for colour in self._palette().values()}
+        css = SHARED_CSS.read_text(encoding="utf-8")
+        for colour in sorted(set(re.findall(r"#[0-9a-fA-F]{6}", css))):
+            with self.subTest(colour=colour):
+                self.assertIn(colour.lower(), palette,
+                              "the site uses a colour the policy does not know")
+
+    def test_the_preview_shell_speaks_the_same_language(self):
+        """The small viewer is the same product: the same ink, the same shadow."""
+        css = PREVIEW_CSS.read_text(encoding="utf-8")
+        for token in ("--gem-void", "--gem-muted", "--gem-ink"):
+            with self.subTest(token=token):
+                self.assertIn(f"{token}:", css,
+                              "the preview shell does not use the tokens of the policy")
+        self.assertIn("radial-gradient(", css,
+                      "the preview shell has no dot texture")
+        self.assertRegex(css, r"\.panel\{[^}]*border:2px solid var\(--gem-muted\)",
+                         "the preview shell draws no ink line")
+        self.assertRegex(css, r"box-shadow:[^;]*var\(--gem-void\)",
+                         "the preview shell casts no hard shadow")
+
+    def test_the_flow_text_requires_the_overall_pass(self):
+        """Section 15: the rule reaches the agent that builds the document."""
+        skill = SKILL_MD.read_text(encoding="utf-8")
+        for phrase in ("每一份产出都要做一次整体 UI/UX 优化",
+                       "风格基准：美漫卡通渲染的宝石主题",
+                       "这一轮不能省"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, skill,
+                              "the flow text does not require the overall pass")
+        service = SERVICE_PY.read_text(encoding="utf-8")
+        self.assertIn("UI/UX 优化", service,
+                      "the brief does not carry the overall pass")
+        self.assertIn("美漫卡通渲染的宝石主题", service,
+                      "the brief does not name the style baseline")
+        server = SERVER_PY.read_text(encoding="utf-8")
+        self.assertIn("整体 UI/UX 优化", server,
+                      "the tool instructions do not carry the overall pass")
+        self.assertIn("美漫卡通渲染的宝石主题", server,
+                      "the tool instructions do not name the style baseline")
+
+    def test_the_packed_flow_text_is_the_same_text(self):
+        """The copy that ships inside the package must not drift from the source."""
+        source = SKILL_MD.read_bytes().replace(b"\r\n", b"\n")
+        packed = PACKED_SKILL_MD.read_bytes().replace(b"\r\n", b"\n")
+        self.assertEqual(
+            source, packed,
+            "the packed flow text differs from skills/gemarc-media-doc/SKILL.md",
+        )
 
 
 class ConsoleStyleBindingTests(unittest.TestCase):

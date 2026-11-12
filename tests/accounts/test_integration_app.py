@@ -69,7 +69,8 @@ class EndToEnd(ServerCase):
         # 4. /mcp without it and with a wrong one
         status, headers, _ = rpc(self.srv.url("/mcp"), "initialize", INITIALIZE["params"])
         self.assertEqual(status, 401)
-        self.assertEqual(headers["WWW-Authenticate"], "Bearer")
+        self.assertEqual(headers["WWW-Authenticate"],
+                         'Bearer resource_metadata="%s/.well-known/oauth-protected-resource"' % self.srv.base)
         status, _h, _b = rpc(self.srv.url("/mcp"), "initialize", INITIALIZE["params"],
                              headers={"Authorization": "Bearer " + token[:-1] + ("a" if token[-1] != "a" else "b")})
         self.assertEqual(status, 401)

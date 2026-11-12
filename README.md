@@ -81,7 +81,8 @@ Claude Code、Codex、Hermes 的配置容器键名各不相同，下一节与 `i
 - Claude Code：`claude mcp add --transport http --scope project gemarc 'https://<project>.vercel.app/mcp' --header 'Authorization: Bearer ${GEMARC_MCP_PAT}'`。**用单引号**，否则令牌会明文写进 `.mcp.json`。
 - Codex：`codex mcp add gemarc --url 'https://<project>.vercel.app/mcp' --bearer-token-env-var GEMARC_MCP_PAT`。
 - Hermes：`hermes mcp add gemarc --url https://<project>.vercel.app/mcp`。
-- claude.ai / Claude Desktop 的远程 connector 只支持 OAuth 或无认证（本仓库未实现 OAuth）：要用就得让部署不设 `GEMARC_MCP_TOKEN`，代价是端点对知道 URL 的人开放。
+- claude.ai / Claude Desktop 的远程 connector 只支持 OAuth 或无认证：账号制部署现在**提供 OAuth 2.1**（v3.4 起，ADR-020），未开账号的部署仍只能无认证（端点对知道 URL 的人开放）。
+- MiniMax Code 没有自己的添加命令：仓库提供导入命令 `python -m gemarc_mcp.clients minimax install --url https://<project>.vercel.app/mcp`（令牌优先从环境变量 `GEMARC_MCP_PAT` 读，**不经过终端**）；加 `--oauth` 则写入「不带任何头」的条目，让客户端走自己的授权流程。逐个客户端的写法见 `integration-examples/README.md`。
 - **令牌从哪来、装的时候怎么设、装完以后怎么改**：账号制部署里，登录 `https://<project>.vercel.app/account` → 「创建令牌」拿到**个人访问令牌**（明文只显示这一次），放进**客户端**的环境变量 `GEMARC_MCP_PAT`（或写进客户端的 `Authorization: Bearer` 头）；换令牌时改环境变量并重启客户端。服务端的环境变量 `GEMARC_MCP_TOKEN` 是另一侧的事（未开账号部署的共享令牌）。逐个客户端的写法见 `integration-examples/README.md` 的「令牌」一节。
 - **连不上时看哪里**：客户端的报错里就有答案——账号制部署的 401 响应体带一句 `hint`（令牌在账号页拿、填进 `GEMARC_MCP_PAT` 或 `Authorization: Bearer` 头），Claude Code 会把它原样显示在 `claude mcp list` 的失败行里 **[RAN，2026-11-10 实测]**。
 - **Claude Code 连真实远程端点已实测**（2026-11-10）：`claude mcp add --transport http --scope user gemarc 'https://<project>.vercel.app/mcp' --header 'Authorization: Bearer ${GEMARC_MCP_PAT}'` → `claude mcp list` 显示 `√ Connected` → 真调 `mcp__gemarc__gemarc_brief` 拿到工作指令正文。`--scope user` 写进 `~/.claude.json`（本机所有项目可用，不动仓库里的 `.mcp.json`）；`--scope project` 写进项目的 `.mcp.json`（会随仓库提交，**别把令牌明文写进去**）。
@@ -225,6 +226,7 @@ npx vercel@65.8.0 deploy --prod
 `/account/admin` 是**仅管理员**的设置区（用户管理、审计日志、站点与工具集、令牌策略）。管理员 = 环境变量
 `GEMARC_ACCOUNTS_ADMIN_EMAILS` 白名单**或**数据库表 `admin_users` 里的运行时授予（两者取并集，收权要两边都做）。
 账号制部署下，`POST /mcp` 的 401 响应体带一句 `hint`（令牌在账号页拿、填进客户端的环境变量 `GEMARC_MCP_PAT` 或 `Authorization: Bearer` 头）；**所有失败原因同一句**，不区分「没带 / 带错 / 过期 / 被撤销」。
+账号制部署同时提供 **OAuth 2.1**（v3.4 起，ADR-020）：三个发现文档（`/.well-known/oauth-protected-resource`、认证服务器元数据）与 `/register` `/authorize` `/token`，授权码 + PKCE（S256）、短期访问令牌与轮换的刷新令牌；只会说 OAuth 的客户端（claude.ai 连接器、MiniMax Code 的「授权」按钮）因此可以只靠 Google 登录连上 `/mcp`。设计与边界见 `docs/09_部署/02_账号与安全.md` 第 3.16 节。
 
 ## 复用现有 GemArc Three.js Viewer
 
@@ -377,6 +379,8 @@ python -m unittest discover -s tests -v
 | 窗格可调高度 | 每个内容面板右下角有拖拽手柄，可单独调整宽与高 |
 | 专注模式 | 顶栏「专注」把两侧窗格收成一条窄导航条，主内容占满窗口，页签仍然可达 |
 | 主内容不被挤小 | 主栏有最小宽度下限，两侧窗格各有最小宽度 |
+| **美漫卡通渲染的宝石主题** | 固定件预置的画风：平涂的面、明确的亮墨线、硬边偏移影（不用模糊投影）、分格留白、纸面网点底纹、面板标题是一枚标题框。颜色仍然只编码事实（`docs/02_基本设计/10_UI风格方针.md` 第 14 章） |
 
-服务器随包发布的那份流程正文把「一轮 UI/UX 优化」列为**硬规则**：每份产出都要按上面这套基线
-复核一遍，并把这一轮做了什么写进最终说明。
+服务器随包发布的那份流程正文把「一次**整体** UI/UX 优化」列为**硬规则**：每份产出都要按上面这套基线
+做一次整体复核（不是逐项打勾），把这一轮做了什么写进最终说明。固定件预置主题是为了**降低使用者的
+优化成本**，不是把这一轮变成可选项——用户的 AI 仍要做一次整体优化（`docs/02_基本设计/10_UI风格方针.md` 第 15 章）。

@@ -29,7 +29,7 @@ class Audit(DbCase):
             if event in A.ANONYMOUS_EVENTS:
                 continue
             self.assertTrue(self.rec(event, code="x"), event)
-        self.assertEqual(len(A.EVENTS), 29)
+        self.assertEqual(len(A.EVENTS), 35)
         with self.assertRaises(ValueError):
             self.rec("made_up")
         self.assertEqual(self.count("audit_log"), len(A.EVENTS) - len(A.ANONYMOUS_EVENTS))

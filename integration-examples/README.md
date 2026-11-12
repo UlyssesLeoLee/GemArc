@@ -1,6 +1,6 @@
 # GemArc MCP 接入示例
 
-把 GemArc MCP 服务器接到 Claude（Claude Code、Claude Desktop、claude.ai）、OpenAI Codex、Hermes Agent。每个客户端一个子目录，里面的文件可以直接复制。
+把 GemArc MCP 服务器接到 Claude（Claude Code、Claude Desktop、claude.ai）、OpenAI Codex、Hermes Agent、MiniMax Code。每个客户端一个子目录，里面的文件可以直接复制。
 
 ## 先看这三条标记
 
@@ -14,11 +14,12 @@
 
 | 客户端 | stdio（本地） | 远程 + Bearer | 远程 无认证 / OAuth | tools | resources | prompts | skills |
 |---|---|---|---|---|---|---|---|
-| Claude Code | **RAN**：配置展开、启动服务器、调用成功 | **RAN**（`--header` + `claude mcp add` + 连上生产端点 + 真调 `mcp__gemarc__gemarc_brief`）；没令牌时客户端会把服务端的 `hint` 显示出来 | 无认证 DOCS；OAuth 本仓库未实现 | **RAN**（stdio 调 `gemarc_new_model`） | DOCS（`@gemarc:gemarc://registry`） | DOCS（`/mcp__gemarc__gemarc-media-doc`） | UNVERIFIED |
+| Claude Code | **RAN**：配置展开、启动服务器、调用成功 | **RAN**（`--header` + `claude mcp add` + 连上生产端点 + 真调 `mcp__gemarc__gemarc_brief`）；没令牌时客户端会把服务端的 `hint` 显示出来 | 无认证 DOCS；OAuth **v3.4 起本仓库实现**（ADR-020），客户端侧未验 | **RAN**（stdio 调 `gemarc_new_model`） | DOCS（`@gemarc:gemarc://registry`） | DOCS（`/mcp__gemarc__gemarc-media-doc`） | UNVERIFIED |
 | Claude Desktop | UNVERIFIED（配置 JSON 语法 RAN） | UNVERIFIED（静态 header 仅 beta，DOCS） | 无认证 DOCS | UNVERIFIED | UNVERIFIED | UNVERIFIED | UNVERIFIED |
 | claude.ai / API connector | 不适用 | UNVERIFIED（静态 header 仅 beta，DOCS） | 无认证 DOCS；API connector 仅 tools、token 须为 OAuth（DOCS） | UNVERIFIED | UNVERIFIED（API connector 不支持，DOCS） | UNVERIFIED（API connector 不支持，DOCS） | UNVERIFIED |
 | OpenAI Codex | 配置被 `--strict-config` 接受、`codex mcp add/list/get/remove` **RAN**；启动服务器 UNVERIFIED | SOURCE（`bearer_token_env_var`）；配置解析 **RAN** | SOURCE | SOURCE | SOURCE（仅内置 list/read 工具） | SOURCE（被忽略） | UNVERIFIED |
 | Hermes Agent | SOURCE | SOURCE | SOURCE | SOURCE | SOURCE | SOURCE | SOURCE（目录）；发现 UNVERIFIED |
+| MiniMax Code | **RAN**：用户级 `~/.minimax/mcp.json` 里的 stdio 条目可用（本会话里 `gemarc_local` 的工具一直在用） | **RAN**：静态 `Authorization` 头 → 鉴权状态 `static`，生产 `POST /mcp` 的 `initialize` 返回 200；**不展开** `${变量名}` 引用，令牌只能写明文；仓库自带导入命令 `python -m gemarc_mcp.clients minimax install` | **RAN**（服务端元数据与端点，ADR-020）；客户端侧的动态注册 + PKCE **UNVERIFIED** | UNVERIFIED | UNVERIFIED | UNVERIFIED | UNVERIFIED |
 | 官方 `mcp` 客户端库（协议层基线） | **RAN**：`scripts/verify_stdio.py`，17 个工具 / 4 个资源 / 1 个提示词全部通过 | 未测 | 未测 | **RAN** | **RAN** | **RAN** | 不适用 |
 
 “协议层基线”那一行说明服务器本身符合协议、字段合法；它**不能**替代各客户端自己的行为（审批、名字改写、输出截断）。
@@ -29,6 +30,7 @@
 2. **不想在每台机器装环境、只做「读仓库 → 填模型 → 校验 → 模拟 → 取回站点数据」** → 远程 `stateless` 工具集（9 个，全只读，没有工作区）。Claude Code / Codex / Hermes 用 Bearer token；claude.ai / Desktop 需要部署**不设** token（见 `claude-desktop/README.md` 的取舍）。
 3. **模型很大**（`gemarc_render` 派生文件合计超过约 35 KiB，或单次输出超过客户端上限）→ 走本地：`gemarc_build`，或命令行 `gemarc build <project> --profile static`。
 4. **只想试一下** → 本地 stdio，`GEMARC_ALLOW_WRITE=0`，只用只读工具。
+5. **不想手工保管令牌**（而且客户端只会说 OAuth）→ 用 **OAuth 通道**：配置里不写任何头，客户端自己走「发现 → 动态注册 → Google 登录 → 同意」。**只对开了账号模式的部署有效**（v3.4 起，ADR-020）；令牌通道永远可用，是默认值。
 
 ## 占位符（全部在这里）
 
@@ -37,6 +39,7 @@
 | `<project>` | 你的 Vercel 项目子域名，远程地址是 `https://<project>.vercel.app/mcp` |
 | `<workspace>` | 本地工作区，必须是**已存在**的目录；`gemarc_inspect` 只能扫描它里面的目录，写入也落在这里 |
 | `<token>` | 远程 Bearer token。**客户端**放环境变量 `GEMARC_MCP_PAT`（账号制部署里是你自己的个人访问令牌），**服务端**的环境变量叫 `GEMARC_MCP_TOKEN`（未开账号部署的共享令牌）；令牌只放环境变量或 `.env`，不要写进配置文件 |
+| `<python>` | 跑本地 stdio 服务器的解释器（`python -m gemarc_mcp`）；MiniMax Code 的示例里用它，因为那个客户端没有自己的添加命令 |
 | `D:\GemArc` | 本仓库的检出路径（不是尖括号，但示例里写死了，换成你的） |
 
 ## 令牌：从哪来、装的时候怎么设、装完以后怎么改
@@ -58,6 +61,7 @@
 | Claude Code | `$env:GEMARC_MCP_PAT = '<token>'` → `claude mcp add --transport http --scope project gemarc 'https://<project>.vercel.app/mcp' --header 'Authorization: Bearer ${GEMARC_MCP_PAT}'` |
 | Codex | `$env:GEMARC_MCP_PAT = '<token>'` → `codex mcp add gemarc --url 'https://<project>.vercel.app/mcp' --bearer-token-env-var GEMARC_MCP_PAT` |
 | Hermes | `GEMARC_MCP_PAT=<token>` 写进 `~/.hermes/.env` → YAML 里写 `Authorization: "Bearer ${GEMARC_MCP_PAT}"` |
+| MiniMax Code | 不支持环境变量引用：令牌**直接写进**用户级 `~/.minimax/mcp.json` 的 `Authorization` 头，步骤见 `minimax-code/README.md`；也可以用仓库自带的导入命令 `python -m gemarc_mcp.clients minimax install --url https://<project>.vercel.app/mcp --token-env GEMARC_MCP_PAT`（令牌不经过终端） |
 
 **装完以后怎么改**：改环境变量里的值并**重启客户端**（客户端只在启动时读一次）；配置里写着令牌明文的，删掉那个条目再重新添加一次。也可以在**控制台**里粘贴令牌：它只存在那个标签页的 `sessionStorage` 里，关掉标签页就没了。
 
@@ -98,6 +102,7 @@
 | `claude-code/` | `.mcp.json`、`settings.example.json`、`README.md` |
 | `codex/` | `config.stdio.toml`、`config.remote.toml`、`README.md` |
 | `hermes/` | `config.stdio.yaml`、`config.remote.yaml`、`env.example`、`README.md` |
+| `minimax-code/` | `mcp.json.example`、`README.md` |
 | `claude-desktop/` | `claude_desktop_config.json`、`README.md` |
 | `codex-marketplace.json` | 旧的 skill 插件市场清单，Codex 不会自动发现，见 `codex/README.md` |
 

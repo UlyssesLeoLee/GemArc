@@ -263,10 +263,11 @@ def authorization_url(endpoints: IdpEndpoints, *, client_id: str, redirect_uri: 
 
 # -- server-side one-time state --------------------------------------------------------------------------------------
 INSERT_STATE_SQL = (
-    "INSERT INTO oauth_states (state_hash, nonce_hash, binding_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?)"
+    "INSERT INTO oauth_states (state_hash, nonce_hash, binding_hash, created_at, expires_at, return_to) "
+    "VALUES (?, ?, ?, ?, ?, ?)"
 )
 CONSUME_STATE_SQL = (
-    "DELETE FROM oauth_states WHERE state_hash = ? RETURNING nonce_hash, binding_hash, expires_at"
+    "DELETE FROM oauth_states WHERE state_hash = ? RETURNING nonce_hash, binding_hash, expires_at, return_to"
 )
 CLEAN_STATE_SQL = (
     "DELETE FROM oauth_states WHERE state_hash IN (SELECT state_hash FROM oauth_states WHERE expires_at < ? LIMIT ?)"
@@ -277,6 +278,10 @@ CLEAN_STATE_SQL = (
 class StateRecord:
     nonce_hash: str
     binding_hash: str
+    #: Where the reader goes after the sign-in (an OAuth authorisation request, or the empty
+    #: string for the ordinary sign-in). It is stored with the one-time state, so it can neither
+    #: be forged nor outlive the state.
+    return_to: str = ""
 
 
 class OAuthStates:
@@ -284,9 +289,10 @@ class OAuthStates:
         self.db = db
         self.ttl = ttl
 
-    def create(self, state: str, nonce: str, binding: str, now: int, tx: Optional[Tx] = None) -> None:
+    def create(self, state: str, nonce: str, binding: str, now: int, tx: Optional[Tx] = None,
+               return_to: str = "") -> None:
         params = (sha256_domain("state", state), sha256_domain("nonce", nonce), binding_hash(state, binding),
-                  int(now), int(now) + self.ttl)
+                  int(now), int(now) + self.ttl, return_to)
         if tx is not None:
             tx.execute(INSERT_STATE_SQL, params)
             tx.execute(CLEAN_STATE_SQL, (int(now), 200))
@@ -301,7 +307,7 @@ class OAuthStates:
             row = tx.fetchone(CONSUME_STATE_SQL, (sha256_domain("state", state),))
         if row is None or int(row["expires_at"]) <= int(now):
             return None
-        return StateRecord(row["nonce_hash"], row["binding_hash"])
+        return StateRecord(row["nonce_hash"], row["binding_hash"], row["return_to"] or "")
 
 
 # -- token exchange --------------------------------------------------------------------------------------------------

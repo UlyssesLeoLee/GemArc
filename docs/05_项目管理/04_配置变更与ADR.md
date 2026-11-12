@@ -185,6 +185,36 @@
   - 出处登记：`src/gemarc_mcp/atlas/provenance/versions.tsv` 新增一行，`PROVENANCE.md` 重新生成（顺带修回了它此前陈旧的状态）。
   - **没有改动的**：发布门、浏览器门、证据门、切片校验、`verify_remote` 的既有判据、`test_disabled_unchanged` 的逐字节不变断言，全部原样。台账与 `.atlas/history/` 的读取都是只读的。
 
+### ADR-020 OAuth 2.1：让「只会说 OAuth 的客户端」也能连上 `/mcp`
+
+- **背景**：`/mcp` 只有**个人访问令牌**一条通道（`Authorization: Bearer gat_…`）。只会说 OAuth 的客户端因此连不上：MiniMax Code 的「授权」按钮走的是 OAuth 2.1 的发现与动态注册，服务器上没有 OAuth 元数据，点它必然报「未找到该服务器的授权配置」（**实测**：2026-11-12 从本机安装包里读到的错误文案是 OAuth 发现失败那一条，与令牌通道无关）；claude.ai 的连接器同理。这不是配置写错，是**协议不匹配**：第 3.6 节早就把 OAuth 2.1 列为下一个任务 `accounts-oauth`，并写明它会打破「`/.well-known/*` 必须 404」的约定（I5）——到那时必须先改这些测试。
+- **决策**：
+  - **新增六个公开路径**（账号模式才有；未开账号的部署仍然一律 404）：
+    - `GET /.well-known/oauth-protected-resource` 与 `GET /.well-known/oauth-protected-resource/mcp`（RFC 9728，资源元数据）；
+    - `GET /.well-known/oauth-authorization-server`（RFC 8414，授权服务器元数据）；
+    - `POST /register`（RFC 7591，动态客户端注册，公共客户端、无密钥）；
+    - `GET /authorize` 与 `POST /authorize`（授权码 + PKCE）；
+    - `POST /token`（授权码换令牌、刷新令牌轮换）。
+  - **只用授权码 + PKCE（S256）**：没有隐式流、没有密码流；公共客户端不持有密钥。
+  - **三种令牌形态**（前缀各自独立，格式与校验沿用第 4.5/4.6 节的口径）：
+    - 访问令牌 `goa_…`：短期（默认 15 分钟），**绑定受众**（`resource` 参数，RFC 8707），只存哈希；
+    - 刷新令牌 `gor_…`：默认 30 天，**每次使用即轮换**，旧令牌立即作废；旧令牌被再次使用 = 重用，撤销整条链；
+    - 授权码 `goc_…`：60 秒，一次性。
+  - **四张新表**（ADDITIVE 迁移 `0004_oauth.sql`）：`oauth_clients`、`oauth_codes`、`oauth_refresh_tokens`、`oauth_access_tokens`。`api_tokens.kind = 'pat'` 一行不改。
+  - **`/mcp` 按前缀分派**：`gat_` 走原有的令牌通道，`goa_` 走新的访问令牌通道；对外契约不变（仍然是 `Authorization: Bearer`），变的只是「这个 Bearer 可以是访问令牌」。两种凭据的失败原因**同一句**（沿用 ADR-018 的口径）。
+  - **401 带 `resource_metadata`**：账号模式下 `/mcp` 的 401 头是 `WWW-Authenticate: Bearer resource_metadata="<基址>/.well-known/oauth-protected-resource"`（RFC 9728 §5.1）。**未开账号的部署仍然是裸 `Bearer`**，逐字节不变（`tests/test_remote_auth.py` 据此判断）。
+  - **作用域**：`read`（默认）与 `write`；`write` 同时需要 `users.can_write` 与运营开关，同意页会把它写出来。
+  - **同意页**：已登录会话下，`/authorize` 先显示一页（客户端名、作用域、受众、访问令牌与刷新令牌的到期），用户点「允许」才发码；未登录则先走 Google 登录再回来（`return_to` 带回原参数）。
+  - **审计与限流**：新增 `oauth_client_registered`、`oauth_authorized`、`oauth_code_redeemed`、`oauth_token_issued`、`oauth_token_refreshed`、`oauth_token_reuse_detected` 六个事件（`ref` = 客户端 ID）；限流作用域 `oauth_register`、`oauth_authorize`、`oauth_token`（按 IP 哈希）与 `oauth_consent`（按用户，同意页的提交）。
+- **原因**：OAuth 2.1 是 MCP 授权规范的走向（第 3.6 节已写明「支持 MCP 授权规范的客户端应当改走 OAuth 2.1，直接用 Google 登录并只持有短期、绑定受众的令牌」）。两条通道并存而不是替换：`Authorization: Bearer` 的对外形状不变，老客户端（Claude Code / Codex / Hermes 的令牌写法）一行配置都不用改；新客户端（只有 OAuth 的那些）多了第二条路。**受众绑定**（RFC 8707）保证一个令牌不能拿去访问别的部署；**刷新令牌轮换 + 重用检测**保证「短访问令牌 + 长刷新令牌」这个推荐组合的弱点（刷新令牌泄露）只暴露一次。不用隐式流是因为短访问令牌不该活在浏览器的 URL 里。
+- **后果**：
+  - **既有约定要改**：第 3.6 节与 I5 的「`/.well-known/*` 必须 404」在账号模式下不再成立；`tests/accounts/test_mcpauth.py` 里探测 404 的那组用例随之改成「账号模式返回元数据、未开账号仍 404、账号开但配置不全答 503」。这是第 3.6 节早就写明的前置条件，不是临时放宽。
+  - **路由表要列全**：第 3.2 节的路由清单补上这六个路径（R-08 已登记「路由表少列路径」这个缺陷，这次一并补齐）。
+  - **三语**：同意页文案进 `zh-CN` / `ja-JP` / `en-US` 三张表，键集合保持相同（`tests/test_i18n.py` 继续守这条）。
+  - **绑定测试**：新增 `tests/accounts/test_oauth.py`（元数据形状、动态注册、授权码一次性与 PKCE 绑定、令牌轮换与重用检测、受众绑定、`/mcp` 双凭据分派、失败原因同一句），并把路由表与错误码的既有断言补到全量。
+  - **实现**：`src/gemarc_mcp/accounts/oauth.py`（新增：令牌形态、元数据、授权码、访问令牌、刷新令牌轮换）、`src/gemarc_mcp/accounts/routes.py`（六个路径与同意页）、`src/gemarc_mcp/accounts/mcpauth.py`（按前缀分派）、`src/gemarc_mcp/accounts/migrations/0004_oauth.sql`（新表）、`src/gemarc_mcp/accounts/pages.py`（同意页）、`src/gemarc_mcp/i18n/*.json`（三语）。
+  - **没有改动的**：令牌通道的格式、校验和、缓存与限流口径；`/mcp` 的工具集与作用域判定；未开账号的部署（仍然没有这些端点）。
+
 ## 变更流程
 
 提交 CR→影响分析 FR/NFR/Schema/View/测试→设计变更评审→实现和测试→QA 审查→基线发布。凡变动稳定 ID 与 Schema major，需要迁移方案与回滚计划。变更决议与审批记在台账，未经审批不改成“已采用”。

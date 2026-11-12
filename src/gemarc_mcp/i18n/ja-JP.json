@@ -266,7 +266,20 @@
     "account.settingstoolssome": "選んだツールだけ",
     "account.settingstoolsnote": "「すべてのツール」はいまと同じです。「選んだツールだけ」にすると表はそのツールだけになり、サーバーが後から加えたツールは現れません。",
     "account.settingssave": "調整を保存",
-    "account.settingssaved": "調整を保存しました。"
+    "account.settingssaved": "調整を保存しました。",
+    "oauth.consent.title": "このクライアントを許可する",
+    "oauth.consent.intro": "このクライアントがあなたの GemArc 利用者として動作する許可を求めています。取得される権限は次のとおりです。",
+    "oauth.consent.client": "クライアント",
+    "oauth.consent.scope": "範囲",
+    "oauth.consent.audience": "対象",
+    "oauth.consent.lifetime": "有効期間",
+    "oauth.consent.access": "認証鍵",
+    "oauth.consent.minutes": "分",
+    "oauth.consent.refresh": "更新鍵",
+    "oauth.consent.days": "日",
+    "oauth.consent.redirect": "許可後の戻り先",
+    "oauth.consent.allow": "許可する",
+    "oauth.consent.deny": "拒否する"
   },
   "tools": {
     "gemarc_media_doc_guide": {
@@ -366,6 +379,6 @@
     "GEMARC_ACCT_038": "「選んだツールだけ」を選びましたが、一つも選ばれていません。"
   },
   "mcp": {
-    "unauthorized.hint": "認証鍵は利用者画面で発行されます：{url} を開いてトークンを作成し、クライアントの実行環境へ参照名 GEMARC_MCP_PAT として入れてください（Claude Code / Codex / Hermes が読みます）。クライアントが送る Authorization: Bearer に直接書くこともできます。"
+    "unauthorized.hint": "認証鍵は利用者画面で発行します: {url} を開いてトークンを作成し、クライアントの実行環境へ参照名 GEMARC_MCP_PAT として入れてください（Claude Code / Codex / Hermes が読みます）。クライアントが送る Authorization: Bearer に直接書くこともできます。OAuth しか扱えないクライアントは認可の操作を使います: {oauth_url} を開いて署名してください（この手順の説明は /.well-known/oauth-protected-resource にあります）。"
   }
 }

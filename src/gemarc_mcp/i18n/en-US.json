@@ -266,7 +266,20 @@
     "account.settingstoolssome": "Only the checked tools",
     "account.settingstoolsnote": "All tools is what you have now. Only the checked tools narrows the list to those; a tool the server adds later will not appear.",
     "account.settingssave": "Save settings",
-    "account.settingssaved": "Settings saved."
+    "account.settingssaved": "Settings saved.",
+    "oauth.consent.title": "Authorize this client",
+    "oauth.consent.intro": "This client asks for access to your GemArc account. These are the permissions it gets.",
+    "oauth.consent.client": "Client",
+    "oauth.consent.scope": "Scope",
+    "oauth.consent.audience": "Audience",
+    "oauth.consent.lifetime": "Lifetime",
+    "oauth.consent.access": "Access token",
+    "oauth.consent.minutes": "minutes",
+    "oauth.consent.refresh": "Refresh token",
+    "oauth.consent.days": "days",
+    "oauth.consent.redirect": "After the authorization the client returns to",
+    "oauth.consent.allow": "Allow",
+    "oauth.consent.deny": "Deny"
   },
   "messages": {
     "GEMARC_ACCT_001": "The accounts feature is not available right now.",
@@ -296,6 +309,6 @@
     "GEMARC_ACCT_038": "You chose only the checked tools, but no tool is checked."
   },
   "mcp": {
-    "unauthorized.hint": "An access token is issued on the account page: open {url} to create one, then put it in the client's GEMARC_MCP_PAT environment variable (Claude Code, Codex and Hermes read it), or straight into the client's Authorization: Bearer header."
+    "unauthorized.hint": "Access tokens are issued on the account page: open {url}, create a personal access token and put it in the client's environment variable GEMARC_MCP_PAT (Claude Code / Codex / Hermes read it), or write it straight into the client's Authorization: Bearer header. A client that only speaks OAuth uses the authorization flow: open {oauth_url} and sign in once (this channel is described in /.well-known/oauth-protected-resource)."
   }
 }

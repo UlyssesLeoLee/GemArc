@@ -14,11 +14,12 @@ Failures are swallowed by the caller: clean-up is best effort and must never fai
 """
 from __future__ import annotations
 
-from typing import Callable, Dict
+from typing import Callable, Dict, Optional
 
 from . import audit as audit_mod
 from . import oidc
 from .db import Database
+from .oauth import OAuthStore
 from .ratelimit import RateLimiter
 from .sessions import SessionStore
 from .tokens import TokenStore
@@ -29,7 +30,7 @@ MAX_ROUNDS = 200  # ``gc`` safety bound: 200 rounds of 200 rows per table
 
 
 def run_once(db: Database, *, sessions: SessionStore, tokens: TokenStore, limiter: RateLimiter, retention_days: int,
-             now: int, batch: int = BATCH) -> "Dict[str, int]":
+             now: int, batch: int = BATCH, oauth: Optional["OAuthStore"] = None) -> "Dict[str, int]":
     """One bounded pass; returns the number of rows deleted per table."""
     now = int(now)
     out: "Dict[str, int]" = {}
@@ -40,6 +41,8 @@ def run_once(db: Database, *, sessions: SessionStore, tokens: TokenStore, limite
         ("api_tokens", lambda: tokens.cleanup(now, batch)),
         ("oauth_states", lambda: _in_tx(db, lambda tx: tx.execute(oidc.CLEAN_STATE_SQL, (now, batch)))),
     ]
+    if oauth is not None:
+        steps.append(("oauth", lambda: oauth.cleanup(now, batch)))
     for name, step in steps:
         try:
             out[name] = max(int(step()), 0)
@@ -49,12 +52,13 @@ def run_once(db: Database, *, sessions: SessionStore, tokens: TokenStore, limite
 
 
 def run_until_empty(db: Database, *, sessions: SessionStore, tokens: TokenStore, limiter: RateLimiter,
-                    retention_days: int, now: int, batch: int = BATCH) -> "Dict[str, int]":
+                    retention_days: int, now: int, batch: int = BATCH,
+                    oauth: Optional["OAuthStore"] = None) -> "Dict[str, int]":
     """Repeat ``run_once`` until a pass deletes nothing (or ``MAX_ROUNDS``); returns the rows removed per table."""
     removed_sum: "Dict[str, int]" = {}
     for _ in range(MAX_ROUNDS):
         done = run_once(db, sessions=sessions, tokens=tokens, limiter=limiter, retention_days=retention_days,
-                        now=now, batch=batch)
+                        now=now, batch=batch, oauth=oauth)
         for key, value in done.items():
             removed_sum[key] = removed_sum.get(key, 0) + value
         if not any(done.values()):

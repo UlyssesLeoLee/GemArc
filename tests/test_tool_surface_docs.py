@@ -40,7 +40,7 @@ NOT_TOOLS = {
     "gemarc_local": "the server name of the stdio entry in the Claude Code .mcp.json example",
 }
 #: Placeholders the integration examples may use in their config files (listed in integration-examples/README.md).
-PLACEHOLDERS = {"<project>", "<workspace>", "<token>"}
+PLACEHOLDERS = {"<project>", "<workspace>", "<token>", "<python>"}
 TEXT_SUFFIXES = {".md", ".json", ".toml", ".yaml", ".yml", ".txt", ".py", ".js", ".mjs", ".css", ".html", ".mmd", ".csv", ".example"}
 
 

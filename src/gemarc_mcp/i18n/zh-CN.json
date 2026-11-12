@@ -266,7 +266,20 @@
     "account.settingstoolssome": "只用勾选的工具",
     "account.settingstoolsnote": "「全部工具」和现在一样；「只用勾选的工具」会让清单只剩这些，服务器以后新增的工具不会自动出现。",
     "account.settingssave": "保存设置",
-    "account.settingssaved": "设置已保存。"
+    "account.settingssaved": "设置已保存。",
+    "oauth.consent.title": "授权这个客户端",
+    "oauth.consent.intro": "这个客户端请求访问你的 GemArc 账号。下面是它要拿到的权限。",
+    "oauth.consent.client": "客户端",
+    "oauth.consent.scope": "权限范围",
+    "oauth.consent.audience": "访问对象",
+    "oauth.consent.lifetime": "有效期",
+    "oauth.consent.access": "访问令牌",
+    "oauth.consent.minutes": "分钟",
+    "oauth.consent.refresh": "刷新令牌",
+    "oauth.consent.days": "天",
+    "oauth.consent.redirect": "授权完成后回到",
+    "oauth.consent.allow": "允许",
+    "oauth.consent.deny": "拒绝"
   },
   "tools": {
     "gemarc_media_doc_guide": {
@@ -366,6 +379,6 @@
     "GEMARC_ACCT_038": "选择了「只用勾选的工具」，但一个都没有勾选。"
   },
   "mcp": {
-    "unauthorized.hint": "访问令牌在账号页签发：打开 {url} 创建个人访问令牌，再放进客户端的环境变量 GEMARC_MCP_PAT（Claude Code / Codex / Hermes 都读它），或直接写进客户端的 Authorization: Bearer 头。"
+    "unauthorized.hint": "访问令牌在账号页签发：打开 {url} 创建个人访问令牌，再放进客户端的环境变量 GEMARC_MCP_PAT（Claude Code / Codex / Hermes 都读它），或直接写进客户端的 Authorization: Bearer 头。只会说 OAuth 的客户端走授权流程：打开 {oauth_url} 登录一次即可（这条通道的说明在 /.well-known/oauth-protected-resource）。"
   }
 }

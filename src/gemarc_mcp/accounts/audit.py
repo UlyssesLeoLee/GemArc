@@ -29,6 +29,8 @@ EVENTS = frozenset({
     "token_scope_denied", "export", "account_deleted", "signup_saturated", "audit_overflow", "key_rekeyed",
     "migration_applied", "user_disabled", "user_enabled", "user_purged", "user_reconciled", "write_granted",
     "write_revoked", "admin_action", "admin_setting", "admin_site_rebuild", "settings_updated",
+    "oauth_client_registered", "oauth_authorized", "oauth_code_redeemed", "oauth_token_issued",
+    "oauth_token_refreshed", "oauth_token_reuse_detected",
 })
 #: Events caused by anonymous traffic: deduplicated and subject to the global hourly ceiling.
 ANONYMOUS_EVENTS = frozenset({"login_denied", "token_auth_failed"})

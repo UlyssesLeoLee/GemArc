@@ -72,7 +72,13 @@ def count_transactions(case):
 
 def expected_hint(case, lang: str = "zh-CN") -> str:
     """The one sentence the 401 carries (ADR-018): where to get a token, where to put it."""
-    return i18n.text(lang, "mcp", "unauthorized.hint", url=f"{case.srv.base}/account")
+    return i18n.text(lang, "mcp", "unauthorized.hint", url=f"{case.srv.base}/account",
+                     oauth_url=f"{case.srv.base}/authorize")
+
+
+def expected_challenge(base: str) -> str:
+    """The challenge of the account mode: the scheme and the metadata pointer (RFC 9728 section 5.1)."""
+    return 'Bearer resource_metadata="%s/.well-known/oauth-protected-resource"' % base
 
 
 @unittest.skipUnless(sdk_available(), "MCP SDK is not installed")
@@ -84,7 +90,7 @@ class PatMode(ServerCase):
         payload = json.loads(body)
         self.assertEqual(payload["error"], "unauthorized")
         self.assertEqual(payload["hint"], expected_hint(self))
-        self.assertEqual(headers["WWW-Authenticate"], "Bearer")
+        self.assertEqual(headers["WWW-Authenticate"], expected_challenge(self.srv.base))
         self.assertEqual(headers["Cache-Control"], "no-store")
         self.assertEqual(post(self, ENV_TOKEN)[0], 401)
         self.assertEqual(post(self, token)[0], 200)
@@ -597,11 +603,35 @@ class FailClosed(unittest.TestCase):
             self.assertNotIn("accounts", json.loads(run(app, "GET", "/healthz")[2]))
             self.assertEqual(run(app, "GET", "/account")[0], 404)
 
-    def test_wellknown_stays_404_json_in_every_state(self):
-        for env in ({}, complete_env(), {"GEMARC_REQUIRE_LOGIN": "1"}, {"GEMARC_ACCOUNTS": "1"}):
+    def test_wellknown_is_a_metadata_document_only_in_the_account_mode(self):
+        """ADR-020: the discovery documents exist only when the accounts feature is on.
+
+        Without it the path does not exist at all (a clean 404 JSON, never the HTML console);
+        with it but not ready the deployment fails closed (503), never with a half-open document.
+        """
+        for env in ({}, {"GEMARC_REQUIRE_LOGIN": "1"}):
             with built(env) as app:
                 status, _h, body = run(app, "GET", "/.well-known/oauth-protected-resource")
                 self.assertEqual((status, json.loads(body)), (404, {"error": "not_found"}))
+        with built({"GEMARC_ACCOUNTS": "1"}) as app:  # accounts on, misconfigured: fail closed
+            status, _h, _b = run(app, "GET", "/.well-known/oauth-protected-resource")
+            self.assertEqual(status, 503)
+        with built(complete_env()) as app:  # accounts ready: the two metadata documents
+            status, headers, body = run(app, "GET", "/.well-known/oauth-protected-resource",
+                                        {"Host": "127.0.0.1:8000"})
+            self.assertEqual(status, 200)
+            document = json.loads(body)
+            self.assertEqual(document["resource"], "http://127.0.0.1:8000")
+            self.assertEqual(document["authorization_servers"], ["http://127.0.0.1:8000"])
+            self.assertEqual(headers["cache-control"], "no-store")
+            status, _h, body = run(app, "GET", "/.well-known/oauth-authorization-server",
+                                   {"Host": "127.0.0.1:8000"})
+            self.assertEqual(status, 200)
+            server = json.loads(body)
+            self.assertEqual(server["issuer"], "http://127.0.0.1:8000")
+            self.assertEqual(server["authorization_endpoint"], "http://127.0.0.1:8000/authorize")
+            self.assertEqual(server["token_endpoint"], "http://127.0.0.1:8000/token")
+            self.assertEqual(server["registration_endpoint"], "http://127.0.0.1:8000/register")
 
 
 @unittest.skipUnless(sdk_available(), "MCP SDK is not installed")
@@ -620,8 +650,9 @@ class LoginIntentGate(unittest.TestCase):
             payload = json.loads(body)
             self.assertEqual(payload["error"], "unauthorized")
             self.assertEqual(payload["hint"], i18n.text("zh-CN", "mcp", "unauthorized.hint",
-                                                         url="http://127.0.0.1:8000/account"))
-            self.assertEqual(headers["www-authenticate"], "Bearer")
+                                                         url="http://127.0.0.1:8000/account",
+                                                         oauth_url="http://127.0.0.1:8000/authorize"))
+            self.assertEqual(headers["www-authenticate"], expected_challenge("http://127.0.0.1:8000"))
             health = json.loads(run(app, "GET", "/healthz")[2])
             self.assertTrue(health["authRequired"])
             self.assertTrue(health["sessionAuth"])  # the login session is accepted, so the console works

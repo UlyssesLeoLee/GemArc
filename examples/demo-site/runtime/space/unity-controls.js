@@ -571,8 +571,8 @@ export class UnityControls {
       box.className = 'gemarc-marquee';
       box.style.position = 'absolute';
       box.style.pointerEvents = 'none';
-      box.style.border = '1px solid var(--gem-aqua, #6fe3ff)';
-      box.style.background = 'rgba(111, 227, 255, 0.08)';
+      box.style.border = '1px solid var(--gem-ai, #3d5a72)';
+      box.style.background = 'rgba(61, 90, 114, 0.08)';
       box.style.zIndex = '2';
       element.parentNode.appendChild(box);
       this._marqueeElement = box;

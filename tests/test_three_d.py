@@ -49,14 +49,71 @@ SERVER_PY = REPO_ROOT / "src" / "gemarc_mcp" / "server.py"
 def _palette_section(policy: str, section: str) -> str:
     """The palette table of one section of the style policy.
 
-    The policy carries two tables: the dark band (3.1) and the light band
-    (3.2). A caller asks for the one it means, so the site is bound to the
-    dark band and the backend to both.
+    The policy carries two tables: the paper and the ink (3.1) and the
+    pigments (3.2). A caller asks for the one it means.
     """
     table = re.search(rf"### {re.escape(section)} .*?\n(\|.*?)\n\n", policy, re.S)
     if table is None:
         return ""
     return table.group(1)
+
+
+def _rgb(hex_colour: str):
+    """The three channels of a hex colour."""
+    value = hex_colour.lstrip("#")
+    return tuple(int(value[index:index + 2], 16) for index in (0, 2, 4))
+
+
+def _hsl(hex_colour: str):
+    """The HSL triple of a hex colour: hue in degrees, saturation and lightness."""
+    import colorsys
+    r, g, b = (channel / 255.0 for channel in _rgb(hex_colour))
+    hue, lightness, saturation = colorsys.rgb_to_hls(r, g, b)
+    return hue * 360.0, saturation, lightness
+
+
+def _lab(hex_colour: str):
+    """The CIELAB triple of a hex colour (D65)."""
+    def linear(channel):
+        value = channel / 255.0
+        if value <= 0.04045:
+            return value / 12.92
+        return ((value + 0.055) / 1.055) ** 2.4
+    r, g, b = (linear(channel) for channel in _rgb(hex_colour))
+    x = (r * 0.4124564 + g * 0.3575761 + b * 0.1804375) / 0.95047
+    y = r * 0.2126729 + g * 0.7151522 + b * 0.0721750
+    z = (r * 0.0193339 + g * 0.1191920 + b * 0.9503041) / 1.08883
+    def f(value):
+        if value > 0.008856:
+            return value ** (1.0 / 3.0)
+        return 7.787 * value + 16.0 / 116.0
+    fx, fy, fz = f(x), f(y), f(z)
+    return 116.0 * fy - 16.0, 500.0 * (fx - fy), 200.0 * (fy - fz)
+
+
+def _chroma(hex_colour: str) -> float:
+    """The CIELAB chroma C* of a hex colour."""
+    _, a, b = _lab(hex_colour)
+    return (a * a + b * b) ** 0.5
+
+
+def _lightness(hex_colour: str) -> float:
+    """The CIELAB lightness L* of a hex colour."""
+    return _lab(hex_colour)[0]
+
+
+def _contrast(first: str, second: str) -> float:
+    """The WCAG contrast ratio of two hex colours."""
+    def luminance(hex_colour):
+        def linear(channel):
+            value = channel / 255.0
+            if value <= 0.04045:
+                return value / 12.92
+            return ((value + 0.055) / 1.055) ** 2.4
+        r, g, b = (linear(channel) for channel in _rgb(hex_colour))
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    high, low = sorted((luminance(first), luminance(second)), reverse=True)
+    return (high + 0.05) / (low + 0.05)
 
 
 def _without_comments(source: str) -> str:
@@ -208,7 +265,7 @@ class StylePolicyBindingTests(unittest.TestCase):
         self.assertTrue(STYLE_POLICY.is_file(), "the style policy document is missing")
 
     def test_the_site_uses_every_token_of_the_policy(self):
-        """The site is the dark band: it uses the tokens of section 3.1."""
+        """The site is the paper and the ink: it uses the tokens of section 3.1."""
         policy = self._policy_text()
         css = SHARED_CSS.read_text(encoding="utf-8")
         tokens = set(re.findall(r"\| `(--gem-[a-z0-9-]+)` \| `#[0-9a-fA-F]{6}`",
@@ -219,12 +276,13 @@ class StylePolicyBindingTests(unittest.TestCase):
                 self.assertIn(f"{token}:", css, f"{token} is in the policy but not in the site")
 
     def test_the_scene_uses_the_axis_colours_of_the_policy(self):
+        """Section 4.4: X is blue, Y is wisteria, Z is persimmon."""
         policy = self._policy_text()
         viewer = AXIS_VIEWER.read_text(encoding="utf-8")
-        for token in ("--gem-aqua", "--gem-violet", "--gem-topaz"):
+        for token in ("--gem-ai", "--gem-fuji", "--gem-kaki"):
             with self.subTest(token=token):
                 self.assertIn(token, policy)
-        for key, value in (("x", "0x6fe3ff"), ("y", "0xb78cff"), ("z", "0xffc46b")):
+        for key, value in (("x", "0x3d5a72"), ("y", "0x5f5573"), ("z", "0x96501f")):
             with self.subTest(axis=key):
                 self.assertRegex(viewer, rf"{key}: {value}")
 
@@ -265,10 +323,13 @@ class ComicLayerBindingTests(unittest.TestCase):
         return STYLE_POLICY.read_text(encoding="utf-8")
 
     def _palette(self):
+        """The whole palette of section 3: the paper, the ink and the pigments."""
         policy = self._policy_text()
-        tokens = dict(re.findall(r"\| `(--gem-[a-z0-9-]+)` \| `(#[0-9a-fA-F]{6})`",
-                                 _palette_section(policy, "3.1")))
-        self.assertTrue(tokens, "the policy does not list the dark band")
+        tokens = {}
+        for section in ("3.1", "3.2"):
+            tokens.update(dict(re.findall(r"\| `(--gem-[a-z0-9-]+)` \| `(#[0-9a-fA-F]{6})`",
+                                          _palette_section(policy, section))))
+        self.assertTrue(tokens, "the policy does not list the palette")
         return tokens
 
     def _rule(self, css, selector):
@@ -279,10 +340,10 @@ class ComicLayerBindingTests(unittest.TestCase):
 
     def test_the_policy_carries_the_comic_layer_and_the_overall_pass(self):
         policy = self._policy_text()
-        for heading in ("## 14. 平面层的美漫卡通渲染",
+        for heading in ("## 14. 平面层的和紙墨描渲染",
                         "### 14.1 墨线",
                         "### 14.3 硬边阴影",
-                        "### 14.5 纸面网点",
+                        "### 14.5 和紙纤维",
                         "## 15. 产出必须经过一次整体 UI/UX 优化（硬约束）",
                         "### 15.1 硬约束",
                         "### 15.2 固定件预置主题，降低成本",
@@ -323,12 +384,14 @@ class ComicLayerBindingTests(unittest.TestCase):
                                  "the hard shadow must have a zero blur radius")
 
     def test_the_site_carries_the_paper_texture(self):
-        """Section 14.5: the sparse dot grid of the printed page."""
+        """Section 14.5: the fibre of washi, and never the dots of print."""
         css = SHARED_CSS.read_text(encoding="utf-8")
-        self.assertIn("background-image: radial-gradient(", css,
-                      "the page has no dot texture")
-        self.assertRegex(css, r"background-size:\s*7px 7px",
-                         "the dot texture must stay very sparse")
+        self.assertIn("repeating-linear-gradient(", css,
+                      "the page has no fibre texture")
+        self.assertNotIn("radial-gradient(", css,
+                         "the page still carries a halftone dot grid")
+        self.assertNotIn("background-size: 7px 7px", css,
+                         "the dot grid of the printed page is still there")
 
     def test_the_site_does_not_grow_a_second_palette(self):
         """Section 14.6: the palette does not change with the drawing style."""
@@ -346,8 +409,10 @@ class ComicLayerBindingTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(f"{token}:", css,
                               "the preview shell does not use the tokens of the policy")
-        self.assertIn("radial-gradient(", css,
-                      "the preview shell has no dot texture")
+        self.assertIn("repeating-linear-gradient(", css,
+                      "the preview shell has no fibre texture")
+        self.assertNotIn("radial-gradient(", css,
+                         "the preview shell still carries a halftone dot grid")
         self.assertRegex(css, r"\.panel\{[^}]*border:2px solid var\(--gem-muted\)",
                          "the preview shell draws no ink line")
         self.assertRegex(css, r"box-shadow:[^;]*var\(--gem-void\)",
@@ -357,7 +422,7 @@ class ComicLayerBindingTests(unittest.TestCase):
         """Section 15: the rule reaches the agent that builds the document."""
         skill = SKILL_MD.read_text(encoding="utf-8")
         for phrase in ("每一份产出都要做一次整体 UI/UX 优化",
-                       "风格基准：美漫卡通渲染的宝石主题",
+                       "风格基准：和紙墨描的宝石主题",
                        "这一轮不能省"):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, skill,
@@ -365,12 +430,12 @@ class ComicLayerBindingTests(unittest.TestCase):
         service = SERVICE_PY.read_text(encoding="utf-8")
         self.assertIn("UI/UX 优化", service,
                       "the brief does not carry the overall pass")
-        self.assertIn("美漫卡通渲染的宝石主题", service,
+        self.assertIn("和紙墨描的宝石主题", service,
                       "the brief does not name the style baseline")
         server = SERVER_PY.read_text(encoding="utf-8")
         self.assertIn("整体 UI/UX 优化", server,
                       "the tool instructions do not carry the overall pass")
-        self.assertIn("美漫卡通渲染的宝石主题", server,
+        self.assertIn("和紙墨描的宝石主题", server,
                       "the tool instructions do not name the style baseline")
 
     def test_the_packed_flow_text_is_the_same_text(self):
@@ -474,12 +539,28 @@ class ConsoleStyleBindingTests(unittest.TestCase):
                          "always produce the same picture")
 
     def test_the_console_scene_uses_the_colours_of_the_policy(self):
-        """Section 12.4: a read tool is aqua, a write tool is topaz."""
-        palette = self._palette()
+        """Section 12.4: a read tool is blue, a write tool is persimmon."""
         source = CONSOLE_SPACE.read_text(encoding="utf-8")
-        self.assertIn(f"0x{palette['--gem-aqua'][1:].lower()}", source)
-        self.assertIn(f"0x{palette['--gem-topaz'][1:].lower()}", source)
-        self.assertIn(f"0x{palette['--gem-void'][1:].lower()}", source)
+        for name in ("PALETTE.ai", "PALETTE.kaki", "PALETTE.bg"):
+            with self.subTest(colour=name):
+                self.assertIn(name, source,
+                              "the console scene does not take its colours from the one palette")
+
+    def test_the_scenes_share_the_one_palette(self):
+        """Section 16.4: the scenes may not grow a second skin."""
+        expected = {token.replace("--gem-", ""): colour for token, colour in self._palette().items()}
+        source = TOON_MATERIAL.read_text(encoding="utf-8")
+        block = re.search(r"export const PALETTE = Object\.freeze\(\{(.*?)\}\);", source, re.S)
+        self.assertIsNotNone(block, "the shared palette module is missing")
+        found = dict(re.findall(r"(\w+):\s*(0x[0-9a-fA-F]{6})", block.group(1)))
+        self.assertTrue(found, "the shared palette module carries no colour")
+        self.assertEqual(set(found), set(expected),
+                         "the shared palette and the policy disagree on the colours")
+        for name, hex_value in sorted(found.items()):
+            with self.subTest(colour=name):
+                self.assertEqual(hex_value.lower().replace("0x", "#"),
+                                 expected[name].lower(),
+                                 f"{name} is not the colour of the policy")
 
     def test_the_console_has_a_scene_and_says_so_when_it_is_missing(self):
         html = CONSOLE_HTML.read_text(encoding="utf-8")
@@ -508,10 +589,10 @@ class ConsoleStyleBindingTests(unittest.TestCase):
                          "the backend is one light theme: a dark one would be a second palette")
         self.assertIn("color-scheme:light", block)
 
-    # --- section 12.2: the crystal cabinet --------------------------------
+    # --- section 12.2: the backend is the same sheet of paper ---------------
 
-    def test_the_backend_is_the_light_crystal_cabinet(self):
-        """Section 12.2: the backend is a pale, misty, crystal one - and only one."""
+    def test_the_backend_is_the_washi_paper(self):
+        """Section 12.2: the backend is one sheet of paper - and only one."""
         policy = self._policy_text()
         self.assertIn("浅色单主题", policy)
         for name, path in (("console", CONSOLE_CSS), ("account pages", ACCOUNT_PAGES)):
@@ -522,24 +603,21 @@ class ConsoleStyleBindingTests(unittest.TestCase):
                                  "a second theme would be a second palette")
                 self.assertRegex(css, r"color-scheme:\s*light",
                                  "the backend declares one light theme")
-                self.assertIn("var(--gem-air)", css, "the backend sits on the air layer")
+                self.assertIn("repeating-linear-gradient(", css,
+                              "the backend has no fibre texture")
 
-    def test_the_backend_has_the_three_halos(self):
-        """Section 12.2: three static halos behind the crystal."""
+    def test_the_backend_has_no_translucent_shell_and_no_halo(self):
+        """Sections 8 and 12.2: wabi-sabi is paper, not a translucent shell."""
         policy = self._policy_text()
-        self.assertIn("背景光晕", policy)
-        halos = ("--gem-halo-aqua", "--gem-halo-violet", "--gem-halo-topaz")
+        self.assertIn("没有玻璃层、没有背景光晕、没有背景模糊", policy)
         for name, path in (("console", CONSOLE_CSS), ("account pages", ACCOUNT_PAGES)):
             with self.subTest(surface=name):
                 css = path.read_text(encoding="utf-8")
-                self.assertIn("radial-gradient", css, "the backend has no halo")
-                for token in halos:
-                    self.assertIn(token, css, f"the halo {token} is missing")
-        # The halos are still: a drifting halo would be a loop animation.
-        for name, path in (("console", CONSOLE_CSS), ("account pages", ACCOUNT_PAGES)):
-            with self.subTest(surface=name):
-                css = path.read_text(encoding="utf-8")
-                self.assertNotIn("@keyframes", css, "the halos must stay still")
+                self.assertNotIn("backdrop-filter", css,
+                                 "the backend has a translucent shell; the policy forbids it")
+                self.assertNotIn("radial-gradient", css,
+                                 "the backend still carries a halo behind the page")
+                self.assertNotIn("@keyframes", css, "the page must stay still")
 
     # --- section 12.6: the first screen says a few phrases ---------------
 
@@ -582,6 +660,132 @@ class ConsoleStyleBindingTests(unittest.TestCase):
         scene = CONSOLE_SPACE.read_text(encoding="utf-8")
         self.assertIn("prefers-reduced-motion", scene)
         self.assertIn("lessMotion", scene)
+
+
+class WabiSabiConstraintTests(unittest.TestCase):
+    """Section 16.2: the five hard constraints, measured with the same ruler.
+
+    The policy writes them down with a method, a limit and a measured value.
+    This class is that ruler: it measures the palette of the policy and fails
+    when a colour drifts out of the bound.
+    """
+
+    PIGMENTS = ("--gem-ai", "--gem-fuji", "--gem-kaki", "--gem-koke", "--gem-sabi")
+    NEUTRALS = ("--gem-void", "--gem-bg", "--gem-panel", "--gem-facet",
+                "--gem-rim", "--gem-ink", "--gem-muted")
+    PAPER_FACES = ("--gem-bg", "--gem-panel", "--gem-facet")
+
+    def _palette(self):
+        policy = STYLE_POLICY.read_text(encoding="utf-8")
+        tokens = {}
+        for section in ("3.1", "3.2"):
+            tokens.update(dict(re.findall(r"\| `(--gem-[a-z0-9-]+)` \| `(#[0-9a-fA-F]{6})`",
+                                          _palette_section(policy, section))))
+        self.assertTrue(tokens, "the policy does not list any token")
+        return tokens
+
+    def test_item_1_no_pure_black_and_no_pure_white(self):
+        palette = self._palette()
+        for token, colour in sorted(palette.items()):
+            with self.subTest(token=token):
+                self.assertNotIn(colour.lower(), ("#000000", "#ffffff"),
+                                 "the palette has no pure black and no pure white")
+
+    def test_item_1_the_neutral_colours_are_warm(self):
+        palette = self._palette()
+        for token in self.NEUTRALS:
+            with self.subTest(token=token):
+                hue = _hsl(palette[token])[0]
+                self.assertTrue(25.0 <= hue <= 45.0,
+                                f"{token} has the hue {hue:.1f}: paper is not neutral")
+
+    def test_item_2_the_chroma_of_the_pigments_and_of_the_paper(self):
+        palette = self._palette()
+        for token in self.PIGMENTS:
+            with self.subTest(token=token):
+                self.assertLessEqual(_chroma(palette[token]), 50.0,
+                                     f"{token} is louder than a pigment may be")
+        for token in self.PAPER_FACES:
+            with self.subTest(token=token):
+                self.assertLessEqual(_chroma(palette[token]), 12.0,
+                                     f"{token} is more chromatic than paper may be")
+
+    def test_item_2_the_type_palette_stays_under_the_ceiling(self):
+        policy = STYLE_POLICY.read_text(encoding="utf-8")
+        table = re.search(r"### 4\.3 类型色板(.*?)(?:\n### |\Z)", policy, re.S)
+        self.assertIsNotNone(table, "the policy does not carry the type colour table")
+        rows = re.findall(r"\|\s*([a-z]+)\s*\|\s*`(#[0-9a-fA-F]{6})`", table.group(1))
+        self.assertTrue(rows, "the type colour table is empty")
+        for kind, colour in rows:
+            with self.subTest(kind=kind):
+                self.assertLessEqual(_chroma(colour), 50.0)
+
+    def test_item_3_the_three_paper_faces_are_close_in_lightness(self):
+        palette = self._palette()
+        faces = [_lightness(palette[token]) for token in self.PAPER_FACES]
+        self.assertLessEqual(max(faces) - min(faces), 8.0,
+                             "the layers of the paper come from the material, "
+                             "not from a strong contrast")
+
+    def test_item_5_the_text_and_the_control_boundaries_reach_the_floor(self):
+        palette = self._palette()
+        paper = palette["--gem-bg"]
+        for token in ("--gem-ink", "--gem-muted"):
+            with self.subTest(token=token):
+                self.assertGreaterEqual(_contrast(palette[token], paper), 4.5,
+                                        f"{token} does not carry body text on paper")
+        for token in ("--gem-muted", "--gem-ai"):
+            with self.subTest(token=token):
+                self.assertGreaterEqual(_contrast(palette[token], paper), 3.0,
+                                        f"{token} does not carry a control boundary")
+        # The rim is the weak tier: it may not be the boundary of a control.
+        self.assertLess(_contrast(palette["--gem-rim"], paper), 3.0)
+
+    def test_the_pigments_all_reach_the_body_text_floor(self):
+        palette = self._palette()
+        paper = palette["--gem-bg"]
+        for token in self.PIGMENTS:
+            with self.subTest(token=token):
+                self.assertGreaterEqual(_contrast(palette[token], paper), 4.5)
+
+
+class ToonMaterialBindingTests(unittest.TestCase):
+    """Sections 4.2, 13.1 and 13.2: the one material, drawn the way the policy
+    says - banded light, an opaque body and an ink line that is ink."""
+
+    def _source(self):
+        return TOON_MATERIAL.read_text(encoding="utf-8")
+
+    def test_the_body_is_opaque(self):
+        """Section 4.2: paper does not let the light through."""
+        source = self._source()
+        self.assertIn("transparent: false", source,
+                      "the crystal body is translucent; the policy forbids it")
+        self.assertNotIn("transparent: true", source,
+                         "the crystal body is translucent; the policy forbids it")
+
+    def test_the_dark_band_is_never_a_hole(self):
+        """Section 13.1: the dark band is 55% and never darker."""
+        source = self._source()
+        match = re.search(r"TOON_BAND_STEPS = Object\.freeze\(\[([^\]]+)\]\)", source)
+        self.assertIsNotNone(match, "the toon material carries no band table")
+        steps = [int(value.strip(), 16) for value in match.group(1).split(",")]
+        self.assertEqual(len(steps), 3, "the light is banded into three steps")
+        self.assertGreaterEqual(steps[0], 0x8c,
+                                "the dark band is darker than 55%: it reads as a hole")
+        self.assertEqual(steps[-1], 0xff, "the bright band is 100%")
+
+    def test_the_ink_line_is_the_ink(self):
+        """Section 13.2: the outline never takes a brighter step of the body."""
+        for name, path in (("axis viewer", AXIS_VIEWER),
+                           ("space viewer", SPACE_VIEWER),
+                           ("console scene", CONSOLE_SPACE)):
+            with self.subTest(renderer=name):
+                source = path.read_text(encoding="utf-8")
+                self.assertIn("PALETTE.ink", source,
+                              f"{name} does not draw the ink line with the ink")
+                self.assertNotIn("brighten(", source,
+                                 f"{name} still brightens the body colour into an edge")
 
 
 class UnityGesturePolicyTests(unittest.TestCase):

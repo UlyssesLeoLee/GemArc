@@ -268,14 +268,25 @@ test('the highlight marks the selected entity', () => {
   renderer.setHighlight({ nodeIds: ['n-b'], edgeIds: ['e-1'] });
   let alphaOpacity = null;
   let betaOpacity = null;
+  let alphaScale = null;
+  let betaScale = null;
   renderer.scene.traverse((object) => {
-    if (object.userData && object.userData.nodeId === 'n-a') alphaOpacity = object.material.opacity;
-    if (object.userData && object.userData.nodeId === 'n-b') betaOpacity = object.material.opacity;
+    if (object.userData && object.userData.nodeId === 'n-a') {
+      alphaOpacity = object.material.opacity;
+      alphaScale = object.children[0] ? object.children[0].scale.x : null;
+    }
+    if (object.userData && object.userData.nodeId === 'n-b') {
+      betaOpacity = object.material.opacity;
+      betaScale = object.children[0] ? object.children[0].scale.x : null;
+    }
   });
-  // The body of a crystal stays translucent in every state; the selection is
-  // carried by the edge, not by the opacity of the body.
-  assert.equal(alphaOpacity, 0.58, 'the entity that is not selected is dimmed');
-  assert.equal(betaOpacity, 0.88, 'the selected entity is drawn at full strength');
+  // The body of a crystal is solid in every state; the selection is carried
+  // by the ink line, which grows one step (BD-010 section 4.2).
+  assert.equal(alphaOpacity, 1, 'the body of a crystal is solid');
+  assert.equal(betaOpacity, 1, 'the body of a crystal is solid');
+  assert.ok(alphaScale !== null, 'the crystal has no ink line');
+  assert.ok(betaScale > alphaScale,
+            'the selected entity carries the heavier ink line');
   renderer.dispose();
 });
 

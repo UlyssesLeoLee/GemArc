@@ -67,11 +67,14 @@ test('the scene builds one crystal per tool and marks the selection', () => {
   assert.ok(record);
   // The body is a toon material with the shared gradient map.
   assert.equal(record.material.gradientMap.width, 3);
-  assert.equal(record.material.transparent, true);
+  // A crystal on paper is a solid shape (BD-010 section 4.2).
+  assert.equal(record.material.transparent, false);
 
   scene.setSelected('gemarc_model');
+  // The selection is carried by the ink line, which grows one step.
   assert.equal(record.edgeMaterial.opacity, 1);
-  assert.equal(scene.crystals.get('gemarc_brief').edgeMaterial.opacity, 0.8);
+  assert.ok(record.edge.scale.x > scene.crystals.get('gemarc_brief').edge.scale.x,
+            'the selected crystal carries the heavier ink line');
 });
 
 test('picking a crystal names the tool it stands for', () => {

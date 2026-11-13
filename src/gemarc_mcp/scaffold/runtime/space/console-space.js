@@ -17,17 +17,17 @@
  */
 
 import { UnityControls } from './unity-controls.js';
-import { createToonGradient, createToonMaterial } from './toon-material.js';
+import { createToonGradient, createToonMaterial, PALETTE } from './toon-material.js';
 
 /**
  * The colours of the tool surface. They are the palette of the policy:
- * a read tool is aqua, a write tool is topaz.
+ * a read tool is blue, a write tool is persimmon (section 12.4).
  * @type {Readonly<Record<string, number>>}
  */
 export const CONSOLE_SPACE_COLORS = Object.freeze({
-  read: 0x6fe3ff,
-  write: 0xffc46b,
-  background: 0x06090e,
+  read: PALETTE.ai,
+  write: PALETTE.kaki,
+  background: PALETTE.bg,
 });
 
 /**
@@ -106,21 +106,6 @@ export function layoutConsoleCrystals(tools, options = {}) {
 }
 
 /**
- * A brighter version of a colour: the bright edge of a crystal.
- *
- * @param {number} color the colour
- * @param {number} [amount] how much brighter
- * @returns {number} the brighter colour
- */
-export function brightenEdge(color, amount = 0.45) {
-  const red = (color >> 16) & 0xff;
-  const green = (color >> 8) & 0xff;
-  const blue = color & 0xff;
-  const mix = (part) => Math.min(255, Math.round(part + (255 - part) * amount));
-  return (mix(red) << 16) | (mix(green) << 8) | mix(blue);
-}
-
-/**
  * Build the scene.
  *
  * @param {object} THREE the three-dimensional library
@@ -193,12 +178,16 @@ export function createConsoleSpace(THREE, options = {}) {
   const root = new THREE.Group();
   scene.add(root);
 
-  const ambient = new THREE.AmbientLight(0xffffff, 0.66);
+  // The ratios of section 4.5 (0.75 / 0.55 / 0.25) times one scale: the
+  // three-dimensional library divides the light by pi, so without the scale a
+  // pigment would arrive on the paper at a third of its own colour.
+  const ambient = new THREE.AmbientLight(0xfaf2e2, 0.75 * 2.1);
   scene.add(ambient);
-  const key = new THREE.DirectionalLight(0xffffff, 0.8);
+  const key = new THREE.DirectionalLight(0xfff8ee, 0.55 * 2.1);
   key.position.set(1, 2.4, 1.4);
   scene.add(key);
-  const fill = new THREE.DirectionalLight(CONSOLE_SPACE_COLORS.read, 0.3);
+  // The fill is the bounce of the paper: warm, never cold blue (section 4.5).
+  const fill = new THREE.DirectionalLight(PALETTE.facet, 0.25 * 2.1);
   fill.position.set(-1.4, 0.8, -1.1);
   scene.add(fill);
 
@@ -227,7 +216,6 @@ export function createConsoleSpace(THREE, options = {}) {
       const geometry = new THREE.OctahedronGeometry(CONSOLE_SPACE_CONSTANTS.crystalSize, 0);
       const material = createToonMaterial(THREE, {
         color: plan.color,
-        opacity: 0.68,
         gradient,
         // The self-light of the crystal: this is the only thing that breathes
         // (section 13.3). No new texture, no new shader.
@@ -240,13 +228,10 @@ export function createConsoleSpace(THREE, options = {}) {
       root.add(mesh);
       pickTargets.push(mesh);
 
-      // The ink line is the crystal's own edge: no second outline pass.
+      // The ink line is the crystal's own edge: no second outline pass. The
+      // ink is the ink, never a brighter step of the body colour (section 13.2).
       const edgeGeometry = new THREE.EdgesGeometry(geometry);
-      const edgeMaterial = new THREE.LineBasicMaterial({
-        color: brightenEdge(plan.color, 0.5),
-        transparent: true,
-        opacity: 0.8,
-      });
+      const edgeMaterial = new THREE.LineBasicMaterial({ color: PALETTE.ink });
       const edge = new THREE.LineSegments(edgeGeometry, edgeMaterial);
       mesh.add(edge);
 
@@ -256,6 +241,7 @@ export function createConsoleSpace(THREE, options = {}) {
         material,
         edgeGeometry,
         edgeMaterial,
+        edge,
         color: plan.color,
         // The phase of this crystal in the turn and in the breath. It comes
         // from the place of the crystal, so it never changes between two runs.
@@ -274,9 +260,11 @@ export function createConsoleSpace(THREE, options = {}) {
   function markSelection() {
     for (const [name, record] of crystals) {
       const active = name === selected;
-      // The body stays transparent; the selection is carried by the edge.
-      record.material.opacity = active ? 0.88 : 0.68;
-      record.edgeMaterial.opacity = active ? 1 : 0.8;
+      // The body keeps its colour and stays solid; the selection is carried
+      // by the ink line, which grows one step (section 4.2).
+      record.material.opacity = 1;
+      record.edgeMaterial.opacity = 1;
+      if (record.edge) record.edge.scale.setScalar(active ? 1.12 : 1);
     }
   }
 

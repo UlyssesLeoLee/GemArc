@@ -37,7 +37,7 @@ import { RELATION_CLASS_IDS, relationClassSpec } from '../core/vocab.js';
 import { treatmentForRelationClass } from '../focus/retreat-animation.js';
 import { SpaceModel } from './space-model.js';
 import { UnityControls, boundsOfPoints } from './unity-controls.js';
-import { createToonGradient, createToonMaterial } from './toon-material.js';
+import { createToonGradient, createToonMaterial, mixToward, PALETTE } from './toon-material.js';
 
 /**
  * The diagnostic codes this module raises.
@@ -76,35 +76,49 @@ export const LAYOUT_CONSTANTS = Object.freeze({
 });
 
 /**
- * The colours of the relationship lines. A trust boundary edge is always
- * visually distinct from an ordinary edge.
+ * The colours of the relationship lines.
+ *
+ * They are the pigments of the policy, one meaning each: the tea ink for a
+ * relation inside the same room, the three step pigments for the three
+ * kinds of crossing, the weak rim for a relation that is not placed yet, and
+ * the rust for a trust boundary - a boundary is a line that crosses the edge
+ * of something, and rust is the colour the policy reserves for exactly that
+ * (BD-010 section 3.2). A trust boundary is dashed as well, so the shape
+ * carries the fact too.
  */
 const EDGE_COLORS = Object.freeze({
-  'same-room': 0x7f8fa6,
-  'cross-room': 0x6bd68a,
-  'cross-floor': 0x6fe3ff,
-  'cross-building': 0xb78cff,
-  'unassigned': 0x93a6bd,
-  'trust-boundary': 0xffc46b,
+  'same-room': 0x6e6354,
+  'cross-room': 0x5f5573,
+  'cross-floor': 0x3d5a72,
+  'cross-building': 0x96501f,
+  'unassigned': 0xa89a7c,
+  'trust-boundary': 0x8a3a2c,
 });
 
-const NODE_COLOR = 0x6fe3ff;
-const NODE_COLOR_HIGHLIGHT = 0xffc46b;
-const CONTAINER_COLOR = 0x2c3d52;
-const CONTAINER_COLOR_VIRTUAL = 0x44536b;
 /**
- * The body of a crystal is never fully opaque (BD-010 section 4.2). The
- * retreat still decides how strong the emphasis is; it only scales this
- * value, so the body keeps its translucency in every state.
+ * The body of a crystal in this scene. It is the blue of the policy; the
+ * selection never changes it (BD-010 section 3.2 and 4.2).
  */
-const CRYSTAL_BODY_OPACITY = 0.62;
+const NODE_COLOR = 0x3d5a72;
+/**
+ * The ink line of a crystal, and the colour of the wire frames that hold the
+ * building together.
+ */
+const CONTAINER_COLOR = 0x6e6354;
+const CONTAINER_COLOR_VIRTUAL = 0xa89a7c;
+/**
+ * The body of a crystal is solid: a crystal on paper is a cut shape, not a
+ * lump of translucent material (BD-010 section 4.2). The retreat therefore
+ * draws a crystal in a colour that is closer to the paper, and the retreat
+ * never moves real coordinates.
+ */
 const OUTLINE_STRENGTH = Object.freeze({
   strong: { opacity: 1, scale: 1.42 },
   normal: { opacity: 0.8, scale: 1.22 },
-  weak: { opacity: 0.35, scale: 1.1 },
+  weak: { opacity: 0.5, scale: 1.1 },
   // A crystal keeps a hint of its edge even when it steps back: without the
   // edge it stops being a crystal and becomes a colored blob.
-  none: { opacity: 0.18, scale: 1 },
+  none: { opacity: 0.35, scale: 1 },
 });
 
 const LINE_WEIGHT_SCALE = Object.freeze({
@@ -831,8 +845,8 @@ function createWebGLContext(canvas) {
  */
 function createLabel(THREE, text, options = {}) {
   if (typeof document === 'undefined' || typeof document.createElement !== 'function') return null;
-  const color = options.color || '#e6eef7';
-  const background = options.background || 'rgba(11,15,20,0.82)';
+  const color = options.color || '#2e2a24';
+  const background = options.background || 'rgba(244, 237, 223, 0.92)';
   const fontSize = 44;
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d');
@@ -939,7 +953,7 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
   renderer.setPixelRatio(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x06090e);
+  scene.background = new THREE.Color(PALETTE.bg);
 
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 6000);
   // The camera and the selection follow the Unity gestures. The mapping is
@@ -959,12 +973,16 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
     getSelectionBounds: () => selectionBounds(),
   });
 
-  const ambient = new THREE.AmbientLight(0xffffff, 0.62);
+  // The ratios of section 4.5 (0.75 / 0.55 / 0.25) times one scale: the
+  // three-dimensional library divides the light by pi, so without the scale a
+  // pigment would arrive on the paper at a third of its own colour.
+  const ambient = new THREE.AmbientLight(0xfaf2e2, 0.75 * 2.1);
   scene.add(ambient);
-  const key = new THREE.DirectionalLight(0xffffff, 0.78);
+  const key = new THREE.DirectionalLight(0xfff8ee, 0.55 * 2.1);
   key.position.set(1, 2.4, 1.4);
   scene.add(key);
-  const fill = new THREE.DirectionalLight(0x4cc2ff, 0.28);
+  // The fill is the bounce of the paper: warm, never cold blue (section 4.5).
+  const fill = new THREE.DirectionalLight(PALETTE.facet, 0.25 * 2.1);
   fill.position.set(-1.4, 0.8, -1.1);
   scene.add(fill);
 
@@ -1094,7 +1112,7 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
       plate = makePlate(
         THREE,
         { x: record.size.x, y: Math.max(0.2, record.size.y), z: record.size.z },
-        virtual ? 0x182030 : 0x1b2532,
+        virtual ? 0xa89a7c : 0xe6dac6,
         0.75,
       );
       plate.position.copy(frame.position);
@@ -1105,7 +1123,7 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
     // explicitly, so a virtual organisation never masquerades as a real one.
     const suffix = virtual ? '（未声明语义来源）' : '';
     const label = createLabel(THREE, `${record.name}${suffix}`, {
-      color: virtual ? '#93a6bd' : '#e6eef7',
+      color: virtual ? '#6e6354' : '#2e2a24',
       height: record.level === 'Room' ? 3.0 : 4.2,
     });
     if (label) {
@@ -1148,7 +1166,6 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
     track(geometry);
     const material = createToonMaterial(THREE, {
       color: NODE_COLOR,
-      opacity: CRYSTAL_BODY_OPACITY,
       gradient: toonGradient,
     });
     track(material);
@@ -1158,7 +1175,7 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
     const outlineGeometry = new THREE.EdgesGeometry(geometry);
     track(outlineGeometry);
     const outlineMaterial = new THREE.LineBasicMaterial({
-      color: 0xe6eef7,
+      color: PALETTE.ink,
       transparent: true,
       opacity: 0,
     });
@@ -1396,11 +1413,12 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
       const treatment = treatments[nodeId] || null;
       const isHighlighted = highlight.nodeIds.has(nodeId);
       const opacity = treatment?.opacity ?? 1;
-      // The retreat scales the translucency of the body; it never makes the
-      // crystal opaque again.
-      record.material.opacity = opacity * CRYSTAL_BODY_OPACITY;
-      record.material.transparent = true;
-      record.material.color.setHex(isHighlighted ? NODE_COLOR_HIGHLIGHT : NODE_COLOR);
+      // The body is solid. The retreat draws a crystal in a colour that is
+      // closer to the paper - the way a drawing puts an unimportant shape in
+      // a lighter ink instead of making it see-through (BD-010 section 4.2).
+      record.material.opacity = 1;
+      record.material.transparent = false;
+      record.material.color.setHex(mixToward(NODE_COLOR, PALETTE.bg, 1 - opacity));
 
       const outlineName = treatment?.outline
         || (isHighlighted ? 'strong' : 'none');

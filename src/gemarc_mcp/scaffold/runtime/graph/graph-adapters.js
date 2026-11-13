@@ -344,8 +344,8 @@ export function createSigmaRendererAdapter(Sigma, options = {}) {
     labelDensity: 0.07,
     labelGridCellSize: 60,
     labelRenderedSizeThreshold: 6,
-    defaultNodeColor: '#8899aa',
-    defaultEdgeColor: '#ccddee',
+    defaultNodeColor: '#6e6354',
+    defaultEdgeColor: '#a89a7c',
     zIndex: true,
     ...options,
   };
@@ -388,7 +388,7 @@ export function createThreeRendererAdapter(THREE, options = {}) {
   if (!THREE) {
     throw new GemArcError('GEMARC_GRAPH_004', 'Three 适配器缺少 Three 实例');
   }
-  const defaults = { radius: 12, color: 0x8899aa, edgeColor: 0xccddee, ...options };
+  const defaults = { radius: 12, color: 0x6e6354, edgeColor: 0xa89a7c, ...options };
   return {
     name: 'three',
     available: true,

@@ -404,7 +404,7 @@ def create_server(toolset: str | None = None):
                     "4D 仅使用真实事件或显式假设场景；5D 只能根据确认的规则做计算（gemarc_simulate）；"
                     "6D 的执行图只写契约与门禁，不要声称会真的执行。"
                     "最后调用 gemarc_render 取得 data/*.json 与固定件下载地址，"
-                    "做一次整体 UI/UX 优化（硬规则：风格基准是美漫卡通渲染的宝石主题，"
+                    "做一次整体 UI/UX 优化（硬规则：风格基准是和紙墨描的宝石主题，"
                     "固定件已预置这一版主题），并说明哪些浏览器能力未经测试。")
         return (f"{target}{lead}再调用 gemarc_brief 取得精简工作指令、槽位清单与词表，"
                 "不要自行发明字段名、证据等级说法或引擎。"
@@ -412,7 +412,7 @@ def create_server(toolset: str | None = None):
                 "建立一个统一 Architecture Model，未确定事实标为 unknown/assumed；调用 gemarc_validate。"
                 "禁止重写现成 Viewer 共通代码；4D 仅使用真实事件或显式假设场景；5D 只能根据确认的规则做计算。"
                 "生成后运行 gemarc_build、gemarc_verify，做一次整体 UI/UX 优化"
-                "（硬规则：风格基准是美漫卡通渲染的宝石主题，固定件已预置这一版主题），"
+                "（硬规则：风格基准是和紙墨描的宝石主题，固定件已预置这一版主题），"
                 "审查未测试的浏览器能力并说明限制。")
 
     return app

@@ -62,12 +62,12 @@ function render2D(el){head('节点与依赖关系','2D / GRAPH VIEW');const wrap
  views.forEach(v=>{let o=node('option','',select,v.title||v.id);o.value=v.id});const holder=node('div','',wrapper);
  function draw(){clear(holder);const view=views.find(v=>v.id===select.value)||views[0];const nodes=current().nodes.filter(n=>!view.nodeIds||view.nodeIds.includes(n.id));const edges=current().edges.filter(e=>nodes.some(n=>n.id===esrc(e))&&nodes.some(n=>n.id===etgt(e))&&(!view.edgeKinds||view.edgeKinds.includes(etype(e))));
  const {pos,width,height}=graphLayout(nodes,edges);const root=svg('svg',holder,{viewBox:`0 0 ${width} ${height}`,class:'chart',role:'img','aria-label':'架构节点依赖图'});
- const defs=svg('defs',root);const marker=svg('marker',defs,{id:'arr',markerWidth:10,markerHeight:8,refX:10,refY:4,orient:'auto'});svg('path',marker,{d:'M0,0 L10,4 L0,8 Z',fill:'#5b9bb8'});
+ const defs=svg('defs',root);const marker=svg('marker',defs,{id:'arr',markerWidth:10,markerHeight:8,refX:10,refY:4,orient:'auto'});svg('path',marker,{d:'M0,0 L10,4 L0,8 Z',fill:'#3d5a72'});
  edges.forEach(e=>{const a=pos[esrc(e)],b=pos[etgt(e)];if(!a||!b)return;const focus=state.selectedIds.has(esrc(e))||state.selectedIds.has(etgt(e));const route=a.x===b.x?`M${a.x+46} ${a.y+15} L${b.x+46} ${b.y-18}`:`M${a.x+74} ${a.y} C${a.x+115} ${a.y} ${b.x-115} ${b.y} ${b.x-74} ${b.y}`;
  svg('path',root,{d:route,class:'edge'+(focus?' focus':''),'marker-end':'url(#arr)'});
  let x=(a.x+b.x)/2,y=(a.y+b.y)/2-10;svg('text',root,{x,y,class:'edge-label','text-anchor':'middle'},e.description||etype(e)||e.id);
  });
- nodes.forEach(n=>{const p=pos[n.id],g=svg('g',root,{class:'node'+(state.selectedIds.has(n.id)?' selected':''),tabindex:0,role:'button','aria-label':n.name});svg('rect',g,{x:p.x-74,y:p.y-28,width:148,height:57,rx:10});svg('text',g,{x:p.x,y:p.y-1,'text-anchor':'middle'},n.name.length>12?n.name.slice(0,11)+'…':n.name);svg('text',g,{x:p.x,y:p.y+17,'text-anchor':'middle',fill:'#9baec9','font-size':10},n.id.length>20?n.id.slice(0,19)+'…':n.id);
+ nodes.forEach(n=>{const p=pos[n.id],g=svg('g',root,{class:'node'+(state.selectedIds.has(n.id)?' selected':''),tabindex:0,role:'button','aria-label':n.name});svg('rect',g,{x:p.x-74,y:p.y-28,width:148,height:57,rx:10});svg('text',g,{x:p.x,y:p.y-1,'text-anchor':'middle'},n.name.length>12?n.name.slice(0,11)+'…':n.name);svg('text',g,{x:p.x,y:p.y+17,'text-anchor':'middle',fill:'#6e6354','font-size':10},n.id.length>20?n.id.slice(0,19)+'…':n.id);
  const selectNode=()=>{state.selectedIds=new Set([n.id]);state.selected=n.id;draw();renderInspector()};g.addEventListener('click',selectNode);g.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();selectNode()}})});
  node('p','muted small',holder,`节点 ${nodes.length} · 关系 ${edges.length} · 单击实体可在不同维度保持选中 ID`);
  }

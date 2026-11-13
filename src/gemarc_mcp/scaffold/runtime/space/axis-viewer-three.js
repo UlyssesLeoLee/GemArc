@@ -40,7 +40,7 @@
  */
 
 import { UnityControls, boundsOfPoints } from './unity-controls.js';
-import { createToonGradient, createToonMaterial } from './toon-material.js';
+import { createToonGradient, createToonMaterial, PALETTE } from './toon-material.js';
 
 /**
  * The diagnostic codes this module raises.
@@ -88,33 +88,37 @@ export const AXIS_DIRECTIONS = Object.freeze({
 
 /**
  * One colour per axis, so a reader can tell the three directions apart.
+ * The three axes take the three pigments of BD-010 section 4.4: blue for X,
+ * wisteria for Y and persimmon for Z.
  * @type {Readonly<Record<string, number>>}
  */
 export const AXIS_COLORS = Object.freeze({
-  x: 0x6fe3ff,
-  y: 0xb78cff,
-  z: 0xffc46b,
+  x: 0x3d5a72,
+  y: 0x5f5573,
+  z: 0x96501f,
 });
 
 /**
- * One colour per entity kind of the Three.js architecture contract.
+ * One colour per entity kind of the Three.js architecture contract. The
+ * table is the one of BD-010 section 4.3: the same pigments as the rest of
+ * the product, in a light and a dark step of each.
  * @type {Readonly<Record<string, number>>}
  */
 export const KIND_COLORS = Object.freeze({
-  actor: 0xff9a8b,
-  system: 0x6fb3ff,
-  service: 0xffc46b,
-  process: 0xd59bff,
-  module: 0x9ad36f,
-  runtime: 0xc9d1d9,
-  database: 0x7fb0ff,
-  external: 0x8a94a6,
-  gateway: 0xffd166,
-  plugin: 0xc8f06a,
-  security: 0xff7b9c,
-  operations: 0x7fd1ff,
-  data: 0x7fe3d4,
-  storage: 0xc0a6ff,
+  actor: 0xb4654a,
+  system: 0x3d5a72,
+  service: 0x96501f,
+  process: 0x5f5573,
+  module: 0x56663a,
+  runtime: 0x8c8271,
+  database: 0x4c6e7a,
+  external: 0x8f8577,
+  gateway: 0xa9762f,
+  plugin: 0x6e7b45,
+  security: 0x8a3a2c,
+  operations: 0x7e8b93,
+  data: 0x5a7566,
+  storage: 0x6b5f7e,
 });
 
 /**
@@ -122,7 +126,40 @@ export const KIND_COLORS = Object.freeze({
  * muted: an unregistered kind is not the same thing as a known one.
  * @type {number}
  */
-export const UNKNOWN_KIND_COLOR = 0x8d97a3;
+export const UNKNOWN_KIND_COLOR = 0x9c927f;
+
+/**
+ * The ink the drawing is made of. Every crystal is outlined with it, and the
+ * outline never takes the colour of the body (BD-010 section 13.2).
+ * @type {number}
+ */
+export const INK_COLOR = PALETTE.ink;
+
+/**
+ * The paper the scene is drawn on. It is the same sheet as the page around
+ * the canvas (BD-010 section 5 and 16.4).
+ * @type {number}
+ */
+export const PAPER_COLOR = PALETTE.bg;
+
+/**
+ * The light of the drawing: an ambient light, a key light and a warm fill
+ * that is the bounce of the paper. There is no cold blue fill any more
+ * (BD-010 section 4.5).
+ *
+ * The three intensities are the ratios of section 4.5 (0.75 / 0.55 / 0.25)
+ * times one scale: the three-dimensional library divides the light by pi, so
+ * without the scale a pigment would arrive on the paper at a third of its own
+ * colour and the crystal would read as a brown blob instead of as a shape
+ * painted in that pigment.
+ */
+const LIGHT_AMBIENT = 0xfaf2e2;
+const LIGHT_KEY = 0xfff8ee;
+const LIGHT_FILL = PALETTE.facet;
+const LIGHT_SCALE = 2.1;
+const LIGHT_AMBIENT_INTENSITY = 0.75 * LIGHT_SCALE;
+const LIGHT_KEY_INTENSITY = 0.55 * LIGHT_SCALE;
+const LIGHT_FILL_INTENSITY = 0.25 * LIGHT_SCALE;
 
 /**
  * The golden angle. Entities that share a cell are spread along a spiral
@@ -350,21 +387,6 @@ export function kindColor(kind) {
 }
 
 /**
- * A brighter version of a colour: the edge of a crystal is always brighter
- * than its body.
- * @param {number} color the colour
- * @param {number} amount how much white is mixed in, 0 to 1
- * @returns {number} the brighter colour
- */
-export function brighten(color, amount = 0.45) {
-  const red = (color >> 16) & 0xff;
-  const green = (color >> 8) & 0xff;
-  const blue = color & 0xff;
-  const mix = (channel) => Math.round(channel + (255 - channel) * amount);
-  return (mix(red) << 16) | (mix(green) << 8) | mix(blue);
-}
-
-/**
  * Draw a text label as a sprite.
  * @param {object} THREE the injected three namespace
  * @param {string} text the label text
@@ -373,8 +395,8 @@ export function brighten(color, amount = 0.45) {
  */
 function createLabel(THREE, text, options = {}) {
   if (typeof document === 'undefined' || typeof document.createElement !== 'function') return null;
-  const color = options.color || '#e6eef7';
-  const background = options.background || 'rgba(6,9,14,0.82)';
+  const color = options.color || '#2e2a24';
+  const background = options.background || 'rgba(244, 237, 223, 0.92)';
   const fontSize = 44;
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d');
@@ -515,7 +537,7 @@ export function createThreeAxisRenderer(THREE, options = {}) {
   renderer.setPixelRatio(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x06090e);
+  scene.background = new THREE.Color(PAPER_COLOR);
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 6000);
   // The camera and the selection follow the Unity gestures. The mapping is
   // shared with the space scene, so the two can never disagree.
@@ -535,12 +557,14 @@ export function createThreeAxisRenderer(THREE, options = {}) {
     getSelectionBounds: () => selectionBounds(),
   });
 
-  const ambient = new THREE.AmbientLight(0xffffff, 0.66);
+  const ambient = new THREE.AmbientLight(LIGHT_AMBIENT, LIGHT_AMBIENT_INTENSITY);
   scene.add(ambient);
-  const key = new THREE.DirectionalLight(0xffffff, 0.8);
+  const key = new THREE.DirectionalLight(LIGHT_KEY, LIGHT_KEY_INTENSITY);
   key.position.set(1, 2.4, 1.4);
   scene.add(key);
-  const fill = new THREE.DirectionalLight(0x4cc2ff, 0.3);
+  // The fill is the bounce of the paper: it is warm, and there is no cold
+  // blue light anywhere in the scene (BD-010 section 4.5).
+  const fill = new THREE.DirectionalLight(LIGHT_FILL, LIGHT_FILL_INTENSITY);
   fill.position.set(-1.4, 0.8, -1.1);
   scene.add(fill);
 
@@ -563,7 +587,7 @@ export function createThreeAxisRenderer(THREE, options = {}) {
 
   for (const plan of layout.axes) {
     const direction = AXIS_DIRECTIONS[plan.key];
-    const color = AXIS_COLORS[plan.key] || 0x9aa5b1;
+    const color = AXIS_COLORS[plan.key] || PALETTE.rim;
     const from = plan.first - constants.axisMargin;
     const to = plan.last + constants.axisMargin;
     const length = to - from;
@@ -575,7 +599,7 @@ export function createThreeAxisRenderer(THREE, options = {}) {
       direction.z ? length : constants.axisThickness,
     );
     track(geometry);
-    const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85 });
+    const material = new THREE.MeshBasicMaterial({ color });
     track(material);
     const bar = new THREE.Mesh(geometry, material);
     bar.position.set(direction.x * mid, direction.y * mid, direction.z * mid);
@@ -588,7 +612,7 @@ export function createThreeAxisRenderer(THREE, options = {}) {
         direction.z ? constants.tickLength : constants.axisThickness * 2,
       );
       track(tickGeometry);
-      const tickMaterial = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95 });
+      const tickMaterial = new THREE.MeshBasicMaterial({ color });
       track(tickMaterial);
       const tick = new THREE.Mesh(tickGeometry, tickMaterial);
       tick.position.set(
@@ -600,7 +624,7 @@ export function createThreeAxisRenderer(THREE, options = {}) {
 
       const label = createLabel(THREE, slot.value, {
         height: constants.valueLabelHeight,
-        color: '#e6eef7',
+        color: '#2e2a24',
       });
       if (label) {
         label.position.set(
@@ -643,12 +667,11 @@ export function createThreeAxisRenderer(THREE, options = {}) {
   for (const node of layout.nodes) {
     const color = kindColor(node.kind);
     // A crystal is a cut polyhedron, not a ball: the cut planes are what
-    // catch the light, and the bright edge is what makes it read as a gem.
+    // catch the light, and the ink line is what makes it read as a crystal.
     const geometry = new THREE.OctahedronGeometry(constants.nodeSize * 0.74, 0);
     track(geometry);
     const material = createToonMaterial(THREE, {
       color,
-      opacity: 0.62,
       gradient: toonGradient,
     });
     track(material);
@@ -660,11 +683,9 @@ export function createThreeAxisRenderer(THREE, options = {}) {
 
     const outlineGeometry = new THREE.EdgesGeometry(geometry);
     track(outlineGeometry);
-    const outlineMaterial = new THREE.LineBasicMaterial({
-      color: brighten(color, 0.5),
-      transparent: true,
-      opacity: 0.8,
-    });
+    // The ink line is the ink: it never takes a brighter step of the body
+    // colour (BD-010 section 4.2 and 13.2).
+    const outlineMaterial = new THREE.LineBasicMaterial({ color: INK_COLOR });
     track(outlineMaterial);
     const outline = new THREE.LineSegments(outlineGeometry, outlineMaterial);
     mesh.add(outline);
@@ -675,7 +696,7 @@ export function createThreeAxisRenderer(THREE, options = {}) {
       mesh.add(label);
     }
 
-    nodeRecords.set(node.id, { node, mesh, material, outlineMaterial, baseColor: color });
+    nodeRecords.set(node.id, { node, mesh, material, outline, outlineMaterial, baseColor: color });
   }
 
   for (const edge of layout.edges) {
@@ -688,10 +709,13 @@ export function createThreeAxisRenderer(THREE, options = {}) {
       true,
     );
     track(geometry);
+    // A relation is a thin tube in the ink of the tea colour. It is the one
+    // shape that stays translucent: it is a line, not a body
+    // (BD-010 section 4.1 and 4.2).
     const material = new THREE.MeshBasicMaterial({
-      color: 0x7f8fa6,
+      color: PALETTE.muted,
       transparent: true,
-      opacity: 0.42,
+      opacity: 0.55,
     });
     track(material);
     const mesh = new THREE.Mesh(geometry, material);
@@ -848,15 +872,17 @@ export function createThreeAxisRenderer(THREE, options = {}) {
     highlight = { nodeIds, edgeIds };
     for (const [id, record] of nodeRecords) {
       const active = nodeIds.has(id);
-      // The body stays transparent; the selection is carried by the edge,
-      // which is the brightest line of the crystal.
-      record.material.opacity = active ? 0.88 : 0.58;
-      record.outlineMaterial.opacity = active ? 1 : 0.75;
+      // The body keeps its colour and stays solid; the selection is carried
+      // by the ink line, which grows one step when the entity is selected
+      // (BD-010 section 4.2).
+      record.material.opacity = 1;
+      record.outlineMaterial.opacity = active ? 1 : 0.85;
+      record.outline.scale.setScalar(active ? 1.12 : 1);
     }
     for (const [id, record] of edgeRecords) {
       const active = edgeIds.has(id);
-      record.material.opacity = active ? 0.95 : 0.42;
-      record.material.color = active ? 0x6fe3ff : 0x7f8fa6;
+      record.material.opacity = active ? 0.95 : 0.55;
+      record.material.color = active ? PALETTE.ai : PALETTE.muted;
     }
   }
 

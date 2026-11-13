@@ -101,64 +101,59 @@ def unavailable(code: str = "GEMARC_ACCT_001", *, hsts: bool = False, retry_afte
 CSS = """
 /* The gem theme of BD-010 (UI style policy). The account page and the operator
    area are the same product as the site and the console: one palette, the
-   tokens of section 3. The backend is the crystal cabinet of section 12.2 - a
-   pale, misty air layer, three static halos, crystal panes with one bright edge
-   and one very light shadow. The theme is light and it does not follow the
-   system preference: a second dark palette would be a second set of
-   near-duplicate colours. */
+   tokens of section 3. The backend stands on the same sheet of washi as the
+   site (section 12.2) - a warm paper, an ink line on every edge, one hard
+   offset shadow, and no translucent shell and no halo. The theme is light and it does not
+   follow the system preference: a second dark palette would be a second set
+   of near-duplicate colours. */
 :root {
   color-scheme:light;
-  /* The dark band of section 3.1 is the shared palette of the site and the three-dimensional
-     scene; the backend adds the light band of section 3.2. Both bands are the one colour
-     source (section 3), so the account pages carry both. */
-  --gem-void:#06090e;--gem-bg:#0b0f16;--gem-panel:#111823;--gem-facet:#1b2635;--gem-rim:#2c3d52;
-  --gem-ink:#e6eef7;--gem-muted:#93a6bd;--gem-aqua:#6fe3ff;--gem-violet:#b78cff;--gem-topaz:#ffc46b;
-  --gem-emerald:#6bd68a;--gem-ruby:#ff6b8a;
-  --gem-air:#e9eff8;--gem-sheen:#ffffff;--gem-halo-aqua:#c9ecf7;--gem-halo-violet:#ded3fb;
-  --gem-halo-topaz:#ffe6c4;--gem-ink-deep:#16233a;--gem-muted-deep:#5a6b84;--gem-aqua-deep:#0c6d84;
-  --gem-topaz-deep:#96601a;--gem-emerald-deep:#2a7048;--gem-ruby-deep:#a8324f}
-body{margin:0;min-height:100vh;color:var(--gem-ink-deep);font:16px/1.65 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-background:radial-gradient(52rem 32rem at 2% -12%,color-mix(in srgb,var(--gem-halo-aqua) 60%,transparent),transparent 68%),
-radial-gradient(44rem 30rem at 100% 0%,color-mix(in srgb,var(--gem-halo-violet) 52%,transparent),transparent 70%),
-radial-gradient(58rem 38rem at 48% 116%,color-mix(in srgb,var(--gem-halo-topaz) 48%,transparent),transparent 72%),
-var(--gem-air);background-attachment:fixed}
+  /* The paper and the ink (section 3.1). */
+  --gem-void:#d6c9ae;--gem-bg:#ebe1ce;--gem-panel:#f4eddf;--gem-facet:#e6dac6;--gem-rim:#a89a7c;
+  --gem-ink:#2e2a24;--gem-muted:#6e6354;
+  /* The pigments (section 3.2). */
+  --gem-ai:#3d5a72;--gem-fuji:#5f5573;--gem-kaki:#96501f;--gem-koke:#56663a;--gem-sabi:#8a3a2c}
+body{margin:0;min-height:100vh;color:var(--gem-ink);font:16px/1.65 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+background-color:var(--gem-bg);
+background-image:repeating-linear-gradient(45deg,color-mix(in srgb,var(--gem-rim) 12%,transparent) 0 1px,transparent 1px 15px),
+repeating-linear-gradient(-45deg,color-mix(in srgb,var(--gem-rim) 8%,transparent) 0 1px,transparent 1px 23px);
+background-attachment:fixed}
 main{max-width:46rem;margin:0 auto;padding:2.2rem 16px 3.4rem}
 h1{font-size:1.45rem;margin:.2rem 0 1rem;letter-spacing:-.01em}
 /* The brand mark: a crystal, and only in the title (section 12.3). */
-h1::before{content:"◆";color:var(--gem-aqua-deep);font-size:.72em;margin-right:.5rem;vertical-align:.1em}
-h2{font-size:1.08rem;margin:2.2rem 0 .7rem;color:var(--gem-ink-deep)}
+h1::before{content:"◆";color:var(--gem-ai);font-size:.72em;margin-right:.5rem;vertical-align:.1em}
+h2{font-size:1.08rem;margin:2.2rem 0 .7rem;color:var(--gem-ink)}
 ul{margin:.5rem 0 .3rem;padding-left:1.15rem}
 li{margin:.3rem 0}
-.card{background:color-mix(in srgb,var(--gem-sheen) 64%,transparent);border:1px solid color-mix(in srgb,var(--gem-sheen) 74%,var(--gem-rim));
-border-radius:12px;padding:1.1rem 1.2rem;margin:1rem 0;
-box-shadow:0 1px 2px color-mix(in srgb,var(--gem-ink-deep) 9%,transparent),inset 0 1px 0 color-mix(in srgb,var(--gem-sheen) 86%,transparent);
-backdrop-filter:blur(16px) saturate(1.15);-webkit-backdrop-filter:blur(16px) saturate(1.15)}
-.mute{color:var(--gem-muted-deep);font-size:.9rem}.bad{color:var(--gem-ruby-deep)}.ok{color:var(--gem-emerald-deep)}
-a{color:var(--gem-aqua-deep)}
-.btn,button{display:inline-block;background:color-mix(in srgb,var(--gem-sheen) 72%,transparent);color:var(--gem-ink-deep);
-border:1px solid color-mix(in srgb,var(--gem-ink-deep) 18%,transparent);border-radius:8px;padding:.5rem 1rem;font:inherit;cursor:pointer;text-decoration:none;
-box-shadow:inset 0 1px 0 color-mix(in srgb,var(--gem-sheen) 90%,transparent);transition:border-color .12s ease,color .12s ease}
-.btn:hover,button:hover{border-color:var(--gem-aqua-deep);color:var(--gem-aqua-deep)}
-.btn:active,button:active{background:color-mix(in srgb,var(--gem-air) 72%,transparent)}
-button:focus-visible,.btn:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--gem-aqua-deep);outline-offset:1px}
-button.danger{border-color:var(--gem-ruby-deep);color:var(--gem-ruby-deep)}button.danger:hover{background:color-mix(in srgb,var(--gem-sheen) 72%,transparent)}
-button.plain{color:var(--gem-aqua-deep)}button.plain:hover{color:var(--gem-aqua-deep)}
-input,select{font:inherit;padding:.45rem .6rem;border:1px solid color-mix(in srgb,var(--gem-ink-deep) 15%,transparent);
-border-radius:6px;background:var(--gem-sheen);color:var(--gem-ink-deep);max-width:100%}
-label{display:block;margin:.6rem 0 .25rem;color:var(--gem-ink-deep)}
-table{border-collapse:collapse;width:100%;font-size:.9rem;background:var(--gem-sheen);border-radius:8px;overflow:hidden}
-th,td{border-bottom:1px solid color-mix(in srgb,var(--gem-ink-deep) 12%,transparent);padding:.45rem .55rem;text-align:left;vertical-align:top}
-th{color:var(--gem-muted-deep);font-weight:600}
-pre{background:var(--gem-sheen);border:1px solid color-mix(in srgb,var(--gem-ink-deep) 13%,transparent);border-radius:8px;padding:.8rem;
+.card{background:var(--gem-panel);border:1px solid var(--gem-rim);
+border-radius:8px;padding:1.1rem 1.2rem;margin:1rem 0;
+box-shadow:4px 4px 0 var(--gem-void)}
+.mute{color:var(--gem-muted);font-size:.9rem}.bad{color:var(--gem-sabi)}.ok{color:var(--gem-koke)}
+a{color:var(--gem-ai)}
+.btn,button{display:inline-block;background:var(--gem-panel);color:var(--gem-ink);
+border:1px solid var(--gem-muted);border-radius:6px;padding:.5rem 1rem;font:inherit;cursor:pointer;text-decoration:none;
+box-shadow:3px 3px 0 var(--gem-void);transition:border-color .12s ease,color .12s ease}
+.btn:hover,button:hover{border-color:var(--gem-ai);color:var(--gem-ai)}
+.btn:active,button:active{background:var(--gem-facet)}
+button:focus-visible,.btn:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--gem-ai);outline-offset:1px}
+button.danger{border-color:var(--gem-sabi);color:var(--gem-sabi)}button.danger:hover{background:var(--gem-facet)}
+button.plain{color:var(--gem-ai)}button.plain:hover{color:var(--gem-ai)}
+input,select{font:inherit;padding:.45rem .6rem;border:1px solid var(--gem-muted);
+border-radius:6px;background:var(--gem-panel);color:var(--gem-ink);max-width:100%}
+label{display:block;margin:.6rem 0 .25rem;color:var(--gem-ink)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;background:var(--gem-panel);border-radius:8px;overflow:hidden}
+th,td{border-bottom:1px solid var(--gem-rim);padding:.45rem .55rem;text-align:left;vertical-align:top}
+th{color:var(--gem-muted);font-weight:600}
+pre{background:var(--gem-panel);border:1px solid var(--gem-muted);border-radius:8px;padding:.8rem;
 overflow-x:auto;white-space:pre-wrap;word-break:break-all;user-select:all}
 .tok{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.95rem}
 form{margin:.4rem 0}.row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:end}
 /* The language switcher: three links, each written in its own language
    (section 12.7). The pages have no script, so a link is the only control. */
 .langbar{display:flex;align-items:baseline;gap:.55rem;margin:0 0 1.4rem;font-size:.85rem}
-.langbar a{text-decoration:none;padding:.1rem .35rem;border-radius:5px}
-.langbar a:hover{background:color-mix(in srgb,var(--gem-sheen) 70%,transparent)}
-.langbar a.on{color:var(--gem-ink-deep);border:1px solid color-mix(in srgb,var(--gem-aqua-deep) 45%,transparent)}
+.langbar a{text-decoration:none;padding:.1rem .35rem;border-radius:4px}
+.langbar a:hover{background:var(--gem-facet)}
+.langbar a.on{color:var(--gem-ink);border:1px solid var(--gem-ai)}
 """
 
 

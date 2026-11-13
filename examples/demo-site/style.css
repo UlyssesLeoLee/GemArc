@@ -22,14 +22,14 @@ a.link:hover{color:#2e2a24;border-bottom-style:solid}
 .wbs-detail{list-style:none;margin:2px 0 2px 8px;padding-left:10px}
 .wbs-detail li{color:#6e6354;font-size:12px;line-height:1.7}
 
-/* The flat layer in the comic language (BD-010 section 14): flat colour, an
+/* The flat layer in the ink language (BD-010 section 14): flat colour, an
    ink line on every structural element, a hard offset shadow instead of a
    blurred one, and the paper texture behind the frames. The palette does not
-   change - the ink line is the rim colour, the shadow is the void colour, and
+   change - the ink line is the muted ink, the shadow is the void colour, and
    colour still only encodes facts. */
 :root{color-scheme:light;--gem-void:#d6c9ae;--gem-bg:#ebe1ce;--gem-panel:#f4eddf;--gem-facet:#e6dac6;--gem-rim:#a89a7c;--gem-ink:#2e2a24;--gem-muted:#6e6354;--gem-ai:#3d5a72;--gem-fuji:#5f5573;--gem-kaki:#96501f;--gem-koke:#56663a;--gem-sabi:#8a3a2c}
 body{background-color:var(--gem-bg);background-image:repeating-linear-gradient(45deg,color-mix(in srgb,var(--gem-rim) 12%,transparent) 0 1px,transparent 1px 15px),repeating-linear-gradient(-45deg,color-mix(in srgb,var(--gem-rim) 8%,transparent) 0 1px,transparent 1px 23px)}
-.panel{border:2px solid var(--gem-muted);border-radius:8px;background:var(--gem-panel);box-shadow:inset 0 1px 0 rgba(255,253,246,.5),4px 4px 0 var(--gem-void)}
+.panel{border:2px solid var(--gem-muted);border-radius:8px;background:var(--gem-panel);box-shadow:4px 4px 0 var(--gem-void)}
 .panel h2{margin:0 0 14px;padding:6px 10px;border:2px solid var(--gem-muted);border-radius:4px;background:var(--gem-facet);box-shadow:3px 3px 0 var(--gem-void);color:var(--gem-ink);font-size:14px}
 .fact{border:1px solid var(--gem-muted);background:var(--gem-facet);border-radius:6px;box-shadow:3px 3px 0 var(--gem-void)}
 .chart{border:2px solid var(--gem-muted);border-radius:8px;background:var(--gem-panel);box-shadow:4px 4px 0 var(--gem-void)}

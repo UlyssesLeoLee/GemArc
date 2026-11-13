@@ -116,6 +116,35 @@ def _contrast(first: str, second: str) -> float:
     return (high + 0.05) / (low + 0.05)
 
 
+_FUNCTIONAL_COLOUR = re.compile(
+    r"rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})"
+    r"|hsla?\(\s*(\d{1,3})\s*,\s*(\d{1,3})%\s*,\s*(\d{1,3})%"
+)
+
+
+def _functional_colours(source: str):
+    """Every colour written as a function: rgb(), rgba(), hsl(), hsla().
+
+    A hex scan cannot see these. A colour written this way is still a
+    colour, and if the policy does not know it, it is a second skin.
+    """
+    for match in _FUNCTIONAL_COLOUR.finditer(source):
+        if match.group(1) is not None:
+            yield match.group(0), (int(match.group(1)), int(match.group(2)),
+                                   int(match.group(3)))
+        else:
+            hue = int(match.group(4)) % 360
+            saturation = int(match.group(5)) / 100.0
+            lightness = int(match.group(6)) / 100.0
+            chroma = (1 - abs(2 * lightness - 1)) * saturation
+            second = chroma * (1 - abs(hue % 60 // 30 - 1))
+            offset = lightness - chroma / 2
+            table = [(chroma, second, 0), (second, chroma, 0), (0, chroma, second),
+                     (0, second, chroma), (second, 0, chroma), (chroma, 0, second)]
+            yield match.group(0), tuple(round(channel * 255 + offset)
+                                        for channel in table[hue // 60])
+
+
 def _without_comments(source: str) -> str:
     """The code of a module, without its comments.
 
@@ -747,6 +776,80 @@ class WabiSabiConstraintTests(unittest.TestCase):
         for token in self.PIGMENTS:
             with self.subTest(token=token):
                 self.assertGreaterEqual(_contrast(palette[token], paper), 4.5)
+
+
+class OneSkinTests(unittest.TestCase):
+    """Section 16.4: the site, the scene, the backend and the produced file
+    share one skin.
+
+    Two kinds of second skin slip past a hex scan. A colour can be written
+    as a function - rgb(), rgba(), hsl() - and a page can still declare the
+    dark stage of the old theme. Both are checked here, over every surface
+    the reader can see.
+    """
+
+    SURFACES = (
+        ("site shell", REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "templates" / "shared" / "style.css"),
+        ("preview shell", REPO_ROOT / "src" / "gemarc_mcp" / "web" / "style.css"),
+        ("console", REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "templates" / "console" / "console.css"),
+        ("account pages", REPO_ROOT / "src" / "gemarc_mcp" / "accounts" / "pages.py"),
+        ("toon material", TOON_MATERIAL),
+        ("axis viewer", AXIS_VIEWER),
+        ("space viewer", SPACE_VIEWER),
+        ("console scene", CONSOLE_SPACE),
+        ("unity controls", UNITY_CONTROLS),
+    )
+
+    PAGES = (
+        ("site shell", REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "templates" / "static" / "index.html"),
+        ("vite shell", REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "templates" / "vite" / "index.html"),
+        ("preview shell", REPO_ROOT / "src" / "gemarc_mcp" / "web" / "index.html"),
+        ("console", CONSOLE_HTML),
+    )
+
+    def _palette(self):
+        policy = STYLE_POLICY.read_text(encoding="utf-8")
+        tokens = {}
+        for section in ("3.1", "3.2"):
+            tokens.update(dict(re.findall(r"\| `(--gem-[a-z0-9-]+)` \| `(#[0-9a-fA-F]{6})`",
+                                          _palette_section(policy, section))))
+        self.assertTrue(tokens, "the policy does not list the palette")
+        return tokens
+
+    def test_no_surface_names_a_colour_the_policy_does_not_know(self):
+        """A colour written as a function is still a colour."""
+        known = [_rgb(colour) for colour in self._palette().values()]
+        for name, path in self.SURFACES:
+            source = path.read_text(encoding="utf-8")
+            for notation, channels in _functional_colours(source):
+                with self.subTest(surface=name, colour=notation):
+                    self.assertTrue(
+                        any(all(abs(a - b) <= 2 for a, b in zip(channels, candidate))
+                            for candidate in known),
+                        f"{name} writes {notation}: the policy knows no such colour")
+
+    def test_no_page_declares_the_dark_stage(self):
+        """The paper is the only theme: a page may not ask for the dark one."""
+        for name, path in self.PAGES:
+            html = path.read_text(encoding="utf-8")
+            with self.subTest(page=name):
+                self.assertNotIn('name="color-scheme" content="dark"', html,
+                                 "the page still declares the dark stage")
+                self.assertNotIn("prefers-color-scheme", html,
+                                 "the page follows the system: that would be a second theme")
+                self.assertIn('name="color-scheme" content="light"', html,
+                              "the page does not declare the paper")
+
+    def test_the_paper_carries_no_light_on_it(self):
+        """Section 16.3: the layers are paper depth and a rule, not a highlight."""
+        for name, path in self.SURFACES:
+            if path.suffix != ".css":
+                continue
+            source = path.read_text(encoding="utf-8")
+            for value in re.findall(r"box-shadow:\s*([^;}]+)", source):
+                with self.subTest(surface=name, shadow=value):
+                    self.assertNotIn("inset", value,
+                                     "an inner highlight is light on the paper")
 
 
 class ToonMaterialBindingTests(unittest.TestCase):

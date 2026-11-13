@@ -2,9 +2,9 @@
  * The crystal scene of the console's tool surface.
  *
  * The scene carries runtime facts and nothing else: one crystal per tool the
- * server really registered, the read ones aqua and the write ones topaz. The
- * layout has to be the same every time, and picking a crystal has to name the
- * tool it stands for.
+ * server really registered, the read ones blue and the write ones persimmon.
+ * The layout has to be the same every time, and picking a crystal has to name
+ * the tool it stands for.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,7 +28,7 @@ test('one crystal per tool, in the order of the tool list', () => {
   assert.deepEqual(layout.map((item) => item.name), ['gemarc_brief', 'gemarc_validate', 'gemarc_model']);
 });
 
-test('a read tool is aqua and a write tool is topaz', () => {
+test('a read tool is blue and a write tool is persimmon', () => {
   const layout = layoutConsoleCrystals(TOOLS);
   assert.equal(layout[0].color, CONSOLE_SPACE_COLORS.read);
   assert.equal(layout[1].color, CONSOLE_SPACE_COLORS.read);

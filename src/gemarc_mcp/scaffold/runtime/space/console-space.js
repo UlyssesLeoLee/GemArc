@@ -3,8 +3,8 @@
  *
  * The console is a tuning panel for the server, so its scene carries a
  * runtime fact and nothing else: **one crystal per registered tool**. The
- * read tools are aqua, the write tools are topaz, and the layout is a golden
- * angle spiral, so the same tool list always produces the same picture.
+ * read tools are blue, the write tools are persimmon, and the layout is a
+ * golden angle spiral, so the same tool list always produces the same picture.
  *
  * The scene borrows what it must not reinvent:
  *

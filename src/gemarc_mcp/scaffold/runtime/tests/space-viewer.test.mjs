@@ -348,6 +348,35 @@ test('the relation treatments come from the vocabulary', () => {
   assert.equal(table.Unrelated.labels, 'hidden');
 });
 
+test('the retreat makes a crystal more transparent, never a different colour', () => {
+  const { renderer } = buildRenderer();
+  const bodyOf = (id) => {
+    let found = null;
+    renderer.scene.traverse((object) => {
+      const data = object.userData || {};
+      if (data.pickKind === 'node' && data.pickId === id) found = object;
+    });
+    return found;
+  };
+
+  const alpha = bodyOf('n-a');
+  assert.ok(alpha, 'the node has no body');
+  assert.equal(alpha.material.transparent, true,
+    'the body is opaque: the policy asks for a transparent stone');
+  assert.ok(alpha.material.opacity >= 0.45 && alpha.material.opacity <= 0.62,
+    `the body opacity ${alpha.material.opacity} is outside the range of the policy`);
+  const colour = alpha.material.color.hex;
+  const baseOpacity = alpha.material.opacity;
+
+  renderer.setRelationClasses(new Map([['n-a', 'Unrelated']]));
+  const retreated = bodyOf('n-a');
+  assert.ok(retreated.material.opacity < baseOpacity,
+    'the retreat did not make the crystal more transparent');
+  assert.equal(retreated.material.color.hex, colour,
+    'the retreat changed the colour: the colour encodes the type');
+  renderer.dispose();
+});
+
 /* -------------------------------------------------- error handling */
 
 test('the renderer rejects an incomplete setup with an explicit code', () => {

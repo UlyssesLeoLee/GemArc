@@ -17,7 +17,7 @@
  */
 
 import { UnityControls } from './unity-controls.js';
-import { createToonGradient, createToonMaterial, PALETTE } from './toon-material.js';
+import { createToonGradient, createToonMaterial, CRYSTAL_BODY_OPACITY, PALETTE } from './toon-material.js';
 
 /**
  * The colours of the tool surface. They are the palette of the policy:
@@ -260,9 +260,9 @@ export function createConsoleSpace(THREE, options = {}) {
   function markSelection() {
     for (const [name, record] of crystals) {
       const active = name === selected;
-      // The body keeps its colour and stays solid; the selection is carried
-      // by the ink line, which grows one step (section 4.2).
-      record.material.opacity = 1;
+      // The body keeps its colour and its transparency; the selection is
+      // carried by the ink line, which grows one step (section 4.2).
+      record.material.opacity = CRYSTAL_BODY_OPACITY;
       record.edgeMaterial.opacity = 1;
       if (record.edge) record.edge.scale.setScalar(active ? 1.12 : 1);
     }

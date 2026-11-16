@@ -67,8 +67,12 @@ test('the scene builds one crystal per tool and marks the selection', () => {
   assert.ok(record);
   // The body is a toon material with the shared gradient map.
   assert.equal(record.material.gradientMap.width, 3);
-  // A crystal on paper is a solid shape (BD-010 section 4.2).
-  assert.equal(record.material.transparent, false);
+  // A cut stone is transparent (BD-010 section 4.2).
+  assert.equal(record.material.transparent, true);
+  assert.ok(record.material.opacity >= 0.45 && record.material.opacity <= 0.62,
+    `the body opacity ${record.material.opacity} is outside the range of the policy`);
+  assert.equal(record.material.depthWrite, false,
+    'the body writes depth: what is behind it would be hidden');
 
   scene.setSelected('gemarc_model');
   // The selection is carried by the ink line, which grows one step.

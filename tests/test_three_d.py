@@ -854,18 +854,50 @@ class OneSkinTests(unittest.TestCase):
 
 class ToonMaterialBindingTests(unittest.TestCase):
     """Sections 4.2, 13.1 and 13.2: the one material, drawn the way the policy
-    says - banded light, an opaque body and an ink line that is ink."""
+    says - banded light, a translucent body and an ink line that is ink."""
 
     def _source(self):
         return TOON_MATERIAL.read_text(encoding="utf-8")
 
-    def test_the_body_is_opaque(self):
-        """Section 4.2: paper does not let the light through."""
+    def test_the_body_is_translucent(self):
+        """Section 4.2: a cut stone is transparent, and the policy says how much."""
         source = self._source()
-        self.assertIn("transparent: false", source,
-                      "the crystal body is translucent; the policy forbids it")
-        self.assertNotIn("transparent: true", source,
-                         "the crystal body is translucent; the policy forbids it")
+        self.assertIn("transparent: true", source,
+                      "the crystal body is opaque; the policy asks for a stone")
+        self.assertNotIn("transparent: false", source,
+                         "the crystal body is opaque; the policy asks for a stone")
+
+    def test_the_body_does_not_write_depth_and_is_drawn_on_both_sides(self):
+        """Section 4.2: you see through the stone, and you see its own cut faces."""
+        source = self._source()
+        self.assertIn("depthWrite: false", source,
+                      "the body writes depth: what is behind it would be hidden")
+        self.assertIn("side: THREE.DoubleSide", source,
+                      "the body is drawn on one side only: it reads as a pane")
+
+    def test_the_opacity_is_inside_the_range_the_policy_writes_down(self):
+        """Section 4.2: 0.45 to 0.62, measured on the constant the code uses."""
+        source = self._source()
+        for name in ("CRYSTAL_BODY_OPACITY", "CRYSTAL_BODY_OPACITY_MIN",
+                     "CRYSTAL_BODY_OPACITY_MAX"):
+            with self.subTest(constant=name):
+                self.assertRegex(source, rf"{name} = ([0-9.]+);",
+                                 f"the material does not export {name}")
+        value = float(re.search(r"CRYSTAL_BODY_OPACITY = ([0-9.]+);", source).group(1))
+        low = float(re.search(r"CRYSTAL_BODY_OPACITY_MIN = ([0-9.]+);", source).group(1))
+        high = float(re.search(r"CRYSTAL_BODY_OPACITY_MAX = ([0-9.]+);", source).group(1))
+        self.assertAlmostEqual(low, 0.45, places=3)
+        self.assertAlmostEqual(high, 0.62, places=3)
+        self.assertTrue(low <= value <= high,
+                        f"the body opacity {value} is outside {low}-{high}")
+
+    def test_the_policy_writes_the_same_range_down(self):
+        """Section 4.2 and 16.4: the document and the code agree."""
+        policy = STYLE_POLICY.read_text(encoding="utf-8")
+        self.assertIn("0.45–0.62", policy,
+                      "the policy does not write the opacity range down")
+        self.assertIn("`depthWrite: false`", policy,
+                      "the policy does not say that the body does not write depth")
 
     def test_the_dark_band_is_never_a_hole(self):
         """Section 13.1: the dark band is 55% and never darker."""

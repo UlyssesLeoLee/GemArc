@@ -280,10 +280,13 @@ test('the highlight marks the selected entity', () => {
       betaScale = object.children[0] ? object.children[0].scale.x : null;
     }
   });
-  // The body of a crystal is solid in every state; the selection is carried
-  // by the ink line, which grows one step (BD-010 section 4.2).
-  assert.equal(alphaOpacity, 1, 'the body of a crystal is solid');
-  assert.equal(betaOpacity, 1, 'the body of a crystal is solid');
+  // The body of a crystal is transparent in every state and keeps the same
+  // transparency; the selection is carried by the ink line, which grows one
+  // step (BD-010 section 4.2).
+  assert.ok(alphaOpacity >= 0.45 && alphaOpacity <= 0.62,
+    `the body opacity ${alphaOpacity} is outside the range of the policy`);
+  assert.equal(betaOpacity, alphaOpacity,
+    'the selection must not change the transparency of the body');
   assert.ok(alphaScale !== null, 'the crystal has no ink line');
   assert.ok(betaScale > alphaScale,
             'the selected entity carries the heavier ink line');

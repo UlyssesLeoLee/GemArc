@@ -37,7 +37,7 @@ import { RELATION_CLASS_IDS, relationClassSpec } from '../core/vocab.js';
 import { treatmentForRelationClass } from '../focus/retreat-animation.js';
 import { SpaceModel } from './space-model.js';
 import { UnityControls, boundsOfPoints } from './unity-controls.js';
-import { createToonGradient, createToonMaterial, mixToward, PALETTE } from './toon-material.js';
+import { createToonGradient, createToonMaterial, CRYSTAL_BODY_OPACITY, PALETTE } from './toon-material.js';
 
 /**
  * The diagnostic codes this module raises.
@@ -107,9 +107,9 @@ const NODE_COLOR = 0x3d5a72;
 const CONTAINER_COLOR = 0x6e6354;
 const CONTAINER_COLOR_VIRTUAL = 0xa89a7c;
 /**
- * The body of a crystal is solid: a crystal on paper is a cut shape, not a
- * lump of translucent material (BD-010 section 4.2). The retreat therefore
- * draws a crystal in a colour that is closer to the paper, and the retreat
+ * The body of a crystal is transparent (BD-010 section 4.2), so the retreat
+ * scales that transparency instead of changing the colour: a crystal that
+ * steps back becomes more transparent, never a different colour. The retreat
  * never moves real coordinates.
  */
 const OUTLINE_STRENGTH = Object.freeze({
@@ -1413,12 +1413,11 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
       const treatment = treatments[nodeId] || null;
       const isHighlighted = highlight.nodeIds.has(nodeId);
       const opacity = treatment?.opacity ?? 1;
-      // The body is solid. The retreat draws a crystal in a colour that is
-      // closer to the paper - the way a drawing puts an unimportant shape in
-      // a lighter ink instead of making it see-through (BD-010 section 4.2).
-      record.material.opacity = 1;
-      record.material.transparent = false;
-      record.material.color.setHex(mixToward(NODE_COLOR, PALETTE.bg, 1 - opacity));
+      // The retreat scales the transparency of the body; it never makes the
+      // crystal opaque again and it never changes its colour (the colour
+      // encodes the type, and only the type).
+      record.material.opacity = opacity * CRYSTAL_BODY_OPACITY;
+      record.material.transparent = true;
 
       const outlineName = treatment?.outline
         || (isHighlighted ? 'strong' : 'none');

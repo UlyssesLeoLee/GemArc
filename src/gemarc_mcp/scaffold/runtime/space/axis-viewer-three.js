@@ -40,7 +40,7 @@
  */
 
 import { UnityControls, boundsOfPoints } from './unity-controls.js';
-import { createToonGradient, createToonMaterial, PALETTE } from './toon-material.js';
+import { createToonGradient, createToonMaterial, CRYSTAL_BODY_OPACITY, PALETTE } from './toon-material.js';
 
 /**
  * The diagnostic codes this module raises.
@@ -872,10 +872,10 @@ export function createThreeAxisRenderer(THREE, options = {}) {
     highlight = { nodeIds, edgeIds };
     for (const [id, record] of nodeRecords) {
       const active = nodeIds.has(id);
-      // The body keeps its colour and stays solid; the selection is carried
-      // by the ink line, which grows one step when the entity is selected
-      // (BD-010 section 4.2).
-      record.material.opacity = 1;
+      // The body keeps its colour and its transparency; the selection is
+      // carried by the ink line, which grows one step when the entity is
+      // selected (BD-010 section 4.2).
+      record.material.opacity = CRYSTAL_BODY_OPACITY;
       record.outlineMaterial.opacity = active ? 1 : 0.85;
       record.outline.scale.setScalar(active ? 1.12 : 1);
     }

@@ -40,7 +40,7 @@
  */
 
 import { UnityControls, boundsOfPoints } from './unity-controls.js';
-import { createToonGradient, createToonMaterial, CRYSTAL_BODY_OPACITY, PALETTE } from './toon-material.js';
+import { createToonGradient, createToonMaterial, createFacetHighlightMaterial, CRYSTAL_BODY_OPACITY, PALETTE } from './toon-material.js';
 
 /**
  * The diagnostic codes this module raises.
@@ -675,6 +675,12 @@ export function createThreeAxisRenderer(THREE, options = {}) {
       gradient: toonGradient,
     });
     track(material);
+    // The shine on the cut faces (BD-010 section 4.7). The material is made
+    // right after the body material on purpose: the library draws the
+    // transparent objects in the order their materials were made, so the
+    // shine lands on top of its own body and not on top of the scene.
+    const highlightMaterial = createFacetHighlightMaterial(THREE);
+    track(highlightMaterial);
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(node.position.x, node.position.y, node.position.z);
     mesh.userData.nodeId = node.id;
@@ -689,6 +695,12 @@ export function createThreeAxisRenderer(THREE, options = {}) {
     track(outlineMaterial);
     const outline = new THREE.LineSegments(outlineGeometry, outlineMaterial);
     mesh.add(outline);
+
+    // The shine sits on the same geometry as the body: the stone keeps its
+    // shape and its colour, and only gains a reflection. It is the last
+    // child, so the first child stays the ink line.
+    const highlight = new THREE.Mesh(geometry, highlightMaterial);
+    mesh.add(highlight);
 
     const label = createLabel(THREE, node.name, { height: constants.labelHeight * 0.8 });
     if (label) {

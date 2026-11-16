@@ -22,10 +22,16 @@
  *      inner cut faces. The body therefore does not write depth and is drawn
  *      on both sides (BD-010 section 4.2). The ink line stays solid, so the
  *      silhouette is still a drawn one.
- *   4. **No third-party import.** The three-dimensional library is injected
+ *   4. **The stone has a shine.** Transparency alone reads as a sheet of
+ *      colored paper; what makes a cut stone a stone is the one reflection
+ *      on its cut faces. The shine is a second layer over the same geometry
+ *      (BD-010 section 4.7): it carries the specular term only, it is added
+ *      on top of the body, and it never reaches past the paper's own white.
+ *   5. **No third-party import.** The three-dimensional library is injected
  *      by the caller (an import map for the static profile, node_modules for
  *      the vite profile, a CDN for the console). The only standard pieces
- *      this module needs are a toon material and a data texture.
+ *      this module needs are a toon material, a phong material and a data
+ *      texture.
  *
  * @module toon-material
  */
@@ -71,6 +77,30 @@ export const CRYSTAL_BODY_OPACITY_MIN = 0.45;
  * @type {number}
  */
 export const CRYSTAL_BODY_OPACITY_MAX = 0.62;
+
+/**
+ * How sharp the shine on a cut face is.
+ *
+ * A cut face has one normal, so the whole face carries one brightness and
+ * the border between two faces stays the crystal's own edge (BD-010 section
+ * 4.7). A high number keeps the reflection on the face that really looks
+ * into the light, so the glint sits on one cut instead of spreading over the
+ * whole stone.
+ *
+ * @type {number}
+ */
+export const CRYSTAL_HIGHLIGHT_SHININESS = 18;
+
+/**
+ * How strong the shine on a cut face is.
+ *
+ * The shine is added on top of the paper, so it can never be brighter than
+ * the paper itself: the ceiling is the paper's white, not a pure white
+ * (section 4.7).
+ *
+ * @type {number}
+ */
+export const CRYSTAL_HIGHLIGHT_OPACITY = 0.45;
 
 /**
  * The palette of the product, as the scenes see it (BD-010 section 3 and
@@ -152,4 +182,53 @@ export function createToonMaterial(THREE, options = {}) {
     emissiveIntensity: options.emissiveIntensity ?? 0,
   });
   return material;
+}
+
+/**
+ * Build the material of the shine on a cut face.
+ *
+ * The body is a toon material: it knows the three bands of the light and
+ * nothing else. It has no specular term, so a transparent body reads as a
+ * sheet of colored paper. The shine is the second layer that puts the one
+ * reflection back (BD-010 section 4.7):
+ *
+ *   - **no diffuse light**: the colour is black, which means "nothing but
+ *     the reflection" and not a colour on the paper;
+ *   - **the paper's own white** as the specular colour, so the shine can
+ *     never be brighter than the paper;
+ *   - **flat shading**: one brightness per cut face, so the border between
+ *     two faces stays a hard edge instead of a soft patch;
+ *   - **added on top** of the body, so the stone keeps its colour
+ *     underneath the reflection;
+ *   - **no depth written** and **the outward faces only**: the inner faces
+ *     are seen through the stone, they do not catch the light a second time.
+ *
+ * The material is the same for the three scenes, so the shine cannot drift
+ * apart between them (section 13.4).
+ *
+ * @param {object} THREE the three-dimensional library
+ * @param {object} [options] the material options
+ * @param {number} [options.specular] the colour of the reflection
+ * @param {number} [options.shininess] how sharp the reflection is
+ * @param {number} [options.opacity] how strong the reflection is
+ * @returns {object} the material (dispose it with the scene)
+ */
+export function createFacetHighlightMaterial(THREE, options = {}) {
+  return new THREE.MeshPhongMaterial({
+    // No diffuse light: this layer carries the reflection only.
+    color: 0x000000,
+    // The reflection is the paper's white, never a pure white.
+    specular: options.specular ?? PALETTE.panel,
+    shininess: options.shininess ?? CRYSTAL_HIGHLIGHT_SHININESS,
+    // One brightness per cut face: the edge between two faces stays hard.
+    flatShading: true,
+    transparent: true,
+    opacity: options.opacity ?? CRYSTAL_HIGHLIGHT_OPACITY,
+    // The shine never hides what is behind the stone.
+    depthWrite: false,
+    // Added on top of the body: the stone keeps its colour underneath.
+    blending: THREE.AdditiveBlending,
+    // The outward faces only: the inner faces are seen through the stone.
+    side: THREE.FrontSide,
+  });
 }

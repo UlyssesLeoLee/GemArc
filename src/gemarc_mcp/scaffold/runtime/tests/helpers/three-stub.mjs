@@ -234,6 +234,11 @@ export class Color {
     this.hex = value;
     return this;
   }
+
+  /** The colour as a hex number, the way the client reads it back. */
+  getHex() {
+    return this.hex;
+  }
 }
 
 /* ---------------------------------------------------------------- scene */
@@ -418,6 +423,13 @@ class MeshBasicMaterial {
 }
 class MeshStandardMaterial extends MeshBasicMaterial {}
 class MeshToonMaterial extends MeshBasicMaterial {}
+class MeshPhongMaterial extends MeshBasicMaterial {
+  constructor(parameters = {}) {
+    super(parameters);
+    // The client keeps the specular colour as a colour object, not a number.
+    this.specular = new Color(parameters.specular ?? 0x111111);
+  }
+}
 class LineBasicMaterial extends MeshBasicMaterial {}
 class SpriteMaterial {
   constructor(parameters = {}) {
@@ -689,6 +701,7 @@ export const DoubleSide = 2;
 export const FrontSide = 0;
 export const RedFormat = 1023;
 export const NearestFilter = 1003;
+export const AdditiveBlending = 2;
 
 /**
  * Build the stub three namespace.
@@ -715,6 +728,7 @@ export function createStubThree() {
     MeshBasicMaterial,
     MeshStandardMaterial,
     MeshToonMaterial,
+    MeshPhongMaterial,
     LineBasicMaterial,
     SpriteMaterial,
     CanvasTexture,
@@ -725,6 +739,7 @@ export function createStubThree() {
     FrontSide,
     RedFormat,
     NearestFilter,
+    AdditiveBlending,
   };
 }
 

@@ -24,6 +24,7 @@ import {
   resolvePickHit,
 } from '../space/space-viewer-three.js';
 import {
+  AdditiveBlending,
   createStubCanvas,
   createStubContainer,
   createStubThree,
@@ -374,6 +375,35 @@ test('the retreat makes a crystal more transparent, never a different colour', (
     'the retreat did not make the crystal more transparent');
   assert.equal(retreated.material.color.hex, colour,
     'the retreat changed the colour: the colour encodes the type');
+  renderer.dispose();
+});
+
+test('every crystal carries the shine on its cut faces', () => {
+  const { renderer } = buildRenderer();
+  let checked = 0;
+  renderer.scene.traverse((object) => {
+    const data = object.userData || {};
+    if (data.pickKind !== 'node') return;
+    // The shine is a second layer on the very geometry of the stone
+    // (BD-010 section 4.7).
+    const shine = object.children.find((child) => child.material && child.material.specular);
+    assert.ok(shine, `the crystal ${data.pickId} has no shine`);
+    assert.equal(shine.geometry, object.geometry,
+      'the shine is not on the geometry of the stone');
+    // One brightness per cut face: the border between two faces stays hard.
+    assert.equal(shine.material.flatShading, true,
+      'the shine is smooth: the border between two cut faces would blur');
+    // Added on top of the body, so the stone keeps its colour underneath.
+    assert.equal(shine.material.blending, AdditiveBlending,
+      'the shine replaces the colour of the stone instead of adding to it');
+    assert.equal(shine.material.depthWrite, false,
+      'the shine writes depth: what is behind the stone would be hidden');
+    // The reflection is the paper's white.
+    assert.equal(shine.material.specular.getHex(), 0xf4eddf,
+      'the shine does not use the paper white');
+    checked += 1;
+  });
+  assert.ok(checked > 0, 'the scene has no crystal to check');
   renderer.dispose();
 });
 

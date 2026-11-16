@@ -923,6 +923,100 @@ class ToonMaterialBindingTests(unittest.TestCase):
                                  f"{name} still brightens the body colour into an edge")
 
 
+class FacetHighlightTests(unittest.TestCase):
+    """Section 4.7: the shine on the cut faces.
+
+    Transparency alone reads as a sheet of colored paper; what makes a cut
+    stone a stone is the one reflection on its cut faces. The rules are
+    measurable: one brightness per cut face, the paper's white as the
+    ceiling, added on top of the body, and no light of its own.
+    """
+
+    SCENES = (("axis viewer", AXIS_VIEWER),
+              ("space viewer", SPACE_VIEWER),
+              ("console scene", CONSOLE_SPACE))
+
+    def _material(self):
+        return TOON_MATERIAL.read_text(encoding="utf-8")
+
+    def _shine_source(self):
+        """The body of the shine factory, and nothing else."""
+        source = self._material()
+        match = re.search(r"export function createFacetHighlightMaterial\(.*?\n\}\n",
+                          source, re.S)
+        self.assertIsNotNone(match, "the material module has no shine factory")
+        return match.group(0)
+
+    def test_the_shine_is_one_material_for_the_three_scenes(self):
+        """Section 13.4: the shine lives in one module."""
+        for name, path in self.SCENES:
+            with self.subTest(scene=name):
+                source = path.read_text(encoding="utf-8")
+                self.assertIn("createFacetHighlightMaterial", source,
+                              f"{name} does not take the shine from the shared material")
+                self.assertNotIn("MeshPhongMaterial", source,
+                                 f"{name} writes its own shine: the three would drift")
+
+    def test_the_shine_is_one_brightness_per_cut_face(self):
+        """Section 4.7: the border between two faces stays a hard edge."""
+        source = self._shine_source()
+        self.assertIn("flatShading: true", source,
+                      "the shine is smooth: the border between two cut faces would blur")
+
+    def test_the_shine_is_added_and_never_hides(self):
+        """Section 4.7: the shine sits on top of the body and hides nothing."""
+        source = self._shine_source()
+        self.assertIn("blending: THREE.AdditiveBlending", source,
+                      "the shine replaces the colour of the stone instead of adding to it")
+        self.assertIn("depthWrite: false", source,
+                      "the shine writes depth: what is behind the stone would be hidden")
+        self.assertIn("side: THREE.FrontSide", source,
+                      "the shine is drawn on the inner faces too")
+
+    def test_the_shine_carries_no_colour_and_no_light(self):
+        """Section 4.7: the reflection is the paper's white, nothing else."""
+        source = self._shine_source()
+        self.assertIn("specular: options.specular ?? PALETTE.panel", source,
+                      "the shine does not use the paper white")
+        self.assertIn("color: 0x000000", source,
+                      "the shine paints the stone instead of reflecting on it")
+        self.assertNotIn("emissive", source,
+                         "the shine is a light of its own: the stone may not emit light")
+
+    def test_the_shine_never_reaches_past_the_paper(self):
+        """Section 4.7: the ceiling is the paper, not a pure white."""
+        source = self._material()
+        match = re.search(r"CRYSTAL_HIGHLIGHT_OPACITY = ([0-9.]+);", source)
+        self.assertIsNotNone(match, "the material does not export the strength of the shine")
+        value = float(match.group(1))
+        self.assertTrue(0 < value <= 1, f"the shine is off the paper: {value}")
+        self.assertIn("CRYSTAL_HIGHLIGHT_SHININESS", source,
+                      "the material does not say how sharp the shine is")
+
+    def test_the_policy_writes_the_shine_down(self):
+        """Section 4.7: the document and the code agree."""
+        policy = STYLE_POLICY.read_text(encoding="utf-8")
+        section = re.search(r"### 4\.7 .*?(?:\n## |\Z)", policy, re.S)
+        self.assertIsNotNone(section, "the policy has no section for the shine")
+        text = section.group(0)
+        for marker in ("flatShading: true", "AdditiveBlending", "--gem-panel",
+                       "FrontSide", "depthWrite: false"):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, text,
+                              f"the policy does not write the shine down: {marker}")
+
+    def test_the_shine_sits_on_the_geometry_of_the_stone(self):
+        """Section 4.2 and 4.7: the stone keeps its shape, its colour and its
+        transparency; only a reflection is added."""
+        for name, path in self.SCENES:
+            with self.subTest(scene=name):
+                source = path.read_text(encoding="utf-8")
+                self.assertRegex(source, r"new THREE\.Mesh\(\s*geometry\s*,\s*highlightMaterial\s*\)",
+                                 f"{name} does not put the shine on the geometry of the stone")
+                self.assertRegex(source, r"mesh\.add\(highlight\)",
+                                 f"{name} does not carry the shine with the stone")
+
+
 class UnityGesturePolicyTests(unittest.TestCase):
     """The Unity gestures of the three-dimensional scenes.
 

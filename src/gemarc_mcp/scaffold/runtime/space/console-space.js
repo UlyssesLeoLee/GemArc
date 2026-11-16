@@ -17,7 +17,7 @@
  */
 
 import { UnityControls } from './unity-controls.js';
-import { createToonGradient, createToonMaterial, CRYSTAL_BODY_OPACITY, PALETTE } from './toon-material.js';
+import { createToonGradient, createToonMaterial, createFacetHighlightMaterial, CRYSTAL_BODY_OPACITY, PALETTE } from './toon-material.js';
 
 /**
  * The colours of the tool surface. They are the palette of the policy:
@@ -204,7 +204,8 @@ export function createConsoleSpace(THREE, options = {}) {
   function setTools(list) {
     for (const record of crystals.values()) {
       root.remove(record.mesh);
-      for (const item of [record.geometry, record.material, record.edgeGeometry, record.edgeMaterial]) {
+      for (const item of [record.geometry, record.material, record.highlightMaterial,
+        record.edgeGeometry, record.edgeMaterial]) {
         if (item && typeof item.dispose === 'function') item.dispose();
       }
     }
@@ -222,6 +223,11 @@ export function createConsoleSpace(THREE, options = {}) {
         emissive: plan.color,
         emissiveIntensity: CONSOLE_SPACE_CONSTANTS.breathLow,
       });
+      // The shine on the cut faces (section 4.7). The material is made right
+      // after the body material on purpose: the library draws the transparent
+      // objects in the order their materials were made, so the shine lands on
+      // top of its own body and not on top of the scene.
+      const highlightMaterial = createFacetHighlightMaterial(THREE);
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.set(plan.position.x, plan.position.y, plan.position.z);
       mesh.userData.toolName = plan.name;
@@ -235,10 +241,17 @@ export function createConsoleSpace(THREE, options = {}) {
       const edge = new THREE.LineSegments(edgeGeometry, edgeMaterial);
       mesh.add(edge);
 
+      // The shine sits on the same geometry as the body: the stone keeps its
+      // shape and its colour, and only gains a reflection.
+      const highlight = new THREE.Mesh(geometry, highlightMaterial);
+      mesh.add(highlight);
+
       crystals.set(plan.name, {
         mesh,
         geometry,
         material,
+        highlightMaterial,
+        highlight,
         edgeGeometry,
         edgeMaterial,
         edge,

@@ -37,7 +37,7 @@ import { RELATION_CLASS_IDS, relationClassSpec } from '../core/vocab.js';
 import { treatmentForRelationClass } from '../focus/retreat-animation.js';
 import { SpaceModel } from './space-model.js';
 import { UnityControls, boundsOfPoints } from './unity-controls.js';
-import { createToonGradient, createToonMaterial, CRYSTAL_BODY_OPACITY, PALETTE } from './toon-material.js';
+import { createToonGradient, createToonMaterial, createFacetHighlightMaterial, CRYSTAL_BODY_OPACITY, PALETTE } from './toon-material.js';
 
 /**
  * The diagnostic codes this module raises.
@@ -1169,6 +1169,12 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
       gradient: toonGradient,
     });
     track(material);
+    // The shine on the cut faces (BD-010 section 4.7). The material is made
+    // right after the body material on purpose: the library draws the
+    // transparent objects in the order their materials were made, so the
+    // shine lands on top of its own body and not on top of the scene.
+    const highlightMaterial = createFacetHighlightMaterial(THREE);
+    track(highlightMaterial);
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(localPosition.x, localPosition.y, localPosition.z);
 
@@ -1182,6 +1188,11 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
     track(outlineMaterial);
     const outline = new THREE.LineSegments(outlineGeometry, outlineMaterial);
     mesh.add(outline);
+
+    // The shine sits on the same geometry as the body: the stone keeps its
+    // shape and its colour, and only gains a reflection.
+    const highlight = new THREE.Mesh(geometry, highlightMaterial);
+    mesh.add(highlight);
 
     const label = createLabel(THREE, node.name, { height: 2.4 });
     if (label) {

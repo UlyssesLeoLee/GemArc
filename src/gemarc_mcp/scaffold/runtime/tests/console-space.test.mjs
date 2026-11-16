@@ -81,6 +81,35 @@ test('the scene builds one crystal per tool and marks the selection', () => {
             'the selected crystal carries the heavier ink line');
 });
 
+test('every crystal carries the shine on its cut faces', () => {
+  const THREE = createStubThree();
+  const canvas = createStubCanvas();
+  const container = createStubContainer({ canvas });
+  const scene = createConsoleSpace(THREE, { container, tools: TOOLS });
+
+  for (const [name, record] of scene.crystals) {
+    // The shine is a second layer on the very geometry of the stone
+    // (BD-010 section 4.7).
+    assert.ok(record.highlight, `the crystal ${name} has no shine`);
+    assert.equal(record.highlight.geometry, record.mesh.geometry,
+      'the shine is not on the geometry of the stone');
+    // One brightness per cut face: the border between two faces stays hard.
+    assert.equal(record.highlightMaterial.flatShading, true,
+      'the shine is smooth: the border between two cut faces would blur');
+    // Added on top of the body, so the stone keeps its colour underneath.
+    assert.equal(record.highlightMaterial.blending, THREE.AdditiveBlending,
+      'the shine replaces the colour of the stone instead of adding to it');
+    assert.equal(record.highlightMaterial.depthWrite, false,
+      'the shine writes depth: what is behind the stone would be hidden');
+    // The reflection is the paper's white; the layer carries no colour of
+    // its own, so the stone keeps the colour of its type.
+    assert.equal(record.highlightMaterial.specular.getHex(), 0xf4eddf,
+      'the shine does not use the paper white');
+    assert.equal(record.highlightMaterial.color.getHex(), 0x000000,
+      'the shine paints the stone instead of reflecting on it');
+  }
+});
+
 test('picking a crystal names the tool it stands for', () => {
   const THREE = createStubThree();
   const canvas = createStubCanvas();

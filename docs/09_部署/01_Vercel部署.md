@@ -621,6 +621,39 @@ GitHub 上该提交的 Vercel 检查是 success，部署 id `dpl_fP3G25GdYMWseph
    进 3D 视图必须点「03 3D 语义与空间」按钮（`/site/` 的其余资源则是运行时用
    `builder.build_site(SEED_MODEL, "static")` 现生成的，不是静态产物）。
 
+### 推 `main` 后的生产复验（2026-11-17，BD-010 v3.8 架构箭头）
+
+推 `origin/main`（commit `c160e21`「feat(3d): 三维画出架构——产品阶段与动态箭头（BD-010 v3.8）」），
+触发一次自动生产部署：状态 READY，target `production`，该次部署地址
+`gem-c5wdv2gim-lidian727.vercel.app`。**生产别名 `gem-arc.vercel.app` 随之指到它**
+（alias 列表为 `gem-arc.vercel.app` / `gem-arc-lidian727.vercel.app` /
+`gem-arc-git-main-lidian727.vercel.app`），不需要手工 `vercel alias set`。
+
+本次改的是三维的**方向**：新增 `scaffold/runtime/space/flow-arrows.js`（箭头三件套）与
+`scaffold/runtime/space/product-architecture.js`（阶段表与切工表）。控制台的 SURFACE 从此
+按产品的五个阶段摆石头，阶段之间是动态箭头；公共语义轴场景的关系由圆柱改成箭头。
+
+生产复验（只读，不带令牌、不带凭据）：
+
+- `/console-space/flow-arrows.js` → **200**，9518 字节；`/console-space/product-architecture.js`
+  → **200**，7627 字节；`/console-space/console-space.js` → 200，24972 字节；
+  `/site/runtime/space/flow-arrows.js`、`/site/runtime/space/product-architecture.js` → 均 200；
+- 旧模块 `/console-space/toon-material.js` → **404**（v3.7 已下线，属预期）；
+- 上述 10 个线上文件与仓库副本**换行归一后逐字节相等**（全部 MATCH）；
+- `/healthz` → 200；`/` → **303 → `/auth/google/start`**（登录门禁完好）；
+- `scripts/verify_remote.py https://gem-arc.vercel.app`（无令牌形态）：**11 PASS / 2 FAIL**，
+  两条 FAIL 与 v3.7 记录的**完全相同**（①「`/` 是控制台 HTML」——账号模式下 `/` 是登录页，
+  脚本的旧断言没跟上；②「a bearer token is available」——无令牌形态下本项必然红）。**没有新增失败。**
+- 浏览器实机：生产站点点「03 3D 语义与空间」后，语义轴场景的关系已是**带墨色锥头的箭头**
+  （不再是圆柱），真宝石的刻面硬边与高光仍在。
+
+本轮新增的一条运维事实：
+
+3. **控制台页在生产上要登录**：`/` 已被账号门禁挡住（303 → `/auth/google/start`），
+   所以生产控制台的**页面级**目视复验只能用真实 Google 登录完成（只能由账号所有者做）。
+   但控制台的 3D 模块是公开资源（`/console-space/*.js` → 200），可以逐字节比对：本轮 10 个模块
+   全部与仓库副本一致，因此渲染结果与本地目视复验等价。
+
 ### UNVERIFIED（没有人运行过）
 
 - **带令牌的部署**：`vercel env add GEMARC_MCP_TOKEN production --sensitive` 的写入、之后的新部署、`verify_remote.py --token` 的 401/200 分支在真实域名上的表现

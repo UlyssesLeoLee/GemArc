@@ -582,6 +582,45 @@ GitHub 上该提交的 Vercel 检查是 success，部署 id `dpl_fP3G25GdYMWseph
   **脚本断言的既有问题，不是生产缺陷**：①「`/` 是控制台 HTML」——生产 `/` 现在要求登录，脚本的旧断言没跟上；
   ②「a bearer token is available」——无令牌形态下本项必然红，令牌形态那一半没有被覆盖到。
 
+### 推 `main` 后的生产复验（2026-11-17，BD-010 v3.7 真宝石）
+
+推 `origin/main`（commit `15fb3cb`「feat(3d): 宝石恢复成真正的宝石——物理材质、切工语义与只留外缘的墨线」），
+触发一次自动生产部署：部署 id `dpl_4cpCFbiqTCXek8oFitiZixuxFsLv`，状态 READY，target `production`，
+该次部署地址 `gem-gz2o9k8zd-lidian727.vercel.app`。
+
+**生产别名 `gem-arc.vercel.app` 随之指到它**（该部署的 alias 列表为 `gem-arc.vercel.app` /
+`gem-arc-lidian727.vercel.app` / `gem-arc-git-main-lidian727.vercel.app`），**不需要**手工
+`vercel alias set`。这与 §8.0 记的「别名会被 Git 推送改写」一致：`main` 当时比 `dev` 新
+（`origin/main` 领先 10 个提交，`origin/dev` 没有新提交），所以别名落到新代码上；只有在 `main`
+落后于 `dev` 时才会落到旧代码，那时才需要手工指回。
+
+本次改的是三维材质：新增 `scaffold/runtime/space/gem-material.js`（替代 `toon-material.js`），
+路由白名单与打包清单同步改名。生产复验（只读，不带令牌、不带凭据）：
+
+- `/console-space/gem-material.js` → **200**，23123 字节；`/console-space/toon-material.js` → **404**
+  （旧模块已下线，属预期，不是缺件）；
+- `/site/runtime/space/gem-material.js` → 200；`/site/runtime/space/axis-viewer-three.js`、
+  `/site/runtime/space/unity-controls.js` → 200；
+- 上述线上文件与仓库副本**换行归一后逐字节相等**（仓库 CRLF / 线上 LF，字节数会差几百，
+  别把它误判成「线上还是旧版」）；
+- `/healthz` → 200：`accounts: ok`、`consoleRequiresLogin: true`、`staticSiteSource: scaffold-static`、
+  `staticSiteAvailable: true`；`/` → **303 → `/auth/google/start`**（登录门禁完好）；
+- `scripts/verify_remote.py https://gem-arc.vercel.app`（无令牌形态）：**11 PASS / 2 FAIL**，
+  两条 FAIL 与 2026-11-11 记录的**完全相同**（①「`/` 是控制台 HTML」——账号模式下 `/` 是登录页，
+  脚本的旧断言没跟上；②「a bearer token is available」——无令牌形态下本项必然红）。**没有新增失败。**
+- 浏览器实机：生产站点点「03 3D 语义与空间」后，语义轴场景渲染出真宝石（橄榄式双锥、柱式六棱），
+  刻面硬边、白色高光与 1 像素外缘墨线都在。
+
+两条运维事实（本轮实测）：
+
+1. **本机 Vercel CLI 的 access token 会过期**：`auth.json` 的 `expiresAt` 过期后调 `api.vercel.com`
+   返回 **403**；但 `npx vercel@65.8.0 whoami` 会用 `refreshToken` 自动刷新并写回 `auth.json` ——
+   **先跑一次 CLI，再用令牌调 REST API**，不要把 403 当成「没权限」。
+2. **生产站点的 `app.js` 是 `scaffold/templates/shared/app.js`，不是 `src/gemarc_mcp/web/app.js`** ——
+   前者**没有 `location.hash` 直达标签**。所以 `https://gem-arc.vercel.app/site/#3d` 仍会停在 1D，
+   进 3D 视图必须点「03 3D 语义与空间」按钮（`/site/` 的其余资源则是运行时用
+   `builder.build_site(SEED_MODEL, "static")` 现生成的，不是静态产物）。
+
 ### UNVERIFIED（没有人运行过）
 
 - **带令牌的部署**：`vercel env add GEMARC_MCP_TOKEN production --sensitive` 的写入、之后的新部署、`verify_remote.py --token` 的 401/200 分支在真实域名上的表现

@@ -8,8 +8,8 @@
  *
  * The scene borrows what it must not reinvent:
  *
- *   - the toon (cel) material comes from `toon-material.js`, the one module
- *     of the product (section 13.4);
+ *   - the gem material comes from `gem-material.js`, the one module of the
+ *     product (section 13.4);
  *   - the gestures come from `unity-controls.js`, so the console reacts
  *     exactly like the two public scenes (section 9.1).
  *
@@ -17,7 +17,18 @@
  */
 
 import { UnityControls } from './unity-controls.js';
-import { createToonGradient, createToonMaterial, createFacetHighlightMaterial, CRYSTAL_BODY_OPACITY, PALETTE } from './toon-material.js';
+import {
+  applyGemRendererSettings,
+  createCrystalGeometry,
+  createGemMaterial,
+  createSilhouetteOutline,
+  createStudioEnvironment,
+  updateSilhouetteWidth,
+  GEM_LIGHT_SCALE,
+  GEM_OUTLINE_PIXELS,
+  GEM_OUTLINE_PIXELS_SELECTED,
+  PALETTE,
+} from './gem-material.js';
 
 /**
  * The colours of the tool surface. They are the palette of the policy:
@@ -28,6 +39,19 @@ export const CONSOLE_SPACE_COLORS = Object.freeze({
   read: PALETTE.ai,
   write: PALETTE.kaki,
   background: PALETTE.bg,
+});
+
+/**
+ * The cut work of a tool, by what the tool does to the world (section 4.3):
+ * a read tool is a standing eight-sided wedge - the boundary that hands
+ * things out - and a write tool is a pyramid - the point that pushes
+ * something forward. The cut says what the tool does, so the colour never
+ * has to say it alone.
+ * @type {Readonly<Record<string, string>>}
+ */
+export const CONSOLE_SPACE_CUT_FORMS = Object.freeze({
+  read: 'wedge',
+  write: 'pyramid',
 });
 
 /**
@@ -160,9 +184,16 @@ export function createConsoleSpace(THREE, options = {}) {
     throw new Error('无法初始化 WebGL 渲染器');
   }
   renderer.setPixelRatio(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1);
+  // The stones are lit and refracted, so the renderer needs the tone mapper
+  // and the half-size transmission buffer (BD-010 section 13.1).
+  applyGemRendererSettings(THREE, renderer);
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(CONSOLE_SPACE_COLORS.background);
+  // The little studio the cut faces reflect (BD-010 section 4.5). It is
+  // baked once, from code, and it never changes.
+  const studio = createStudioEnvironment(THREE, renderer);
+  scene.environment = studio.texture;
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 6000);
 
   const disposables = [];
@@ -170,24 +201,22 @@ export function createConsoleSpace(THREE, options = {}) {
     if (item) disposables.push(item);
     return item;
   };
-
-  // One gradient map for the whole scene: the light is banded into three
-  // steps on the cut faces and the map never changes (section 13.1).
-  const gradient = track(createToonGradient(THREE));
+  // One vector, reused: the ink line needs the world position of every
+  // stone on every frame.
+  const worldPosition = new THREE.Vector3();
 
   const root = new THREE.Group();
   scene.add(root);
 
-  // The ratios of section 4.5 (0.75 / 0.55 / 0.25) times one scale: the
-  // three-dimensional library divides the light by pi, so without the scale a
-  // pigment would arrive on the paper at a third of its own colour.
-  const ambient = new THREE.AmbientLight(0xfaf2e2, 0.75 * 2.1);
+  // The ratios of section 4.5 (0.75 / 0.55 / 0.25) times one scale. The stone
+  // is lit by the studio (section 13.1); these three are only the fill.
+  const ambient = new THREE.AmbientLight(0xfaf2e2, 0.75 * GEM_LIGHT_SCALE);
   scene.add(ambient);
-  const key = new THREE.DirectionalLight(0xfff8ee, 0.55 * 2.1);
+  const key = new THREE.DirectionalLight(0xfff8ee, 0.55 * GEM_LIGHT_SCALE);
   key.position.set(1, 2.4, 1.4);
   scene.add(key);
   // The fill is the bounce of the paper: warm, never cold blue (section 4.5).
-  const fill = new THREE.DirectionalLight(PALETTE.facet, 0.25 * 2.1);
+  const fill = new THREE.DirectionalLight(PALETTE.facet, 0.25 * GEM_LIGHT_SCALE);
   fill.position.set(-1.4, 0.8, -1.1);
   scene.add(fill);
 
@@ -204,8 +233,7 @@ export function createConsoleSpace(THREE, options = {}) {
   function setTools(list) {
     for (const record of crystals.values()) {
       root.remove(record.mesh);
-      for (const item of [record.geometry, record.material, record.highlightMaterial,
-        record.edgeGeometry, record.edgeMaterial]) {
+      for (const item of [record.geometry, record.material, record.outlineMaterial]) {
         if (item && typeof item.dispose === 'function') item.dispose();
       }
     }
@@ -214,50 +242,42 @@ export function createConsoleSpace(THREE, options = {}) {
 
     const layout = layoutConsoleCrystals(list);
     layout.forEach((plan, index) => {
-      const geometry = new THREE.OctahedronGeometry(CONSOLE_SPACE_CONSTANTS.crystalSize, 0);
-      const material = createToonMaterial(THREE, {
+      // A stone is a cut polyhedron, not a ball: the cut says what the tool
+      // does to the world (BD-010 section 4.3).
+      const size = CONSOLE_SPACE_CONSTANTS.crystalSize;
+      const cut = createCrystalGeometry(
+        THREE,
+        plan.write ? CONSOLE_SPACE_CUT_FORMS.write : CONSOLE_SPACE_CUT_FORMS.read,
+        size,
+      );
+      const geometry = cut.geometry;
+      const material = createGemMaterial(THREE, {
         color: plan.color,
-        gradient,
-        // The self-light of the crystal: this is the only thing that breathes
+        size,
+        // The self-light of the stone: this is the only thing that breathes
         // (section 13.3). No new texture, no new shader.
         emissive: plan.color,
         emissiveIntensity: CONSOLE_SPACE_CONSTANTS.breathLow,
       });
-      // The shine on the cut faces (section 4.7). The material is made right
-      // after the body material on purpose: the library draws the transparent
-      // objects in the order their materials were made, so the shine lands on
-      // top of its own body and not on top of the scene.
-      const highlightMaterial = createFacetHighlightMaterial(THREE);
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.set(plan.position.x, plan.position.y, plan.position.z);
       mesh.userData.toolName = plan.name;
       root.add(mesh);
       pickTargets.push(mesh);
 
-      // The ink line is the crystal's own edge: no second outline pass. The
-      // ink is the ink, never a brighter step of the body colour (section 13.2).
-      const edgeGeometry = new THREE.EdgesGeometry(geometry);
-      const edgeMaterial = new THREE.LineBasicMaterial({ color: PALETTE.ink });
-      const edge = new THREE.LineSegments(edgeGeometry, edgeMaterial);
-      mesh.add(edge);
-
-      // The shine sits on the same geometry as the body: the stone keeps its
-      // shape and its colour, and only gains a reflection.
-      const highlight = new THREE.Mesh(geometry, highlightMaterial);
-      mesh.add(highlight);
+      // The ink line is a hairline around the outside of the stone; the inner
+      // edges are already visible in the refraction (BD-010 section 4.8).
+      const outline = createSilhouetteOutline(THREE, geometry, cut.half, { color: PALETTE.ink });
+      mesh.add(outline);
 
       crystals.set(plan.name, {
         mesh,
         geometry,
         material,
-        highlightMaterial,
-        highlight,
-        edgeGeometry,
-        edgeMaterial,
-        edge,
+        outline,
         color: plan.color,
-        // The phase of this crystal in the turn and in the breath. It comes
-        // from the place of the crystal, so it never changes between two runs.
+        // The phase of this stone in the turn and in the breath. It comes
+        // from the place of the stone, so it never changes between two runs.
         phase: index * 0.37,
       });
     });
@@ -273,11 +293,12 @@ export function createConsoleSpace(THREE, options = {}) {
   function markSelection() {
     for (const [name, record] of crystals) {
       const active = name === selected;
-      // The body keeps its colour and its transparency; the selection is
-      // carried by the ink line, which grows one step (section 4.2).
-      record.material.opacity = CRYSTAL_BODY_OPACITY;
-      record.edgeMaterial.opacity = 1;
-      if (record.edge) record.edge.scale.setScalar(active ? 1.12 : 1);
+      // The stone keeps its colour and its shape; the selection is carried by
+      // the ink line, which grows one step (section 4.2 and 4.8).
+      record.outline.material.opacity = 1;
+      record.outline.userData.outlinePixels = active
+        ? GEM_OUTLINE_PIXELS_SELECTED
+        : GEM_OUTLINE_PIXELS;
     }
   }
 
@@ -384,6 +405,23 @@ export function createConsoleSpace(THREE, options = {}) {
   }
 
   function draw() {
+    // The ink line is counted in pixels, so its width is measured again on
+    // every frame: the line is one pixel wide on a far stone and on a near
+    // one alike (BD-010 section 4.8).
+    scene.updateMatrixWorld(true);
+    const deviceHeight = Math.max(1, canvas.height || container.clientHeight || 1);
+    const ratio = typeof renderer.getPixelRatio === 'function' ? renderer.getPixelRatio() : 1;
+    for (const record of crystals.values()) {
+      if (!record.outline) continue;
+      const world = record.mesh.getWorldPosition(worldPosition);
+      updateSilhouetteWidth(
+        record.outline,
+        camera,
+        world,
+        deviceHeight,
+        (record.outline.userData.outlinePixels ?? GEM_OUTLINE_PIXELS) * ratio,
+      );
+    }
     renderer.render(scene, camera);
   }
 
@@ -487,6 +525,7 @@ export function createConsoleSpace(THREE, options = {}) {
       for (const item of disposables) {
         if (item && typeof item.dispose === 'function') item.dispose();
       }
+      if (studio && typeof studio.dispose === 'function') studio.dispose();
       if (renderer && typeof renderer.dispose === 'function') renderer.dispose();
       if (typeof container.removeChild === 'function' && canvas.parentNode === container) {
         container.removeChild(canvas);

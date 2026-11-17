@@ -14,6 +14,7 @@ import {
   createConsoleSpace,
   layoutConsoleCrystals,
 } from '../space/console-space.js';
+import { PALETTE } from '../space/gem-material.js';
 import { createStubCanvas, createStubContainer, createStubThree } from './helpers/three-stub.mjs';
 
 const TOOLS = [
@@ -56,7 +57,7 @@ test('the crystals do not sit on top of each other', () => {
   }
 });
 
-test('the scene builds one crystal per tool and marks the selection', () => {
+test('the scene builds one stone per tool and marks the selection', () => {
   const THREE = createStubThree();
   const canvas = createStubCanvas();
   const container = createStubContainer({ canvas });
@@ -65,49 +66,79 @@ test('the scene builds one crystal per tool and marks the selection', () => {
   assert.equal(scene.crystals.size, 3);
   const record = scene.crystals.get('gemarc_model');
   assert.ok(record);
-  // The body is a toon material with the shared gradient map.
-  assert.equal(record.material.gradientMap.width, 3);
-  // A cut stone is transparent (BD-010 section 4.2).
-  assert.equal(record.material.transparent, true);
-  assert.ok(record.material.opacity >= 0.45 && record.material.opacity <= 0.62,
-    `the body opacity ${record.material.opacity} is outside the range of the policy`);
-  assert.equal(record.material.depthWrite, false,
-    'the body writes depth: what is behind it would be hidden');
+  // The body is a real stone (BD-010 section 13.1): it is transparent
+  // because the light bends on the way in, not because it is painted pale.
+  assert.equal(record.material.transmission, 0.9,
+    'the stone does not let the light through');
+  assert.equal(record.material.clearcoat, 1,
+    'the stone has no polished coat: the cut faces lose their glint');
+  assert.equal(record.material.metalness, 0, 'a stone is not a metal');
+  assert.ok(record.material.roughness <= 0.05,
+    `the stone is too rough (${record.material.roughness}): it would read as plastic`);
+  assert.ok(record.material.ior >= 2.0 && record.material.ior <= 2.4,
+    `the index of refraction ${record.material.ior} is outside the range of the policy`);
+  assert.ok(record.material.dispersion > 0,
+    'the stone does not split the light: there is no colour at its edges');
+  // One normal per cut face: the edge between two faces stays hard.
+  assert.equal(record.material.flatShading, true,
+    'the stone is smooth: the border between two cut faces would blur');
+  // The inner cut faces are seen through the stone.
+  assert.equal(record.material.side, THREE.DoubleSide);
+  // The type colour is in the stone, not on it (BD-010 section 4.7).
+  assert.equal(record.material.attenuationColor.getHex(), CONSOLE_SPACE_COLORS.write,
+    'the stone does not carry the colour of its type');
+  assert.equal(record.material.color.getHex(), 0xffffff,
+    'the surface of the stone is painted: a stone is not painted');
 
   scene.setSelected('gemarc_model');
   // The selection is carried by the ink line, which grows one step.
-  assert.equal(record.edgeMaterial.opacity, 1);
-  assert.ok(record.edge.scale.x > scene.crystals.get('gemarc_brief').edge.scale.x,
-            'the selected crystal carries the heavier ink line');
+  assert.equal(record.outline.material.opacity, 1);
+  assert.ok(
+    record.outline.userData.outlinePixels > scene.crystals.get('gemarc_brief').outline.userData.outlinePixels,
+    'the selected crystal carries the heavier ink line');
 });
 
-test('every crystal carries the shine on its cut faces', () => {
+test('every stone is a real gem with an ink line around its outside', () => {
   const THREE = createStubThree();
   const canvas = createStubCanvas();
   const container = createStubContainer({ canvas });
   const scene = createConsoleSpace(THREE, { container, tools: TOOLS });
 
   for (const [name, record] of scene.crystals) {
-    // The shine is a second layer on the very geometry of the stone
-    // (BD-010 section 4.7).
-    assert.ok(record.highlight, `the crystal ${name} has no shine`);
-    assert.equal(record.highlight.geometry, record.mesh.geometry,
-      'the shine is not on the geometry of the stone');
-    // One brightness per cut face: the border between two faces stays hard.
-    assert.equal(record.highlightMaterial.flatShading, true,
-      'the shine is smooth: the border between two cut faces would blur');
-    // Added on top of the body, so the stone keeps its colour underneath.
-    assert.equal(record.highlightMaterial.blending, THREE.AdditiveBlending,
-      'the shine replaces the colour of the stone instead of adding to it');
-    assert.equal(record.highlightMaterial.depthWrite, false,
-      'the shine writes depth: what is behind the stone would be hidden');
-    // The reflection is the paper's white; the layer carries no colour of
-    // its own, so the stone keeps the colour of its type.
-    assert.equal(record.highlightMaterial.specular.getHex(), 0xf4eddf,
-      'the shine does not use the paper white');
-    assert.equal(record.highlightMaterial.color.getHex(), 0x000000,
-      'the shine paints the stone instead of reflecting on it');
+    // The ink line is a hairline around the outside of the stone; the inner
+    // edges are left to the refraction (BD-010 section 4.8).
+    assert.ok(record.outline, `the crystal ${name} has no ink line`);
+    assert.equal(record.outline.geometry, record.mesh.geometry,
+      'the ink line is not on the geometry of the stone');
+    // Only the back of the shell is drawn, so it never covers the stone.
+    assert.equal(record.outline.material.side, THREE.BackSide,
+      'the ink line is drawn over the stone');
+    // The line never hides what is behind the stone.
+    assert.equal(record.outline.material.depthWrite, false,
+      'the ink line writes depth: what is behind the stone would be hidden');
+    // The ink is ink: it is never tone mapped into another colour.
+    assert.equal(record.outline.material.toneMapped, false,
+      'the ink line is tone mapped: the ink would not be the ink');
+    assert.equal(record.outline.material.color.getHex(), PALETTE.ink,
+      'the ink line is not the ink of the palette');
   }
+});
+
+test('the cut of a stone says what the tool does', () => {
+  const THREE = createStubThree();
+  const canvas = createStubCanvas();
+  const container = createStubContainer({ canvas });
+  const scene = createConsoleSpace(THREE, { container, tools: TOOLS });
+
+  const read = scene.crystals.get('gemarc_brief');
+  const write = scene.crystals.get('gemarc_model');
+  assert.ok(read && write);
+  // A read tool and a write tool do not look alike: the colour says which
+  // one it is and the cut says what it does (BD-010 section 4.3). Both are
+  // turned stones now, so the cut is told apart by the number of sides.
+  assert.notEqual(read.mesh.geometry.parameters.segments,
+    write.mesh.geometry.parameters.segments,
+    'a read tool and a write tool are cut the same way');
 });
 
 test('picking a crystal names the tool it stands for', () => {

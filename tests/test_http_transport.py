@@ -480,7 +480,7 @@ class RemoteDefaultTests(unittest.TestCase):
 
         for asset, marker in (("/console-space/boot.js", "console-space.js"),
                               ("/console-space/console-space.js", "createConsoleSpace"),
-                              ("/console-space/toon-material.js", "createToonMaterial"),
+                              ("/console-space/gem-material.js", "createGemMaterial"),
                               ("/console-space/unity-controls.js", "UnityControls")):
             with self.subTest(asset=asset):
                 status, headers, content = http(self.live.url(asset))

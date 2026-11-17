@@ -23,6 +23,19 @@
 
 /* -------------------------------------------------------------- vectors */
 
+export class Vector2 {
+  constructor(x = 0, y = 0) {
+    this.x = x;
+    this.y = y;
+  }
+
+  set(x, y) {
+    this.x = x;
+    this.y = y;
+    return this;
+  }
+}
+
 export class Vector3 {
   constructor(x = 0, y = 0, z = 0) {
     this.x = x;
@@ -91,6 +104,14 @@ export class Vector3 {
 
   length() {
     return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+  }
+
+  /** The distance to another point, the way the client reads it back. */
+  distanceTo(v) {
+    const dx = this.x - v.x;
+    const dy = this.y - v.y;
+    const dz = this.z - v.z;
+    return Math.sqrt(dx * dx + dy * dy + dz * dz);
   }
 
   normalize() {
@@ -227,7 +248,11 @@ export class Quaternion {
 
 export class Color {
   constructor(value = 0) {
-    this.hex = value;
+    // The client accepts a colour or a number, and copies the colour when it
+    // is given one: `new Color(otherColor)` is the same colour.
+    this.hex = value && typeof value === 'object' && typeof value.getHex === 'function'
+      ? value.getHex()
+      : value;
   }
 
   setHex(value) {
@@ -289,6 +314,17 @@ export class Object3D {
   updateMatrixWorld() {
     // The stub computes world transforms from the parent chain on demand.
     return this;
+  }
+
+  /**
+   * The world position of this object, written into the given vector.
+   * @param {object} target the vector to write into
+   * @returns {object} the target
+   */
+  getWorldPosition(target) {
+    const point = this.worldPosition();
+    if (target && typeof target.set === 'function') target.set(point.x, point.y, point.z);
+    return target;
   }
 
   lookAt(x, y, z) {
@@ -382,20 +418,46 @@ export class PerspectiveCamera extends Object3D {
 
 /* ------------------------------------------------------------ geometries */
 
-class BoxGeometry {
+/**
+ * The shared behaviour of the geometries: the client can scale them and turn
+ * them around, and the stub only has to remember that it was told to.
+ */
+class Geometry {
+  scale(x = 1, y = 1, z = 1) {
+    this.scaled = true;
+    this.scaleFactor = { x, y, z };
+    return this;
+  }
+
+  rotateY() {
+    this.rotated = true;
+    return this;
+  }
+
+  translate(x = 0, y = 0, z = 0) {
+    this.translated = true;
+    this.translation = { x, y, z };
+    return this;
+  }
+}
+
+class BoxGeometry extends Geometry {
   constructor(width = 1, height = 1, depth = 1) {
+    super();
     this.type = 'BoxGeometry';
     this.parameters = { width, height, depth };
   }
 }
-class EdgesGeometry {
+class EdgesGeometry extends Geometry {
   constructor(source = null) {
+    super();
     this.type = 'EdgesGeometry';
     this.parameters = source?.parameters || { width: 1, height: 1, depth: 1 };
   }
 }
-class CylinderGeometry {
+class CylinderGeometry extends Geometry {
   constructor(radiusTop = 1, radiusBottom = 1, height = 1, radialSegments = 8) {
+    super();
     this.type = 'CylinderGeometry';
     this.parameters = {
       radiusTop,
@@ -406,10 +468,55 @@ class CylinderGeometry {
     };
   }
 }
-class OctahedronGeometry {
+class ConeGeometry extends Geometry {
+  constructor(radius = 1, height = 1, radialSegments = 8) {
+    super();
+    this.type = 'ConeGeometry';
+    this.parameters = { radius, height, radialSegments };
+  }
+}
+class OctahedronGeometry extends Geometry {
   constructor(radius = 1, detail = 0) {
+    super();
     this.type = 'OctahedronGeometry';
     this.parameters = { radius, detail };
+  }
+}
+class PlaneGeometry extends Geometry {
+  constructor(width = 1, height = 1) {
+    super();
+    this.type = 'PlaneGeometry';
+    this.parameters = { width, height };
+  }
+}
+class LatheGeometry extends Geometry {
+  constructor(points = [], segments = 8) {
+    super();
+    this.type = 'LatheGeometry';
+    this.parameters = { points, segments };
+  }
+
+  /**
+   * The client scales and moves the vertices of a turned stone, so the stub
+   * does the same to the profile it was given: a stone that was moved up or
+   * scaled down has to be picked where it really is.
+   */
+  scale(x = 1, y = 1, z = 1) {
+    super.scale(x, y, z);
+    for (const point of this.parameters.points) {
+      point.x *= x;
+      point.y *= y;
+    }
+    return this;
+  }
+
+  translate(x = 0, y = 0, z = 0) {
+    super.translate(x, y, z);
+    for (const point of this.parameters.points) {
+      point.x += x;
+      point.y += y;
+    }
+    return this;
   }
 }
 
@@ -428,6 +535,16 @@ class MeshPhongMaterial extends MeshBasicMaterial {
     super(parameters);
     // The client keeps the specular colour as a colour object, not a number.
     this.specular = new Color(parameters.specular ?? 0x111111);
+  }
+}
+/**
+ * The stone material. The client keeps the attenuation colour as a colour
+ * object, like every other colour it hands to a shader.
+ */
+class MeshPhysicalMaterial extends MeshBasicMaterial {
+  constructor(parameters = {}) {
+    super(parameters);
+    this.attenuationColor = new Color(parameters.attenuationColor ?? 0xffffff);
   }
 }
 class LineBasicMaterial extends MeshBasicMaterial {}
@@ -468,11 +585,18 @@ export class WebGLRenderer {
     this.context = parameters.context || null;
     this.renderCount = 0;
     this.disposed = false;
+    this.pixelRatio = 1;
+    this.toneMapping = 0;
+    this.toneMappingExposure = 1;
   }
 
   setPixelRatio(ratio) {
     this.pixelRatio = ratio;
     return this;
+  }
+
+  getPixelRatio() {
+    return this.pixelRatio;
   }
 
   setSize(width, height, updateStyle = true) {
@@ -599,6 +723,29 @@ function intersectOctahedron(origin, direction, radius) {
   return tmin >= 0 ? tmin : tmax;
 }
 
+/**
+ * The ray/sphere intersection of three: the sphere that encloses a turned
+ * stone. The client tests the triangles of the stone; the stub tests the
+ * sphere around them. The two agree at the middle of the stone, which is
+ * where the pick tests aim, and the sphere is the same size the stone is -
+ * so a click that lands on nothing in the client is still nothing here.
+ * @returns {number|null} the distance to the entry, or null
+ */
+function intersectSphere(origin, direction, center, radius) {
+  const ox = origin.x - center.x;
+  const oy = origin.y - center.y;
+  const oz = origin.z - center.z;
+  const b = 2 * (ox * direction.x + oy * direction.y + oz * direction.z);
+  const c = ox * ox + oy * oy + oz * oz - radius * radius;
+  const discriminant = b * b - 4 * c;
+  if (discriminant < 0) return null;
+  const root = Math.sqrt(discriminant);
+  let distance = (-b - root) / 2;
+  if (distance < 0) distance = (-b + root) / 2;
+  if (distance < 0) return null;
+  return distance;
+}
+
 export class Raycaster {
   constructor() {
     this.ray = { origin: new Vector3(), direction: new Vector3(0, 0, -1) };
@@ -691,7 +838,60 @@ export class Raycaster {
       return { object, distance, point: null };
     }
 
+    if (geometry.type === 'LatheGeometry' || geometry.type === 'ConeGeometry') {
+      const center = object.worldPosition();
+      const scale = Math.max(
+        Math.abs(object.scale.x),
+        Math.abs(object.scale.y),
+        Math.abs(object.scale.z),
+      );
+      let radius = 0;
+      if (geometry.type === 'ConeGeometry') {
+        radius = Math.hypot(
+          geometry.parameters.radius,
+          geometry.parameters.height / 2,
+        );
+      } else {
+        for (const point of geometry.parameters.points || []) {
+          const reach = Math.hypot(point.x, point.y);
+          if (reach > radius) radius = reach;
+        }
+      }
+      const distance = intersectSphere(origin, direction, center, radius * scale);
+      if (distance === null) return null;
+      return { object, distance, point: null };
+    }
+
     return null;
+  }
+}
+
+/* --------------------------------------------------- the environment baker */
+
+/**
+ * The pre-filtered environment baker. The stub hands back a texture it can
+ * dispose, the way the client does, and it remembers how often it was asked
+ * to bake a room.
+ */
+export class PMREMGenerator {
+  constructor(renderer = null) {
+    this.renderer = renderer;
+    this.disposed = false;
+    this.bakes = 0;
+  }
+
+  fromScene(scene = null, sigma = 0, near = 0.1, far = 100) {
+    this.bakes += 1;
+    return {
+      texture: { isTexture: true, source: scene, sigma, near, far },
+      dispose() {
+        this.disposed = true;
+      },
+    };
+  }
+
+  dispose() {
+    this.disposed = true;
   }
 }
 
@@ -699,9 +899,11 @@ export class Raycaster {
 
 export const DoubleSide = 2;
 export const FrontSide = 0;
+export const BackSide = 1;
 export const RedFormat = 1023;
 export const NearestFilter = 1003;
 export const AdditiveBlending = 2;
+export const ACESFilmicToneMapping = 4;
 
 /**
  * Build the stub three namespace.
@@ -709,6 +911,7 @@ export const AdditiveBlending = 2;
  */
 export function createStubThree() {
   return {
+    Vector2,
     Vector3,
     Quaternion,
     Color,
@@ -724,22 +927,29 @@ export function createStubThree() {
     BoxGeometry,
     EdgesGeometry,
     CylinderGeometry,
+    ConeGeometry,
     OctahedronGeometry,
+    PlaneGeometry,
+    LatheGeometry,
     MeshBasicMaterial,
     MeshStandardMaterial,
     MeshToonMaterial,
     MeshPhongMaterial,
+    MeshPhysicalMaterial,
     LineBasicMaterial,
     SpriteMaterial,
     CanvasTexture,
     DataTexture,
     WebGLRenderer,
+    PMREMGenerator,
     Raycaster,
     DoubleSide,
     FrontSide,
+    BackSide,
     RedFormat,
     NearestFilter,
     AdditiveBlending,
+    ACESFilmicToneMapping,
   };
 }
 

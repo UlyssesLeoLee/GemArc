@@ -32,7 +32,7 @@ ACCOUNT_PAGES = REPO_ROOT / "src" / "gemarc_mcp" / "accounts" / "pages.py"
 CONSOLE_HTML = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "templates" / "console" / "index.html"
 CONSOLE_JS = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "templates" / "console" / "console.js"
 CONSOLE_SPACE = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space" / "console-space.js"
-TOON_MATERIAL = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space" / "toon-material.js"
+GEM_MATERIAL = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space" / "gem-material.js"
 AXIS_VIEWER = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space" / "axis-viewer-three.js"
 SPACE_VIEWER = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space" / "space-viewer-three.js"
 UNITY_CONTROLS = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space" / "unity-controls.js"
@@ -317,7 +317,9 @@ class StylePolicyBindingTests(unittest.TestCase):
 
     def test_the_type_colours_of_the_policy_are_the_colours_of_the_scene(self):
         policy = self._policy_text()
-        viewer = AXIS_VIEWER.read_text(encoding="utf-8")
+        # The table of the kinds is a fact of the product, so it lives in the
+        # shared gem module and the scenes read it from there (section 13.4).
+        viewer = GEM_MATERIAL.read_text(encoding="utf-8")
         table = re.search(r"### 4\.3 类型色板(.*?)(?:\n### |\Z)", policy, re.S)
         self.assertIsNotNone(table, "the policy does not carry the type colour table")
         rows = re.findall(r"\|\s*([a-z]+)\s*\|\s*`(#[0-9a-fA-F]{6})`", table.group(1))
@@ -483,7 +485,7 @@ class ConsoleStyleBindingTests(unittest.TestCase):
     The console used to carry its own set of near-duplicate colours
     (``--bg``/``--panel``/``--accent``). Section 12.1 forbids that: the
     background shares the palette of section 3, the crystal scene shares the
-    toon material and the gesture mapping of the two public scenes.
+    gem material and the gesture mapping of the two public scenes.
     """
 
     def _policy_text(self):
@@ -526,39 +528,43 @@ class ConsoleStyleBindingTests(unittest.TestCase):
                 self.assertIn(hex_colour.lower(), [c.lower() for c in self._palette().values()],
                               "the console root declares a colour the policy does not know")
 
-    def test_the_console_scene_shares_the_toon_material_and_the_gestures(self):
+    def test_the_console_scene_shares_the_gem_material_and_the_gestures(self):
         source = CONSOLE_SPACE.read_text(encoding="utf-8")
-        self.assertIn("toon-material.js", source,
-                      "the console scene does not use the shared toon material")
+        self.assertIn("gem-material.js", source,
+                      "the console scene does not use the shared gem material")
         self.assertIn("unity-controls.js", source,
                       "the console scene does not use the shared gesture mapping")
         self.assertIn("UnityControls", source)
         # A second gesture mapping would drift from the nine rows of section 9.1.
         self.assertNotIn("event.button ===", _without_comments(source))
 
-    def test_the_toon_material_has_exactly_one_implementation(self):
+    def test_the_gem_material_has_exactly_one_implementation(self):
         """Section 13.4: the material lives in one module and everybody uses it."""
         root = REPO_ROOT / "src" / "gemarc_mcp"
         makers = [path for path in root.rglob("*.js")
-                  if "createToonMaterial" in path.read_text(encoding="utf-8")
-                  and "export function createToonMaterial" in path.read_text(encoding="utf-8")]
-        self.assertEqual([path.name for path in makers], ["toon-material.js"],
-                         "the toon material must exist in one module only")
+                  if "createGemMaterial" in path.read_text(encoding="utf-8")
+                  and "export function createGemMaterial" in path.read_text(encoding="utf-8")]
+        self.assertEqual([path.name for path in makers], ["gem-material.js"],
+                         "the gem material must exist in one module only")
         for name, path in (("axis viewer", AXIS_VIEWER), ("space viewer", SPACE_VIEWER),
                            ("console scene", CONSOLE_SPACE)):
             with self.subTest(renderer=name):
-                self.assertIn("toon-material.js", path.read_text(encoding="utf-8"))
+                self.assertIn("gem-material.js", path.read_text(encoding="utf-8"))
 
-    def test_the_toon_material_is_the_one_the_policy_describes(self):
-        """Section 13.1: three bands, a toon material, a constant gradient map."""
+    def test_the_gem_material_is_the_one_the_policy_describes(self):
+        """Section 13.1: a real stone - refraction, dispersion and cut faces."""
         policy = self._policy_text()
-        source = TOON_MATERIAL.read_text(encoding="utf-8")
-        self.assertIn("3 阶", policy)
-        self.assertIn("TOON_BAND_COUNT = 3", source)
-        self.assertIn("MeshToonMaterial", source)
-        self.assertIn("DataTexture", source)
-        self.assertIn("NearestFilter", source)
-        # The gradient is a constant: it never depends on the entity or the frame.
+        source = GEM_MATERIAL.read_text(encoding="utf-8")
+        self.assertIn("MeshPhysicalMaterial", source)
+        self.assertIn("transmission", source)
+        self.assertIn("dispersion", source)
+        self.assertIn("flatShading: true", source)
+        # The parameters are constants: the same model renders the same pixels.
+        self.assertNotIn("Math.random", source)
+        for marker in ("transmission", "ior", "dispersion", "flatShading: true"):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, policy,
+                              f"the policy does not write the stone down: {marker}")
         self.assertNotIn("Math.random", _without_comments(source))
 
     def test_the_console_scene_does_not_animate_itself(self):
@@ -578,7 +584,7 @@ class ConsoleStyleBindingTests(unittest.TestCase):
     def test_the_scenes_share_the_one_palette(self):
         """Section 16.4: the scenes may not grow a second skin."""
         expected = {token.replace("--gem-", ""): colour for token, colour in self._palette().items()}
-        source = TOON_MATERIAL.read_text(encoding="utf-8")
+        source = GEM_MATERIAL.read_text(encoding="utf-8")
         block = re.search(r"export const PALETTE = Object\.freeze\(\{(.*?)\}\);", source, re.S)
         self.assertIsNotNone(block, "the shared palette module is missing")
         found = dict(re.findall(r"(\w+):\s*(0x[0-9a-fA-F]{6})", block.group(1)))
@@ -793,7 +799,7 @@ class OneSkinTests(unittest.TestCase):
         ("preview shell", REPO_ROOT / "src" / "gemarc_mcp" / "web" / "style.css"),
         ("console", REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "templates" / "console" / "console.css"),
         ("account pages", REPO_ROOT / "src" / "gemarc_mcp" / "accounts" / "pages.py"),
-        ("toon material", TOON_MATERIAL),
+        ("gem material", GEM_MATERIAL),
         ("axis viewer", AXIS_VIEWER),
         ("space viewer", SPACE_VIEWER),
         ("console scene", CONSOLE_SPACE),
@@ -852,63 +858,137 @@ class OneSkinTests(unittest.TestCase):
                                      "an inner highlight is light on the paper")
 
 
-class ToonMaterialBindingTests(unittest.TestCase):
+class GemMaterialBindingTests(unittest.TestCase):
     """Sections 4.2, 13.1 and 13.2: the one material, drawn the way the policy
-    says - banded light, a translucent body and an ink line that is ink."""
+    says - a real stone with cut faces, and an ink line that is ink."""
 
     def _source(self):
-        return TOON_MATERIAL.read_text(encoding="utf-8")
+        return GEM_MATERIAL.read_text(encoding="utf-8")
 
-    def test_the_body_is_translucent(self):
-        """Section 4.2: a cut stone is transparent, and the policy says how much."""
-        source = self._source()
-        self.assertIn("transparent: true", source,
-                      "the crystal body is opaque; the policy asks for a stone")
-        self.assertNotIn("transparent: false", source,
-                         "the crystal body is opaque; the policy asks for a stone")
+    def _policy(self):
+        return STYLE_POLICY.read_text(encoding="utf-8")
 
-    def test_the_body_does_not_write_depth_and_is_drawn_on_both_sides(self):
-        """Section 4.2: you see through the stone, and you see its own cut faces."""
+    def test_the_body_is_a_real_stone(self):
+        """Section 4.2 and 13.1: the stone lets the light through and bends it."""
         source = self._source()
-        self.assertIn("depthWrite: false", source,
-                      "the body writes depth: what is behind it would be hidden")
+        self.assertIn("MeshPhysicalMaterial", source,
+                      "the stone is not a physical material: it cannot refract")
+        match = re.search(r"GEM_TRANSMISSION = ([0-9.]+);", source)
+        self.assertIsNotNone(match, "the material does not export the transmission")
+        transmission = float(match.group(1))
+        self.assertTrue(0.8 <= transmission <= 0.95,
+                        f"the transmission {transmission} is outside the range of the policy: "
+                        "a fully transmissive stone reads as a tinted pane, an opaque one as plastic")
+        self.assertIn("clearcoat: GEM_CLEARCOAT", source,
+                      "the stone has no polished coat: the cut faces lose their glint")
+
+    def test_the_stone_is_polished_and_not_a_metal(self):
+        """Section 13.1: a cut face is smooth; a stone is not a metal."""
+        source = self._source()
+        match = re.search(r"GEM_ROUGHNESS = ([0-9.]+);", source)
+        self.assertIsNotNone(match, "the material does not export the roughness")
+        roughness = float(match.group(1))
+        self.assertTrue(0 <= roughness <= 0.05,
+                        f"the stone is too rough ({roughness}): it reads as plastic")
+        self.assertIn("metalness: 0", source,
+                      "a stone is not a metal")
+
+    def test_the_refraction_carries_the_gem_index_and_the_colour_spread(self):
+        """Section 4.7: the light bends, and it splits into colours."""
+        source = self._source()
+        match = re.search(r"GEM_IOR = ([0-9.]+);", source)
+        self.assertIsNotNone(match, "the material does not export the index of refraction")
+        ior = float(match.group(1))
+        self.assertTrue(2.0 <= ior <= 2.4,
+                        f"the index of refraction {ior} is outside the range of the policy")
+        match = re.search(r"GEM_DISPERSION = ([0-9.]+);", source)
+        self.assertIsNotNone(match, "the material does not export the dispersion")
+        self.assertGreater(float(match.group(1)), 0,
+                           "the stone does not split the light: there is no colour at its edges")
+        self.assertIn("attenuationColor", source,
+                      "the type colour is not in the stone")
+        self.assertIn("attenuationDistance", source,
+                      "the stone has no depth of colour")
+
+    def test_the_cut_faces_are_hard_and_the_inner_faces_are_seen(self):
+        """Section 13.1: one normal per cut face, and both sides of the stone."""
+        source = self._source()
+        self.assertIn("flatShading: true", source,
+                      "the stone is smooth: the border between two cut faces would blur")
         self.assertIn("side: THREE.DoubleSide", source,
-                      "the body is drawn on one side only: it reads as a pane")
+                      "the stone is drawn on one side only: it reads as a pane")
 
-    def test_the_opacity_is_inside_the_range_the_policy_writes_down(self):
-        """Section 4.2: 0.45 to 0.62, measured on the constant the code uses."""
+    def test_the_surface_of_the_stone_is_not_painted(self):
+        """Section 4.7: the colour is in the stone, not on it."""
         source = self._source()
-        for name in ("CRYSTAL_BODY_OPACITY", "CRYSTAL_BODY_OPACITY_MIN",
-                     "CRYSTAL_BODY_OPACITY_MAX"):
-            with self.subTest(constant=name):
-                self.assertRegex(source, rf"{name} = ([0-9.]+);",
-                                 f"the material does not export {name}")
-        value = float(re.search(r"CRYSTAL_BODY_OPACITY = ([0-9.]+);", source).group(1))
-        low = float(re.search(r"CRYSTAL_BODY_OPACITY_MIN = ([0-9.]+);", source).group(1))
-        high = float(re.search(r"CRYSTAL_BODY_OPACITY_MAX = ([0-9.]+);", source).group(1))
-        self.assertAlmostEqual(low, 0.45, places=3)
-        self.assertAlmostEqual(high, 0.62, places=3)
-        self.assertTrue(low <= value <= high,
-                        f"the body opacity {value} is outside {low}-{high}")
+        self.assertIn("color: 0xffffff", source,
+                      "the surface of the stone carries a colour of its own")
 
-    def test_the_policy_writes_the_same_range_down(self):
-        """Section 4.2 and 16.4: the document and the code agree."""
-        policy = STYLE_POLICY.read_text(encoding="utf-8")
-        self.assertIn("0.45–0.62", policy,
-                      "the policy does not write the opacity range down")
-        self.assertIn("`depthWrite: false`", policy,
-                      "the policy does not say that the body does not write depth")
+    def test_the_policy_writes_the_same_parameters_down(self):
+        """Section 13.1: the document and the code agree."""
+        policy = self._policy()
+        for marker in ("`transmission`", "`ior`", "`dispersion`", "`attenuationColor`",
+                       "`flatShading`", "`roughness`"):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, policy,
+                              f"the policy does not write the stone down: {marker}")
+        self.assertIn("roughness ≤ 0.05", policy,
+                      "the policy does not put a ceiling on the roughness")
 
-    def test_the_dark_band_is_never_a_hole(self):
-        """Section 13.1: the dark band is 55% and never darker."""
+    def test_the_policy_and_the_code_agree_on_the_numbers(self):
+        """Section 13.1: the table of the policy is the table of the code.
+
+        The table is written down once, but it is written down twice - once
+        in the document and once in the module. A stone that does not match
+        the document is a stone nobody can check, so the two are compared
+        number by number.
+        """
         source = self._source()
-        match = re.search(r"TOON_BAND_STEPS = Object\.freeze\(\[([^\]]+)\]\)", source)
-        self.assertIsNotNone(match, "the toon material carries no band table")
-        steps = [int(value.strip(), 16) for value in match.group(1).split(",")]
-        self.assertEqual(len(steps), 3, "the light is banded into three steps")
-        self.assertGreaterEqual(steps[0], 0x8c,
-                                "the dark band is darker than 55%: it reads as a hole")
-        self.assertEqual(steps[-1], 0xff, "the bright band is 100%")
+        policy = self._policy()
+        rows = (
+            ("GEM_TRANSMISSION", "0.9", "`transmission` | `0.9`"),
+            ("GEM_ROUGHNESS", "0.03", "`roughness` | `0.03`"),
+            ("GEM_IOR", "2.2", "`ior` | `2.2`"),
+            ("GEM_DISPERSION", "1.5", "`dispersion` | `1.5`"),
+            ("GEM_THICKNESS_RATIO", "0.85", "`thickness` | 石头半径 × 0.85"),
+            ("GEM_ATTENUATION_RATIO", "2.2", "`attenuationDistance` | 石头半径 × 2.2"),
+            ("GEM_ENV_INTENSITY", "4.5", "`envMapIntensity` | `4.5`"),
+            ("GEM_CLEARCOAT", "1", "`clearcoat` | `1`"),
+            ("GEM_CLEARCOAT_ROUGHNESS", "0.03", "`clearcoatRoughness` | `0.03`"),
+            ("GEM_TONE_MAPPING_EXPOSURE", "1.6", "`toneMappingExposure` | `1.6`"),
+        )
+        for constant, value, cell in rows:
+            with self.subTest(constant=constant):
+                match = re.search(rf"{constant} = ([0-9.]+);", source)
+                self.assertIsNotNone(match,
+                                     f"the material does not export {constant}")
+                self.assertEqual(match.group(1), value,
+                                 f"the code says {constant} = {match.group(1)}, "
+                                 f"the policy says {value}")
+                self.assertIn(cell, policy,
+                              f"the policy does not write down {cell}")
+
+    def test_the_studio_is_the_key_light(self):
+        """Section 4.5: the room lights the stone, the three lamps fill it.
+
+        The scene lamps add a white diffuse that washes the type colour out
+        of the body, so they stay weak; the studio environment is what a
+        cut face actually reflects.
+        """
+        source = self._source()
+        match = re.search(r"GEM_LIGHT_SCALE = ([0-9.]+);", source)
+        self.assertIsNotNone(match, "the material does not export the light scale")
+        scale = float(match.group(1))
+        self.assertTrue(0.3 <= scale <= 0.8,
+                        f"the light scale {scale} is outside the range of the policy: "
+                        "too bright and the type colour is washed out")
+        for scene in (AXIS_VIEWER, SPACE_VIEWER, CONSOLE_SPACE):
+            with self.subTest(scene=scene.name):
+                text = scene.read_text(encoding="utf-8")
+                self.assertIn("GEM_LIGHT_SCALE", text,
+                              f"{scene.name} does not use the shared light scale")
+                self.assertNotIn("* 2.1", text,
+                                 f"{scene.name} still turns the fill lights up by hand")
 
     def test_the_ink_line_is_the_ink(self):
         """Section 13.2: the outline never takes a brighter step of the body."""
@@ -923,13 +1003,12 @@ class ToonMaterialBindingTests(unittest.TestCase):
                                  f"{name} still brightens the body colour into an edge")
 
 
-class FacetHighlightTests(unittest.TestCase):
-    """Section 4.7: the shine on the cut faces.
+class SilhouetteInkTests(unittest.TestCase):
+    """Section 4.8: the ink is a hairline around the outside of the stone.
 
-    Transparency alone reads as a sheet of colored paper; what makes a cut
-    stone a stone is the one reflection on its cut faces. The rules are
-    measurable: one brightness per cut face, the paper's white as the
-    ceiling, added on top of the body, and no light of its own.
+    The inside edges of a cut stone are already visible in the refraction, so
+    they are not drawn a second time. The line is the ink of the palette, it
+    is counted in pixels on the screen, and it never takes part in picking.
     """
 
     SCENES = (("axis viewer", AXIS_VIEWER),
@@ -937,84 +1016,169 @@ class FacetHighlightTests(unittest.TestCase):
               ("console scene", CONSOLE_SPACE))
 
     def _material(self):
-        return TOON_MATERIAL.read_text(encoding="utf-8")
+        return GEM_MATERIAL.read_text(encoding="utf-8")
 
-    def _shine_source(self):
-        """The body of the shine factory, and nothing else."""
+    def _shell_source(self):
+        """The body of the shell factory, and nothing else."""
         source = self._material()
-        match = re.search(r"export function createFacetHighlightMaterial\(.*?\n\}\n",
-                          source, re.S)
-        self.assertIsNotNone(match, "the material module has no shine factory")
+        match = re.search(r"export function createSilhouetteOutline\(.*?\n\}\n", source, re.S)
+        self.assertIsNotNone(match, "the material module has no ink line factory")
         return match.group(0)
 
-    def test_the_shine_is_one_material_for_the_three_scenes(self):
-        """Section 13.4: the shine lives in one module."""
+    def test_the_ink_line_is_one_material_for_the_three_scenes(self):
+        """Section 13.4: the ink line lives in one module."""
         for name, path in self.SCENES:
             with self.subTest(scene=name):
                 source = path.read_text(encoding="utf-8")
-                self.assertIn("createFacetHighlightMaterial", source,
-                              f"{name} does not take the shine from the shared material")
-                self.assertNotIn("MeshPhongMaterial", source,
-                                 f"{name} writes its own shine: the three would drift")
+                self.assertIn("createSilhouetteOutline", source,
+                              f"{name} does not take the ink line from the shared material")
+                self.assertNotIn("BackSide", source,
+                                 f"{name} writes its own ink line: the three would drift")
 
-    def test_the_shine_is_one_brightness_per_cut_face(self):
-        """Section 4.7: the border between two faces stays a hard edge."""
-        source = self._shine_source()
-        self.assertIn("flatShading: true", source,
-                      "the shine is smooth: the border between two cut faces would blur")
-
-    def test_the_shine_is_added_and_never_hides(self):
-        """Section 4.7: the shine sits on top of the body and hides nothing."""
-        source = self._shine_source()
-        self.assertIn("blending: THREE.AdditiveBlending", source,
-                      "the shine replaces the colour of the stone instead of adding to it")
+    def test_the_ink_line_is_only_the_outside(self):
+        """Section 4.8: the shell is drawn from the back, so it cannot cover the stone."""
+        source = self._shell_source()
+        self.assertIn("side: THREE.BackSide", source,
+                      "the ink line is drawn over the stone")
         self.assertIn("depthWrite: false", source,
-                      "the shine writes depth: what is behind the stone would be hidden")
-        self.assertIn("side: THREE.FrontSide", source,
-                      "the shine is drawn on the inner faces too")
+                      "the ink line writes depth: what is behind the stone would be hidden")
 
-    def test_the_shine_carries_no_colour_and_no_light(self):
-        """Section 4.7: the reflection is the paper's white, nothing else."""
-        source = self._shine_source()
-        self.assertIn("specular: options.specular ?? PALETTE.panel", source,
-                      "the shine does not use the paper white")
-        self.assertIn("color: 0x000000", source,
-                      "the shine paints the stone instead of reflecting on it")
-        self.assertNotIn("emissive", source,
-                         "the shine is a light of its own: the stone may not emit light")
+    def test_the_ink_line_is_the_ink_of_the_palette(self):
+        """Section 13.2 and 4.8: the line is ink, and it is not tone mapped."""
+        source = self._shell_source()
+        self.assertIn("PALETTE.ink", source,
+                      "the ink line does not use the ink of the palette")
+        self.assertIn("toneMapped: false", source,
+                      "the ink line is tone mapped: the ink would not be the ink")
 
-    def test_the_shine_never_reaches_past_the_paper(self):
-        """Section 4.7: the ceiling is the paper, not a pure white."""
+    def test_the_ink_line_never_takes_part_in_picking(self):
+        """Section 4.8: clicking next to a stone is still clicking on nothing."""
+        source = self._shell_source()
+        self.assertIn("raycast", source,
+                      "the ink line takes part in picking: the stone grows a dead zone")
+
+    def test_the_width_of_the_ink_line_is_counted_in_pixels(self):
+        """Section 4.8: the line is one pixel wide, near and far."""
         source = self._material()
-        match = re.search(r"CRYSTAL_HIGHLIGHT_OPACITY = ([0-9.]+);", source)
-        self.assertIsNotNone(match, "the material does not export the strength of the shine")
-        value = float(match.group(1))
-        self.assertTrue(0 < value <= 1, f"the shine is off the paper: {value}")
-        self.assertIn("CRYSTAL_HIGHLIGHT_SHININESS", source,
-                      "the material does not say how sharp the shine is")
+        match = re.search(r"GEM_OUTLINE_PIXELS = ([0-9.]+);", source)
+        self.assertIsNotNone(match, "the material does not export the width of the ink line")
+        self.assertAlmostEqual(float(match.group(1)), 1.0, places=3)
+        match = re.search(r"GEM_OUTLINE_PIXELS_SELECTED = ([0-9.]+);", source)
+        self.assertIsNotNone(match, "the material does not export the width of the selected ink line")
+        self.assertGreater(float(match.group(1)), float(re.search(r"GEM_OUTLINE_PIXELS = ([0-9.]+);", source).group(1)),
+                           "the selected stone does not carry a heavier ink line")
+        self.assertIn("updateSilhouetteWidth", source,
+                      "the ink line is not measured against the camera")
 
-    def test_the_policy_writes_the_shine_down(self):
-        """Section 4.7: the document and the code agree."""
+    def test_the_policy_writes_the_ink_line_down(self):
+        """Section 4.8: the document and the code agree."""
         policy = STYLE_POLICY.read_text(encoding="utf-8")
-        section = re.search(r"### 4\.7 .*?(?:\n## |\Z)", policy, re.S)
-        self.assertIsNotNone(section, "the policy has no section for the shine")
+        section = re.search(r"### 4\.8 .*?(?:\n## |\Z)", policy, re.S)
+        self.assertIsNotNone(section, "the policy has no section for the ink line")
         text = section.group(0)
-        for marker in ("flatShading: true", "AdditiveBlending", "--gem-panel",
-                       "FrontSide", "depthWrite: false"):
+        for marker in ("外轮廓", "1 像素", "BackSide", "拾取"):
             with self.subTest(marker=marker):
                 self.assertIn(marker, text,
-                              f"the policy does not write the shine down: {marker}")
+                              f"the policy does not write the ink line down: {marker}")
 
-    def test_the_shine_sits_on_the_geometry_of_the_stone(self):
-        """Section 4.2 and 4.7: the stone keeps its shape, its colour and its
-        transparency; only a reflection is added."""
+
+class CutFormTests(unittest.TestCase):
+    """Sections 4.3 and 13.5: the cut of a stone says what it is.
+
+    The colour says which kind an entity is; the cut says which role it
+    plays. The table lives in the shared module, so the three scenes cannot
+    give the same kind two different shapes.
+    """
+
+    SCENES = (("axis viewer", AXIS_VIEWER),
+              ("space viewer", SPACE_VIEWER),
+              ("console scene", CONSOLE_SPACE))
+
+    def _material(self):
+        return GEM_MATERIAL.read_text(encoding="utf-8")
+
+    def _policy(self):
+        return STYLE_POLICY.read_text(encoding="utf-8")
+
+    def test_every_kind_of_the_policy_has_a_cut(self):
+        """Section 4.3: the cut table of the policy and the table of the code agree."""
+        policy = self._policy()
+        block = re.search(r"\*\*切工表（形状编码语义族）\*\*.*?\n\n(.*?)\n\n", policy, re.S)
+        self.assertIsNotNone(block, "the policy has no table of the cut works")
+        rows = re.findall(r"^\| (明亮式|柱式|棱式|阶式|锥式|橄榄式|盾式|素石) ", block.group(1), re.M)
+        self.assertTrue(rows, "the table of the cut works is empty")
+        names = {"明亮式": "brilliant", "柱式": "column", "棱式": "wedge", "阶式": "step",
+                 "锥式": "pyramid", "橄榄式": "marquise", "盾式": "shield", "素石": "plain"}
+        source = self._material()
+        for chinese, english in names.items():
+            with self.subTest(cut=chinese):
+                self.assertIn(chinese, rows, f"the policy does not list the cut {chinese}")
+                self.assertIn(f"{english}:", source,
+                              f"the material has no cut work named {english}")
+
+    def test_the_cut_works_are_different_shapes(self):
+        """Section 4.3: a cut that looks like another cut says nothing."""
+        source = self._material()
+        block = re.search(r"const CUT_SHAPES = Object\.freeze\(\{(.*?)\n\}\);", source, re.S)
+        self.assertIsNotNone(block, "the material has no table of the cut works")
+        builds = re.findall(r"build\(THREE\) \{", block.group(1))
+        self.assertGreaterEqual(len(builds), 8,
+                                "there are not enough cut works: every role needs one")
+
+    def test_every_cut_is_a_cut_and_not_a_vessel(self):
+        """Section 4.3: a cut has a table on top and a pavilion below.
+
+        A stone whose profile starts or ends wide is a vessel, not a gem: on
+        the paper it reads as a tin. The two cuts that are not turned - the
+        raw stone and the long double pyramid - are the exception, and they
+        say so in their own shape.
+        """
+        source = self._material()
+        block = re.search(r"const CUT_SHAPES = Object\.freeze\(\{(.*?)\n\}\);", source, re.S)
+        self.assertIsNotNone(block, "the material has no table of the cut works")
+        profiles = re.findall(r"latheCut\(THREE, \[(.*?)\], (\d+)\)", block.group(1), re.S)
+        self.assertGreaterEqual(len(profiles), 6,
+                                "the cuts are not built from profiles: they cannot be cut stones")
+        sides = []
+        for points, segments in profiles:
+            rows = re.findall(r"\[([0-9.]+),\s*(-?[0-9.]+)\]", points)
+            with self.subTest(sides=segments):
+                self.assertGreaterEqual(len(rows), 5,
+                                        "a cut needs more than a table and a body")
+                self.assertLess(float(rows[0][0]), 0.1,
+                                "the cut starts wide: it is a vessel, not a stone")
+                self.assertLess(float(rows[-1][0]), 0.1,
+                                "the cut ends wide: it is a vessel, not a stone")
+            sides.append(int(segments))
+        self.assertEqual(len(set(sides)), len(sides),
+                         "two cuts have the same number of sides: they look alike")
+
+    def test_the_three_scenes_take_the_cut_from_the_shared_table(self):
+        """Section 13.5: the same kind, the same cut, in every scene."""
         for name, path in self.SCENES:
             with self.subTest(scene=name):
                 source = path.read_text(encoding="utf-8")
-                self.assertRegex(source, r"new THREE\.Mesh\(\s*geometry\s*,\s*highlightMaterial\s*\)",
-                                 f"{name} does not put the shine on the geometry of the stone")
-                self.assertRegex(source, r"mesh\.add\(highlight\)",
-                                 f"{name} does not carry the shine with the stone")
+                self.assertIn("createCrystalGeometry", source,
+                              f"{name} cuts its own stones: the three would drift")
+                self.assertNotIn("new THREE.OctahedronGeometry", source,
+                                 f"{name} cuts every stone the same way")
+        # The two public scenes read the cut of a kind from the shared table.
+        for name, path in (("axis viewer", AXIS_VIEWER), ("space viewer", SPACE_VIEWER)):
+            with self.subTest(scene=name):
+                self.assertIn("cutFormForKind", path.read_text(encoding="utf-8"),
+                              f"{name} does not read the cut of a kind from the shared table")
+        # The console cuts by what the tool does: a read tool and a write tool
+        # do not look alike (BD-010 section 4.3).
+        self.assertIn("CONSOLE_SPACE_CUT_FORMS", CONSOLE_SPACE.read_text(encoding="utf-8"),
+                      "the console scene does not cut its tools by what they do")
+
+    def test_the_policy_says_that_the_cut_carries_a_meaning(self):
+        """Section 4.3: the cut is not decoration."""
+        policy = self._policy()
+        self.assertIn("切工表（形状编码语义族）", policy,
+                      "the policy does not write the cut table down")
+        self.assertIn("颜色说「是哪一类」", policy,
+                      "the policy does not say which fact the cut carries")
 
 
 class UnityGesturePolicyTests(unittest.TestCase):

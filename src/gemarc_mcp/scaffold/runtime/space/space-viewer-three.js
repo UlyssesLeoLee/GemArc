@@ -37,7 +37,21 @@ import { RELATION_CLASS_IDS, relationClassSpec } from '../core/vocab.js';
 import { treatmentForRelationClass } from '../focus/retreat-animation.js';
 import { SpaceModel } from './space-model.js';
 import { UnityControls, boundsOfPoints } from './unity-controls.js';
-import { createToonGradient, createToonMaterial, createFacetHighlightMaterial, CRYSTAL_BODY_OPACITY, PALETTE } from './toon-material.js';
+import {
+  applyGemRendererSettings,
+  createCrystalGeometry,
+  createGemMaterial,
+  createSilhouetteOutline,
+  createStudioEnvironment,
+  cutFormForKind,
+  kindColor,
+  updateSilhouetteWidth,
+  GEM_ENV_INTENSITY,
+  GEM_LIGHT_SCALE,
+  GEM_OUTLINE_PIXELS,
+  GEM_OUTLINE_PIXELS_SELECTED,
+  PALETTE,
+} from './gem-material.js';
 
 /**
  * The diagnostic codes this module raises.
@@ -96,29 +110,23 @@ const EDGE_COLORS = Object.freeze({
 });
 
 /**
- * The body of a crystal in this scene. It is the blue of the policy; the
- * selection never changes it (BD-010 section 3.2 and 4.2).
- */
-const NODE_COLOR = 0x3d5a72;
-/**
- * The ink line of a crystal, and the colour of the wire frames that hold the
+ * The ink line of a stone, and the colour of the wire frames that hold the
  * building together.
  */
 const CONTAINER_COLOR = 0x6e6354;
 const CONTAINER_COLOR_VIRTUAL = 0xa89a7c;
 /**
- * The body of a crystal is transparent (BD-010 section 4.2), so the retreat
- * scales that transparency instead of changing the colour: a crystal that
- * steps back becomes more transparent, never a different colour. The retreat
- * never moves real coordinates.
+ * The retreat weakens the ink and the reflection of a stone; it never changes
+ * its colour (the colour encodes the type, and only the type) and it never
+ * moves it (BD-010 section 4.2).
  */
 const OUTLINE_STRENGTH = Object.freeze({
-  strong: { opacity: 1, scale: 1.42 },
-  normal: { opacity: 0.8, scale: 1.22 },
-  weak: { opacity: 0.5, scale: 1.1 },
-  // A crystal keeps a hint of its edge even when it steps back: without the
-  // edge it stops being a crystal and becomes a colored blob.
-  none: { opacity: 0.35, scale: 1 },
+  strong: { opacity: 1, pixels: GEM_OUTLINE_PIXELS_SELECTED },
+  normal: { opacity: 0.85, pixels: GEM_OUTLINE_PIXELS },
+  weak: { opacity: 0.55, pixels: GEM_OUTLINE_PIXELS },
+  // A stone keeps a hint of its edge even when it steps back: without the
+  // edge it stops being a stone and becomes a colored blob.
+  none: { opacity: 0.35, pixels: GEM_OUTLINE_PIXELS },
 });
 
 const LINE_WEIGHT_SCALE = Object.freeze({
@@ -870,6 +878,8 @@ function createLabel(THREE, text, options = {}) {
     transparent: true,
     depthTest: false,
     depthWrite: false,
+    // The label is written on the paper, not lit: it keeps its own colour.
+    toneMapped: false,
   });
   const sprite = new THREE.Sprite(material);
   const worldHeight = options.height ?? 3.4;
@@ -951,9 +961,16 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
     );
   }
   renderer.setPixelRatio(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1);
+  // The stones are lit and refracted, so the renderer needs the tone mapper
+  // and the half-size transmission buffer (BD-010 section 13.1).
+  applyGemRendererSettings(THREE, renderer);
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(PALETTE.bg);
+  // The little studio the cut faces reflect (BD-010 section 4.5). It is
+  // baked once, from code, and it never changes.
+  const studio = createStudioEnvironment(THREE, renderer);
+  scene.environment = studio.texture;
 
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 6000);
   // The camera and the selection follow the Unity gestures. The mapping is
@@ -973,16 +990,15 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
     getSelectionBounds: () => selectionBounds(),
   });
 
-  // The ratios of section 4.5 (0.75 / 0.55 / 0.25) times one scale: the
-  // three-dimensional library divides the light by pi, so without the scale a
-  // pigment would arrive on the paper at a third of its own colour.
-  const ambient = new THREE.AmbientLight(0xfaf2e2, 0.75 * 2.1);
+  // The ratios of section 4.5 (0.75 / 0.55 / 0.25) times one scale. The stone
+  // is lit by the studio (section 13.1); these three are only the fill.
+  const ambient = new THREE.AmbientLight(0xfaf2e2, 0.75 * GEM_LIGHT_SCALE);
   scene.add(ambient);
-  const key = new THREE.DirectionalLight(0xfff8ee, 0.55 * 2.1);
+  const key = new THREE.DirectionalLight(0xfff8ee, 0.55 * GEM_LIGHT_SCALE);
   key.position.set(1, 2.4, 1.4);
   scene.add(key);
   // The fill is the bounce of the paper: warm, never cold blue (section 4.5).
-  const fill = new THREE.DirectionalLight(PALETTE.facet, 0.25 * 2.1);
+  const fill = new THREE.DirectionalLight(PALETTE.facet, 0.25 * GEM_LIGHT_SCALE);
   fill.position.set(-1.4, 0.8, -1.1);
   scene.add(fill);
 
@@ -997,6 +1013,9 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
     if (item) disposables.push(item);
     return item;
   };
+  // One vector, reused: the ink line needs the world position of every
+  // stone on every frame.
+  const worldPosition = new THREE.Vector3();
 
   /** @type {Map<string, object>} node id -> mesh record */
   const nodeRecords = new Map();
@@ -1068,6 +1087,8 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
       color,
       transparent: true,
       opacity,
+      // The frame is ink on paper, not a lit object.
+      toneMapped: false,
     });
     track(material);
     const frame = new THREE.LineSegments(edges, material);
@@ -1081,6 +1102,8 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
       color,
       transparent: true,
       opacity,
+      // The slab is a sheet of paper, not a lit object.
+      toneMapped: false,
     });
     track(material);
     return new THREE.Mesh(geometry, material);
@@ -1151,48 +1174,27 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
     return group;
   };
 
-  // One gradient map for the whole scene (BD-010 section 13): the light is
-  // banded into three steps on the cut faces, and the map never changes, so
-  // the same model renders the same pixels twice.
-  const toonGradient = track(createToonGradient(THREE));
-
   const buildNode = (node, parent, localPosition) => {
-    // A crystal is a cut polyhedron, not a ball: the cut planes are what
-    // catch the light (BD-010 section 4.1).
-    const geometry = new THREE.OctahedronGeometry(
-      LAYOUT_CONSTANTS.nodeSize * 0.74,
-      0,
-    );
+    // A stone is a cut polyhedron, not a ball: the cut planes are what catch
+    // the light, and the cut says which kind of thing this is
+    // (BD-010 section 4.1 and 4.3).
+    const size = LAYOUT_CONSTANTS.nodeSize * 0.74;
+    const cut = createCrystalGeometry(THREE, cutFormForKind(node.kind), size);
+    const geometry = cut.geometry;
     track(geometry);
-    const material = createToonMaterial(THREE, {
-      color: NODE_COLOR,
-      gradient: toonGradient,
+    const material = createGemMaterial(THREE, {
+      color: kindColor(node.kind),
+      size,
     });
     track(material);
-    // The shine on the cut faces (BD-010 section 4.7). The material is made
-    // right after the body material on purpose: the library draws the
-    // transparent objects in the order their materials were made, so the
-    // shine lands on top of its own body and not on top of the scene.
-    const highlightMaterial = createFacetHighlightMaterial(THREE);
-    track(highlightMaterial);
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(localPosition.x, localPosition.y, localPosition.z);
 
-    const outlineGeometry = new THREE.EdgesGeometry(geometry);
-    track(outlineGeometry);
-    const outlineMaterial = new THREE.LineBasicMaterial({
-      color: PALETTE.ink,
-      transparent: true,
-      opacity: 0,
-    });
-    track(outlineMaterial);
-    const outline = new THREE.LineSegments(outlineGeometry, outlineMaterial);
+    // The ink line is a hairline around the outside of the stone; the inner
+    // edges are already visible in the refraction (BD-010 section 4.8).
+    const outline = createSilhouetteOutline(THREE, geometry, cut.half, { color: PALETTE.ink });
+    track(outline.material);
     mesh.add(outline);
-
-    // The shine sits on the same geometry as the body: the stone keeps its
-    // shape and its colour, and only gains a reflection.
-    const highlight = new THREE.Mesh(geometry, highlightMaterial);
-    mesh.add(highlight);
 
     const label = createLabel(THREE, node.name, { height: 2.4 });
     if (label) {
@@ -1212,7 +1214,6 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
       mesh,
       material,
       outline,
-      outlineMaterial,
       label,
       group: parent,
       local: { x: localPosition.x, y: localPosition.y, z: localPosition.z },
@@ -1238,6 +1239,8 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
         color,
         transparent: true,
         opacity: 0.95,
+        // The relation is a line of ink, not a lit object.
+        toneMapped: false,
       });
       track(material);
       const geometry = new THREE.CylinderGeometry(0.12, 0.12, 1, 8, 1, true);
@@ -1257,6 +1260,8 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
         color,
         transparent: true,
         opacity: 0.95,
+        // The dashes are ink, not a lit object.
+        toneMapped: false,
       });
       track(dashMaterial);
       record.dashMaterial = dashMaterial;
@@ -1424,17 +1429,16 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
       const treatment = treatments[nodeId] || null;
       const isHighlighted = highlight.nodeIds.has(nodeId);
       const opacity = treatment?.opacity ?? 1;
-      // The retreat scales the transparency of the body; it never makes the
-      // crystal opaque again and it never changes its colour (the colour
-      // encodes the type, and only the type).
-      record.material.opacity = opacity * CRYSTAL_BODY_OPACITY;
-      record.material.transparent = true;
+      // The retreat weakens the ink and the reflection of the stone; it never
+      // changes its colour (the colour encodes the type, and only the type)
+      // and it never moves it (BD-010 section 4.2).
+      record.material.envMapIntensity = GEM_ENV_INTENSITY * (0.35 + 0.65 * opacity);
 
       const outlineName = treatment?.outline
         || (isHighlighted ? 'strong' : 'none');
       const strength = OUTLINE_STRENGTH[outlineName] || OUTLINE_STRENGTH.none;
-      record.outlineMaterial.opacity = strength.opacity;
-      record.outline.scale.setScalar(strength.scale);
+      record.outline.material.opacity = strength.opacity;
+      record.outline.userData.outlinePixels = strength.pixels;
 
       if (record.label) {
         const mode = treatment?.labels ?? 'full';
@@ -1694,6 +1698,23 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
     if (disposed) return;
     // The fly keys move the camera only while the right button is held.
     controls.tick();
+    // The ink line is counted in pixels, so its width is measured again on
+    // every frame: the line is one pixel wide on a far stone and on a near
+    // one alike (BD-010 section 4.8).
+    scene.updateMatrixWorld(true);
+    const deviceHeight = Math.max(1, canvas.height || container.clientHeight || 1);
+    const ratio = typeof renderer.getPixelRatio === 'function' ? renderer.getPixelRatio() : 1;
+    for (const record of nodeRecords.values()) {
+      if (!record.outline) continue;
+      const world = record.mesh.getWorldPosition(worldPosition);
+      updateSilhouetteWidth(
+        record.outline,
+        camera,
+        world,
+        deviceHeight,
+        (record.outline.userData.outlinePixels ?? GEM_OUTLINE_PIXELS) * ratio,
+      );
+    }
     // The loop only draws. Every position change belongs to `refreshVisuals`,
     // which owns the display-only z offset. A per-frame position write would
     // fight the layout and could silently move a node off its room floor.
@@ -1837,6 +1858,7 @@ export function createThreeSpaceRenderer(THREE, options = {}) {
       }
       controls.dispose();
       clearScene();
+      if (studio && typeof studio.dispose === 'function') studio.dispose();
       if (typeof renderer.dispose === 'function') renderer.dispose();
       if (canvas && canvas.parentNode && typeof canvas.parentNode.removeChild === 'function') {
         canvas.parentNode.removeChild(canvas);

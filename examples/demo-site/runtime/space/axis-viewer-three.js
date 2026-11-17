@@ -40,7 +40,25 @@
  */
 
 import { UnityControls, boundsOfPoints } from './unity-controls.js';
-import { createToonGradient, createToonMaterial, createFacetHighlightMaterial, CRYSTAL_BODY_OPACITY, PALETTE } from './toon-material.js';
+import {
+  applyGemRendererSettings,
+  createCrystalGeometry,
+  createGemMaterial,
+  createSilhouetteOutline,
+  createStudioEnvironment,
+  cutFormForKind,
+  kindColor,
+  updateSilhouetteWidth,
+  GEM_LIGHT_SCALE,
+  GEM_OUTLINE_PIXELS,
+  GEM_OUTLINE_PIXELS_SELECTED,
+  PALETTE,
+} from './gem-material.js';
+
+// The colour of a kind is a fact of the product, so it lives with the other
+// facts of the product: the shared gem module owns the table and the scenes
+// re-export it, so an old import keeps working (BD-010 section 13.4).
+export { KIND_COLORS, UNKNOWN_KIND_COLOR, kindColor } from './gem-material.js';
 
 /**
  * The diagnostic codes this module raises.
@@ -99,36 +117,6 @@ export const AXIS_COLORS = Object.freeze({
 });
 
 /**
- * One colour per entity kind of the Three.js architecture contract. The
- * table is the one of BD-010 section 4.3: the same pigments as the rest of
- * the product, in a light and a dark step of each.
- * @type {Readonly<Record<string, number>>}
- */
-export const KIND_COLORS = Object.freeze({
-  actor: 0xb4654a,
-  system: 0x3d5a72,
-  service: 0x96501f,
-  process: 0x5f5573,
-  module: 0x56663a,
-  runtime: 0x8c8271,
-  database: 0x4c6e7a,
-  external: 0x8f8577,
-  gateway: 0xa9762f,
-  plugin: 0x6e7b45,
-  security: 0x8a3a2c,
-  operations: 0x7e8b93,
-  data: 0x5a7566,
-  storage: 0x6b5f7e,
-});
-
-/**
- * The colour of an entity whose kind is not registered. It is deliberately
- * muted: an unregistered kind is not the same thing as a known one.
- * @type {number}
- */
-export const UNKNOWN_KIND_COLOR = 0x9c927f;
-
-/**
  * The ink the drawing is made of. Every crystal is outlined with it, and the
  * outline never takes the colour of the body (BD-010 section 13.2).
  * @type {number}
@@ -156,7 +144,7 @@ export const PAPER_COLOR = PALETTE.bg;
 const LIGHT_AMBIENT = 0xfaf2e2;
 const LIGHT_KEY = 0xfff8ee;
 const LIGHT_FILL = PALETTE.facet;
-const LIGHT_SCALE = 2.1;
+const LIGHT_SCALE = GEM_LIGHT_SCALE;
 const LIGHT_AMBIENT_INTENSITY = 0.75 * LIGHT_SCALE;
 const LIGHT_KEY_INTENSITY = 0.55 * LIGHT_SCALE;
 const LIGHT_FILL_INTENSITY = 0.25 * LIGHT_SCALE;
@@ -375,18 +363,6 @@ export function computeAxisLayout(view, options = {}) {
 }
 
 /**
- * The colour of an entity kind.
- * @param {string|null} kind the kind
- * @returns {number} the colour
- */
-export function kindColor(kind) {
-  if (typeof kind !== 'string') return UNKNOWN_KIND_COLOR;
-  return Object.prototype.hasOwnProperty.call(KIND_COLORS, kind)
-    ? KIND_COLORS[kind]
-    : UNKNOWN_KIND_COLOR;
-}
-
-/**
  * Draw a text label as a sprite.
  * @param {object} THREE the injected three namespace
  * @param {string} text the label text
@@ -420,6 +396,8 @@ function createLabel(THREE, text, options = {}) {
     transparent: true,
     depthTest: false,
     depthWrite: false,
+    // The label is written on the paper, not lit: it keeps its own colour.
+    toneMapped: false,
   });
   const sprite = new THREE.Sprite(material);
   const worldHeight = options.height ?? 3.2;
@@ -535,9 +513,16 @@ export function createThreeAxisRenderer(THREE, options = {}) {
     );
   }
   renderer.setPixelRatio(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1);
+  // The stones are lit and refracted, so the renderer needs the tone mapper
+  // and the half-size transmission buffer (BD-010 section 13.1).
+  applyGemRendererSettings(THREE, renderer);
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(PAPER_COLOR);
+  // The little studio the cut faces reflect (BD-010 section 4.5). It is
+  // baked once, from code, and it never changes.
+  const studio = createStudioEnvironment(THREE, renderer);
+  scene.environment = studio.texture;
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 6000);
   // The camera and the selection follow the Unity gestures. The mapping is
   // shared with the space scene, so the two can never disagree.
@@ -580,6 +565,9 @@ export function createThreeAxisRenderer(THREE, options = {}) {
     if (item) disposables.push(item);
     return item;
   };
+  // One vector, reused: the ink line needs the world position of every
+  // stone on every frame.
+  const worldPosition = new THREE.Vector3();
 
   const constants = layout.constants || AXIS_LAYOUT_CONSTANTS;
 
@@ -599,7 +587,9 @@ export function createThreeAxisRenderer(THREE, options = {}) {
       direction.z ? length : constants.axisThickness,
     );
     track(geometry);
-    const material = new THREE.MeshBasicMaterial({ color });
+    // The axis is ink on paper, not a lit object: it keeps its own colour
+    // exactly (BD-010 section 16.2).
+    const material = new THREE.MeshBasicMaterial({ color, toneMapped: false });
     track(material);
     const bar = new THREE.Mesh(geometry, material);
     bar.position.set(direction.x * mid, direction.y * mid, direction.z * mid);
@@ -612,7 +602,7 @@ export function createThreeAxisRenderer(THREE, options = {}) {
         direction.z ? constants.tickLength : constants.axisThickness * 2,
       );
       track(tickGeometry);
-      const tickMaterial = new THREE.MeshBasicMaterial({ color });
+      const tickMaterial = new THREE.MeshBasicMaterial({ color, toneMapped: false });
       track(tickMaterial);
       const tick = new THREE.Mesh(tickGeometry, tickMaterial);
       tick.position.set(
@@ -659,56 +649,38 @@ export function createThreeAxisRenderer(THREE, options = {}) {
   /** @type {object[]} the meshes the raycaster tests */
   const nodePickTargets = [];
 
-  // One gradient map for the whole scene (BD-010 section 13): the light is
-  // banded into three steps on the cut faces, and the map never changes, so
-  // the same model renders the same pixels twice.
-  const toonGradient = track(createToonGradient(THREE));
-
   for (const node of layout.nodes) {
     const color = kindColor(node.kind);
-    // A crystal is a cut polyhedron, not a ball: the cut planes are what
-    // catch the light, and the ink line is what makes it read as a crystal.
-    const geometry = new THREE.OctahedronGeometry(constants.nodeSize * 0.74, 0);
+    // A stone is a cut polyhedron, not a ball: the cut planes are what
+    // catch the light, and the cut says which kind of thing this is
+    // (BD-010 section 4.3).
+    const cut = createCrystalGeometry(THREE, cutFormForKind(node.kind), constants.nodeSize * 0.92);
+    const geometry = cut.geometry;
     track(geometry);
-    const material = createToonMaterial(THREE, {
+    const material = createGemMaterial(THREE, {
       color,
-      gradient: toonGradient,
+      size: constants.nodeSize * 0.92,
     });
     track(material);
-    // The shine on the cut faces (BD-010 section 4.7). The material is made
-    // right after the body material on purpose: the library draws the
-    // transparent objects in the order their materials were made, so the
-    // shine lands on top of its own body and not on top of the scene.
-    const highlightMaterial = createFacetHighlightMaterial(THREE);
-    track(highlightMaterial);
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(node.position.x, node.position.y, node.position.z);
     mesh.userData.nodeId = node.id;
     nodeGroup.add(mesh);
     nodePickTargets.push(mesh);
 
-    const outlineGeometry = new THREE.EdgesGeometry(geometry);
-    track(outlineGeometry);
-    // The ink line is the ink: it never takes a brighter step of the body
-    // colour (BD-010 section 4.2 and 13.2).
-    const outlineMaterial = new THREE.LineBasicMaterial({ color: INK_COLOR });
-    track(outlineMaterial);
-    const outline = new THREE.LineSegments(outlineGeometry, outlineMaterial);
+    // The ink line is a hairline around the outside of the stone; the inner
+    // edges are already visible in the refraction (BD-010 section 4.8).
+    const outline = createSilhouetteOutline(THREE, geometry, cut.half, { color: INK_COLOR });
+    track(outline.material);
     mesh.add(outline);
-
-    // The shine sits on the same geometry as the body: the stone keeps its
-    // shape and its colour, and only gains a reflection. It is the last
-    // child, so the first child stays the ink line.
-    const highlight = new THREE.Mesh(geometry, highlightMaterial);
-    mesh.add(highlight);
 
     const label = createLabel(THREE, node.name, { height: constants.labelHeight * 0.8 });
     if (label) {
-      label.position.set(0, constants.nodeSize * 0.75 + constants.labelHeight * 0.5, 0);
+      label.position.set(0, constants.nodeSize * 1.0 + constants.labelHeight * 0.5, 0);
       mesh.add(label);
     }
 
-    nodeRecords.set(node.id, { node, mesh, material, outline, outlineMaterial, baseColor: color });
+    nodeRecords.set(node.id, { node, mesh, material, outline, baseColor: color, cutHalf: cut.half });
   }
 
   for (const edge of layout.edges) {
@@ -728,6 +700,8 @@ export function createThreeAxisRenderer(THREE, options = {}) {
       color: PALETTE.muted,
       transparent: true,
       opacity: 0.55,
+      // The relation is a line of tea ink, not a lit object.
+      toneMapped: false,
     });
     track(material);
     const mesh = new THREE.Mesh(geometry, material);
@@ -884,12 +858,13 @@ export function createThreeAxisRenderer(THREE, options = {}) {
     highlight = { nodeIds, edgeIds };
     for (const [id, record] of nodeRecords) {
       const active = nodeIds.has(id);
-      // The body keeps its colour and its transparency; the selection is
-      // carried by the ink line, which grows one step when the entity is
-      // selected (BD-010 section 4.2).
-      record.material.opacity = CRYSTAL_BODY_OPACITY;
-      record.outlineMaterial.opacity = active ? 1 : 0.85;
-      record.outline.scale.setScalar(active ? 1.12 : 1);
+      // The stone keeps its colour and its shape; the selection is carried
+      // by the ink line, which grows one step when the entity is selected
+      // (BD-010 section 4.2 and 4.8).
+      record.outline.userData.outlinePixels = active
+        ? GEM_OUTLINE_PIXELS_SELECTED
+        : GEM_OUTLINE_PIXELS;
+      record.outline.material.opacity = active ? 1 : 0.85;
     }
     for (const [id, record] of edgeRecords) {
       const active = edgeIds.has(id);
@@ -911,6 +886,23 @@ export function createThreeAxisRenderer(THREE, options = {}) {
   }
 
   function draw() {
+    // The ink line is counted in pixels, so its width is measured again on
+    // every frame: the line is one pixel wide on a far stone and on a near
+    // one alike (BD-010 section 4.8).
+    scene.updateMatrixWorld(true);
+    const deviceHeight = Math.max(1, canvas.height || container.clientHeight || 1);
+    const ratio = typeof renderer.getPixelRatio === 'function' ? renderer.getPixelRatio() : 1;
+    for (const record of nodeRecords.values()) {
+      if (!record.outline) continue;
+      const world = record.mesh.getWorldPosition(worldPosition);
+      updateSilhouetteWidth(
+        record.outline,
+        camera,
+        world,
+        deviceHeight,
+        (record.outline.userData.outlinePixels ?? GEM_OUTLINE_PIXELS) * ratio,
+      );
+    }
     renderer.render(scene, camera);
   }
 
@@ -961,6 +953,7 @@ export function createThreeAxisRenderer(THREE, options = {}) {
       for (const item of disposables) {
         if (item && typeof item.dispose === 'function') item.dispose();
       }
+      if (studio && typeof studio.dispose === 'function') studio.dispose();
       if (renderer && typeof renderer.dispose === 'function') renderer.dispose();
       if (typeof container.removeChild === 'function' && canvas.parentNode === container) {
         container.removeChild(canvas);

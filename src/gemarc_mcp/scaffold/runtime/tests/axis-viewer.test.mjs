@@ -17,7 +17,8 @@ import {
   kindColor,
   screenDistanceToSegment,
 } from '../space/axis-viewer-three.js';
-import { AdditiveBlending, createStubContainer, createStubThree, Vector3 } from './helpers/three-stub.mjs';
+import { BackSide, createStubContainer, createStubThree, Vector3 } from './helpers/three-stub.mjs';
+import { PALETTE } from '../space/gem-material.js';
 
 /* ------------------------------------------------------------- fixture */
 
@@ -265,56 +266,60 @@ test('a drag that starts on an entity selects nothing', () => {
 
 test('the highlight marks the selected entity', () => {
   const { renderer } = buildRenderer();
+  const inkOf = (id) => {
+    let found = null;
+    renderer.scene.traverse((object) => {
+      if (object.userData && object.userData.nodeId === id) found = object;
+    });
+    return found;
+  };
+  const alpha = inkOf('n-a');
+  const beta = inkOf('n-b');
+  const alphaColour = alpha.material.attenuationColor.getHex();
+  const betaColour = beta.material.attenuationColor.getHex();
+
   renderer.setHighlight({ nodeIds: ['n-b'], edgeIds: ['e-1'] });
-  let alphaOpacity = null;
-  let betaOpacity = null;
-  let alphaScale = null;
-  let betaScale = null;
-  renderer.scene.traverse((object) => {
-    if (object.userData && object.userData.nodeId === 'n-a') {
-      alphaOpacity = object.material.opacity;
-      alphaScale = object.children[0] ? object.children[0].scale.x : null;
-    }
-    if (object.userData && object.userData.nodeId === 'n-b') {
-      betaOpacity = object.material.opacity;
-      betaScale = object.children[0] ? object.children[0].scale.x : null;
-    }
-  });
-  // The body of a crystal is transparent in every state and keeps the same
-  // transparency; the selection is carried by the ink line, which grows one
-  // step (BD-010 section 4.2).
-  assert.ok(alphaOpacity >= 0.45 && alphaOpacity <= 0.62,
-    `the body opacity ${alphaOpacity} is outside the range of the policy`);
-  assert.equal(betaOpacity, alphaOpacity,
-    'the selection must not change the transparency of the body');
-  assert.ok(alphaScale !== null, 'the crystal has no ink line');
-  assert.ok(betaScale > alphaScale,
+  const alphaInk = alpha.children[0] ? alpha.children[0].userData.outlinePixels : null;
+  const betaInk = beta.children[0] ? beta.children[0].userData.outlinePixels : null;
+  // The stone keeps its colour in every state; the selection is carried by
+  // the ink line, which grows one step (BD-010 section 4.2 and 4.8).
+  assert.ok(alphaInk !== null, 'the crystal has no ink line');
+  assert.ok(betaInk > alphaInk,
             'the selected entity carries the heavier ink line');
+  assert.equal(alpha.material.attenuationColor.getHex(), alphaColour,
+    'the selection must not change the colour of the stone');
+  assert.equal(beta.material.attenuationColor.getHex(), betaColour,
+    'the selection must not change the colour of the stone');
   renderer.dispose();
 });
 
-test('every crystal carries the shine on its cut faces', () => {
+test('every stone is a real gem with an ink line around its outside', () => {
   const { renderer } = buildRenderer();
   let checked = 0;
   renderer.scene.traverse((object) => {
     if (!object.userData || !object.userData.nodeId) return;
-    // The shine is a second layer on the very geometry of the stone
-    // (BD-010 section 4.7).
-    const shine = object.children.find((child) => child.material && child.material.specular);
-    assert.ok(shine, `the crystal ${object.userData.nodeId} has no shine`);
-    assert.equal(shine.geometry, object.geometry,
-      'the shine is not on the geometry of the stone');
-    // One brightness per cut face: the border between two faces stays hard.
-    assert.equal(shine.material.flatShading, true,
-      'the shine is smooth: the border between two cut faces would blur');
-    // Added on top of the body, so the stone keeps its colour underneath.
-    assert.equal(shine.material.blending, AdditiveBlending,
-      'the shine replaces the colour of the stone instead of adding to it');
-    assert.equal(shine.material.depthWrite, false,
-      'the shine writes depth: what is behind the stone would be hidden');
-    // The reflection is the paper's white.
-    assert.equal(shine.material.specular.getHex(), 0xf4eddf,
-      'the shine does not use the paper white');
+    // The body is a real stone (BD-010 section 13.1).
+    assert.equal(object.material.transmission, 0.9,
+      'the stone does not let the light through');
+    assert.ok(object.material.dispersion > 0,
+      'the stone does not split the light: there is no colour at its edges');
+    assert.equal(object.material.clearcoat, 1,
+      'the stone has no polished coat: the cut faces lose their glint');
+    assert.equal(object.material.flatShading, true,
+      'the stone is smooth: the border between two cut faces would blur');
+    // The ink line is a hairline around the outside of the stone; the inner
+    // edges are left to the refraction (BD-010 section 4.8).
+    const ink = object.children.find((child) => child.material && child.material.color
+      && child.material.color.getHex() === PALETTE.ink);
+    assert.ok(ink, `the crystal ${object.userData.nodeId} has no ink line`);
+    assert.equal(ink.geometry, object.geometry,
+      'the ink line is not on the geometry of the stone');
+    // Only the back of the shell is drawn, so it never covers the stone.
+    assert.equal(ink.material.side, BackSide,
+      'the ink line is drawn over the stone');
+    // The line never hides what is behind the stone.
+    assert.equal(ink.material.depthWrite, false,
+      'the ink line writes depth: what is behind the stone would be hidden');
     checked += 1;
   });
   assert.ok(checked > 0, 'the scene has no crystal to check');

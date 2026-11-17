@@ -24,12 +24,13 @@ import {
   resolvePickHit,
 } from '../space/space-viewer-three.js';
 import {
-  AdditiveBlending,
+  BackSide,
   createStubCanvas,
   createStubContainer,
   createStubThree,
   Vector3,
 } from './helpers/three-stub.mjs';
+import { PALETTE } from '../space/gem-material.js';
 
 /* ------------------------------------------------------------- fixture */
 
@@ -349,7 +350,7 @@ test('the relation treatments come from the vocabulary', () => {
   assert.equal(table.Unrelated.labels, 'hidden');
 });
 
-test('the retreat makes a crystal more transparent, never a different colour', () => {
+test('the retreat weakens the ink and the reflection, never the colour', () => {
   const { renderer } = buildRenderer();
   const bodyOf = (id) => {
     let found = null;
@@ -362,45 +363,41 @@ test('the retreat makes a crystal more transparent, never a different colour', (
 
   const alpha = bodyOf('n-a');
   assert.ok(alpha, 'the node has no body');
-  assert.equal(alpha.material.transparent, true,
-    'the body is opaque: the policy asks for a transparent stone');
-  assert.ok(alpha.material.opacity >= 0.45 && alpha.material.opacity <= 0.62,
-    `the body opacity ${alpha.material.opacity} is outside the range of the policy`);
-  const colour = alpha.material.color.hex;
-  const baseOpacity = alpha.material.opacity;
+  // The stone is transparent because the light bends on the way in
+  // (BD-010 section 4.2).
+  assert.equal(alpha.material.transmission, 0.9,
+    'the stone does not let the light through');
+  const colour = alpha.material.attenuationColor.getHex();
+  const baseReflection = alpha.material.envMapIntensity;
 
   renderer.setRelationClasses(new Map([['n-a', 'Unrelated']]));
   const retreated = bodyOf('n-a');
-  assert.ok(retreated.material.opacity < baseOpacity,
-    'the retreat did not make the crystal more transparent');
-  assert.equal(retreated.material.color.hex, colour,
+  assert.ok(retreated.material.envMapIntensity < baseReflection,
+    'the retreat did not weaken the reflection of the stone');
+  assert.equal(retreated.material.attenuationColor.getHex(), colour,
     'the retreat changed the colour: the colour encodes the type');
   renderer.dispose();
 });
 
-test('every crystal carries the shine on its cut faces', () => {
+test('every stone carries an ink line around its outside', () => {
   const { renderer } = buildRenderer();
   let checked = 0;
   renderer.scene.traverse((object) => {
     const data = object.userData || {};
     if (data.pickKind !== 'node') return;
-    // The shine is a second layer on the very geometry of the stone
-    // (BD-010 section 4.7).
-    const shine = object.children.find((child) => child.material && child.material.specular);
-    assert.ok(shine, `the crystal ${data.pickId} has no shine`);
-    assert.equal(shine.geometry, object.geometry,
-      'the shine is not on the geometry of the stone');
-    // One brightness per cut face: the border between two faces stays hard.
-    assert.equal(shine.material.flatShading, true,
-      'the shine is smooth: the border between two cut faces would blur');
-    // Added on top of the body, so the stone keeps its colour underneath.
-    assert.equal(shine.material.blending, AdditiveBlending,
-      'the shine replaces the colour of the stone instead of adding to it');
-    assert.equal(shine.material.depthWrite, false,
-      'the shine writes depth: what is behind the stone would be hidden');
-    // The reflection is the paper's white.
-    assert.equal(shine.material.specular.getHex(), 0xf4eddf,
-      'the shine does not use the paper white');
+    // The ink line is a hairline around the outside of the stone; the inner
+    // edges are left to the refraction (BD-010 section 4.8).
+    const ink = object.children.find((child) => child.material && child.material.color
+      && child.material.color.getHex() === PALETTE.ink);
+    assert.ok(ink, `the crystal ${data.pickId} has no ink line`);
+    assert.equal(ink.geometry, object.geometry,
+      'the ink line is not on the geometry of the stone');
+    // Only the back of the shell is drawn, so it never covers the stone.
+    assert.equal(ink.material.side, BackSide,
+      'the ink line is drawn over the stone');
+    // The line never hides what is behind the stone.
+    assert.equal(ink.material.depthWrite, false,
+      'the ink line writes depth: what is behind the stone would be hidden');
     checked += 1;
   });
   assert.ok(checked > 0, 'the scene has no crystal to check');

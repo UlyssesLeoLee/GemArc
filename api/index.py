@@ -122,12 +122,12 @@ CONSOLE_DIR = Path(gemarc_mcp.__file__).resolve().parent / "scaffold" / "templat
 CONSOLE_HTML = CONSOLE_DIR / "index.html"
 CONSOLE_ASSETS = ("console.css", "console.js")
 #: The crystal scene of the console's tool surface. The scene engine and the two
-#: modules it shares with the public scenes are served from one place: the toon
+#: modules it shares with the public scenes are served from one place: the gem
 #: material and the gesture mapping must not exist twice (BD-010 section 13.4).
 CONSOLE_SPACE_ASSETS = {
     "boot.js": CONSOLE_DIR / "console-space-boot.js",
     "console-space.js": Path(gemarc_mcp.__file__).resolve().parent / "scaffold" / "runtime" / "space" / "console-space.js",
-    "toon-material.js": Path(gemarc_mcp.__file__).resolve().parent / "scaffold" / "runtime" / "space" / "toon-material.js",
+    "gem-material.js": Path(gemarc_mcp.__file__).resolve().parent / "scaffold" / "runtime" / "space" / "gem-material.js",
     "unity-controls.js": Path(gemarc_mcp.__file__).resolve().parent / "scaffold" / "runtime" / "space" / "unity-controls.js",
 }
 
@@ -852,7 +852,7 @@ def build_app(*, token: str | None = None, toolset: str | None = None,
         """The modules of the console's crystal scene.
 
         The engine and the two shared modules are served from the package, so
-        the console uses the same toon material and the same gesture mapping as
+        the console uses the same gem material and the same gesture mapping as
         the two public scenes.
         """
         if not await read_only(scope, receive, send):

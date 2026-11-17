@@ -127,7 +127,9 @@ CONSOLE_ASSETS = ("console.css", "console.js")
 CONSOLE_SPACE_ASSETS = {
     "boot.js": CONSOLE_DIR / "console-space-boot.js",
     "console-space.js": Path(gemarc_mcp.__file__).resolve().parent / "scaffold" / "runtime" / "space" / "console-space.js",
+    "flow-arrows.js": Path(gemarc_mcp.__file__).resolve().parent / "scaffold" / "runtime" / "space" / "flow-arrows.js",
     "gem-material.js": Path(gemarc_mcp.__file__).resolve().parent / "scaffold" / "runtime" / "space" / "gem-material.js",
+    "product-architecture.js": Path(gemarc_mcp.__file__).resolve().parent / "scaffold" / "runtime" / "space" / "product-architecture.js",
     "unity-controls.js": Path(gemarc_mcp.__file__).resolve().parent / "scaffold" / "runtime" / "space" / "unity-controls.js",
 }
 

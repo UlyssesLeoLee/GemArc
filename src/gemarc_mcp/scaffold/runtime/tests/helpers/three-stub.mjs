@@ -489,6 +489,55 @@ class PlaneGeometry extends Geometry {
     this.parameters = { width, height };
   }
 }
+class SphereGeometry extends Geometry {
+  constructor(radius = 1, widthSegments = 8, heightSegments = 6) {
+    super();
+    this.type = 'SphereGeometry';
+    this.parameters = { radius, widthSegments, heightSegments };
+  }
+}
+class TubeGeometry extends Geometry {
+  constructor(path = null, tubularSegments = 64, radius = 1, radialSegments = 8, closed = false) {
+    super();
+    this.type = 'TubeGeometry';
+    this.parameters = { path, tubularSegments, radius, radialSegments, closed };
+  }
+}
+
+/**
+ * The quadratic curve an arrow shaft is bent along.
+ *
+ * The stub computes the same points the library does, so a test can say
+ * where the bead of an arrow is.
+ */
+class QuadraticBezierCurve3 {
+  constructor(v0 = new Vector3(), v1 = new Vector3(), v2 = new Vector3()) {
+    this.v0 = v0;
+    this.v1 = v1;
+    this.v2 = v2;
+    this.type = 'QuadraticBezierCurve3';
+  }
+
+  getPoint(t = 0, target = new Vector3()) {
+    const u = 1 - t;
+    target.set(
+      u * u * this.v0.x + 2 * u * t * this.v1.x + t * t * this.v2.x,
+      u * u * this.v0.y + 2 * u * t * this.v1.y + t * t * this.v2.y,
+      u * u * this.v0.z + 2 * u * t * this.v1.z + t * t * this.v2.z,
+    );
+    return target;
+  }
+
+  getTangent(t = 0, target = new Vector3()) {
+    const u = 1 - t;
+    target.set(
+      2 * u * (this.v1.x - this.v0.x) + 2 * t * (this.v2.x - this.v1.x),
+      2 * u * (this.v1.y - this.v0.y) + 2 * t * (this.v2.y - this.v1.y),
+      2 * u * (this.v1.z - this.v0.z) + 2 * t * (this.v2.z - this.v1.z),
+    );
+    return target.normalize();
+  }
+}
 class LatheGeometry extends Geometry {
   constructor(points = [], segments = 8) {
     super();
@@ -930,6 +979,9 @@ export function createStubThree() {
     ConeGeometry,
     OctahedronGeometry,
     PlaneGeometry,
+    SphereGeometry,
+    TubeGeometry,
+    QuadraticBezierCurve3,
     LatheGeometry,
     MeshBasicMaterial,
     MeshStandardMaterial,

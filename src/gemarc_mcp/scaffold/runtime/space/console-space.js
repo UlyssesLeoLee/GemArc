@@ -3,13 +3,23 @@
  *
  * The console is a tuning panel for the server, so its scene carries a
  * runtime fact and nothing else: **one crystal per registered tool**. The
- * read tools are blue, the write tools are persimmon, and the layout is a
- * golden angle spiral, so the same tool list always produces the same picture.
+ * read tools are blue, the write tools are persimmon.
+ *
+ * But a pile of stones is not an architecture. Since v3.8 the surface shows
+ * **the architecture of the product itself**: the tools stand in the stages
+ * they belong to (the workflow of `gemarc_brief`), every stage has its own
+ * cut, and the stages are joined by **arrows** with a bead walking along
+ * them (section 4.9). The colours still say read or write; the shape says
+ * which stage the tool is in.
  *
  * The scene borrows what it must not reinvent:
  *
  *   - the gem material comes from `gem-material.js`, the one module of the
  *     product (section 13.4);
+ *   - the arrows come from `flow-arrows.js`, and so does every generated
+ *     artefact (section 13.4);
+ *   - the stages come from `product-architecture.js`, the one table of the
+ *     product's own workflow (section 13.6);
  *   - the gestures come from `unity-controls.js`, so the console reacts
  *     exactly like the two public scenes (section 9.1).
  *
@@ -29,6 +39,8 @@ import {
   GEM_OUTLINE_PIXELS_SELECTED,
   PALETTE,
 } from './gem-material.js';
+import { createFlowArrows, disposeFlowArrows, updateFlowArrows } from './flow-arrows.js';
+import { layoutProductArchitecture } from './product-architecture.js';
 
 /**
  * The colours of the tool surface. They are the palette of the policy:
@@ -42,33 +54,33 @@ export const CONSOLE_SPACE_COLORS = Object.freeze({
 });
 
 /**
- * The cut work of a tool, by what the tool does to the world (section 4.3):
- * a read tool is a standing eight-sided wedge - the boundary that hands
- * things out - and a write tool is a pyramid - the point that pushes
- * something forward. The cut says what the tool does, so the colour never
- * has to say it alone.
- * @type {Readonly<Record<string, string>>}
- */
-export const CONSOLE_SPACE_CUT_FORMS = Object.freeze({
-  read: 'wedge',
-  write: 'pyramid',
-});
-
-/**
  * The numbers of the scene.
  * @type {Readonly<Record<string, number>>}
  */
 export const CONSOLE_SPACE_CONSTANTS = Object.freeze({
-  /** The angle of the spiral: 137.5 degrees. */
-  goldenAngle: Math.PI * (3 - Math.sqrt(5)),
-  /** The radius of the disc the crystals fill. */
-  radius: 24,
   /** The radius of one crystal. */
-  crystalSize: 4.4,
-  /** How high the middle of the disc sits above the rim. */
-  lift: 6,
+  crystalSize: 3.4,
+  /** How high the middle of the row sits above the rim. */
+  lift: 0,
   /** The distance of the camera. */
   distance: 62,
+  /**
+   * The camera looks at the row straight from the front: the stages have to
+   * read from left to right, because the row **is** the order of the work.
+   * Any turn to the side would tilt the row on the screen - the near end
+   * would sit lower than the far one, and a pipeline that leans is not a
+   * pipeline.
+   */
+  theta: 0,
+  /** How far the camera leans above the row. */
+  phi: Math.PI * 0.3,
+  /**
+   * How much room the row keeps around itself. The row is wide and the
+   * panel is short, so the camera has to step back until the **near** end
+   * of the row is inside the frame - the near end is the one that gets
+   * cut off when the distance is computed from the width alone.
+   */
+  frameMargin: 1.08,
   /** Seconds for one full turn of a crystal. */
   spinPeriod: 60,
   /** Seconds for one breath: dark, bright, dark. */
@@ -96,37 +108,22 @@ export function prefersLessMotion() {
 }
 
 /**
- * Where every crystal sits.
+ * Where every crystal stands.
  *
- * The spiral is deterministic: the n-th tool always lands on the n-th place
- * of the spiral, so the same tool list renders the same picture twice
- * (section 11.5).
+ * The scene shows the architecture of the product (section 12.4): the tools
+ * stand in the stages they belong to, and the stages are joined by arrows.
+ * The layout is deterministic - the same tool list renders the same picture
+ * twice (section 11.5) - and it touches no three-dimensional library, so it
+ * can be checked without a canvas.
  *
  * @param {Array<{name: string, write?: boolean}>} tools the registered tools
  * @param {object} [options] the options
  * @param {object} [options.constants] the numbers to override
- * @returns {Array<{name: string, write: boolean, color: number,
- *   position: {x: number, y: number, z: number}}>} the crystals
+ * @returns {{nodes: Array<object>, links: Array<object>, stages: Array<object>}}
+ *   the crystals, the links between the stages, and the stages
  */
 export function layoutConsoleCrystals(tools, options = {}) {
-  const constants = { ...CONSOLE_SPACE_CONSTANTS, ...(options.constants || {}) };
-  const list = Array.isArray(tools) ? tools : [];
-  const count = Math.max(1, list.length);
-  return list.map((tool, index) => {
-    const radius = constants.radius * Math.sqrt((index + 0.5) / count);
-    const angle = index * constants.goldenAngle;
-    const write = Boolean(tool && tool.write);
-    return {
-      name: tool.name,
-      write,
-      color: write ? CONSOLE_SPACE_COLORS.write : CONSOLE_SPACE_COLORS.read,
-      position: {
-        x: radius * Math.cos(angle),
-        y: constants.lift * (1 - radius / constants.radius),
-        z: radius * Math.sin(angle),
-      },
-    };
-  });
+  return layoutProductArchitecture(tools, options);
 }
 
 /**
@@ -224,10 +221,16 @@ export function createConsoleSpace(THREE, options = {}) {
   const crystals = new Map();
   /** @type {object[]} the meshes the raycaster tests */
   const pickTargets = [];
+  /** @type {object[]} the arrows between the stages */
+  let arrows = [];
   let selected = null;
 
   /**
    * Build the crystals of the given tools.
+   *
+   * The crystals stand in the stages of the product's workflow and the stages
+   * are joined by arrows (BD-010 section 12.4).
+   *
    * @param {Array<{name: string, write?: boolean}>} list the tools
    */
   function setTools(list) {
@@ -239,24 +242,26 @@ export function createConsoleSpace(THREE, options = {}) {
     }
     crystals.clear();
     pickTargets.length = 0;
+    for (const arrow of arrows) {
+      root.remove(arrow.group);
+    }
+    disposeFlowArrows(arrows);
+    arrows = [];
 
     const layout = layoutConsoleCrystals(list);
-    layout.forEach((plan, index) => {
-      // A stone is a cut polyhedron, not a ball: the cut says what the tool
-      // does to the world (BD-010 section 4.3).
+    layout.nodes.forEach((plan, index) => {
+      // A stone is a cut polyhedron, not a ball: the cut says which stage of
+      // the product the tool belongs to (BD-010 section 4.3 and 13.6).
       const size = CONSOLE_SPACE_CONSTANTS.crystalSize;
-      const cut = createCrystalGeometry(
-        THREE,
-        plan.write ? CONSOLE_SPACE_CUT_FORMS.write : CONSOLE_SPACE_CUT_FORMS.read,
-        size,
-      );
+      const cut = createCrystalGeometry(THREE, plan.cut, size);
       const geometry = cut.geometry;
+      const color = plan.write ? CONSOLE_SPACE_COLORS.write : CONSOLE_SPACE_COLORS.read;
       const material = createGemMaterial(THREE, {
-        color: plan.color,
+        color,
         size,
         // The self-light of the stone: this is the only thing that breathes
         // (section 13.3). No new texture, no new shader.
-        emissive: plan.color,
+        emissive: color,
         emissiveIntensity: CONSOLE_SPACE_CONSTANTS.breathLow,
       });
       const mesh = new THREE.Mesh(geometry, material);
@@ -275,12 +280,20 @@ export function createConsoleSpace(THREE, options = {}) {
         geometry,
         material,
         outline,
-        color: plan.color,
+        color,
         // The phase of this stone in the turn and in the breath. It comes
         // from the place of the stone, so it never changes between two runs.
         phase: index * 0.37,
       });
     });
+
+    // The arrows between the stages: one per pair of neighbouring stages that
+    // both have stones, with a bead walking along each of them.
+    arrows = createFlowArrows(THREE, layout.links, { animate: !lessMotion });
+    for (const arrow of arrows) {
+      root.add(arrow.group);
+    }
+
     if (selected && !crystals.has(selected)) selected = null;
     markSelection();
     frameAll();
@@ -369,7 +382,13 @@ export function createConsoleSpace(THREE, options = {}) {
   const controls = new UnityControls(camera, canvas, {
     distance: CONSOLE_SPACE_CONSTANTS.distance,
     minDistance: 18,
-    maxDistance: 200,
+    // A wide panel with seventeen tools needs room: the camera has to be
+    // able to step back far enough to hold the whole row.
+    maxDistance: 600,
+    // The row reads from left to right, so the camera starts almost in front
+    // of it (BD-010 section 12.4).
+    theta: CONSOLE_SPACE_CONSTANTS.theta,
+    phi: CONSOLE_SPACE_CONSTANTS.phi,
     pick: (event) => pick(event),
     pickInRect: (rect) => pickInRect(rect),
     onSelect: (hit) => {
@@ -379,7 +398,14 @@ export function createConsoleSpace(THREE, options = {}) {
       selected = null;
       markSelection();
     },
-    getBounds: () => ({ center: { x: 0, y: 0, z: 0 }, radius: CONSOLE_SPACE_CONSTANTS.radius }),
+    getBounds: () => ({
+      ...sceneBounds(),
+      // Unity's F frames the scene. The controls multiply the radius by
+      // their own padding, so the radius has to be the distance the fit
+      // found - otherwise F would pull the camera away from the picture the
+      // console shows.
+      radius: fittedDistance() / (controls.constants.framePadding || 1),
+    }),
   });
 
   const onPointerMove = (event) => {
@@ -426,12 +452,13 @@ export function createConsoleSpace(THREE, options = {}) {
   }
 
   /**
-   * One step of the motion: a slow turn and a slow breath.
+   * One step of the motion: a slow turn, a slow breath and the beads that
+   * walk the arrows.
    *
-   * The motion changes the **pose** and the **self-light** only. The
-   * geometry, the place of every crystal and its colour stay exactly where
-   * the tool list put them (sections 12.4 and 11.8), so the picture of the
-   * tool surface still describes the same facts.
+   * The motion changes the **pose**, the **self-light** and the **place of
+   * the beads** only. The geometry, the place of every crystal and its
+   * colour stay exactly where the tool list put them (sections 12.4 and
+   * 11.8), so the picture of the tool surface still describes the same facts.
    */
   function applyMotion() {
     if (lessMotion) return;
@@ -445,6 +472,9 @@ export function createConsoleSpace(THREE, options = {}) {
       record.material.emissiveIntensity = CONSOLE_SPACE_CONSTANTS.breathLow
         + (CONSOLE_SPACE_CONSTANTS.breathHigh - CONSOLE_SPACE_CONSTANTS.breathLow) * wave;
     }
+    // The beads walk the arrows: the flow between the stages is visible
+    // (BD-010 section 4.9).
+    updateFlowArrows(arrows, elapsed);
   }
 
   function loop() {
@@ -454,26 +484,135 @@ export function createConsoleSpace(THREE, options = {}) {
     if (typeof requestAnimationFrame === 'function') frame = requestAnimationFrame(loop);
   }
 
-  /** Point the camera at the whole disc. */
+  /** Point the camera at the whole row of stages. */
   function frameAll() {
+    const bounds = sceneBounds();
+    controls.target = { ...bounds.center };
     fitCamera();
   }
 
   /**
-   * Put the whole disc into the frame.
+   * The box the whole row of stages stands in.
    *
-   * The panel is narrow, so the distance cannot be the one of the wide public
-   * scenes: the camera has to step back until the disc fits in the narrower of
-   * the two directions, or the outer crystals are cut off. The disc is seen at
-   * an angle, so it is shorter on the screen than it is wide.
+   * The row is wide and shallow: the stages stand along the X axis and the
+   * tools of a stage along the Z axis. The camera has to frame the row, not a
+   * disc, so the bounds come from the stones themselves.
+   *
+   * @returns {{center: {x: number, y: number, z: number}, halfWidth: number,
+   *   halfDepth: number, halfHeight: number, radius: number}}
+   *   the centre and the size of the row
+   */
+  function sceneBounds() {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (const record of crystals.values()) {
+      const place = record.mesh.position;
+      minX = Math.min(minX, place.x);
+      maxX = Math.max(maxX, place.x);
+      minZ = Math.min(minZ, place.z);
+      maxZ = Math.max(maxZ, place.z);
+    }
+    const size = CONSOLE_SPACE_CONSTANTS.crystalSize;
+    if (!Number.isFinite(minX)) {
+      return {
+        center: { x: 0, y: 0, z: 0 },
+        halfWidth: size,
+        halfDepth: 0,
+        halfHeight: size,
+        radius: size,
+      };
+    }
+    const halfWidth = Math.abs(maxX - minX) / 2 + size;
+    const halfDepth = Math.abs(maxZ - minZ) / 2 + size;
+    return {
+      center: { x: (minX + maxX) / 2, y: 0, z: (minZ + maxZ) / 2 },
+      halfWidth,
+      halfDepth,
+      // A stone is never taller than its radius, and the arch of an arrow
+      // stays below that: the row is as high as one stone.
+      halfHeight: size,
+      radius: Math.max(halfWidth, halfDepth),
+    };
+  }
+
+  /**
+   * The unit vectors of the camera, taken from the angles the controls hold.
+   *
+   * They are the same convention the controls use to place the camera, so
+   * the fit is computed with the very view the reader will see.
+   *
+   * @returns {{forward: object, right: object, up: object}} the basis
+   */
+  function cameraAxes() {
+    const theta = controls.theta || 0;
+    const phi = controls.phi || Math.PI * 0.3;
+    const sinPhi = Math.sin(phi);
+    const cosPhi = Math.cos(phi);
+    const sinTheta = Math.sin(theta);
+    const cosTheta = Math.cos(theta);
+    return {
+      forward: { x: -sinPhi * sinTheta, y: -cosPhi, z: -sinPhi * cosTheta },
+      right: { x: cosTheta, y: 0, z: -sinTheta },
+      up: { x: -sinTheta * cosPhi, y: sinPhi, z: -cosTheta * cosPhi },
+    };
+  }
+
+  /**
+   * How far the camera has to be for the whole row to be inside the frame.
+   *
+   * The row is long and the panel is wide and short, so the **near** end of
+   * the row is the one that leaves the frame first: it is closer to the
+   * camera, so the same width takes more of the picture there. The distance
+   * is therefore solved from the corners of the box, corner by corner, and
+   * the largest of them wins.
+   *
+   * @returns {number} the distance
+   */
+  function fittedDistance() {
+    const bounds = sceneBounds();
+    const basis = cameraAxes();
+    const tangent = Math.tan((camera.fov * Math.PI) / 360);
+    const aspect = Math.max(0.35, camera.aspect || 1);
+    const target = controls.target || bounds.center;
+    let wanted = 0;
+    for (const sx of [-1, 1]) {
+      for (const sy of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          const corner = {
+            x: bounds.center.x + sx * bounds.halfWidth,
+            y: bounds.center.y + sy * bounds.halfHeight,
+            z: bounds.center.z + sz * bounds.halfDepth,
+          };
+          const dx = corner.x - target.x;
+          const dy = corner.y - target.y;
+          const dz = corner.z - target.z;
+          // How far the corner is in front of the camera, the side it takes
+          // and the height it takes - all three measured in the view.
+          const depth = dx * basis.forward.x + dy * basis.forward.y + dz * basis.forward.z;
+          const side = Math.abs(dx * basis.right.x + dy * basis.right.y + dz * basis.right.z);
+          const height = Math.abs(dx * basis.up.x + dy * basis.up.y + dz * basis.up.z);
+          wanted = Math.max(
+            wanted,
+            side / (tangent * aspect) - depth,
+            height / tangent - depth,
+          );
+        }
+      }
+    }
+    return wanted * CONSOLE_SPACE_CONSTANTS.frameMargin;
+  }
+
+  /**
+   * Put the whole row into the frame.
+   *
+   * The row is wide and shallow, so the width of the panel decides the
+   * distance, not its height. The camera has to step back until the two ends
+   * of the row are both inside the frame, or the last stage is cut off.
    */
   function fitCamera() {
-    const radius = CONSOLE_SPACE_CONSTANTS.radius + CONSOLE_SPACE_CONSTANTS.crystalSize;
-    const halfFov = (camera.fov * Math.PI) / 360;
-    const flat = Math.sin(Math.PI / 2 - (controls.phi || 0));
-    const vertical = (radius * flat + CONSOLE_SPACE_CONSTANTS.lift) / Math.tan(halfFov);
-    const horizontal = radius / (Math.tan(halfFov) * Math.max(0.35, camera.aspect || 1));
-    const wanted = Math.max(vertical, horizontal) * 1.15;
+    const wanted = fittedDistance();
     controls.distance = Math.max(controls.minDistance, Math.min(controls.maxDistance, wanted));
     controls.apply();
   }
@@ -495,6 +634,10 @@ export function createConsoleSpace(THREE, options = {}) {
     canvas,
     /** The crystals, by tool name. */
     crystals,
+    /** The arrows between the stages. */
+    get arrows() {
+      return arrows;
+    },
     /** Rebuild the crystals of a tool list. */
     setTools,
     /** Mark the selected crystal. */
@@ -525,6 +668,8 @@ export function createConsoleSpace(THREE, options = {}) {
       for (const item of disposables) {
         if (item && typeof item.dispose === 'function') item.dispose();
       }
+      disposeFlowArrows(arrows);
+      arrows = [];
       if (studio && typeof studio.dispose === 'function') studio.dispose();
       if (renderer && typeof renderer.dispose === 'function') renderer.dispose();
       if (typeof container.removeChild === 'function' && canvas.parentNode === container) {

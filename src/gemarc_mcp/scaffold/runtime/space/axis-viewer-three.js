@@ -40,6 +40,7 @@
  */
 
 import { UnityControls, boundsOfPoints } from './unity-controls.js';
+import { createFlowArrow, FLOW_ARROW_CONSTANTS } from './flow-arrows.js';
 import {
   applyGemRendererSettings,
   createCrystalGeometry,
@@ -430,6 +431,34 @@ function placeCylinder(THREE, mesh, a, b) {
 }
 
 /**
+ * The point where an arrow leaves a stone.
+ *
+ * The arrow stops at the surface of the stone it points at. A head buried
+ * inside the stone would sit in the transmission buffer of the scene, and
+ * the stone would refract the head of its own arrow - the gem would turn
+ * (BD-010 section 4.9).
+ *
+ * @param {object} from the stone the arrow leaves
+ * @param {object} to the stone the arrow points at
+ * @param {number} inset how far from the centre the point is
+ * @returns {object} the point on the surface of the stone
+ */
+function surfacePoint(from, to, inset) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const dz = to.z - from.z;
+  const length = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+  // The arrow never eats more than a third of the relation, so a short
+  // relation still shows an arrow.
+  const step = Math.min(inset, length / 3);
+  return {
+    x: from.x + (dx / length) * step,
+    y: from.y + (dy / length) * step,
+    z: from.z + (dz / length) * step,
+  };
+}
+
+/**
  * The distance from a point to a segment, in screen space.
  * @param {number} px the x of the point
  * @param {number} py the y of the point
@@ -684,31 +713,31 @@ export function createThreeAxisRenderer(THREE, options = {}) {
   }
 
   for (const edge of layout.edges) {
-    const geometry = new THREE.CylinderGeometry(
-      constants.edgeRadius,
-      constants.edgeRadius,
-      1,
-      8,
-      1,
-      true,
-    );
-    track(geometry);
-    // A relation is a thin tube in the ink of the tea colour. It is the one
-    // shape that stays translucent: it is a line, not a body
-    // (BD-010 section 4.1 and 4.2).
-    const material = new THREE.MeshBasicMaterial({
+    // A relation has a direction in the model, so it is drawn as an arrow:
+    // a thin shaft in the pale ink and a small ink cone at the end
+    // (BD-010 section 4.9). The bead stands still here - the public scene has
+    // no continuous motion (section 6) - and walks when the reader picks the
+    // relation.
+    // The arrow stops at the surface of the stones: the cone is never buried
+    // inside a gem (BD-010 section 4.9).
+    const radius = constants.nodeSize * 0.92;
+    const arrow = createFlowArrow(THREE, {
+      from: surfacePoint(edge.from, edge.to, radius),
+      to: surfacePoint(edge.to, edge.from, radius + FLOW_ARROW_CONSTANTS.headLength / 2 + 0.2),
       color: PALETTE.muted,
-      transparent: true,
       opacity: 0.55,
-      // The relation is a line of tea ink, not a lit object.
-      toneMapped: false,
+      animate: false,
+      name: `edge-${edge.id}`,
     });
-    track(material);
-    const mesh = new THREE.Mesh(geometry, material);
-    placeCylinder(THREE, mesh, edge.from, edge.to);
-    mesh.userData.edgeId = edge.id;
-    edgeGroup.add(mesh);
-    edgeRecords.set(edge.id, { edge, mesh, material });
+    track(arrow.shaft.geometry);
+    track(arrow.shaft.material);
+    track(arrow.head.geometry);
+    track(arrow.head.material);
+    track(arrow.pulse.geometry);
+    track(arrow.pulse.material);
+    arrow.shaft.userData.edgeId = edge.id;
+    edgeGroup.add(arrow.group);
+    edgeRecords.set(edge.id, { edge, mesh: arrow.shaft, material: arrow.shaft.material, arrow });
   }
 
   /* --------------------------------------------------------------- picking */
@@ -870,6 +899,11 @@ export function createThreeAxisRenderer(THREE, options = {}) {
       const active = edgeIds.has(id);
       record.material.opacity = active ? 0.95 : 0.55;
       record.material.color = active ? PALETTE.ai : PALETTE.muted;
+      // The head follows the shaft, and the bead walks only on the relation
+      // the reader has picked: the public scene has no continuous motion
+      // (BD-010 section 4.9 and section 6).
+      record.arrow.head.material.color = active ? PALETTE.ai : PALETTE.ink;
+      record.arrow.setAnimating(active);
     }
   }
 
@@ -909,6 +943,13 @@ export function createThreeAxisRenderer(THREE, options = {}) {
   function loop() {
     // The fly keys move the camera only while the right button is held.
     controls.tick();
+    // The bead of a picked relation walks its shaft (BD-010 section 4.9).
+    const elapsed = (typeof performance !== 'undefined' && typeof performance.now === 'function'
+      ? performance.now() / 1000
+      : Date.now() / 1000);
+    for (const record of edgeRecords.values()) {
+      if (record.arrow && record.arrow.animating) record.arrow.update(elapsed);
+    }
     draw();
     if (typeof requestAnimationFrame === 'function') {
       frame = requestAnimationFrame(loop);

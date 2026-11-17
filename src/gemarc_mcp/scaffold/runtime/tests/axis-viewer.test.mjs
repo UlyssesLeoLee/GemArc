@@ -19,6 +19,7 @@ import {
 } from '../space/axis-viewer-three.js';
 import { BackSide, createStubContainer, createStubThree, Vector3 } from './helpers/three-stub.mjs';
 import { PALETTE } from '../space/gem-material.js';
+import { FLOW_ARROW_CONSTANTS } from '../space/flow-arrows.js';
 
 /* ------------------------------------------------------------- fixture */
 
@@ -323,6 +324,35 @@ test('every stone is a real gem with an ink line around its outside', () => {
     checked += 1;
   });
   assert.ok(checked > 0, 'the scene has no crystal to check');
+  renderer.dispose();
+});
+
+test('the arrow of a relation stops at the surface of the stone', () => {
+  const { renderer } = buildRenderer();
+  const edge = renderer.layout.edges[0];
+  let arrow = null;
+  renderer.scene.traverse((object) => {
+    if (object.userData && object.userData.edgeId === edge.id) arrow = object.parent;
+  });
+  assert.ok(arrow, 'the relation has no arrow');
+  const head = arrow.children.find((child) => child.geometry
+    && child.geometry.type === 'ConeGeometry');
+  assert.ok(head, 'the arrow has no head');
+  // The head is outside the stone it points at. A head buried inside the
+  // stone is drawn into the transmission buffer of the scene, and the stone
+  // would refract the head of its own arrow: the gem turns black (BD-010 4.9).
+  const target = findById(renderer.layout.nodes, edge.targetId);
+  const radius = AXIS_LAYOUT_CONSTANTS.nodeSize * 0.92;
+  const distance = Math.hypot(
+    head.position.x - target.position.x,
+    head.position.y - target.position.y,
+    head.position.z - target.position.z,
+  );
+  assert.ok(distance >= radius,
+    `the head of the arrow is inside the stone (${distance.toFixed(2)} < ${radius.toFixed(2)})`);
+  // The tip of the cone stops at the surface: it does not pierce the stone.
+  assert.ok(distance - FLOW_ARROW_CONSTANTS.headLength / 2 >= radius - 0.01,
+    'the tip of the arrow pierces the stone');
   renderer.dispose();
 });
 

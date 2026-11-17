@@ -36,6 +36,9 @@ GEM_MATERIAL = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "spac
 AXIS_VIEWER = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space" / "axis-viewer-three.js"
 SPACE_VIEWER = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space" / "space-viewer-three.js"
 UNITY_CONTROLS = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space" / "unity-controls.js"
+FLOW_ARROWS = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space" / "flow-arrows.js"
+PRODUCT_ARCHITECTURE = (REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "runtime" / "space"
+                        / "product-architecture.js")
 SHARED_SHELL = REPO_ROOT / "src" / "gemarc_mcp" / "scaffold" / "templates" / "shared" / "app.js"
 PREVIEW_SHELL = REPO_ROOT / "src" / "gemarc_mcp" / "web" / "app.js"
 PREVIEW_CSS = REPO_ROOT / "src" / "gemarc_mcp" / "web" / "style.css"
@@ -1167,10 +1170,14 @@ class CutFormTests(unittest.TestCase):
             with self.subTest(scene=name):
                 self.assertIn("cutFormForKind", path.read_text(encoding="utf-8"),
                               f"{name} does not read the cut of a kind from the shared table")
-        # The console cuts by what the tool does: a read tool and a write tool
-        # do not look alike (BD-010 section 4.3).
-        self.assertIn("CONSOLE_SPACE_CUT_FORMS", CONSOLE_SPACE.read_text(encoding="utf-8"),
-                      "the console scene does not cut its tools by what they do")
+        # The console cuts by the stage the tool belongs to: the stages of the
+        # product's own workflow, each with its own cut (BD-010 section 12.4
+        # and 13.6).
+        console_source = CONSOLE_SPACE.read_text(encoding="utf-8")
+        self.assertIn("product-architecture.js", console_source,
+                      "the console scene does not cut its tools by their stage")
+        self.assertIn("plan.cut", console_source,
+                      "the console scene does not use the cut of the stage")
 
     def test_the_policy_says_that_the_cut_carries_a_meaning(self):
         """Section 4.3: the cut is not decoration."""
@@ -1286,6 +1293,211 @@ class UnityGesturePolicyTests(unittest.TestCase):
         self.assertIn("5 像素", policy, "the policy does not state the drag threshold")
         self.assertIn("dragThresholdPx: 5", source,
                       "the drag threshold of the code is not the one of the policy")
+
+
+class ArchitectureArrowBindingTests(unittest.TestCase):
+    """Sections 4.9, 12.4, 13.6 and 13.7: the arrows and the architecture of the
+    product.
+
+    A scene of cut stones says what the stones are; it does not say which way
+    the work flows. The arrows say that, and the console's surface draws the
+    architecture of the product itself: the stages of the workflow, one cut per
+    stage, and the arrows between them. The same modules have to travel with
+    the artefacts a user generates, or the produced site would not be the same
+    product as the console.
+    """
+
+    def _policy(self):
+        return STYLE_POLICY.read_text(encoding="utf-8")
+
+    def _source(self):
+        return FLOW_ARROWS.read_text(encoding="utf-8")
+
+    def _architecture(self):
+        return PRODUCT_ARCHITECTURE.read_text(encoding="utf-8")
+
+    def test_the_arrow_parameters_are_the_ones_the_policy_writes(self):
+        """Section 13.7: the table of the policy is the table of the code."""
+        source = self._source()
+        policy = self._policy()
+        rows = (
+            ("shaftRadius", "0.2", "`0.2`"),
+            ("headRadius", "0.8", "`0.8`"),
+            ("headLength", "2.2", "`2.2`"),
+            ("pulseRadius", "0.5", "`0.5`"),
+            ("pulsePeriod", "2.6", "`2.6`"),
+            ("bow", "3.0", "`3.0`"),
+            ("tubularSegments", "40", "`40`"),
+            ("radialSegments", "8", "`8`"),
+        )
+        for name, value, cell in rows:
+            with self.subTest(parameter=name):
+                match = re.search(rf"{name}: ([0-9.]+),", source)
+                self.assertIsNotNone(match, f"the arrow module does not export {name}")
+                self.assertEqual(match.group(1), value,
+                                 f"the code says {name} = {match.group(1)}, "
+                                 f"the policy says {value}")
+                self.assertIn(cell, policy,
+                              f"the policy does not write the arrow parameter down: {name}")
+
+    def test_the_bead_is_geometry_and_not_a_light(self):
+        """Section 4.9: the bead that walks the shaft is a solid little ball."""
+        source = self._source()
+        self.assertIn("SphereGeometry", source,
+                      "the bead is not a piece of geometry")
+        self.assertIn("toneMapped: false", source,
+                      "the bead is tone mapped: the arrow would change its colour")
+        self.assertNotIn("emissive:", source,
+                         "the bead shines: the policy forbids a light on the arrow")
+        self.assertNotIn("emissiveIntensity", source,
+                         "the bead shines: the policy forbids a light on the arrow")
+        self.assertNotIn("AdditiveBlending", source,
+                         "the arrow is additively blended: it would burn into the paper")
+
+    def test_the_stage_table_is_the_one_the_policy_writes(self):
+        """Section 13.6: the stages of the product, stage by stage."""
+        source = self._architecture()
+        policy = self._policy()
+        rows = (
+            ("entry", "wedge", ("gemarc_media_doc_guide", "gemarc_brief")),
+            ("rules", "column", ("gemarc_contracts", "gemarc_assets",
+                                 "gemarc_inspect", "gemarc_plan")),
+            ("model", "brilliant", ("gemarc_new_model", "gemarc_scaffold", "gemarc_init")),
+            ("verify", "shield", ("gemarc_validate", "gemarc_simulate",
+                                  "gemarc_diff", "gemarc_verify")),
+            ("produce", "pyramid", ("gemarc_render", "gemarc_build",
+                                    "gemarc_export", "gemarc_model")),
+        )
+        for stage, cut, tools in rows:
+            with self.subTest(stage=stage):
+                self.assertIn(f"id: '{stage}'", source,
+                              f"the stage table does not carry {stage}")
+                self.assertIn(f"cut: '{cut}'", source,
+                              f"the stage {stage} is not cut {cut}")
+                for tool in tools:
+                    self.assertIn(f"'{tool}'", source,
+                                  f"the stage {stage} does not carry {tool}")
+                    self.assertIn(f"`{tool}`", policy,
+                                  f"the policy does not list {tool} in the stage table")
+
+    def test_the_stage_table_covers_every_tool_the_server_registers(self):
+        """Section 13.6: the table knows the tools of both modes."""
+        source = self._architecture()
+        for tool in ("gemarc_media_doc_guide", "gemarc_brief", "gemarc_contracts",
+                     "gemarc_assets", "gemarc_inspect", "gemarc_plan",
+                     "gemarc_new_model", "gemarc_scaffold", "gemarc_init",
+                     "gemarc_validate", "gemarc_simulate", "gemarc_diff",
+                     "gemarc_verify", "gemarc_render", "gemarc_build",
+                     "gemarc_export", "gemarc_model"):
+            with self.subTest(tool=tool):
+                self.assertIn(f"'{tool}'", source,
+                              f"the stage table does not know {tool}")
+
+    def test_the_console_draws_the_architecture_and_the_arrows(self):
+        """Section 12.4: the surface of the console is the architecture."""
+        scene = CONSOLE_SPACE.read_text(encoding="utf-8")
+        self.assertIn("product-architecture.js", scene,
+                      "the console does not read the stage table")
+        self.assertIn("flow-arrows.js", scene,
+                      "the console does not read the shared arrows")
+        self.assertIn("layoutProductArchitecture", scene,
+                      "the console does not lay the tools out in stages")
+        self.assertIn("createFlowArrows", scene,
+                      "the console draws no arrow between the stages")
+        self.assertNotIn("goldenAngle", scene,
+                         "the console still lays the tools out on a spiral")
+
+    def test_the_console_keeps_the_unity_gestures(self):
+        """Section 9.1: the console drives the scene the way Unity does."""
+        scene = CONSOLE_SPACE.read_text(encoding="utf-8")
+        self.assertIn("unity-controls.js", scene,
+                      "the console does not use the shared gesture mapping")
+        self.assertIn("new UnityControls", scene,
+                      "the console does not drive the camera with the shared controller")
+        self.assertNotIn("addEventListener('keydown'", scene,
+                         "the console listens to the keys itself: the mapping is "
+                         "the one of Unity and it lives in one module")
+
+    def test_the_artefacts_ship_the_arrows_and_the_cuts(self):
+        """Section 13.4: the produced file carries the same preset."""
+        service = SERVICE_PY.read_text(encoding="utf-8")
+        for name in ("flow-arrows.js", "product-architecture.js"):
+            with self.subTest(name=name):
+                self.assertIn(name, service,
+                              f"the produced file does not carry {name}")
+        self.assertTrue(FLOW_ARROWS.is_file(),
+                        "the shared arrow module is missing from the runtime")
+        self.assertTrue(PRODUCT_ARCHITECTURE.is_file(),
+                        "the shared stage table is missing from the runtime")
+
+    def test_the_console_route_carries_the_same_modules(self):
+        """Section 13.4: the console serves the shared modules, not its own."""
+        api = (REPO_ROOT / "api" / "index.py").read_text(encoding="utf-8")
+        for name in ("flow-arrows.js", "product-architecture.js"):
+            with self.subTest(name=name):
+                self.assertIn(name, api,
+                              f"the console route does not serve {name}")
+
+    def test_the_arrow_head_is_the_ink_and_not_the_paper(self):
+        """Section 4.9: the cone is ink.
+
+        The scene is drawn on paper, so a paper-white cone would be the same
+        colour as the ground: the direction of the flow would be lost.
+        """
+        source = self._source()
+        policy = self._policy()
+        self.assertIn("headColor === undefined ? PALETTE.ink", source,
+                      "the head of the arrow is not the ink of the palette")
+        self.assertIn("pulseColor === undefined ? PALETTE.ink", source,
+                      "the bead that walks the shaft is not the ink of the palette")
+        self.assertNotIn("headColor === undefined ? PALETTE.panel", source,
+                         "the head of the arrow is paper white: it would vanish "
+                         "into the paper")
+        self.assertIn("锥头取 `--gem-ink`", policy,
+                      "the policy does not say that the cone is the ink")
+        self.assertIn("锥头不得用纸白", policy,
+                      "the policy does not forbid the paper-white cone")
+
+    def test_the_whole_arrow_is_a_transparent_line(self):
+        """Section 4.9: the arrow is a line, so it is drawn transparent.
+
+        An opaque object is drawn into the transmission buffer of the scene,
+        and a stone would then refract the head of its own arrow: the gem turns
+        black. The shaft, the head and the bead are all transparent.
+        """
+        source = self._source()
+        policy = self._policy()
+        self.assertEqual(source.count("transparent: true"), 3,
+                         "the shaft, the head and the bead are all drawn as "
+                         "transparent lines")
+        self.assertIn("整个箭头都是线", policy,
+                      "the policy does not say that the arrow is a line")
+        self.assertIn("折射缓冲", policy,
+                      "the policy does not say why the arrow may not be opaque")
+
+    def test_the_arrow_stops_at_the_surface_of_the_stone(self):
+        """Section 4.9: the cone is not buried inside the stone."""
+        scene = CONSOLE_SPACE.read_text(encoding="utf-8")
+        axis = AXIS_VIEWER.read_text(encoding="utf-8")
+        self.assertIn("surfacePoint", axis,
+                      "the public scene does not stop the arrow at the stone")
+        policy = self._policy()
+        self.assertIn("箭头停在石头表面", policy,
+                      "the policy does not say that the arrow stops at the stone")
+
+    def test_the_policy_writes_the_architecture_down(self):
+        """Sections 4.9 and 12.4: the document says what the code does."""
+        policy = self._policy()
+        for marker in ("### 4.9 架构箭头",
+                       "### 12.4 后台三维场景（控制台）：画出产品自己的架构",
+                       "### 13.6 产品架构阶段表", "### 13.7 箭头参数表"):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, policy,
+                              f"the policy does not have the section: {marker}")
+        self.assertIn("动态箭头", policy,
+                      "the policy does not say that the arrows move")
+        self.assertIn("Unity 的那九行", policy,
+                      "the policy does not bind the gestures to Unity")
 
 
 if __name__ == "__main__":
